@@ -35,13 +35,41 @@
 
 > **Frase-firma**: "Diseño + Fabricación + Instalación — todo en uno."
 
-### Materiales (a confirmar con cliente)
-[TODO: confirmar listado exacto]
-- Melamina (estándar — varios colores)
-- MDF
-- Madera maciza (premium)
-- Herrajes alemanes / nacionales
-- Vidrio templado (si aplica)
+### Materiales — CONFIRMADO desde sesión Arauco (abril 2026)
+
+> 📋 Fuente: research session optimizador Arauco con cuenta de César Lozano. Detalle completo en `referencias/proveedores-y-operacion.md`.
+
+**Proveedor PRINCIPAL de melamina**: **Arauco Perú — línea Vesto**
+- Web: https://arauco.com/peru
+- Cuenta César Lozano: `cesarlozano_04@hotmail.com`
+- Herramienta usada: Optimizador de Cortes Arauco
+
+#### Melaminas Vesto que César ha usado/seleccionado (tendencias 2026)
+
+**Tonos madera (favoritos confirmados)**:
+- Corteza (15mm + 18mm) ← seleccionada en proyecto reciente
+- Saffron, Jerez, Venezia, Espresso
+- Roble Provenzal, Caramel, Roble Cava, Toscana
+- Cendra Escandinavo, Awoura
+- Roble Rústico, Roble Americano, Teka Ártico
+- Nogal Terracota, Aserrado Nórdico, Fresno Europeo
+
+**Línea Unicolores** (blancos, negros, grises) — para cocinas modernas / estilo nórdico minimalista.
+
+#### Especificaciones técnicas estándar
+- **Medida tablero**: 2440 x 2150 mm (estándar Arauco) o 2500 x 1830 mm (algunas líneas)
+- **Grosores**: 15 mm (puertas, fondos) + 18 mm (estructuras, costados)
+- **Rebaje técnico**: 10 mm a la medida original sobre cada costado
+
+#### Otros materiales (a confirmar con César)
+- **MDF** — para tallados, puertas con detalle
+- **Madera maciza** (cedro, pino) — premium, proyectos especiales
+- **Herrajes**: probable Hettich / Blum (premium soft-close) + nacionales (económicos)
+- **Bisagras / tornillos**: Mesa Redonda mayoristas
+- **Vidrio templado** — si aplica (puertas mostrador, vitrinas)
+
+#### Insight de tendencia 2026 confirmada
+**Tonos madera dominan vs blancos/grises** — implicancia: showcase reels deben favorecer ambientes warm madera (Corteza, Roble Cava, Aserrado Nórdico) para alinearse con tendencia de búsqueda del cliente final.
 
 ---
 

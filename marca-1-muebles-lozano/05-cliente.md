@@ -10,12 +10,17 @@
 |---|---|
 | **Nombre completo** | **César Lozano Valencia** (titular del centro) |
 | **Rol** | Director / Dueño de Muebles Lozano S.A.C. |
-| **Email** | cesarlozanovalencia25@gmail.com (Drive) / muebleslozano@hotmail.com (oficial) |
+| **Email Drive** | cesarlozanovalencia25@gmail.com |
+| **Email oficial empresa** | muebleslozano@hotmail.com |
+| **Email proveedores (Arauco)** | **cesarlozano_04@hotmail.com** ← CONFIRMADO desde sesión optimizador Arauco |
 | **WhatsApp** | +51 969 630 299 (también es ventas) |
 | **Empresa** | Muebles Lozano S.A.C. (RUC 20551446051) |
 | **Ubicación** | Villa María del Triunfo, Lima |
 
-> 📌 **Cómo lo identifiqué**: aparece como owner de carpetas en Drive ("Proyecto Billy", "Proyecto Jesus Espinoza", "Mueble de estudio", etc.). Su email personal de Drive matchea con su nombre comercial.
+> 📌 **Cómo lo identifiqué**:
+> - Aparece como owner de carpetas en Drive ("Proyecto Billy", "Proyecto Jesus Espinoza", "Mueble de estudio", etc.)
+> - **Email `cesarlozano_04@hotmail.com` confirmado** desde sesión del Optimizador de Cortes de Arauco (abril 2026, ver `referencias/proveedores-y-operacion.md`).
+> - Su email personal de Drive matchea con su nombre comercial.
 
 **Estilo de comunicación preferido**:
 [TODO: confirmar — basado en patrón típico de PYME peruana: WhatsApp directo, mensajes cortos, audios]
