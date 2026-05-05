@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Temp
+*.tmp
+*.bak
+*.log
+
+# Claude Code (no versionar configs locales)
+.claude/
+
+# Sensitive (no commitear PDFs reales con datos de cliente sensibles)
+# Descomentar si querés excluir:
+# documentos/*.pdf
+# documentos/*.xlsx
