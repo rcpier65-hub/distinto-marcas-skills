@@ -1,0 +1,52 @@
+═══════════════════════════════════════════════════════════
+COLORES Y FUENTES — Mil Ideas
+═══════════════════════════════════════════════════════════
+
+Archivo de consulta rápida con los códigos exactos.
+Para reglas de uso completas: assets/brand-book-extract.md
+
+
+─── COLORES ───────────────────────────────────────────────
+
+PRIMARIOS:
+[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+
+SECUNDARIOS:
+[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+
+ACENTOS:
+[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+
+NEUTROS:
+Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
+Negro         HEX: #000000    RGB: rgb(0,0,0)
+Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
+Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+
+
+─── TIPOGRAFÍAS ───────────────────────────────────────────
+
+PRIMARIA (titulares):
+  Nombre exacto:  [TODO: ej. "Inter"]
+  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
+  Fuente:         [Google Fonts / Adobe / archivo propio]
+  Link:           [URL]
+
+SECUNDARIA (cuerpo):
+  Nombre exacto:  [TODO]
+  Pesos:          [TODO]
+  Link:           [URL]
+
+ACENTO (highlights):
+  Nombre exacto:  [TODO]
+  Link:           [URL]
+
+
+─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+
+Para reglas de combinación:    assets/brand-book-extract.md
+Para logos en alta:            assets/logos/
+Para dirección de arte:        assets/fotografia-guia/
+Para PDF original completo:    documentos/manual-de-marca.pdf
