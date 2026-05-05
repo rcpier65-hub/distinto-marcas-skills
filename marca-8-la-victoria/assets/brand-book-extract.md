@@ -1,156 +1,108 @@
-# Brand Book Extract — La Victoria
+# Brand Book Extract — La Victoria · Distribuidora de Pino
 
-> Extracto en TEXTO consultable del brand book oficial.
-> El PDF original está en `documentos/manual-de-marca.pdf`.
-> **Este archivo es lo que Claude lee** cuando necesita validar identidad visual.
-
----
-
-## 🧬 Esencia de marca
-
-**Misión**: [TODO: 1 frase]
-**Visión**: [TODO: 1 frase]
-**Valores**: [TODO: 3-5 valores]
-**Promesa**: [TODO: 1 frase]
+> Síntesis de identidad visual y verbal extraída del **BROCHURE LA VICTORIA 2025** (10 páginas).
+> 📋 Fuente: `assets/catalogos-pdf/BROCHURE-LA-VICTORIA.pdf`
 
 ---
 
-## 🎨 Paleta de colores oficial
+## 🎨 Identidad visual (resumen)
 
-### Colores primarios
-| Nombre | HEX | RGB | CMYK | Pantone | Uso |
-|---|---|---|---|---|---|
-| [Nombre 1] | #XXXXXX | rgb(x,x,x) | cmyk(x,x,x,x) | PMS XXX | [cuándo usar] |
-| [Nombre 2] | #XXXXXX | ... | ... | ... | ... |
+### Logo
+- **Símbolo**: pino estilizado (silueta triangular + tronco) dentro de **círculo verde bosque oscuro**
+- **Wordmark**: "LA VICTORIA" en serif moderna semibold + "DISTRIBUIDORA DE PINO" en sans serif tracking amplio (subtítulo)
+- **Versión completa**: símbolo arriba + nombre y tagline centrados debajo (uso principal)
+- **Versión compacta**: símbolo + "LA VICTORIA" en una línea (uso secundario, uniformes)
+- **Color logo**: verde bosque oscuro (mismo del símbolo)
 
-### Colores secundarios
-| Nombre | HEX | RGB | Uso |
-|---|---|---|---|
-| ... | ... | ... | ... |
+### Paleta confirmada
+- 🟢 **Verde bosque oscuro** — primario (~#0F3D2A a #1B4332, confirmar exacto)
+- ⬜ **Blanco** — secundario
+- 🟫 **Crema / beige** — neutro tablas
+- 🟫 **Madera natural** — referencia (color del producto)
+- ⚫ **Gris oscuro / negro suave** — texto
 
-### Colores de acento
-| Nombre | HEX | Uso |
-|---|---|---|
-| ... | ... | ... |
-
-### Reglas de combinación
-- ✅ [combinaciones OK]
-- ❌ [combinaciones prohibidas]
-
----
-
-## 🔤 Tipografías
-
-### Tipografía primaria
-- **Nombre exacto**: [ej. "Inter" — capitalización exacta]
-- **Pesos disponibles**: [Light 300, Regular 400, Bold 700]
-- **Uso**: titulares, headlines
-- **Link**: [Google Fonts / Adobe Fonts / archivo propio]
-
-### Tipografía secundaria
-- **Nombre exacto**: [...]
-- **Pesos**: [...]
-- **Uso**: cuerpo de texto, captions
-
-### Tipografía de acento
-- **Nombre exacto**: [...]
-- **Uso**: highlights, citas
-
-### Reglas tipográficas
-- Tamaño mínimo: [Xpx para web / Xpt para print]
-- Interlineado: [recomendado]
-- Tracking: [recomendado]
-- Jerarquía: H1 = X / H2 = Y / Body = Z
+### Tipografía
+- **Títulos**: serif moderna semibold (mayúsculas y minúsculas)
+- **Subtítulos**: sans serif tracking AMPLIO UPPERCASE
+- **Cuerpo**: sans serif legible
+- **Énfasis**: cursiva sans serif
 
 ---
 
-## 🏷️ Logo
+## 🗣️ Voz / mensajes canon (extraídos del brochure)
 
-### Variantes del logo
-1. **Logo principal** (color completo)
-2. **Logo blanco** (sobre fondos oscuros)
-3. **Logo negro** (sobre fondos claros)
-4. **Isotipo** (símbolo solo)
-5. **Logotipo** (texto solo)
+### Tagline / sub-marca
+> **"DISTRIBUIDORA DE PINO"** (subtítulo permanente debajo del logo)
 
-### Reglas de uso
-- **Espaciado mínimo alrededor**: X (relativo al ancho del logo)
-- **Tamaño mínimo**: Xpx digital / Xmm impreso
-- **Fondos permitidos**: [colores OK]
-- **Fondos prohibidos**: [colores NO]
+### Sobre la empresa (p2)
+> "LA VICTORIA nace de más de 15 años de experiencia en el sector maderero peruano. Nuestra trayectoria inicia con Corporación Deyjim S.A.C., evolucionando de la comercialización de madera nacional a la fabricación de muebles y box tarimas. Ante la creciente demanda, incorporamos la importación directa de pino radiata, asegurando calidad y abastecimiento continuo."
 
-### Errores comunes a evitar
-- ❌ Distorsionar el logo (estirar/aplastar)
-- ❌ Cambiar colores fuera de paleta
-- ❌ Aplicar efectos (sombra, glow, etc.)
-- ❌ Ponerlo sobre fondos visualmente ruidosos
-- ❌ Usar versión vieja del logo
+### Compromiso (5 pilares — p3)
+1. ✅ Madera 100% cultivada
+2. ✅ Bosques reforestados
+3. ✅ Secado en cámara (15% humedad)
+4. ✅ Selección bajo estándares de calidad
+5. ✅ Abastecimiento continuo
 
-> Logos en alta calidad: `assets/logos/`
+### Diferencial (5 atributos — p8)
+1. ✅ Atención personalizada
+2. ✅ Soluciones a medida
+3. ✅ Calidad garantizada
+4. ✅ +15 años de experiencia
+5. ✅ Importación directa
 
----
+### 4 segmentos producto (p4)
+- Industria Mueblera
+- Fabricación De muebles
+- Estructuras De madera
+- Carpintería y proyectos Personalizados
 
-## 📐 Sistema visual
+### Industria embalaje y pallets (p6)
+- Precisión dimensional
+- Alta resistencia estructural
+- Stock permanente
+- Precios competitivos
+- Medidas exactas para fabricación
 
-### Iconografía
-- **Estilo**: [lineal / filled / mixto]
-- **Grosor de línea**: [Xpx]
-- **Esquinas**: [redondeadas / vivas]
-- **Fuente recomendada**: [Lucide / Material / propio]
+### Sostenibilidad (p9 — frase canon)
+> "Madera proveniente de bosques reforestados. Compromiso con la industria responsable."
 
-### Composición
-- **Grid**: [columnas / spacing]
-- **Márgenes**: [recomendados por formato]
-- **Aire blanco**: [filosofía — generoso / denso]
-
-### Fotografía
-- **Estilo de luz**: [natural / estudio / ambos]
-- **Color grading**: [cálido / frío / neutro]
-- **Composición**: [reglas generales]
-- **Sujetos**: [tipos OK / tipos NO]
-
-### Ilustración
-- **Estilo**: [si tiene ilustraciones propias]
-- **Paleta**: [...]
+### CTA cierre (p10)
+> "Cotiza hoy y asegura tu abastecimiento."
+> WhatsApp: 973 991 208
+> Parque Industrial — Villa El Salvador
 
 ---
 
-## 🎬 Video y motion
+## 📸 Estilo fotográfico (del brochure)
 
-### Estilo de edición
-- **Cortes**: [rápidos / largos]
-- **Transiciones**: [tipos preferidos]
-- **Texto en pantalla**: [tipografía / posición / tamaño]
-- **Música**: [referencias / mood]
+| Tipo de foto | Uso documentado |
+|---|---|
+| **Bosque con neblina** | Portada (p1) — fondo aspiracional |
+| **Almacén pino apilado** | p2 quiénes somos (autoridad operativa) |
+| **Equipos forestales** | p3 compromiso (sostenibilidad) |
+| **Operario con casco + chaleco verde** | p4-6 (humanización + uniforme corporativo) |
+| **Detalle medición / marcado** | p5 medidas para muebles |
+| **Operario en línea de producción** | p6 industria pallets |
+| **Aserrador con tronco** | p7 medidas pallets |
+| **Vista interior bodega** | p8 diferencial (escala) |
+| **Bosque pino ordenado** | p9 sostenibilidad |
+| **Operario espalda + uniforme La Victoria** | p10 cierre + contacto |
 
-### Aspect ratios principales
-- **Reels/TikTok**: 9:16
-- **Feed cuadrado**: 1:1
-- **Feed vertical**: 4:5
-- **YouTube**: 16:9
-
----
-
-## ✅ Do / Don't visuales
-
-### ✅ DO
-- [TODO: práctica visual obligatoria 1]
-- [TODO: práctica visual obligatoria 2]
-- [TODO: práctica visual obligatoria 3]
-
-### ❌ DON'T
-- [TODO: error visual prohibido 1]
-- [TODO: error visual prohibido 2]
-- [TODO: error visual prohibido 3]
+**Atributos visuales transversales**:
+- Luz natural cálida
+- Composición limpia + espacio negativo
+- Uniforme verde corporativo siempre visible
+- Marca "LA VICTORIA" presente en bloques de pino apilado en almacén
 
 ---
 
-## 🔄 Cómo regenerar este extracto
+## ✅ Reglas heurísticas para el equipo Distinto
 
-Cuando se actualice `documentos/manual-de-marca.pdf`:
-1. Abrir el PDF
-2. Extraer texto de las secciones clave
-3. Actualizar este archivo manualmente
-4. Si el manual es muy largo, considerar usar AI para extraer y luego revisar
-
-> El PDF original es para humanos. Este `.md` es para Claude.
+1. **SIEMPRE incluir logo** (full o símbolo) en piezas finales — el reconocimiento es bajo
+2. **Verde bosque** como color anchor — no improvisar otros colores
+3. **Subrayar trayectoria 15 años** en piezas de autoridad
+4. **Sostenibilidad SIEMPRE** mencionable como diferencial vs informalidad
+5. **WhatsApp 973 991 208** = único CTA visible
+6. **DEYJIM = marca hermana** — cuando se haga cross-sell, dejar claro que es del mismo grupo
+7. **Tono**: profesional industrial, técnico-accesible, NO casual ni meme

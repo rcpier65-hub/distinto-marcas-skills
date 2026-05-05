@@ -1,52 +1,84 @@
 ═══════════════════════════════════════════════════════════
-COLORES Y FUENTES — La Victoria
+  PALETA + TIPOGRAFÍA — LA VICTORIA · DISTRIBUIDORA DE PINO
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Fuente: BROCHURE LA VICTORIA 2025 (assets/catalogos-pdf/BROCHURE-LA-VICTORIA.pdf)
 
+──────────────────────────────────────────────
+  COLORES
+──────────────────────────────────────────────
 
-─── COLORES ───────────────────────────────────────────────
+PRIMARIO  - Verde Bosque Oscuro
+            Hex aprox: #0F3D2A → #1B4332  (CONFIRMAR EXACTO con cliente)
+            Uso: bloques de títulos, fondos sección, símbolo logo,
+                 chalecos uniforme equipo, checks, fondo cierre
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+SECUNDARIO - Blanco
+            Hex: #FFFFFF
+            Uso: fondos limpios, texto sobre verde
 
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+NEUTRO 1   - Crema / Beige claro
+            Hex aprox: #F5F0E8
+            Uso: fondos de tablas de medidas (productos),
+                 ambiente cálido madera natural
 
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+NEUTRO 2   - Madera natural
+            Hex aprox: #C9A57B → #B5926D
+            Uso: como referencia visual (no como color sólido —
+                 viene del producto fotografiado)
 
-NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+TEXTO      - Gris oscuro / Negro suave
+            Hex aprox: #1F2937 → #2A2A2A
+            Uso: cuerpo de texto
 
+──────────────────────────────────────────────
+  LOGO LA VICTORIA
+──────────────────────────────────────────────
 
-─── TIPOGRAFÍAS ───────────────────────────────────────────
+SÍMBOLO    - Pino estilizado dentro de círculo verde oscuro
+             (silueta triangular con tronco corto)
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+NOMBRE     - "LA VICTORIA" en serif moderna semibold
+             (tracking normal, color verde bosque)
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+TAGLINE    - "DISTRIBUIDORA DE PINO" en sans serif
+             (tracking AMPLIO, debajo del nombre, color verde)
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+VARIACIÓN  - Versión sin tagline (uso compacto, ej: bordados)
 
+──────────────────────────────────────────────
+  LOGO DEYJIM (marca hermana)
+──────────────────────────────────────────────
 
-─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+NOMBRE     - "DEYJIM" en sans serif itálica geométrica blanca
+             sobre fondo verde oscuro
+             (con detalle de líneas dinámicas en la D)
 
-Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+──────────────────────────────────────────────
+  TIPOGRAFÍA
+──────────────────────────────────────────────
+
+TÍTULOS    - Serif moderna semibold (tipo Calluna o similar)
+             Uso: "QUIÉNES SOMOS", "NUESTROS PRODUCTOS"
+
+SUBTÍTULOS - Sans serif tracking ancho UPPERCASE
+             Uso: "DISTRIBUIDORA DE PINO", "MEDIDAS PARA MUEBLES"
+
+CUERPO     - Sans serif legible (tipo Open Sans / Inter)
+             Uso: descripciones, claims
+
+ÉNFASIS    - Cursiva sans serif
+             Uso: nombres marca dentro de texto, labels productos
+                  (ej: "Industria Mueblera", "Carpintería y proyectos
+                   Personalizados")
+
+──────────────────────────────────────────────
+  COMPOSICIÓN
+──────────────────────────────────────────────
+
+- Mucho ESPACIO NEGATIVO
+- BLOQUES VERDES como contenedores de títulos
+- Fotos FULL BLEED en sostenibilidad / portadas
+- Tablas TABULADAS con fondo crema para medidas
+- CHECKS verdes con círculo abierto para listas
+- Logos en marca de agua (versión ghost) sobre fondos verdes
