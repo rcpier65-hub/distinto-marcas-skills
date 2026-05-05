@@ -1,52 +1,148 @@
 ═══════════════════════════════════════════════════════════
-COLORES Y FUENTES — Muebles Lozano
+  PALETA + TIPOGRAFÍA — MUEBLES LOZANO SAC
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Fuente OFICIAL: Manual de Identidad Corporativa
+                (assets/manual-pdf/MUEBLES-LOZANO-MANUAL-IDENTIDAD-CORPORATIVA.pdf)
+Diseño original: Logos Perú (versión 1.0, 20-12-2019)
+Tipo:            Versión Digital / RGB
 
+──────────────────────────────────────────────
+  COLORES (página 6 — A.04 Colores Corporativos)
+──────────────────────────────────────────────
 
-─── COLORES ───────────────────────────────────────────────
+PRIMARIO  - Amarillo Muebles Lozano
+            CMYK: 16% / 26% / 91% / 0%   ← OFICIAL del manual
+            RGB aprox: 220, 195, 44       ← derivado del CMYK
+            Hex aprox: #DCC32C            ← uso digital
+            Significado: vibrante, energético, atrae interés visual
+            Uso: símbolo del logo (letra L), acentos visuales,
+                 fondos hero, CTAs, headlines
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+SECUNDARIO - Negro Corporativo
+            CMYK: 84% / 83% / 73% / 80%   ← OFICIAL del manual
+            RGB aprox: 12, 12, 18          ← casi puro
+            Hex aprox: #0C0C12             ← uso digital
+            Significado: elegancia, sofisticación, lujo, alta calidad
+            Uso: símbolo del logo (letra M + casa),
+                 texto principal, headlines
 
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+NEUTRO     - Blanco
+            CMYK: 0% / 0% / 0% / 0%
+            Hex:  #FFFFFF
+            Significado: simplicidad, prácticidad, armonía
+            Uso: fondos limpios, espacios negativos,
+                 texto sobre amarillo o negro
 
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+ESCALA DE GRISES (página 7):
+   El logo en grises usa una sola tinta (negro)
+   Permite impresión limitada a un color
+   Uso: prensa B/N, fax, impresión económica
 
-NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+──────────────────────────────────────────────
+  TIPOGRAFÍA (página 8 — A.05 Tipografía Corporativa)
+──────────────────────────────────────────────
 
+PRIMARIA   - OPIFICIO NEUE
+             Uso: títulos, headlines, identidad principal
+             ⚠️  IMPORTANTE: NO TIENE versión bold.
+                 Cuando se necesite énfasis, usar BORDE (no peso):
+                   - Borde 1.0 px → letras grandes
+                   - Borde 0.5 px → letras medianas
+                   - Borde 0.25 px → letras pequeñas
+             Substituto OSS si no hay licencia:
+                - Bebas Neue
+                - Oswald Light
+                - Anton (más bold, opción cercana)
 
-─── TIPOGRAFÍAS ───────────────────────────────────────────
+SECUNDARIA - MYRIAD PRO
+             Uso: subtítulos, datos de empresa,
+                  números, correos, dirección
+             Substituto OSS:
+                - Inter
+                - Open Sans
+                - Source Sans Pro
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+──────────────────────────────────────────────
+  LOGO (páginas 4-5 — A.02 / A.03)
+──────────────────────────────────────────────
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+CONCEPTO: Imagotipo
+   - Símbolo (isotipo): silueta de casa con techo a dos aguas
+                        + letras "ML" interior
+                        (M en negro, L en amarillo)
+   - Wordmark: "MUEBLES LOZANO" en sans serif tracking amplio
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+   El isotipo es la combinación de muebles
+   (un ropero + un escritorio sintetizados)
 
+   Transmite: SERIEDAD + FORMALIDAD + FUERZA + CONFIANZA
 
-─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+CONSTRUCCIÓN (página 4 — A.02 Área de Seguridad):
+   - Ancho del logo: 7.7x
+   - Alto del logo:  7x
+   - Zona de seguridad: mínimo 0.5x en cada lado
 
-Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+VERSIONES DOCUMENTADAS (página 10 — B.01 Aplicaciones):
+   1. Logo color sobre BLANCO (positivo)
+   2. Logo color sobre AMARILLO (con fondo del color de marca)
+   3. Logo BLANCO sobre NEGRO (negativo)
+   4. Logo BLANCO sobre AMARILLO (con isotipo en línea blanca)
+   5. Logo NEGRO sobre BLANCO (escala de grises)
+   6. Logo BLANCO sobre fondo GRIS oscuro
+
+──────────────────────────────────────────────
+  REGLAS DE USO ESTRICTAS (página 11 — B.02)
+──────────────────────────────────────────────
+
+❌ PROHIBIDO (6 violaciones documentadas):
+   1. Aplicación incorrecta de COLOR
+      (no usar colores fuera de la paleta corporativa)
+   2. PORCENTAJES DE COLOR
+      (no usar opacidades del logo)
+   3. DEFORMACIÓN
+      (no estirar ni comprimir el logo)
+   4. ESPACIO INCORRECTO
+      (respetar zona de seguridad 0.5x mínimo)
+   5. OCULTACIÓN
+      (no cortar parte del logo)
+   6. DEFORMACIÓN TIPOGRÁFICA
+      (no modificar el wordmark)
+
+✅ PERMITIDO:
+   - Versiones documentadas en B.01
+   - Aplicación sobre fondos blancos, negros, amarillo corporativo,
+     grises (escala de grises documentada)
+
+──────────────────────────────────────────────
+  LOGOS DISPONIBLES EN ESTE SKILL
+──────────────────────────────────────────────
+
+assets/logos/
+   - LOGO.png           → logo positivo color sobre transparente
+   - LOGO BLANCO.png    → logo en negativo (blanco)
+   - FONDO NEGRO-100.jpg → render del logo sobre negro
+   - Mesa de trabajo *  → variantes Kit de Marca 2025
+   - isotipo retoz *    → ⚠️  archivo mal nombrado (es de Retoz, no Lozano)
+
+──────────────────────────────────────────────
+  DATOS DE CONTACTO OFICIALES (de la firma — página 16)
+──────────────────────────────────────────────
+
+Empresa:        Muebles Lozano SAC
+Administrador:  CESAR LOZANO
+Teléfono:       969 630 299
+                (alternativos: 998 376 532 / 998 376 710)
+Email:          muebleslozano@hotmail.com
+Facebook:       Muebles Lozano SAC
+Instagram:      @muebleslozanosac
+Dirección:      Francisco de Zela Mz. N lote 12,
+                Villa María del Triunfo, Lima, Perú
+
+──────────────────────────────────────────────
+  APLICACIONES TANGIBLES DOCUMENTADAS
+──────────────────────────────────────────────
+
+C.01 Hoja membretada A4 (21×29.7 cm), bond alisado blanco 90g, offset
+C.02 Tarjeta corporativa 9×5.5 cm, couche 300g, barnizado mate, offset
+C.03 Firma de correo (formato horizontal)

@@ -90,20 +90,54 @@ Empresa peruana con sede en **Villa María del Triunfo, Lima**. Fundada por la f
 
 ## 🎨 Sistema visual
 
-> 🚧 Pendiente extraer del feed real (IG @muebleslozanosac) y brand book si existe.
+> ✅ **Confirmado desde Manual de Identidad Corporativa oficial** (`assets/manual-pdf/MUEBLES-LOZANO-MANUAL-IDENTIDAD-CORPORATIVA.pdf`, dic 2019 — diseño Logos Perú, 19 páginas).
+> 📋 Detalle completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
 
-### Paleta de colores (tentativa basada en ícono Notion `couch_yellow`)
-| Nombre | HEX | Uso |
+### Naming oficial
+- **Razón social**: Muebles Lozano SAC
+- **Tipo**: Imagotipo (símbolo + tipografía separables)
+- **Concepto del isotipo**: silueta de casa con techo a dos aguas + letras "ML" interior. Representa la combinación de muebles (ropero + escritorio sintetizados).
+- **Transmite**: seriedad + formalidad + fuerza + confianza
+
+### Paleta oficial (página 6 del manual)
+
+| Color | CMYK oficial | Hex aprox digital | Uso |
+|---|---|---|---|
+| 🟡 Amarillo | `16/26/91/0` | **`#DCC32C`** | Letra L del logo, acentos, fondos hero |
+| ⚫ Negro | `84/83/73/80` | **`#0C0C12`** | Letra M + casa del logo, texto principal |
+| ⬜ Blanco | `0/0/0/0` | `#FFFFFF` | Fondos, contraste |
+
+> ⚠️ El amarillo NO es un amarillo limón — es un dorado/mostaza saturado. Vibrante pero elegante.
+> ⚠️ El negro tiene levísima tendencia azulada (CMYK con 80% K + 84% C).
+
+### Tipografía oficial (página 8 del manual)
+
+| Rol | Familia oficial | Substituto OSS para producción |
 |---|---|---|
-| Amarillo madera (primario) | [TODO] | Headers, acentos cálidos |
-| Marrón natural | [TODO] | Acabados, texturas |
-| Blanco | #FFFFFF | Fondos limpios |
-| Gris oscuro | [TODO] | Texto |
+| **Primaria** (títulos) | **Opificio Neue** | Bebas Neue / Oswald Light |
+| **Secundaria** (datos, contacto) | **Myriad Pro** | Inter / Open Sans |
 
-> 📎 Pendiente extraer del feed real
+> ⚠️ **Opificio Neue NO tiene versión bold.** Para énfasis: usar **borde** (1.0/0.5/0.25 px según tamaño), nunca peso.
 
-### Tipografías
-[TODO: por confirmar — extraer de plantillas Canva]
+### Logo: 6 versiones documentadas (página 10)
+
+| # | Fondo | Versión |
+|---|---|---|
+| 1 | Blanco | Color completo |
+| 2 | Amarillo corporativo | Color completo |
+| 3 | Negro | Negativo (blanco + amarillo) |
+| 4 | Amarillo | Negativo en línea blanca |
+| 5 | Blanco | Negro escala de grises |
+| 6 | Gris oscuro | Blanco |
+
+### Construcción (página 4)
+- Ancho del logo: **7.7x**
+- Alto del logo: **7x**
+- Zona de seguridad mínima: **0.5x** en cada lado
+
+### 6 reglas duras — PROHIBIDO (página 11)
+
+❌ Aplicación incorrecta de color · ❌ Porcentajes de opacidad · ❌ Deformación · ❌ Espacio incorrecto · ❌ Ocultación · ❌ Deformación tipográfica
 
 ### Iconografía
 - Emoji-firma posible: 🛋️ (sofá) — usado en TikTok oficial
@@ -140,8 +174,11 @@ Empresa peruana con sede en **Villa María del Triunfo, Lima**. Fundada por la f
 
 ## 📎 Referencias internas
 
-- 📄 Brand book completo: pendiente
-- 📄 Brand book extracto: `assets/brand-book-extract.md`
+- 📄 **Manual de Identidad Corporativa oficial** ✅: `assets/manual-pdf/MUEBLES-LOZANO-MANUAL-IDENTIDAD-CORPORATIVA.pdf` (16.4 MB, 19 páginas)
+- 📋 **Brand book extract** (texto consultable): `assets/brand-book-extract.md`
+- 🎨 **Colores y fuentes** (resumen técnico): `assets/colores-fuentes.txt`
+- 🖼️ **Logos PNG** (15 variantes): `assets/logos/`
+- 🪵 **Proveedores y operación** (Arauco/Vesto): `referencias/proveedores-y-operacion.md`
 - 🎨 Logos: `assets/logos/`
 - 🎯 Cómo diferenciarse: `08-competencia.md`
 - 📱 Inspiración tono: feed real https://www.instagram.com/muebleslozanosac/

@@ -15,7 +15,7 @@
 | **Email proveedores (Arauco)** | **cesarlozano_04@hotmail.com** ← CONFIRMADO desde sesión optimizador Arauco |
 | **WhatsApp** | +51 969 630 299 (también es ventas) |
 | **Empresa** | Muebles Lozano S.A.C. (RUC 20551446051) |
-| **Ubicación** | Villa María del Triunfo, Lima |
+| **Dirección oficial** | **Francisco de Zela Mz. N lote 12, Villa María del Triunfo, Lima** ✅ |
 
 > 📌 **Cómo lo identifiqué**:
 > - Aparece como owner de carpetas en Drive ("Proyecto Billy", "Proyecto Jesus Espinoza", "Mueble de estudio", etc.)
@@ -79,7 +79,7 @@
 ## 🎬 Disponibilidad para grabaciones
 
 - **Frecuencia**: pendiente confirmar (cadencia "12 videos/mes" sugiere grabación intensa)
-- **Locación**: probablemente taller en Villa María del Triunfo + casas de clientes (instalaciones reales)
+- **Locación CONFIRMADA**: taller en **Francisco de Zela Mz. N lote 12, Villa María del Triunfo** (datos oficiales del Manual de Identidad, dic 2019) + casas de clientes (instalaciones reales)
 - **Talento**: equipo de Muebles Lozano + clientes finales (con permiso)
 - **Material visual disponible**: muebles instalados en casas de clientes reales (oro)
 - **Catálogo Drive**: https://drive.google.com/drive/folders/1wNzetNtbaKVG_JZDTx5Dj4A4KQfSQb_7
