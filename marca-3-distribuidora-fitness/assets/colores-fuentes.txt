@@ -1,52 +1,137 @@
 ═══════════════════════════════════════════════════════════
-COLORES Y FUENTES — Distribuidora Fitness Marketing
+  PALETA + TIPOGRAFÍA — DISTRIBUIDORA FITNESS MAYORISTA
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Fuente OFICIAL: Manual Corporativo
+                (assets/manual-pdf/DISTRIBUIDORA FITNESS MANUAL CORPORATIVO.pdf)
+Diseño original: IDEOTAS! Agencia de Diseño (ago 2024)
 
+──────────────────────────────────────────────
+  COLORES (página 7 del manual)
+──────────────────────────────────────────────
 
-─── COLORES ───────────────────────────────────────────────
+PRIMARIO  - Naranja Distribuidora Fitness
+            Hex:  #F54922
+            RGB:  245, 73, 34
+            CMYK: 0%, 82%, 87%, 0%
+            Uso:  símbolo FD, wordmark "FITNESS",
+                  acentos, fondos hero, CTAs, botones
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+SECUNDARIO - Negro Suave
+            Hex:  #333333
+            RGB:  51, 51, 51
+            CMYK: 69%, 60%, 56%, 66%
+            Uso:  wordmark "DISTRIBUIDORA",
+                  texto cuerpo, sombras
 
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+NEUTRO     - Blanco
+            Hex:  #FFFFFF
+            Uso:  fondos limpios, espacios negativos,
+                  texto sobre naranja
 
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+──────────────────────────────────────────────
+  TIPOGRAFÍA (página 6 del manual)
+──────────────────────────────────────────────
 
-NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+DISPLAY / WORDMARK — Stretch Pro
+                     (font display bold extended)
+                     Uso: parte gráfica del logo,
+                          headlines impactantes,
+                          frases cortas tipo POV
+                     Substituto OSS si no hay licencia:
+                       - Bebas Neue (similar feel)
+                       - Anton
+                       - Oswald Bold
 
+TÍTULOS         — Infinite Light
+                  Uso: títulos de carrusel,
+                       subtítulos posts,
+                       labels grandes
+                  Substituto OSS:
+                    - Inter Light
+                    - Montserrat Light
+                    - Outfit Light
 
-─── TIPOGRAFÍAS ───────────────────────────────────────────
+CUERPO          — Infinite Thin
+                  Uso: párrafos, descripciones,
+                       texto largo en carruseles
+                  Substituto OSS:
+                    - Inter Thin
+                    - Montserrat Thin
+                    - Outfit Thin
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+──────────────────────────────────────────────
+  LOGO (3 versiones responsive — página 9)
+──────────────────────────────────────────────
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+ORIGINAL          - Símbolo FD + "DISTRIBUIDORA FITNESS MAYORISTA"
+                    Uso: piezas grandes (web hero, paneles, carteles)
+                    Archivo: assets/logos/logo-para-portada-de-web.png
+                             assets/logos/Recurso 1.png
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+MENOS ELEMENTOS   - Símbolo FD + "DISTRIBUIDORA FITNESS" (sin "MAYORISTA")
+                    Uso: piezas medianas (posts IG, headers email)
+                    Archivo: assets/logos/13.png, 15.png, 17.png
 
+MÍNIMA EXPRESIÓN  - Solo símbolo FD (monograma naranja)
+                    Uso: stickers, favicons, marcas de agua,
+                         miniaturas, esquinas de stories
+                    Archivo: assets/logos/Mesa de trabajo 1 copia 8-8.png
+                             (logo cuadrado pequeño)
 
-─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+VARIACIONES (página 8):
+- Positivo: logo color completo sobre fondo blanco
+- Negativo: logo blanco sobre fondo negro/oscuro
 
-Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+──────────────────────────────────────────────
+  REGLAS DE USO ESTRICTAS (página 11)
+──────────────────────────────────────────────
+
+✅ PERMITIDO:
+   - Logo completo en horizontal (positivo o negativo)
+   - Solo símbolo FD en color naranja sobre blanco
+
+❌ PROHIBIDO:
+   - Rotar el logo (oblicuo, vertical, cualquier ángulo)
+   - Usar solo el wordmark sin el símbolo
+   - Outline / contorno del logo (sin relleno)
+   - Cambiar colores del logo
+     (no negro+naranja invertido, no monocromático fuera del manual)
+   - Distorsionar proporciones
+
+──────────────────────────────────────────────
+  ELEMENTOS GRÁFICOS DISPONIBLES
+  (assets/elementos-graficos/)
+──────────────────────────────────────────────
+
+- Fiery Red Smoke.png    → fondo dramático humo/fuego rojo-naranja
+                           (para piezas de impacto, lanzamientos)
+- abstract-background.png → fondo abstracto naranja
+                            (para fondos de carrusel)
+- background2.png        → fondo alternativo
+- uso.png                → guía visual de uso
+
+──────────────────────────────────────────────
+  COMBINACIONES RECOMENDADAS
+──────────────────────────────────────────────
+
+NARANJA #F54922 sobre BLANCO  → CTAs, headlines, botones
+BLANCO sobre NARANJA #F54922  → frases impactantes en hero
+NEGRO #333333 sobre BLANCO    → cuerpo de texto, descripciones
+BLANCO sobre NEGRO #333333    → footer, fondos secundarios
+NARANJA #F54922 sobre NEGRO   → acentos en piezas dark
+
+──────────────────────────────────────────────
+  NAMING IMPORTANTE
+──────────────────────────────────────────────
+
+Nombre completo oficial: "DISTRIBUIDORA FITNESS MAYORISTA"
+                         (incluye sub-tagline "MAYORISTA")
+
+En piezas pequeñas (IG, stories): "DISTRIBUIDORA FITNESS"
+En contexto coloquial / DMs:      "Distribuidora Fitness"
+Hashtag canon:                    #distribuidorafitness
+Handle IG:                        @distribuidorafitness.pe
+
+NUNCA llamarla solo "Fitness" (genérico)
+NI solo "Distribuidora" (no identifica)

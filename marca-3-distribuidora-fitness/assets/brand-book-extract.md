@@ -1,156 +1,125 @@
-# Brand Book Extract — Distribuidora Fitness Marketing
+# Brand Book Extract — DISTRIBUIDORA FITNESS MAYORISTA
 
-> Extracto en TEXTO consultable del brand book oficial.
-> El PDF original está en `documentos/manual-de-marca.pdf`.
-> **Este archivo es lo que Claude lee** cuando necesita validar identidad visual.
-
----
-
-## 🧬 Esencia de marca
-
-**Misión**: [TODO: 1 frase]
-**Visión**: [TODO: 1 frase]
-**Valores**: [TODO: 3-5 valores]
-**Promesa**: [TODO: 1 frase]
+> Extracto en texto del **MANUAL CORPORATIVO oficial** (14 páginas).
+> 📋 Fuente: `assets/manual-pdf/DISTRIBUIDORA FITNESS MANUAL CORPORATIVO.pdf`
+> 🎨 Diseño original: **IDEOTAS! Agencia de Diseño** (ago 2024)
 
 ---
 
-## 🎨 Paleta de colores oficial
+## 🎨 Identidad visual completa
 
-### Colores primarios
-| Nombre | HEX | RGB | CMYK | Pantone | Uso |
-|---|---|---|---|---|---|
-| [Nombre 1] | #XXXXXX | rgb(x,x,x) | cmyk(x,x,x,x) | PMS XXX | [cuándo usar] |
-| [Nombre 2] | #XXXXXX | ... | ... | ... | ... |
+### Naming oficial
+- **Nombre completo**: DISTRIBUIDORA FITNESS MAYORISTA
+- **Tipo de logo**: IMAGOTIPO (símbolo + tipografía pueden funcionar separados)
+- **Símbolo**: monograma "FD" estilizado (F y D fusionados, color naranja #F54922)
+- **Wordmark**: "DISTRIBUIDORA" (negro #333333) + "FITNESS" (naranja #F54922) + "MAYORISTA" (negro pequeño debajo)
 
-### Colores secundarios
-| Nombre | HEX | RGB | Uso |
+### Paleta confirmada (página 7)
+
+| Color | Hex | RGB | CMYK | Uso |
+|---|---|---|---|---|
+| 🟧 **Naranja DF** | `#F54922` | 245, 73, 34 | 0, 82, 87, 0 | Símbolo, "FITNESS", CTAs, hero |
+| ⚫ **Negro suave** | `#333333` | 51, 51, 51 | 69, 60, 56, 66 | "DISTRIBUIDORA", texto cuerpo |
+| ⬜ **Blanco** | `#FFFFFF` | 255, 255, 255 | 0, 0, 0, 0 | Fondos, contraste |
+
+### Tipografía oficial (página 6)
+
+| Rol | Familia | Peso | Substituto OSS |
 |---|---|---|---|
-| ... | ... | ... | ... |
+| **Display / Wordmark** | Stretch Pro | Bold extended | Bebas Neue, Anton, Oswald Bold |
+| **Títulos** | Infinite | Light | Inter Light, Montserrat Light |
+| **Cuerpo** | Infinite | Thin | Inter Thin, Montserrat Thin |
 
-### Colores de acento
-| Nombre | HEX | Uso |
-|---|---|---|
-| ... | ... | ... |
+### Versiones del logo (página 9 - Responsive)
 
-### Reglas de combinación
-- ✅ [combinaciones OK]
-- ❌ [combinaciones prohibidas]
+1. **ORIGINAL**: símbolo + "DISTRIBUIDORA FITNESS MAYORISTA" → piezas grandes
+2. **MENOS ELEMENTOS**: símbolo + "DISTRIBUIDORA FITNESS" (sin "MAYORISTA") → piezas medianas (posts IG)
+3. **MÍNIMA EXPRESIÓN**: solo símbolo FD → stickers, favicons, marcas de agua
 
----
+### Variaciones de color (página 8)
 
-## 🔤 Tipografías
-
-### Tipografía primaria
-- **Nombre exacto**: [ej. "Inter" — capitalización exacta]
-- **Pesos disponibles**: [Light 300, Regular 400, Bold 700]
-- **Uso**: titulares, headlines
-- **Link**: [Google Fonts / Adobe Fonts / archivo propio]
-
-### Tipografía secundaria
-- **Nombre exacto**: [...]
-- **Pesos**: [...]
-- **Uso**: cuerpo de texto, captions
-
-### Tipografía de acento
-- **Nombre exacto**: [...]
-- **Uso**: highlights, citas
-
-### Reglas tipográficas
-- Tamaño mínimo: [Xpx para web / Xpt para print]
-- Interlineado: [recomendado]
-- Tracking: [recomendado]
-- Jerarquía: H1 = X / H2 = Y / Body = Z
+- **POSITIVO**: logo a color completo sobre fondo blanco
+- **NEGATIVO**: logo blanco sobre fondo negro/oscuro
 
 ---
 
-## 🏷️ Logo
+## ✅ Reglas de uso (página 11)
 
-### Variantes del logo
-1. **Logo principal** (color completo)
-2. **Logo blanco** (sobre fondos oscuros)
-3. **Logo negro** (sobre fondos claros)
-4. **Isotipo** (símbolo solo)
-5. **Logotipo** (texto solo)
+### PERMITIDO ✅
+- Logo completo en horizontal (positivo o negativo)
+- Solo símbolo FD en color naranja sobre blanco
+- Combinación naranja + blanco / negro + blanco
 
-### Reglas de uso
-- **Espaciado mínimo alrededor**: X (relativo al ancho del logo)
-- **Tamaño mínimo**: Xpx digital / Xmm impreso
-- **Fondos permitidos**: [colores OK]
-- **Fondos prohibidos**: [colores NO]
+### PROHIBIDO ❌
+- ❌ **Rotar** el logo (oblicuo, vertical, cualquier ángulo)
+- ❌ Usar **solo el wordmark** sin el símbolo
+- ❌ **Outline / contorno** del logo (sin relleno)
+- ❌ **Cambiar colores** del logo (no negro+naranja invertido, no monocromático fuera del manual)
+- ❌ **Distorsionar proporciones**
+- ❌ Pegar el wordmark de **"DISTRIBUIDORA"** en naranja (es siempre negro)
 
-### Errores comunes a evitar
-- ❌ Distorsionar el logo (estirar/aplastar)
-- ❌ Cambiar colores fuera de paleta
-- ❌ Aplicar efectos (sombra, glow, etc.)
-- ❌ Ponerlo sobre fondos visualmente ruidosos
-- ❌ Usar versión vieja del logo
-
-> Logos en alta calidad: `assets/logos/`
+> 💡 La página 11 muestra explícitamente 4 ejemplos de uso INCORRECTO con ❌.
 
 ---
 
-## 📐 Sistema visual
+## 🖼️ Aplicaciones documentadas (páginas 12-13)
 
-### Iconografía
-- **Estilo**: [lineal / filled / mixto]
-- **Grosor de línea**: [Xpx]
-- **Esquinas**: [redondeadas / vivas]
-- **Fuente recomendada**: [Lucide / Material / propio]
+El manual muestra el logo aplicado en:
+- **Cartel exterior** de tienda física (fachada con luz interna)
+- **Sello de tinta** (versión solo símbolo + "DISTRIBUIDORA FITNESS" en una línea)
 
-### Composición
-- **Grid**: [columnas / spacing]
-- **Márgenes**: [recomendados por formato]
-- **Aire blanco**: [filosofía — generoso / denso]
-
-### Fotografía
-- **Estilo de luz**: [natural / estudio / ambos]
-- **Color grading**: [cálido / frío / neutro]
-- **Composición**: [reglas generales]
-- **Sujetos**: [tipos OK / tipos NO]
-
-### Ilustración
-- **Estilo**: [si tiene ilustraciones propias]
-- **Paleta**: [...]
+> 📐 Esto sugiere que la marca tiene **presencia física real** (no solo digital) — el cartel en fachada urbana es referencia.
 
 ---
 
-## 🎬 Video y motion
+## 🎨 Elementos gráficos disponibles
 
-### Estilo de edición
-- **Cortes**: [rápidos / largos]
-- **Transiciones**: [tipos preferidos]
-- **Texto en pantalla**: [tipografía / posición / tamaño]
-- **Música**: [referencias / mood]
+> Carpeta: `assets/elementos-graficos/`
 
-### Aspect ratios principales
-- **Reels/TikTok**: 9:16
-- **Feed cuadrado**: 1:1
-- **Feed vertical**: 4:5
-- **YouTube**: 16:9
+| Asset | Cuándo usar |
+|---|---|
+| **Fiery Red Smoke.png** | Fondo dramático para lanzamientos, piezas de impacto, hero de campaña |
+| **abstract-background.png** | Fondo de carruseles, posts secundarios |
+| **background2.png** | Fondo alternativo |
+| **uso.png** | Guía visual de aplicación |
 
 ---
 
-## ✅ Do / Don't visuales
+## 🎯 Lineamientos para producción de contenido
 
-### ✅ DO
-- [TODO: práctica visual obligatoria 1]
-- [TODO: práctica visual obligatoria 2]
-- [TODO: práctica visual obligatoria 3]
+### Cuándo usar cada versión del logo
 
-### ❌ DON'T
-- [TODO: error visual prohibido 1]
-- [TODO: error visual prohibido 2]
-- [TODO: error visual prohibido 3]
+| Pieza | Versión recomendada |
+|---|---|
+| Post IG 1080×1080 | "MENOS ELEMENTOS" (con DISTRIBUIDORA FITNESS) |
+| Story IG 1080×1920 | "MÍNIMA EXPRESIÓN" en esquina (símbolo solo) |
+| Reel cover | "ORIGINAL" centrado o "MÍNIMA" en esquina |
+| Carrusel — última slide | "ORIGINAL" centrado |
+| Watermark / firma | "MÍNIMA EXPRESIÓN" |
+
+### Heurísticas de composición
+
+1. **El naranja es protagonista** — usar como anchor visual en cada pieza
+2. **Negro suave NO es negro puro** — siempre usar `#333333`, nunca `#000000`
+3. **Espacio negativo respetado** — el logo necesita aire alrededor (mínimo el ancho del símbolo FD)
+4. **Sin sombras dramáticas** en el logo (no se documenta sombra en el manual)
+5. **No combinar el naranja con otros tonos cálidos** (rojo, fucsia) — usar solo con negro y blanco
 
 ---
 
-## 🔄 Cómo regenerar este extracto
+## ⚠️ Para el equipo Distinto al producir contenido
 
-Cuando se actualice `documentos/manual-de-marca.pdf`:
-1. Abrir el PDF
-2. Extraer texto de las secciones clave
-3. Actualizar este archivo manualmente
-4. Si el manual es muy largo, considerar usar AI para extraer y luego revisar
+- ✅ Usar paleta exacta (no improvisar matices de naranja)
+- ✅ Respetar las 3 versiones responsive del logo según tamaño de pieza
+- ✅ Mantener "MAYORISTA" en piezas grandes (es parte de la identidad)
+- ❌ NO usar substitutos de tipografía sin documentar la decisión
+- ❌ NO modificar el símbolo FD (ni añadir sombra, contorno, glow)
 
-> El PDF original es para humanos. Este `.md` es para Claude.
+---
+
+## 📎 Referencias
+
+- 📄 PDF original: `assets/manual-pdf/DISTRIBUIDORA FITNESS MANUAL CORPORATIVO.pdf`
+- 🎨 Logos PNG: `assets/logos/` (19 variantes)
+- 🌫️ Backgrounds: `assets/elementos-graficos/`
+- 📊 Colores y fuentes resumen: `assets/colores-fuentes.txt`

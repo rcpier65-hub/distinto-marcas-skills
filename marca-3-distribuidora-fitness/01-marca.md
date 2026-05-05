@@ -86,17 +86,42 @@ Distribuidora peruana de suplementos deportivos. Web propia (distribuidorafitnes
 
 ## 🎨 Sistema visual
 
-> Pendiente extraer del feed real (IG @distribuidorafitness.pe + portadas Drive).
+> ✅ **Confirmado desde Manual Corporativo oficial** (`assets/manual-pdf/DISTRIBUIDORA FITNESS MANUAL CORPORATIVO.pdf`, ago 2024 — diseño IDEOTAS!).
+> 📋 Detalle completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
 
-### Paleta de colores (tentativa)
-[TODO: extraer de portadas reales]
-- Negro (típico fitness)
-- Rojo / Naranja energético
-- Blanco
-- Acentos según marca distribuida
+### Naming oficial
+- **Nombre completo**: **DISTRIBUIDORA FITNESS MAYORISTA** (no solo "Distribuidora Fitness")
+- **Tipo**: Imagotipo (símbolo FD + tipografía separables)
 
-### Tipografías
-[TODO: confirmar — feed sugiere bold/sans-serif estilo gym]
+### Paleta oficial (página 7 del manual)
+
+| Color | Hex | Uso |
+|---|---|---|
+| 🟧 Naranja DF | **`#F54922`** (RGB 245, 73, 34) | Símbolo FD, "FITNESS", CTAs, hero |
+| ⚫ Negro suave | **`#333333`** (RGB 51, 51, 51) | "DISTRIBUIDORA", texto cuerpo |
+| ⬜ Blanco | `#FFFFFF` | Fondos, contraste |
+
+> ⚠️ **El negro es `#333333`, NO `#000000`**. Usar negro puro rompe la marca.
+
+### Tipografía oficial (página 6 del manual)
+
+| Rol | Familia oficial | Substituto OSS |
+|---|---|---|
+| **Display / Wordmark** | **Stretch Pro** (bold extended) | Bebas Neue / Anton |
+| **Títulos** | **Infinite Light** | Inter Light / Montserrat Light |
+| **Cuerpo** | **Infinite Thin** | Inter Thin / Montserrat Thin |
+
+### Logo: 3 versiones responsive (página 9)
+
+1. **ORIGINAL** (con "MAYORISTA"): piezas grandes (web, carteles)
+2. **MENOS ELEMENTOS** (sin "MAYORISTA"): piezas medianas (posts IG)
+3. **MÍNIMA EXPRESIÓN** (solo símbolo FD): stickers, watermarks, esquinas stories
+
+### Reglas duras (página 11)
+
+❌ **PROHIBIDO**: rotar, outline, cambiar colores, distorsionar, usar wordmark sin símbolo
+
+✅ **PERMITIDO**: positivo (color sobre blanco), negativo (blanco sobre negro), solo símbolo
 
 ### Iconografía
 - Emoji-firma: 🏋️‍♂️ 💪 🔥 (visto en nombres de carpetas)
@@ -134,8 +159,11 @@ Distribuidora peruana de suplementos deportivos. Web propia (distribuidorafitnes
 
 ## 📎 Referencias internas
 
-- 📄 Brand book: pendiente
-- 🎨 Logos: `assets/logos/`
+- 📄 **Brand book oficial**: `assets/manual-pdf/DISTRIBUIDORA FITNESS MANUAL CORPORATIVO.pdf` ✅
+- 📋 **Brand book extract (text)**: `assets/brand-book-extract.md`
+- 🎨 **Colores y fuentes (resumen)**: `assets/colores-fuentes.txt`
+- 🖼️ **Logos PNG (19 variantes)**: `assets/logos/`
+- 🌫️ **Backgrounds gráficos**: `assets/elementos-graficos/` (Fiery Red Smoke + abstract + más)
 - 🎯 Diferenciarse: `08-competencia.md`
 - 📱 Inspiración tono real:
   - Web: https://distribuidorafitness.pe/
