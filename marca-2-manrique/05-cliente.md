@@ -14,11 +14,14 @@
 | **Email** | [TODO: pendiente confirmar] |
 | **WhatsApp** | [TODO — el 975 961 741 es ventas, no decisor] |
 | **Teléfono** | [TODO] |
+| **Mención en WhatsApp grupal** | @Manrique |
 
 > 📌 **Cómo lo identifiqué**: aparece como una de las 4 cuentas de pago institucional ("Cuenta Daniel Manrique"). Es el dueño legal del centro (apellido en la razón social: Centro Psicológico Manrique Abanza S.A.C.).
 
 **Estilo de comunicación preferido**:
-[TODO: confirmar — basado en patrón típico psicólogos limeños: WhatsApp + reuniones presenciales/Zoom]
+- WhatsApp grupal (canal principal con la agencia)
+- Mensajes amables, no robóticos ("Hola, ¿cómo estás?" en vez de "Estimado")
+- Imágenes/calendarios visuales sobre PDFs/documentos formales
 
 **Lo que valora del trabajo de la agencia**:
 - Profesionalismo en la comunicación
@@ -32,35 +35,35 @@
 
 | Nombre | Rol | Sobre qué decide | Cómo contactar |
 |---|---|---|---|
-| Daniel Manrique | Dueño/Director | Estrategia, cambios mayores, crisis | TODO |
+| Daniel Manrique | Dueño/Director | Estrategia, cambios mayores, crisis | WhatsApp grupal |
 | Coordinador/a admin | Operaciones | Aprobaciones tácticas día a día | TODO |
 | Equipo psicólogos | Profesionales clínicos | Revisión técnica de contenido educativo | A través del coordinador |
 
-> 🔍 Pendiente identificar: el "Administrador" mencionado en PDF (puede bloquear pacientes por saldo). Probablemente persona del día a día.
-
 ---
 
-## ✅ Matriz de aprobación (propuesta inicial — confirmar)
+## ✅ Matriz de aprobación
 
-| Tipo de pieza | Quién aprueba | Tiempo esperado |
+| Tipo de pieza | Quién aprueba | Cuándo |
 |---|---|---|
-| Reel educativo (sin diagnóstico específico) | Coordinador | 24h |
-| Carrusel con info clínica | Coordinador + un psicólogo | 48h |
+| Reel/carrusel/post (mix mensual planificado) | **Pre-aprobado con guion previo** | Antes de grabación mensual |
+| Cambios en piezas ya planificadas | Coordinador | 24h |
 | Testimonio (con paciente real) | Daniel Manrique + abogado si aplica | 72h |
-| Ad / pieza paid media | Daniel Manrique | 48h |
+| Ad nueva / cambio creativo paid media | Daniel Manrique | 48h |
 | Cambio estratégico | Daniel Manrique | reunión |
 | Crisis / tema sensible | Daniel Manrique INMEDIATO | < 1h |
+
+> 💡 **Importante**: el ritual del lunes NO es para pedir aprobación.
+> Es para INFORMAR qué se publica esa semana. Las piezas ya están preaprobadas
+> mediante guion previo y mucho del contenido ya está editado.
 
 ---
 
 ## 🔄 Dinámica de feedback
 
-[TODO: confirmar con cliente. Propuesta:]
-
-- **Cómo aprueba**: WhatsApp + revisión semanal Zoom
+- **Cómo aprueba (cambios excepcionales)**: WhatsApp grupal
 - **Tiempo respuesta**: 24-48h hábiles
-- **Si no responde**: seguimiento amable a 48h, llamada si pasa de 72h
-- **Idioma feedback**: oral (WhatsApp audio) y escrito
+- **Si no responde a un cambio**: seguimiento amable a 48h, llamada si pasa de 72h
+- **Idioma feedback**: oral (audios WhatsApp) y escrito
 
 ---
 
@@ -68,19 +71,49 @@
 
 [TODO: confirmar agenda real. Propuesta:]
 
-- **Planificación mensual**: 1er lunes de cada mes, 60 min
-- **Revisión semanal**: por confirmar
+- **Planificación mensual**: 1er lunes de cada mes, 60 min (incluye grabación)
 - **Reunión de campañas paid**: cuando arranca campaña nueva
 
 ---
 
 ## 🎬 Disponibilidad para grabaciones
 
-- **Días disponibles**: el centro funciona L-V 8:50-9pm + sáb 8-3pm. Grabaciones en horarios sin pacientes (lunes mañana, sábado tarde).
+- **Frecuencia**: **1 sesión mensual** donde se graban los 10 videos del mes (5 paid + 5 orgánicos)
 - **Locación**: **Jr. Mariscal Miller 1665, Lince** (consultorios reales)
 - **Talento**: cualquiera del equipo (18 psicólogos)
 - **Equipo propio**: por confirmar
-- **Contacto coordinación**: [TODO]
+- **Editor**: **Pierre** (filtro Notion — no se menciona explícitamente, solo se etiqueta como "modo urgente" cuando hay atrasos)
+- **Plazo de edición**: video editado debe estar listo el **viernes anterior a la fecha de publicación**
+- **Drive de videos editados**: ver `assets/inventario-drive.md`
+
+---
+
+## 💳 Política de pagos del centro
+
+> Para uso en anuncios y respuestas a clientes potenciales.
+
+### Métodos de pago aceptados (PARA MENCIONAR EN ANUNCIOS)
+- ✅ **Efectivo**
+- ✅ **Yape**
+- ✅ **Plin**
+- ✅ **Tarjeta de crédito**
+- ❌ **NO mencionar transferencia bancaria** en contenido público (decisión del cliente)
+
+### Modalidad de cobro
+- **50% al aperturar** (firma del paquete)
+- **50% antes de la sesión 2** (terapia) o **antes del día 1** (evaluación)
+- Texto recomendado en anuncios: "Paga en 2 partes — S/285 + S/285"
+
+### Boleta SUNAT
+- ✅ **SIEMPRE se emite boleta SUNAT** a quien lo solicita
+- Mencionar en anuncios: "Emitimos boleta SUNAT"
+
+### ⚠️ Sensibilidades importantes
+- 🔴 **NUNCA mencionar** en contenido público (anuncios, redes, DMs):
+  - Descuentos sin boleta
+  - Pagos preferenciales por efectivo
+  - Cualquier práctica de tipo tributario
+  - Esos temas se manejan caso por caso entre cliente y administrador, **NO se documentan en este repo ni en plantillas**
 
 ---
 
@@ -97,6 +130,8 @@
 - ❌ **Fotos identificables de niños** sin consentimiento firmado
 - ❌ **Datos personales de pacientes** en cualquier contexto público
 - ❌ **Críticas explícitas** a otros profesionales o métodos
+- ❌ **Métodos de pago: NO mencionar transferencia bancaria**
+- ❌ **Política tributaria interna** (descuentos sin boleta, etc.) — NUNCA en contenido público
 
 ### Palabras vetadas
 
@@ -107,10 +142,10 @@
 | "Normal" | Implica que el otro no lo es | "neurotípico" si necesario |
 | "Niño problema" | Estigma | "niño con [diagnóstico]" |
 | "Garantizamos" | Compromiso clínico imposible | "trabajamos hacia" |
+| "Transferencia" (en anuncios) | Decisión del cliente | "Yape · Plin · Efectivo · Tarjeta" |
 
 ### Red flags emocionales del decisor
 
-[TODO: confirmar. Probable basado en sector:]
 - Riesgo legal o denuncia INDECOPI / Colegio de Psicólogos del Perú
 - Comentarios públicos de padres no satisfechos sin gestión
 - Que algún competidor aproveche un error nuestro
@@ -143,19 +178,19 @@
 
 - **Cliente desde**: 24 sept 2024 (inicio proyecto en Notion)
 - **Centro fundado**: 15 mayo 2023 (~1.5 años antes de tomarlo)
-- **Cómo llegó**: [TODO — confirmar referencia/origen]
 - **Hitos**:
   - 24 sept 2024: arranca relación con Agencia Distinto
   - Apr 2026: levantamiento v5.0 para sistema web
-  - [Más hitos pendientes]
-- **Conflictos pasados resueltos**: [TODO — preguntar al equipo]
+  - 15 may 2026: entrega rediseño página web (proyecto paralelo Distinto)
+  - 30 may 2026: entrega sistema gestión web (proyecto paralelo Distinto)
+- **Conflictos pasados resueltos**: [TODO]
 - **Proyectos paralelos en curso**: Sistema web de gestión (en construcción por la agencia)
 
 ---
 
 ## 📎 Referencias internas
 
-- 📄 Briefing inicial firmado: `documentos/briefing-original.pdf` (pendiente subir)
+- 📄 Briefing inicial: en Notion (page 21d91873-2000-81f3-897e-c2887891eb7a)
 - 📄 Levantamiento sistema web v5.0: `/Users/pedroreyescalderon/Downloads/1. DISTINTO AGENCIA/APP MANRIQUE ABANZA/pdf info levantada.pdf`
-- 📄 Actas de reuniones: `documentos/reuniones-cliente/actas/`
+- 📋 Proceso operativo (ritual lunes): `referencias/proceso-operativo.md`
 - ⚖️ Crisis playbook: `referencias/legal-crisis.md`

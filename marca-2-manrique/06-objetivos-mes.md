@@ -1,7 +1,7 @@
 # 06 · OBJETIVOS DEL MES — Centro Psicológico Manrique ABA
 
 > 🔴 **ARCHIVO VIVO** — se actualiza el día 1 de cada mes.
-> Última actualización: 2026-05-05 (con data de PDF v5.0 abril 2026)
+> Última actualización: 2026-05-05
 > Mes en curso: **Mayo 2026**
 
 ---
@@ -57,11 +57,30 @@
 
 ---
 
-## 📅 Lanzamientos / eventos del mes
+## 📅 Lanzamientos / eventos / hitos del mes
 
-- **10 mayo (domingo)**: Día de la Madre — pico de campaña
-- **15 mayo**: 🎂 **3er aniversario del Centro** (fundado 15/05/2023) → oportunidad de contenido
-- **Todo mayo**: empuje Evaluaciones para Colegios (segundo trimestre escolar)
+### 🌷 10 mayo (domingo) — Día de la Madre
+- Pico de campaña #1
+- Contenido emocional + comercial
+
+### 🎂 15 mayo — Aniversario del Centro (3 años)
+- Centro fundado 15/05/2023
+- Oportunidad de contenido especial: post + story celebrando + agradecimiento al equipo
+- No requiere ads (contenido orgánico de marca)
+
+### 🌐 15 mayo — ENTREGA: Rediseño página web manriqueabanza.com
+- Proyecto paralelo de Agencia Distinto
+- Hito importante para Daniel Manrique
+- Genera oportunidad de contenido: "renovamos nuestra web"
+
+### 🖥️ 30 mayo — ENTREGA: Sistema de Gestión Web
+- Proyecto paralelo de Agencia Distinto (basado en levantamiento v5.0)
+- Sistema completo: pacientes, agenda, pagos, reportes, dashboard
+- Genera oportunidad de contenido: "nuevo sistema digital de Manrique"
+
+### 📚 Todo mayo — Empuje Evaluaciones para Colegios
+- 2do trimestre escolar arrancando
+- Servicio destacado: Evaluación para Colegios (S/375)
 
 ---
 
@@ -79,18 +98,35 @@
 - 10% retargeting interesados que no convirtieron (S/150)
 
 ### Producción
-- **Sesiones de grabación planificadas**: 2 (1 testimonial mamá, 1 serie ABA)
+- **Sesiones de grabación planificadas**: 1 sesión mensual (10 videos en una)
 - **Talento extra**: ninguno (usar equipo del centro)
 - **Locación**: Jr. Mariscal Miller 1665, Lince
 
 ---
 
+## 📦 Volumen de contenido a producir este mes
+
+```
+🎬 VIDEOS                        10 (5 paid + 5 orgánicos)
+   └── Grabación: 1 sesión mensual
+
+📝 BLOGS WEB                     15 (Lun + Mié + Vie + Sáb)
+
+📅 OTRAS PIEZAS
+   ├── Carruseles IG             ~4-6
+   ├── Stories                   distribuidas a lo largo del mes
+   └── Reels editados de eventos especiales (Día Madre, Aniversario)
+```
+
+---
+
 ## 🔔 Recordatorios contextuales
 
-- 🎂 **15 mayo = aniversario del centro** — preparar contenido especial (post + story, no requiere ads)
+- 🎂 **15 mayo = aniversario del centro** + entrega rediseño web (doble hito)
 - 🌷 **Día de la Madre 10 mayo** — pico, contenido listo el 1 de mayo
+- 🖥️ **30 mayo = entrega sistema** — preparar contenido lanzamiento sistema
 - 🏥 **Sector salud sensible** — doble check con `referencias/legal-crisis.md`
-- 📚 **2do trimestre escolar arrancando** — colegios empiezan a derivar = oportunidad evaluaciones
+- 📚 **2do trimestre escolar arrancando** — colegios derivan = oportunidad evaluaciones
 - ⚠️ **Pre-escolarización noviembre** — no es ahora, ir construyendo autoridad
 
 ---
@@ -101,6 +137,7 @@
 - 📊 Reporte mes anterior: `documentos/reportes-mensuales/2026-04.pdf` (pendiente)
 - 🎯 Plan estratégico anual: `documentos/plan-estrategico-anual.pdf` (pendiente)
 - 💰 Estructura paid completa: `referencias/paid-media.md`
+- 📋 Proceso operativo del lunes: `referencias/proceso-operativo.md`
 
 ---
 
