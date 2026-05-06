@@ -79,19 +79,55 @@ Posicionarse como **la primera opción nacional** en iluminación de calidad y g
 
 ---
 
-## 🎨 Estilo visual (resumen)
+## 🎨 Sistema visual
 
-- **Paleta**: dorados / cobres + negro + blanco + acentos cálidos (luz LED warm)
-- **Tipografía**: serif elegante para títulos (línea MAX) + sans moderna para cuerpo
-- **Fotografía**:
-  - Showroom (con luz instalada en ambientes)
-  - Producto en escenarios reales (sala, cocina, oficina)
-  - Detalles acabados línea MAX (aluminio, vidrio, mármol, madera)
-  - Antes/después de iluminación (cambio dramático)
-  - Colaboraciones con arquitectos/diseñadores en sus proyectos
-- **Composición**: cuidada, espacios reales, luz como protagonista
+> ✅ **Confirmado desde Manual de Identidad Corporativa** (`assets/manual-pdf/NOVALAMPS-MANUAL-BASICO.pdf`).
+> 📋 Detalle completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
 
-> 📂 Detalle visual completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
+### Naming oficial
+- **Escritura correcta**: **Novalamps**
+- **Escrituras incorrectas documentadas**: NOVALAMPS / novalamps
+- **Tipo**: logosímbolo (símbolo + logotipo)
+
+### Paleta oficial (páginas 7-8 del manual)
+
+| Color | Hex | Pantone | Uso |
+|---|---|---|---|
+| 🟩 Verde lima Novalamps | **`#D2DD00`** (RGB 210, 221, 0) | 389 C | Color principal, debe predominar |
+| ⚫ Verde negro / grafito | **`#262726`** (RGB 38, 39, 38) | 419 C | Color secundario, texto, fondos oscuros |
+| ⬜ Blanco | `#FFFFFF` | — | Fondos, contraste, versión negativa |
+
+### Tipografía oficial (página 9 del manual)
+
+| Rol | Familia oficial | Substituto OSS |
+|---|---|---|
+| **Cuerpo / institucional** | Arial Regular | Arimo / Liberation Sans / Inter |
+| **Titulares / énfasis** | Arial Bold | Arimo Bold / Liberation Sans Bold / Inter Bold |
+
+> ⚠️ El manual no define serif elegante. Para piezas fieles a identidad base, usar sans neutra y técnica.
+
+### Logo y construcción
+
+1. **Versión principal**
+2. **Versión principal negativo**
+3. **Versión blanco y negro**
+4. **Versión blanco y negro negativo**
+
+- Área de seguridad: distancia mínima equivalente al símbolo del propio logotipo.
+- Tamaño mínimo: **10 mm de ancho**.
+
+### Reglas duras (páginas 12-14)
+
+❌ **PROHIBIDO**: color incorrecto, porcentajes/opacidades del logo, deformación, ocultación, espaciado incorrecto, tipografía incorrecta, escribir "NOVALAMPS" o "novalamps".
+
+✅ **PERMITIDO**: versión principal cuando sea posible, blanco/negro por limitación técnica, logo blanco o negro sobre fondos/fotografías según luminosidad.
+
+### Fotografía / Dirección de arte
+- Showroom con luz instalada en ambientes reales
+- Producto en sala, cocina, oficina y espacios comerciales
+- Detalles de acabados línea MAX (aluminio, vidrio, mármol, clásico, madera)
+- Antes/después de iluminación cuando el cambio sea claro
+- Composición cuidada, técnica, con luz como protagonista
 
 ---
 
@@ -99,7 +135,7 @@ Posicionarse como **la primera opción nacional** en iluminación de calidad y g
 
 | Documento | Estado | Notas |
 |---|---|---|
-| Brand book formal | ⚠️ NO localizado todavía — pedir al cliente | — |
+| Brand book formal | ✅ `assets/manual-pdf/NOVALAMPS-MANUAL-BASICO.pdf` | Manual de identidad corporativa, 17 páginas |
 | Web | ✅ novalamps.com.pe | Activa con catálogo + sección empresa |
 | Catálogo línea MAX | ⚠️ Tríptico pendiente adjuntar (mencionado en propuestas colab) | — |
 | Showroom | ✅ Surco, Av. Caminos del Inca 1457 | — |

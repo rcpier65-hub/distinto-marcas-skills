@@ -1,156 +1,131 @@
-# Brand Book Extract — Novalamps
+# Brand Book Extract — NOVALAMPS
 
-> Extracto en TEXTO consultable del brand book oficial.
-> El PDF original está en `documentos/manual-de-marca.pdf`.
-> **Este archivo es lo que Claude lee** cuando necesita validar identidad visual.
-
----
-
-## 🧬 Esencia de marca
-
-**Misión**: [TODO: 1 frase]
-**Visión**: [TODO: 1 frase]
-**Valores**: [TODO: 3-5 valores]
-**Promesa**: [TODO: 1 frase]
+> Extracto en texto del **Manual de Identidad Corporativa** (17 páginas).
+> Fuente: `assets/manual-pdf/NOVALAMPS-MANUAL-BASICO.pdf`
+> Diseño original y fecha: **no indicados en el manual**.
 
 ---
 
-## 🎨 Paleta de colores oficial
+## Identidad oficial
 
-### Colores primarios
-| Nombre | HEX | RGB | CMYK | Pantone | Uso |
+### Naming
+- **Escritura correcta**: Novalamps
+- **Escrituras incorrectas documentadas**: NOVALAMPS / novalamps
+- **Tipo de marca**: logosímbolo
+
+### Nota de calidad del manual
+El PDF contiene textos plantilla heredados ("Saba", dirección en Barcelona y papelería genérica). Esos datos **no se toman como información real del cliente**. Solo se documentan como reales los lineamientos gráficos de Novalamps.
+
+---
+
+## Paleta confirmada
+
+| Color | Pantone | Hex | RGB | CMYK | Uso |
 |---|---|---|---|---|---|
-| [Nombre 1] | #XXXXXX | rgb(x,x,x) | cmyk(x,x,x,x) | PMS XXX | [cuándo usar] |
-| [Nombre 2] | #XXXXXX | ... | ... | ... | ... |
+| **Verde lima Novalamps** | 389 C | `#D2DD00` | 210, 221, 0 | 33, 0, 100, 0 | Color principal, debe predominar |
+| **Verde negro / grafito** | 419 C | `#262726` | 38, 39, 38 | 83, 80, 72, 58 | Color secundario, texto, contraste |
+| **Blanco** | - | `#FFFFFF` | 255, 255, 255 | 0, 0, 0, 0 | Fondos, versión negativa |
 
-### Colores secundarios
-| Nombre | HEX | RGB | Uso |
+### Fuente de color
+- Página 7: Pantone 389 C / `#D2DD00`.
+- Página 8: Pantone 419 C / `#262726`.
+
+---
+
+## Tipografía oficial (página 9)
+
+| Rol | Familia oficial | Uso | Substituto OSS |
 |---|---|---|---|
-| ... | ... | ... | ... |
+| **Cuerpo / institucional** | Arial Regular | Textos, papelería, comunicación base | Arimo Regular, Liberation Sans, Inter |
+| **Titulares / énfasis** | Arial Bold | Jerarquía principal, énfasis | Arimo Bold, Liberation Sans Bold, Inter Bold |
 
-### Colores de acento
-| Nombre | HEX | Uso |
-|---|---|---|
-| ... | ... | ... |
-
-### Reglas de combinación
-- ✅ [combinaciones OK]
-- ❌ [combinaciones prohibidas]
+> El manual no define una tipografía serif ni una display premium. Para piezas fieles al manual usar una sans neutra, técnica y legible.
 
 ---
 
-## 🔤 Tipografías
+## Logo
 
-### Tipografía primaria
-- **Nombre exacto**: [ej. "Inter" — capitalización exacta]
-- **Pesos disponibles**: [Light 300, Regular 400, Bold 700]
-- **Uso**: titulares, headlines
-- **Link**: [Google Fonts / Adobe Fonts / archivo propio]
+### Construcción (páginas 5-6)
+- El logotipo es el identificador de uso común en todas las aplicaciones.
+- Está compuesto por **símbolo + logotipo**.
+- El área de seguridad mínima equivale al símbolo del propio logotipo.
+- Tamaño mínimo de reproducción: **10 mm de ancho**.
 
-### Tipografía secundaria
-- **Nombre exacto**: [...]
-- **Pesos**: [...]
-- **Uso**: cuerpo de texto, captions
+### Versiones documentadas (página 11)
 
-### Tipografía de acento
-- **Nombre exacto**: [...]
-- **Uso**: highlights, citas
+1. **Versión principal**
+2. **Versión principal negativo**
+3. **Versión blanco y negro**
+4. **Versión blanco y negro negativo**
 
-### Reglas tipográficas
-- Tamaño mínimo: [Xpx para web / Xpt para print]
-- Interlineado: [recomendado]
-- Tracking: [recomendado]
-- Jerarquía: H1 = X / H2 = Y / Body = Z
+### Archivos disponibles
+`assets/logos/` contiene 38 PNG/JPG copiados desde la carpeta oficial de identidad.
 
 ---
 
-## 🏷️ Logo
+## Reglas de uso
 
-### Variantes del logo
-1. **Logo principal** (color completo)
-2. **Logo blanco** (sobre fondos oscuros)
-3. **Logo negro** (sobre fondos claros)
-4. **Isotipo** (símbolo solo)
-5. **Logotipo** (texto solo)
+### PERMITIDO ✅
+- Usar la versión principal siempre que sea posible.
+- Usar versión blanco y negro cuando haya limitación técnica.
+- Aplicar logo blanco o negro sobre fondos no corporativos o fotografías, según luminosidad.
+- Priorizar máxima visibilidad, legibilidad y contraste.
+- Escribir la marca como **Novalamps** en texto corrido.
 
-### Reglas de uso
-- **Espaciado mínimo alrededor**: X (relativo al ancho del logo)
-- **Tamaño mínimo**: Xpx digital / Xmm impreso
-- **Fondos permitidos**: [colores OK]
-- **Fondos prohibidos**: [colores NO]
-
-### Errores comunes a evitar
-- ❌ Distorsionar el logo (estirar/aplastar)
-- ❌ Cambiar colores fuera de paleta
-- ❌ Aplicar efectos (sombra, glow, etc.)
-- ❌ Ponerlo sobre fondos visualmente ruidosos
-- ❌ Usar versión vieja del logo
-
-> Logos en alta calidad: `assets/logos/`
+### PROHIBIDO ❌
+- Aplicación incorrecta de color.
+- Usar porcentajes u opacidades de color en el logo.
+- Deformar proporciones.
+- Ocultar o cortar partes del logo.
+- Usar espaciado incorrecto.
+- Cambiar la tipografía del logotipo.
+- Escribir la marca como **NOVALAMPS** o **novalamps** en texto corrido.
 
 ---
 
-## 📐 Sistema visual
+## Aplicaciones documentadas
 
-### Iconografía
-- **Estilo**: [lineal / filled / mixto]
-- **Grosor de línea**: [Xpx]
-- **Esquinas**: [redondeadas / vivas]
-- **Fuente recomendada**: [Lucide / Material / propio]
+| Página | Aplicación |
+|---|---|
+| 12 | Aplicaciones correctas sobre fondos no corporativos y fotografías |
+| 13 | Aplicaciones incorrectas |
+| 14 | Expresión textual de la marca |
+| 16 | Papelería corporativa de plantilla |
 
-### Composición
-- **Grid**: [columnas / spacing]
-- **Márgenes**: [recomendados por formato]
-- **Aire blanco**: [filosofía — generoso / denso]
-
-### Fotografía
-- **Estilo de luz**: [natural / estudio / ambos]
-- **Color grading**: [cálido / frío / neutro]
-- **Composición**: [reglas generales]
-- **Sujetos**: [tipos OK / tipos NO]
-
-### Ilustración
-- **Estilo**: [si tiene ilustraciones propias]
-- **Paleta**: [...]
+> La papelería de página 16 usa datos genéricos de Barcelona y no confirma dirección ni contactos reales de Novalamps Perú.
 
 ---
 
-## 🎬 Video y motion
+## Datos de contacto
 
-### Estilo de edición
-- **Cortes**: [rápidos / largos]
-- **Transiciones**: [tipos preferidos]
-- **Texto en pantalla**: [tipografía / posición / tamaño]
-- **Música**: [referencias / mood]
-
-### Aspect ratios principales
-- **Reels/TikTok**: 9:16
-- **Feed cuadrado**: 1:1
-- **Feed vertical**: 4:5
-- **YouTube**: 16:9
+El manual no confirma datos reales del cliente. La dirección Barcelona/teléfonos/fax en papelería se identifican como plantilla y **no deben actualizar `05-cliente.md`**.
 
 ---
 
-## ✅ Do / Don't visuales
+## Lineamientos para producción Distinto
 
-### ✅ DO
-- [TODO: práctica visual obligatoria 1]
-- [TODO: práctica visual obligatoria 2]
-- [TODO: práctica visual obligatoria 3]
+### Heurísticas de composición
 
-### ❌ DON'T
-- [TODO: error visual prohibido 1]
-- [TODO: error visual prohibido 2]
-- [TODO: error visual prohibido 3]
+1. **Verde lima como señal de marca** — debe aparecer como protagonista o acento claro.
+2. **Grafito para autoridad técnica** — usar `#262726`, no negro puro, cuando se busque identidad fiel.
+3. **Contraste antes que decoración** — el manual insiste en visibilidad y legibilidad.
+4. **Sans neutra** — Arial/Inter mantiene la marca técnica; evitar serif editorial como base.
+5. **No usar uppercase sostenido para naming** — escribir Novalamps.
+
+### Cuándo usar cada versión del logo
+
+| Pieza | Versión recomendada |
+|---|---|
+| Post fondo blanco | Versión principal |
+| Fondo grafito / oscuro | Versión principal negativo |
+| Impresión económica | Blanco y negro |
+| Foto clara | Logo negro |
+| Foto oscura | Logo blanco |
 
 ---
 
-## 🔄 Cómo regenerar este extracto
+## Referencias internas
 
-Cuando se actualice `documentos/manual-de-marca.pdf`:
-1. Abrir el PDF
-2. Extraer texto de las secciones clave
-3. Actualizar este archivo manualmente
-4. Si el manual es muy largo, considerar usar AI para extraer y luego revisar
-
-> El PDF original es para humanos. Este `.md` es para Claude.
+- PDF oficial: `assets/manual-pdf/NOVALAMPS-MANUAL-BASICO.pdf`
+- Logos PNG/JPG: `assets/logos/` (38 archivos)
+- Resumen técnico: `assets/colores-fuentes.txt`

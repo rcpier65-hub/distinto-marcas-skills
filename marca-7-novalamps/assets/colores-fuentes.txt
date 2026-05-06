@@ -1,52 +1,136 @@
 ═══════════════════════════════════════════════════════════
-COLORES Y FUENTES — Novalamps
+  PALETA + TIPOGRAFÍA — NOVALAMPS
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Fuente OFICIAL: Manual de Identidad Corporativa
+                (assets/manual-pdf/NOVALAMPS-MANUAL-BASICO.pdf)
+Diseño original: No indicado en el manual
+Fecha:           No indicada en el manual
+Nota:            El manual conserva textos plantilla de "Saba" y
+                 papelería Barcelona; no se toman como datos reales
+                 del cliente Novalamps.
 
+──────────────────────────────────────────────
+  COLORES (páginas 7-8 — A.03 / A.04)
+──────────────────────────────────────────────
 
-─── COLORES ───────────────────────────────────────────────
+PRIMARIO  - Verde lima Novalamps
+            Pantone: 389 C
+            Hex:     #D2DD00
+            RGB:     210, 221, 0
+            CMYK:    33%, 0%, 100%, 0%
+            Uso:     color principal de la marca,
+                     debe predominar; símbolo,
+                     acentos, llamadas visuales
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+SECUNDARIO - Verde negro / grafito
+            Pantone: 419 C
+            Hex:     #262726
+            RGB:     38, 39, 38
+            CMYK:    83%, 80%, 72%, 58%
+            Uso:     color secundario de identidad,
+                     texto principal, fondos oscuros,
+                     contraste institucional
 
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+NEUTRO     - Blanco
+            Hex:  #FFFFFF
+            RGB:  255, 255, 255
+            CMYK: 0%, 0%, 0%, 0%
+            Uso:  fondos limpios, versión negativa,
+                  papelería y contraste
 
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+──────────────────────────────────────────────
+  TIPOGRAFÍA (página 9 — A.05 Tipografía Corporativa)
+──────────────────────────────────────────────
 
-NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+PRIMARIA   - Arial Regular
+             Uso: textos institucionales, cuerpo, papelería
+             Substituto OSS si no hay Arial:
+                - Arimo Regular
+                - Liberation Sans Regular
+                - Inter Regular
 
+SECUNDARIA - Arial Bold
+             Uso: titulares, énfasis, jerarquía principal
+             Substituto OSS:
+                - Arimo Bold
+                - Liberation Sans Bold
+                - Inter Bold
 
-─── TIPOGRAFÍAS ───────────────────────────────────────────
+NOTA:
+   El manual no menciona serif ni tipografías premium.
+   Para producción fiel al manual, priorizar una sans neutra
+   y técnica. Playfair/serif solo debe usarse si una campaña
+   específica de interiorismo lo pide, no como identidad base.
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+──────────────────────────────────────────────
+  LOGO (páginas 5-6 — A.01 / A.02)
+──────────────────────────────────────────────
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+CONCEPTO: Logosímbolo
+   - Símbolo + logotipo Novalamps.
+   - El símbolo se usa como unidad base para calcular
+     el área de seguridad.
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+CONSTRUCCIÓN:
+   - Área de seguridad: distancia mínima equivalente
+     al símbolo del propio logotipo.
+   - Tamaño mínimo de reproducción: 10 mm de ancho.
 
+VERSIONES DOCUMENTADAS (página 11 — B.01):
+   1. Versión principal
+   2. Versión principal negativo
+   3. Versión blanco y negro
+   4. Versión blanco y negro negativo
 
-─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+──────────────────────────────────────────────
+  REGLAS DE USO ESTRICTAS (páginas 12-14)
+──────────────────────────────────────────────
 
-Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+✅ PERMITIDO:
+   - Usar versión principal siempre que sea posible
+   - Usar versión blanco y negro por razones técnicas
+   - Aplicar el logo en blanco o negro sobre fondos no
+     corporativos/fotográficos según luminosidad
+   - Mantener máxima visibilidad, legibilidad y contraste
+
+❌ PROHIBIDO:
+   - Aplicación incorrecta de color
+   - Usar porcentajes/opacidades de color en el logo
+   - Deformar proporciones
+   - Ocultar o cortar parte del logo
+   - Usar espaciado incorrecto
+   - Cambiar la tipografía del logotipo
+   - Escribir la marca como "NOVALAMPS" o "novalamps"
+     en texto corrido; el manual indica "Novalamps"
+
+──────────────────────────────────────────────
+  LOGOS DISPONIBLES EN ESTE SKILL
+──────────────────────────────────────────────
+
+assets/logos/ contiene 38 archivos PNG/JPG copiados desde
+la carpeta oficial de identidad:
+   - Logos Novalamps en PNG/JPG
+   - Foto de perfil
+   - Recursos de animación Electrika/Novalamps
+   - Historias destacadas
+
+──────────────────────────────────────────────
+  COMBINACIONES RECOMENDADAS
+──────────────────────────────────────────────
+
+VERDE LIMA #D2DD00 sobre GRAFITO #262726 → impacto de marca
+GRAFITO #262726 sobre BLANCO             → texto técnico / papelería
+BLANCO sobre GRAFITO                     → versión negativa
+VERDE LIMA sobre BLANCO                  → acento, no texto largo
+BLANCO sobre VERDE LIMA                  → solo si contraste es suficiente
+
+──────────────────────────────────────────────
+  NAMING IMPORTANTE
+──────────────────────────────────────────────
+
+Escritura correcta:   "Novalamps"
+Escritura incorrecta: "NOVALAMPS" / "novalamps"
+
+En contenido Distinto, respetar capitalización tipo nombre propio:
+Novalamps.
