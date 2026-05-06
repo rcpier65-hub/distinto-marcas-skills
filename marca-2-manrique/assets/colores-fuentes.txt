@@ -1,52 +1,131 @@
 ═══════════════════════════════════════════════════════════
-COLORES Y FUENTES — Centro Psicológico Manrique ABA
+  PALETA + TIPOGRAFÍA — CENTRO PSICOLÓGICO MANRIQUE ABA
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Fuente OFICIAL: Manual Centro Psicológico Manrique
+                (assets/manual-pdf/MANRIQUE-MANUAL-DE-MARCA.pdf)
+Diseño original: No indicado en el manual
+Fecha:           No indicada en el manual
 
+──────────────────────────────────────────────
+  COLORES (página 4 — Colores Corporativos)
+──────────────────────────────────────────────
 
-─── COLORES ───────────────────────────────────────────────
+PRIMARIO  - Dark Steel Blue
+            Hex:  #283B6F
+            RGB:  40, 59, 111
+            CMYK: 64%, 47%, 0%, 56%
+            HSV:  224°, 64%, 44%
+            Uso:  títulos, texto principal, wordmark,
+                  contornos y elementos de autoridad clínica
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+SECUNDARIO - Raspberry Pink
+            Hex:  #D9536C
+            RGB:  217, 83, 108
+            CMYK: 0%, 62%, 50%, 15%
+            HSV:  349°, 62%, 85%
+            Uso:  hemisferio izquierdo del isotipo cerebro,
+                  acentos cálidos, líneas divisorias,
+                  detalles de la red ABA
 
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+ACENTO     - Light Sky Blue
+            Hex:  #9AC2E8
+            RGB:  154, 194, 232
+            CMYK: 34%, 16%, 0%, 9%
+            HSV:  209°, 34%, 91%
+            Uso:  hemisferio derecho del isotipo cerebro,
+                  fondos suaves, bloques de apoyo,
+                  señalización amable
 
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+NEUTRO     - Blanco
+            Hex:  #FFFFFF
+            RGB:  255, 255, 255
+            CMYK: 0%, 0%, 0%, 0%
+            Uso:  fondos limpios, aire visual, contraste
 
-NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+──────────────────────────────────────────────
+  TIPOGRAFÍA (página 5 — Tipografía Corporativa)
+──────────────────────────────────────────────
 
+PRIMARIA   - Poppins Family Font
+             Uso: logo, titulares, caracteres, bloque de texto
+             Substituto OSS si no hay archivo/licencia:
+                - Poppins (Google Fonts)
+                - Inter
+                - Open Sans
 
-─── TIPOGRAFÍAS ───────────────────────────────────────────
+NOTA:
+   El manual menciona únicamente "Poppins Family Font";
+   no lista pesos específicos. Para producción Distinto:
+   usar Poppins Bold/SemiBold en titulares y Poppins Regular
+   en cuerpos. En piezas clínicas, Inter u Open Sans son los
+   substitutos más seguros si Poppins no está disponible.
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+──────────────────────────────────────────────
+  LOGO (página 3 — Versiones de logo)
+──────────────────────────────────────────────
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+CONCEPTO: Imagotipo / sistema modular
+   - Isotipo: cerebro dividido en dos hemisferios
+              (rosa + celeste), síntesis de salud mental
+              y neurodesarrollo.
+   - Elemento ABA: letras "ABA" + diagrama de nodos,
+                   asociado al Análisis Conductual Aplicado.
+   - Wordmark: MANRIQUE / CENTRO PSICOLÓGICO.
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+VERSIONES DOCUMENTADAS:
+   1. Isotipo cerebro + "MANRIQUE CENTRO PSICOLÓGICO"
+   2. Isotipo cerebro dentro de sello circular con
+      "CENTRO PSICOLÓGICO MANRIQUE"
+   3. Isotipo cerebro + módulo "ABA"
+   4. Versión completa "ABA" + "CENTRO PSICOLÓGICO MANRIQUE ABANZA"
 
+──────────────────────────────────────────────
+  REGLAS DE USO ESTRICTAS
+──────────────────────────────────────────────
 
-─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+✅ PERMITIDO:
+   - Usar las versiones de logo documentadas en página 3
+   - Usar Dark Steel Blue para texto institucional
+   - Usar Raspberry Pink + Light Sky Blue como pareja del isotipo
+   - Mantener fondos blancos o muy limpios
 
-Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+❌ PROHIBIDO:
+   - Cambiar los colores del isotipo cerebro
+   - Usar negro puro como color principal del wordmark
+   - Separar el módulo ABA y recomponerlo con otra tipografía
+   - Estirar, comprimir, rotar o añadir efectos al logo
+   - Usar fondos ruidosos que resten legibilidad clínica
+
+──────────────────────────────────────────────
+  LOGOS DISPONIBLES EN ESTE SKILL
+──────────────────────────────────────────────
+
+assets/logos/ contiene 30 archivos PNG/JPG copiados desde la
+carpeta oficial de identidad:
+   - Variantes de logo principal
+   - Foto de perfil para redes
+   - Recursos gráficos a1/a2/a3/a4
+   - Iconos de feed e historias destacadas
+
+──────────────────────────────────────────────
+  COMBINACIONES RECOMENDADAS
+──────────────────────────────────────────────
+
+DARK STEEL BLUE #283B6F sobre BLANCO → títulos, cuerpos, CTAs sobrios
+BLANCO sobre DARK STEEL BLUE         → piezas institucionales
+RASPBERRY PINK #D9536C               → acentos emocionales controlados
+LIGHT SKY BLUE #9AC2E8               → fondos de apoyo / calma
+ROSA + CELESTE juntos                → solo cuando refuerza isotipo/cerebro
+
+──────────────────────────────────────────────
+  NAMING IMPORTANTE
+──────────────────────────────────────────────
+
+Nombre oficial solicitado: "Centro Psicológico Manrique ABA"
+Manual visual:             "CENTRO PSICOLÓGICO MANRIQUE"
+Versión extendida en logo: "CENTRO PSICOLÓGICO MANRIQUE ABANZA"
+
+En contenido Distinto usar "Centro Psicológico Manrique ABA"
+cuando el tema sea terapia ABA/neurodesarrollo, y "Manrique"
+solo como forma corta en piezas internas o de baja formalidad.

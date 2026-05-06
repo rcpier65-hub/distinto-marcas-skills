@@ -92,24 +92,51 @@ Fundado el **15 de mayo de 2023** por Daniel Manrique (psicólogo) en Lince, Lim
 
 ## 🎨 Sistema visual
 
-> 🚧 Pendiente extraer del brand book oficial cuando esté disponible.
+> ✅ **Confirmado desde Manual Centro Psicológico Manrique** (`assets/manual-pdf/MANRIQUE-MANUAL-DE-MARCA.pdf`).
+> 📋 Detalle completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
 
-### Paleta de colores (provisorio basado en icon Notion brain_blue)
+### Naming oficial
+- **Naming operativo Distinto**: **Centro Psicológico Manrique ABA**
+- **Manual visual**: CENTRO PSICOLÓGICO MANRIQUE
+- **Versión extendida vista en logo**: CENTRO PSICOLÓGICO MANRIQUE ABANZA
+- **Tipo**: Imagotipo / sistema modular (cerebro + wordmark + módulo ABA)
 
-| Nombre | HEX | Uso |
+### Paleta oficial (página 4 del manual)
+
+| Color | Hex | Uso |
 |---|---|---|
-| Azul Manrique (primario) | #XXXXXX | Headers, CTAs |
-| Blanco | #FFFFFF | Fondos limpios |
-| Gris cálido | #XXXXXX | Cuerpos de texto |
-| Verde esperanza (acento) | #XXXXXX | Highlights positivos |
+| 🔵 Dark Steel Blue | **`#283B6F`** (RGB 40, 59, 111) | Wordmark, titulares, texto institucional |
+| 🌸 Raspberry Pink | **`#D9536C`** (RGB 217, 83, 108) | Hemisferio izquierdo, acentos cálidos, nodos ABA |
+| 🩵 Light Sky Blue | **`#9AC2E8`** (RGB 154, 194, 232) | Hemisferio derecho, fondos suaves, apoyo visual |
+| ⬜ Blanco | `#FFFFFF` | Fondos limpios y contraste |
 
-> 📎 Versión completa: `assets/colores-fuentes.txt`
+> ⚠️ **No usar negro puro como base**. La identidad trabaja con azul profundo `#283B6F`.
 
-### Tipografías
-[TODO: confirmar con brand book]
+### Tipografía oficial (página 5 del manual)
+
+| Rol | Familia oficial | Substituto OSS |
+|---|---|---|
+| **Identidad / títulos / cuerpo** | **Poppins Family Font** | Poppins / Inter / Open Sans |
+
+> El manual no lista pesos específicos. Para producción: Poppins SemiBold/Bold en titulares y Poppins Regular en cuerpos.
+
+### Logo: 4 versiones documentadas (página 3)
+
+1. **Principal horizontal**: cerebro + "MANRIQUE CENTRO PSICOLÓGICO"
+2. **Sello circular**: cerebro al centro + texto circular
+3. **ABA modular**: cerebro + letras ABA + nodos
+4. **Completa extendida**: ABA + "CENTRO PSICOLÓGICO MANRIQUE ABANZA"
+
+### Reglas duras
+
+❌ **PROHIBIDO**: cambiar colores del cerebro, usar negro puro como sistema, deformar/rotar el logo, separar el módulo ABA y recomponerlo, usar fondos ruidosos.
+
+✅ **PERMITIDO**: usar las versiones documentadas, mantener fondos limpios, usar Dark Steel Blue para autoridad clínica, usar el módulo ABA en piezas de neurodesarrollo.
 
 ### Iconografía
-[TODO: estilo lineal "amigable" sugerido — confirmar]
+- Cerebro bicolor como recurso propietario
+- Módulo ABA con nodos para piezas educativas/técnicas
+- Iconos lineales simples si se necesitan apoyos (sin estética infantil excesiva)
 
 ### Fotografía / Dirección de arte
 - Terapeutas reales del centro (humaniza)
@@ -138,8 +165,8 @@ Fundado el **15 de mayo de 2023** por Daniel Manrique (psicólogo) en Lince, Lim
 
 ## 📎 Referencias internas
 
-- 📄 Brand book completo: `documentos/manual-de-marca.pdf` (pendiente)
+- 📄 Brand book oficial: `assets/manual-pdf/MANRIQUE-MANUAL-DE-MARCA.pdf` ✅
 - 📄 Brand book extracto: `assets/brand-book-extract.md`
 - 📄 Documento de voz: `assets/voz-extracto.md`
-- 🎨 Logos: `assets/logos/`
+- 🎨 Logos PNG/JPG (30 archivos): `assets/logos/`
 - 🎯 Cómo diferenciarse: `08-competencia.md`

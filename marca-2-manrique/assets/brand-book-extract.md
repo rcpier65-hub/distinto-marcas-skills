@@ -1,156 +1,121 @@
-# Brand Book Extract — Centro Psicológico Manrique ABA
+# Brand Book Extract — CENTRO PSICOLÓGICO MANRIQUE ABA
 
-> Extracto en TEXTO consultable del brand book oficial.
-> El PDF original está en `documentos/manual-de-marca.pdf`.
-> **Este archivo es lo que Claude lee** cuando necesita validar identidad visual.
-
----
-
-## 🧬 Esencia de marca
-
-**Misión**: [TODO: 1 frase]
-**Visión**: [TODO: 1 frase]
-**Valores**: [TODO: 3-5 valores]
-**Promesa**: [TODO: 1 frase]
+> Extracto en texto del **Manual Centro Psicológico Manrique** (6 páginas).
+> Fuente: `assets/manual-pdf/MANRIQUE-MANUAL-DE-MARCA.pdf`
+> Diseño original y fecha: **no indicados en el manual**.
 
 ---
 
-## 🎨 Paleta de colores oficial
+## Identidad oficial
 
-### Colores primarios
-| Nombre | HEX | RGB | CMYK | Pantone | Uso |
+### Naming
+- **Naming operativo Distinto**: Centro Psicológico Manrique ABA
+- **Texto del manual**: CENTRO PSICOLÓGICO MANRIQUE
+- **Versión extendida vista en logo**: CENTRO PSICOLÓGICO MANRIQUE ABANZA
+- **Especialidad visual reforzada**: ABA (Análisis Conductual Aplicado)
+
+### Concepto visual
+- **Isotipo**: cerebro dividido en dos hemisferios, rosa y celeste.
+- **Módulo ABA**: letras verticales "ABA" conectadas a nodos, asociado a intervención conductual.
+- **Wordmark**: MANRIQUE / CENTRO PSICOLÓGICO en Poppins.
+- **Lectura de marca**: clínica psicológica de neurodesarrollo, con balance entre rigor profesional y calidez familiar.
+
+### Tipo de marca
+**Imagotipo / sistema modular** — el manual muestra versiones con símbolo, sello, módulo ABA y wordmark.
+
+---
+
+## Paleta confirmada (página 4)
+
+| Color | Hex | RGB | CMYK | HSV | Uso |
 |---|---|---|---|---|---|
-| [Nombre 1] | #XXXXXX | rgb(x,x,x) | cmyk(x,x,x,x) | PMS XXX | [cuándo usar] |
-| [Nombre 2] | #XXXXXX | ... | ... | ... | ... |
+| **Dark Steel Blue** | `#283B6F` | 40, 59, 111 | 64, 47, 0, 56 | 224°, 64%, 44% | Wordmark, títulos, texto principal |
+| **Raspberry Pink** | `#D9536C` | 217, 83, 108 | 0, 62, 50, 15 | 349°, 62%, 85% | Hemisferio izquierdo, acentos cálidos |
+| **Light Sky Blue** | `#9AC2E8` | 154, 194, 232 | 34, 16, 0, 9 | 209°, 34%, 91% | Hemisferio derecho, fondos suaves |
+| **Blanco** | `#FFFFFF` | 255, 255, 255 | 0, 0, 0, 0 | - | Fondo limpio y contraste |
 
-### Colores secundarios
-| Nombre | HEX | RGB | Uso |
+---
+
+## Tipografía oficial (página 5)
+
+| Rol | Familia oficial | Pesos documentados | Substituto OSS |
 |---|---|---|---|
-| ... | ... | ... | ... |
+| **Identidad / titulares / cuerpo** | Poppins Family Font | No especificados | Poppins, Inter, Open Sans |
 
-### Colores de acento
-| Nombre | HEX | Uso |
+### Reglas tipográficas para producción
+- El manual solo confirma **Poppins Family Font**.
+- Usar Poppins Bold o SemiBold para titulares.
+- Usar Poppins Regular para texto de apoyo.
+- En automatizaciones Python donde Poppins no esté disponible, usar **Inter** u **Open Sans** por legibilidad clínica.
+
+---
+
+## Logo
+
+### Versiones documentadas (página 3)
+
+| Versión | Descripción | Uso recomendado |
 |---|---|---|
-| ... | ... | ... |
+| **Principal horizontal** | Isotipo cerebro + "MANRIQUE CENTRO PSICOLÓGICO" | Posts institucionales, web, materiales informativos |
+| **Sello circular** | Isotipo al centro + texto circular "CENTRO PSICOLÓGICO MANRIQUE" | Avatar, stickers, cierres |
+| **ABA modular** | Cerebro + letras ABA + nodos | Piezas sobre método ABA, neurodesarrollo |
+| **Completa extendida** | ABA + "CENTRO PSICOLÓGICO MANRIQUE ABANZA" | Piezas grandes o institucionales |
 
-### Reglas de combinación
-- ✅ [combinaciones OK]
-- ❌ [combinaciones prohibidas]
-
----
-
-## 🔤 Tipografías
-
-### Tipografía primaria
-- **Nombre exacto**: [ej. "Inter" — capitalización exacta]
-- **Pesos disponibles**: [Light 300, Regular 400, Bold 700]
-- **Uso**: titulares, headlines
-- **Link**: [Google Fonts / Adobe Fonts / archivo propio]
-
-### Tipografía secundaria
-- **Nombre exacto**: [...]
-- **Pesos**: [...]
-- **Uso**: cuerpo de texto, captions
-
-### Tipografía de acento
-- **Nombre exacto**: [...]
-- **Uso**: highlights, citas
-
-### Reglas tipográficas
-- Tamaño mínimo: [Xpx para web / Xpt para print]
-- Interlineado: [recomendado]
-- Tracking: [recomendado]
-- Jerarquía: H1 = X / H2 = Y / Body = Z
+### Archivos disponibles
+`assets/logos/` contiene 30 PNG/JPG copiados desde la carpeta oficial de identidad.
 
 ---
 
-## 🏷️ Logo
+## Reglas de uso
 
-### Variantes del logo
-1. **Logo principal** (color completo)
-2. **Logo blanco** (sobre fondos oscuros)
-3. **Logo negro** (sobre fondos claros)
-4. **Isotipo** (símbolo solo)
-5. **Logotipo** (texto solo)
+### PERMITIDO ✅
+- Usar las versiones documentadas del logo.
+- Mantener la combinación rosa + celeste en el cerebro.
+- Usar Dark Steel Blue para titulares y texto institucional.
+- Usar fondos blancos o muy limpios para conservar tono clínico.
+- Usar el módulo ABA cuando el contenido hable de terapia conductual o neurodesarrollo.
 
-### Reglas de uso
-- **Espaciado mínimo alrededor**: X (relativo al ancho del logo)
-- **Tamaño mínimo**: Xpx digital / Xmm impreso
-- **Fondos permitidos**: [colores OK]
-- **Fondos prohibidos**: [colores NO]
+### PROHIBIDO ❌
+- Cambiar colores del isotipo o del módulo ABA.
+- Usar negro puro como color base del sistema.
+- Deformar, rotar, comprimir o añadir efectos al logo.
+- Separar el lettering ABA para recomponerlo con otra tipografía.
+- Poner el logo sobre fotografías ruidosas o fondos con bajo contraste.
 
-### Errores comunes a evitar
-- ❌ Distorsionar el logo (estirar/aplastar)
-- ❌ Cambiar colores fuera de paleta
-- ❌ Aplicar efectos (sombra, glow, etc.)
-- ❌ Ponerlo sobre fondos visualmente ruidosos
-- ❌ Usar versión vieja del logo
-
-> Logos en alta calidad: `assets/logos/`
+> El manual no incluye una página específica de "aplicaciones incorrectas"; estas reglas se derivan de las versiones oficiales y de las restricciones básicas de identidad.
 
 ---
 
-## 📐 Sistema visual
+## Datos de contacto
 
-### Iconografía
-- **Estilo**: [lineal / filled / mixto]
-- **Grosor de línea**: [Xpx]
-- **Esquinas**: [redondeadas / vivas]
-- **Fuente recomendada**: [Lucide / Material / propio]
-
-### Composición
-- **Grid**: [columnas / spacing]
-- **Márgenes**: [recomendados por formato]
-- **Aire blanco**: [filosofía — generoso / denso]
-
-### Fotografía
-- **Estilo de luz**: [natural / estudio / ambos]
-- **Color grading**: [cálido / frío / neutro]
-- **Composición**: [reglas generales]
-- **Sujetos**: [tipos OK / tipos NO]
-
-### Ilustración
-- **Estilo**: [si tiene ilustraciones propias]
-- **Paleta**: [...]
+El manual revisado **no incluye datos de contacto, dirección, decisor, agencia ni fecha**. No se actualiza `05-cliente.md` desde este manual.
 
 ---
 
-## 🎬 Video y motion
+## Lineamientos para producción Distinto
 
-### Estilo de edición
-- **Cortes**: [rápidos / largos]
-- **Transiciones**: [tipos preferidos]
-- **Texto en pantalla**: [tipografía / posición / tamaño]
-- **Música**: [referencias / mood]
+### Heurísticas de composición
 
-### Aspect ratios principales
-- **Reels/TikTok**: 9:16
-- **Feed cuadrado**: 1:1
-- **Feed vertical**: 4:5
-- **YouTube**: 16:9
+1. **Clínico, no hospital frío** — usar blanco + azul profundo como base, rosa/celeste como acentos humanos.
+2. **El cerebro es el elemento propietario** — no reemplazarlo por iconos genéricos de salud mental.
+3. **ABA debe verse técnico y ordenado** — evitar estilos infantiles o lúdicos en exceso.
+4. **Contraste alto en textos** — usar `#283B6F` para lectura.
+5. **No saturar con rosa y celeste** — la dupla debe acompañar, no convertir la marca en infantil.
 
----
+### Cuándo usar cada versión del logo
 
-## ✅ Do / Don't visuales
-
-### ✅ DO
-- [TODO: práctica visual obligatoria 1]
-- [TODO: práctica visual obligatoria 2]
-- [TODO: práctica visual obligatoria 3]
-
-### ❌ DON'T
-- [TODO: error visual prohibido 1]
-- [TODO: error visual prohibido 2]
-- [TODO: error visual prohibido 3]
+| Pieza | Versión recomendada |
+|---|---|
+| Post educativo 1080x1080 | Principal horizontal |
+| Story / cierre | Sello circular o isotipo |
+| Reel sobre ABA | Versión ABA modular |
+| Carrusel institucional | Versión completa extendida |
+| Watermark | Isotipo cerebro |
 
 ---
 
-## 🔄 Cómo regenerar este extracto
+## Referencias internas
 
-Cuando se actualice `documentos/manual-de-marca.pdf`:
-1. Abrir el PDF
-2. Extraer texto de las secciones clave
-3. Actualizar este archivo manualmente
-4. Si el manual es muy largo, considerar usar AI para extraer y luego revisar
-
-> El PDF original es para humanos. Este `.md` es para Claude.
+- PDF oficial: `assets/manual-pdf/MANRIQUE-MANUAL-DE-MARCA.pdf`
+- Logos PNG/JPG: `assets/logos/` (30 archivos)
+- Resumen técnico: `assets/colores-fuentes.txt`
