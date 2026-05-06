@@ -1,52 +1,151 @@
 ═══════════════════════════════════════════════════════════
-COLORES Y FUENTES — Kintu
+  PALETA + TIPOGRAFÍA — KINTU ESSENTIAL OILS
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Fuente OFICIAL: Branding Kintu / Identidad Visual
+                (assets/manual-pdf/KINTU-BRANDING.pdf)
+Diseño original: Firma gráfica al cierre del manual; nombre no legible
+Fecha:           No indicada en el manual
+Nota técnica:    PDF sin texto extraíble; datos leídos por revisión visual
+                 de páginas renderizadas.
 
+──────────────────────────────────────────────
+  COLORES (página 6 — Colores institucionales)
+──────────────────────────────────────────────
 
-─── COLORES ───────────────────────────────────────────────
+NEUTRO     - Blanco
+            Hex:  #FFFFFF
+            RGB:  255, 255, 255
+            CMYK: 0%, 0%, 0%, 0%
+            Uso:  fondos limpios, aire visual,
+                  contraste para logo positivo
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+SECUNDARIO - Verde menta claro
+            Hex:  #BBE0CD
+            RGB:  187, 224, 205
+            CMYK: 27%, 0%, 24%, 0%
+            Uso:  patrones, fondos suaves, packaging,
+                  tarjetas y aplicaciones de baja intensidad
 
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+PRIMARIO  - Verde Kintu
+            Hex:  #45B787
+            RGB:  69, 183, 135
+            CMYK: 72%, 0%, 65%, 0%
+            Uso:  logo positivo, etiquetas, stickers,
+                  acentos principales, piezas de producto
 
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+CONTRASTE - Verde profundo
+            Hex:  #1A3E42
+            RGB:  26, 62, 66
+            CMYK: 78%, 42%, 46%, 61%
+            Uso:  logo negativo/oscuro, texto principal,
+                  fondos sólidos, titulares sobrios
 
-NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+──────────────────────────────────────────────
+  TIPOGRAFÍA (página 7 — Tipografías)
+──────────────────────────────────────────────
 
+TAGLINE        - Tracking amplio con "ESSENTIAL OILS"
+                 Uso: acompañamiento del logo, etiquetas,
+                      piezas premium con aire
+                 Substituto OSS:
+                    - Montserrat Regular con tracking alto
+                    - Inter Regular con tracking alto
 
-─── TIPOGRAFÍAS ───────────────────────────────────────────
+TÍTULOS        - Montserrat Extra Bold
+                 Uso: titulares principales, encabezados de carrusel
+                 Substituto OSS:
+                    - Montserrat ExtraBold (Google Fonts)
+                    - Poppins ExtraBold
+                    - Inter ExtraBold
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+SUBTÍTULOS     - Montserrat Semibold
+                 Uso: subtítulos, labels de producto,
+                      jerarquía secundaria
+                 Substituto OSS:
+                    - Montserrat SemiBold
+                    - Poppins SemiBold
+                    - Inter SemiBold
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+CUERPO         - Montserrat Medium
+                 Uso: párrafos, descripciones, información de etiqueta
+                 Substituto OSS:
+                    - Montserrat Medium
+                    - Inter Medium
+                    - Open Sans SemiBold
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+──────────────────────────────────────────────
+  LOGO (páginas 2-5)
+──────────────────────────────────────────────
 
+CONCEPTO: Logotipo + isotipo vegetal
+   - Wordmark "kintu" en minúsculas redondeadas.
+   - Isotipo integrado: símbolo "K" con hojas/brote.
+   - Tagline: ESSENTIAL OILS en mayúsculas espaciadas.
 
-─── REFERENCIAS RÁPIDAS ───────────────────────────────────
+VERSIONES DOCUMENTADAS:
+   1. Logo positivo: verde profundo sobre blanco
+   2. Logo negativo: blanco sobre verde profundo
+   3. Morfología/retícula del logo
+   4. Variantes: símbolo circular, símbolo solo,
+      wordmark horizontal y versión vertical
 
-Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+──────────────────────────────────────────────
+  REGLAS DE USO ESTRICTAS
+──────────────────────────────────────────────
+
+✅ PERMITIDO:
+   - Usar logo positivo sobre blanco o fondos muy claros
+   - Usar logo negativo sobre verde profundo
+   - Usar símbolo solo en stickers, sellos, iconos y cierres
+   - Usar patrones orgánicos documentados en página 8
+   - Aplicar la paleta completa en packaging y etiquetas
+
+❌ PROHIBIDO:
+   - Cambiar la paleta verde oficial
+   - Estirar, comprimir, rotar o redibujar el wordmark
+   - Usar gradientes ajenos a la paleta del manual
+   - Saturar piezas con demasiados patrones sobre texto
+   - Usar fondos oscuros sin versión negativa del logo
+
+──────────────────────────────────────────────
+  APLICACIONES DOCUMENTADAS
+──────────────────────────────────────────────
+
+PÁGINA 8:  Patrones orgánicos y patrón de isotipo repetido
+PÁGINA 9:  Stickers y cintas adhesivas
+PÁGINA 10: Tarjeta personal y de agradecimiento
+PÁGINA 11: Bolsa de papel craft y couche full color
+PÁGINAS 12-14: Propuestas de labelling para aceites
+
+──────────────────────────────────────────────
+  LOGOS DISPONIBLES EN ESTE SKILL
+──────────────────────────────────────────────
+
+assets/logos/ contiene 61 archivos PNG/JPG/JPEG copiados
+desde la carpeta oficial de identidad:
+   - Versiones PNG y JPG del logo
+   - Historias destacadas
+   - Piezas de carrusel/post/catalogo presentes en identidad
+   - Recursos de packaging y labelling
+
+──────────────────────────────────────────────
+  COMBINACIONES RECOMENDADAS
+──────────────────────────────────────────────
+
+VERDE PROFUNDO #1A3E42 sobre BLANCO    → texto, logo positivo, autoridad
+BLANCO sobre VERDE PROFUNDO            → logo negativo, fondos premium
+VERDE KINTU #45B787 sobre BLANCO       → acentos, etiquetas, botones
+MENTA CLARO #BBE0CD + BLANCO           → fondos suaves, packaging
+CRAFT/KRAFT + VERDE PROFUNDO           → bolsas, etiquetas, merch
+
+──────────────────────────────────────────────
+  NAMING IMPORTANTE
+──────────────────────────────────────────────
+
+Wordmark del manual: "kintu"
+Tagline visual:      "ESSENTIAL OILS"
+Naming de uso:       "Kintu" / "Kintu Essential Oils"
+
+En contenido Distinto, mantener "Kintu" con K mayúscula en texto,
+y respetar "kintu" minúscula solo cuando se use el logo.

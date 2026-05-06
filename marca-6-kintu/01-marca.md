@@ -84,18 +84,61 @@ Posicionarse como **la marca peruana #1 de aceites esenciales conscientes** — 
 
 ---
 
-## 🎨 Estilo visual (resumen)
+## 🎨 Sistema visual
 
-- **Paleta**: verdes plantas, terrosos cálidos, blanco crema, dorados sutiles
-- **Tipografía**: serif suave + sans humanista
-- **Fotografía**:
-  - Producto en escenarios cotidianos (sobre la mesa de noche, en mochila, oficina, yoga mat)
-  - Detalle plantas (hojas, gotas, RollOn aplicándose en muñeca/sienes)
-  - Lifestyle real Lima (no estudio aséptico — incluir caos urbano de fondo a veces)
-  - Founders Pilar y Gigi como rostros de marca (storytelling)
-- **Composición**: orgánica, espacios respiratorios, sin saturación
+> ✅ **Confirmado desde Branding Kintu / Identidad Visual** (`assets/manual-pdf/KINTU-BRANDING.pdf`).
+> 📋 Detalle completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
 
-> 📂 Detalle visual completo: `assets/brand-book-extract.md` y `assets/colores-fuentes.txt`
+### Naming oficial
+- **Nombre de uso**: **Kintu**
+- **Wordmark del logo**: **kintu**
+- **Tagline visual**: **ESSENTIAL OILS**
+- **Tipo**: logotipo con isotipo vegetal integrado
+
+### Paleta oficial (página 6 del manual)
+
+| Color | Hex | Uso |
+|---|---|---|
+| ⬜ Blanco | `#FFFFFF` | Fondos limpios, aire visual |
+| 🌿 Verde menta claro | **`#BBE0CD`** (CMYK 27, 0, 24, 0) | Patrones, fondos suaves, packaging |
+| 🟢 Verde Kintu | **`#45B787`** (CMYK 72, 0, 65, 0) | Logo positivo, etiquetas, acentos |
+| 🟩 Verde profundo | **`#1A3E42`** (CMYK 78, 42, 46, 61) | Texto, fondos premium, versión negativa |
+
+### Tipografía oficial (página 7 del manual)
+
+| Rol | Familia oficial | Substituto OSS |
+|---|---|---|
+| **Tagline** | Montserrat con tracking amplio | Montserrat / Inter con tracking |
+| **Títulos** | Montserrat Extra Bold | Montserrat ExtraBold / Poppins ExtraBold |
+| **Subtítulos** | Montserrat Semibold | Montserrat SemiBold / Inter SemiBold |
+| **Cuerpo** | Montserrat Medium | Montserrat Medium / Inter Medium |
+
+### Logo y sistema gráfico
+
+1. **Logo positivo**: verde profundo sobre blanco
+2. **Logo negativo**: blanco sobre verde profundo
+3. **Símbolo circular / símbolo solo**: stickers, sellos, iconos
+4. **Patrones orgánicos**: fondos, bolsas, tarjetas, etiquetas
+
+### Reglas duras
+
+❌ **PROHIBIDO**: cambiar la paleta verde, deformar el wordmark, usar patrones detrás de texto pequeño, reemplazar Montserrat por serif/decorativa mística.
+
+✅ **PERMITIDO**: logo positivo sobre blanco, logo negativo sobre verde profundo, símbolo solo en stickers/cierres, patrones orgánicos en packaging.
+
+### Fotografía / Dirección de arte
+- Producto en escenarios cotidianos (mesa de noche, mochila, oficina, yoga mat)
+- Detalle plantas, gotas y RollOn aplicándose en muñeca/sienes
+- Founders Pilar y Gigi como rostros de marca
+- Packaging y etiquetas como referencia visual principal
+- Composición limpia, orgánica, con aire blanco generoso
+
+### Aplicaciones documentadas
+- Patrones orgánicos
+- Stickers y cintas adhesivas
+- Tarjeta personal y de agradecimiento
+- Bolsa craft / couche full color
+- Propuestas de labelling para aceites
 
 ---
 
@@ -103,7 +146,7 @@ Posicionarse como **la marca peruana #1 de aceites esenciales conscientes** — 
 
 | Documento | Estado | Notas |
 |---|---|---|
-| Brand book formal | ⚠️ NO localizado todavía — pedir al cliente | — |
+| Brand book formal | ✅ `assets/manual-pdf/KINTU-BRANDING.pdf` | Manual visual oficial, 15 páginas |
 | Web | ✅ kintuoils.com | Activa con catálogo + checkout |
 | Story founders | ✅ Documentada en guion "8. QUE ES KINTU" | Pilar (ingeniera) + Gigi (bióloga) — amigas |
 
