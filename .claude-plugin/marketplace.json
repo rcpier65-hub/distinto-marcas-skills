@@ -10,10 +10,10 @@
     {
       "name": "distinto-marcas",
       "source": "./",
-      "description": "Pack completo de identidad de marca para los 9 clientes activos de Agencia Distinto. Carga automáticamente la voz, audiencia, paleta, KPIs y sensibilidades de cada marca cuando se trabaja contenido, copy, estrategia, atención al cliente o paid media.",
-      "version": "1.0.0",
+      "description": "Pack de identidad de marca para los 9 clientes activos + skill `grilla-semanal` que automatiza el flujo Notion → Plantilla → PNG → WhatsApp. Activá la skill diciendo cosas como 'haz la grilla de [marca]' o 'envía la grilla semanal de [contacto]'.",
+      "version": "1.1.0",
       "category": "brand-management",
-      "tags": ["agencia", "marketing", "brands", "social-media"]
+      "tags": ["agencia", "marketing", "brands", "social-media", "workflow-automation"]
     }
   ]
 }

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>¿Qué se viene? — Manrique · Semana 14-17 May 2026 (DEMO REAL Notion)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,500;1,600&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:        #283B6F;
+    --raspberry:   #D9536C;
+    --sky:         #9AC2E8;
+    --canvas:      #FBF6F2;
+    --white:       #FFFFFF;
+    --card-blue:   #E5EEF8;
+    --card-pink:   #F8DEE3;
+    --card-cream:  #FBF1DC;
+    --card-white:  #FFFFFF;
+    --card-rose:   #F4C9D2;
+    --acc-blue:    #6FAEDB;
+    --acc-pink:    #D9536C;
+    --acc-mustard: #D4A93E;
+    --acc-sky:     #9AC2E8;
+    --acc-rose:    #D9536C;
+    --serif:  'Playfair Display', Georgia, serif;
+    --sans:   'Poppins', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #2c2c2c; font-family: var(--sans); color: var(--navy);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { display: flex; justify-content: center; padding: 40px 0; }
+  .poster { width: 1080px; height: 1620px; background: var(--canvas); position: relative;
+    overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .blob { position: absolute; background: var(--raspberry); opacity: .18;
+    filter: blur(2px); border-radius: 50%; pointer-events: none; }
+  .blob.tr { width: 380px; height: 220px; top: -110px; right: -130px;
+    transform: rotate(-25deg); border-radius: 60% 40% 50% 50% / 60% 50% 50% 40%; }
+  .blob.bl { width: 420px; height: 260px; bottom: -120px; left: -150px;
+    transform: rotate(15deg); border-radius: 50% 50% 60% 40% / 50% 60% 40% 50%; }
+
+  .header { display: flex; align-items: center; gap: 24px; margin-bottom: 10px; }
+  .logo { width: 200px; height: 200px; flex-shrink: 0; object-fit: contain;
+    margin: -30px -20px -30px -30px; }
+  .brand-name { flex: 1; }
+  .brand-name .small { font-size: 26px; font-weight: 400; letter-spacing: 1px;
+    color: var(--navy); line-height: 1; margin-bottom: 4px; }
+  .brand-name .big { font-size: 58px; font-weight: 800; letter-spacing: 1px;
+    color: var(--navy); line-height: 1; }
+  .date-pill { background: var(--navy); color: var(--white); font-weight: 600;
+    font-size: 24px; letter-spacing: .8px; padding: 18px 30px; border-radius: 999px;
+    white-space: nowrap; align-self: center; }
+
+  .hero { text-align: center; margin: 50px 0 50px; }
+  .hero h1 { font-family: var(--serif); font-style: italic; font-weight: 500;
+    font-size: 132px; color: var(--navy); line-height: .95; letter-spacing: -1px; white-space: nowrap; }
+  .hero .sub { font-size: 26px; font-weight: 400; color: var(--navy);
+    margin-top: 14px; letter-spacing: .3px; }
+  .divider { display: flex; align-items: center; justify-content: center;
+    gap: 12px; margin-top: 22px; }
+  .divider .line { width: 240px; height: 2px; background: var(--sky); border-radius: 2px; }
+  .divider .dot  { width: 12px; height: 12px; background: var(--sky); border-radius: 50%; }
+
+  .cards { display: flex; flex-direction: column; gap: 26px; margin-top: 20px; }
+  .card { background: var(--card-bg, var(--card-white)); border-radius: 24px;
+    padding: 32px 40px; display: flex; align-items: center; gap: 30px;
+    min-height: 160px; position: relative; }
+  .card .date { flex-shrink: 0; text-align: left; min-width: 130px; }
+  .card .date .day { font-size: 88px; font-weight: 700; color: var(--navy);
+    line-height: .9; letter-spacing: -1px; }
+  .card .date .month { font-size: 26px; font-weight: 700;
+    color: var(--acc, var(--navy)); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+  .card .bar { width: 3px; height: 110px; background: var(--acc, var(--navy));
+    border-radius: 2px; opacity: .9; flex-shrink: 0; }
+  .card .body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .card .body .title { font-size: 44px; font-weight: 700; color: var(--navy);
+    line-height: 1.1; letter-spacing: -.3px; }
+  .card .body .meta { font-size: 22px; font-weight: 400; color: var(--navy);
+    letter-spacing: .2px; opacity: .9; }
+  .card .icon { flex-shrink: 0; width: 100px; height: 100px; color: var(--navy); }
+  .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
+    stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Card empty (sin contenido programado) */
+  .card.empty { background: transparent; border: 2px dashed rgba(40,59,111,.18); min-height: 100px;
+    padding: 24px 40px; }
+  .card.empty .body .title { font-size: 28px; font-weight: 500; opacity: .5; }
+  .card.empty .body .meta { font-size: 18px; opacity: .4; }
+  .card.empty .bar { opacity: 0; }
+  .card.empty .date .day { font-size: 62px; opacity: .35; }
+  .card.empty .date .month { opacity: .35; }
+  .card.empty .icon { opacity: .25; width: 60px; height: 60px; }
+
+  .card.is-white  { --card-bg: var(--card-white); --acc: var(--acc-sky); }
+  .card.is-rose   { --card-bg: var(--card-rose);  --acc: var(--acc-rose); }
+
+  .footer { margin-top: auto; padding-top: 32px; text-align: center; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 14px;
+    font-size: 24px; font-weight: 700; color: var(--navy);
+    letter-spacing: 4px; text-transform: uppercase; }
+  .footer .agency svg { width: auto; height: 42px; flex-shrink: 0; display: block; }
+  .footer .url { font-size: 20px; font-weight: 300; color: var(--navy);
+    margin-top: 8px; letter-spacing: .8px; opacity: .85; }
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="blob tr"></div>
+  <div class="blob bl"></div>
+
+  <header class="header">
+    <img class="logo" src="logo-manrique.png" alt="Centro Psicológico Manrique ABA" />
+    <div class="brand-name">
+      <div class="small">CENTRO PSICOLÓGICO</div>
+      <div class="big">MANRIQUE</div>
+    </div>
+    <div class="date-pill">14 — 17 MAY · 2026</div>
+  </header>
+
+  <section class="hero">
+    <h1>¿Qué se viene?</h1>
+    <div class="sub">Mayo · Del jueves 14 al domingo 17</div>
+    <div class="divider">
+      <span class="line"></span><span class="dot"></span><span class="line"></span>
+    </div>
+  </section>
+
+  <section class="cards">
+
+    <!-- Jueves 14 May — Video Influencer -->
+    <article class="card is-white">
+      <div class="date"><div class="day">14</div><div class="month">Jue</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Video Influencer</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="8" y="12" width="48" height="34" rx="3"/>
+          <path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/>
+          <path d="M22 52h20"/><path d="M32 46v6"/>
+        </svg>
+      </div>
+    </article>
+
+    <!-- Viernes 15 May — sin contenido programado -->
+    <article class="card empty">
+      <div class="date"><div class="day">15</div><div class="month">Vie</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Sin publicación programada</div>
+        <div class="meta">— Día sin contenido en grilla —</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="20"/>
+          <path d="M22 32h20"/>
+        </svg>
+      </div>
+    </article>
+
+    <!-- Sábado 16 May — Testimonio Francesco -->
+    <article class="card is-rose">
+      <div class="date"><div class="day">16</div><div class="month">Sáb</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Testimonio · Francesco</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/>
+          <text x="22" y="38" font-family="Poppins, sans-serif" font-weight="700"
+                font-size="18" fill="currentColor" stroke="none">99</text>
+        </svg>
+      </div>
+    </article>
+
+    <!-- Domingo 17 May — sin contenido programado -->
+    <article class="card empty">
+      <div class="date"><div class="day">17</div><div class="month">Dom</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Sin publicación programada</div>
+        <div class="meta">— Día sin contenido en grilla —</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="20"/>
+          <path d="M22 32h20"/>
+        </svg>
+      </div>
+    </article>
+
+  </section>
+
+  <footer class="footer">
+    <div class="agency">
+      <svg viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+        <defs><mask id="distintoBite"><rect width="200" height="110" fill="white"/>
+          <circle cx="168" cy="92" r="20" fill="black"/></mask></defs>
+        <circle cx="135" cy="58" r="46" fill="#C5A82D" mask="url(#distintoBite)"/>
+        <circle cx="60" cy="55" r="50" fill="#8B2DC9"/>
+      </svg>
+      <span>DISTINTO · AGENCIA</span>
+    </div>
+    <div class="url">www.agenciadistinto.com</div>
+  </footer>
+</div>
+
+</body>
+</html>
