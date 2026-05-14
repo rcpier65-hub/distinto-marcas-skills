@@ -1,6 +1,6 @@
 {
   "name": "distinto-marcas",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Pack de skills de marca + workflow de grilla semanal para los 9 clientes de Agencia Distinto. Incluye identidad completa por marca (voz, audiencia, oferta, KPIs) y un skill operativo (grilla-semanal) que orquesta Notion → plantilla HTML → PNG → WhatsApp cuando el usuario pide generar la guía semanal de cualquier cliente.",
   "author": {
     "name": "Agencia Distinto",

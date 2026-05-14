@@ -24,11 +24,12 @@ Donde `[marca]` puede ser: Manrique, Lozano, Distribuidora Fitness, Kintu, Noval
 1. **NUNCA inventar datos** — todo viene de Notion. Si Notion no tiene contenido para un día, dejar la card como "Sin publicación programada" o omitirla del mensaje (según preferencia del cliente).
 2. **NUNCA enviar el WhatsApp sin mostrar antes el preview** al usuario y esperar su aprobación. Excepción: si el usuario dice explícitamente "envialo directo" o "no hace falta preview".
 3. **SIEMPRE leer primero la skill de marca** (`marca-X-cliente`) para contexto de voz, sensibilidades y reglas de contenido antes de generar el mensaje.
-4. **SIEMPRE confirmar el receptor de WhatsApp** consultando `recipients.md` de este skill — cada marca tiene su grupo y contacto específico.
-5. **NO incluir** la frase "Cualquier ajuste antes de mañana 6:30 pm es bienvenido" ni similares al final del mensaje. El cliente no lo pidió.
-6. **NO incluir** un header tipo "Grilla de contenido para [MARCA]" — el mensaje empieza directo con el saludo personalizado al contacto.
-7. **NO incluir** los días "Sin publicación programada" en el mensaje de texto (sí pueden aparecer visualmente en la pieza si el diseño lo requiere).
-8. **NO incluir** el "Estado Notion" (ej. "Aprobar", "Programar") en el mensaje.
+4. **SIEMPRE confirmar el receptor de WhatsApp** consultando `recipients.md` de este skill — cada marca tiene su grupo, contacto y **tratamiento específico** (Dr., Sr., Lic., etc.).
+5. **SIEMPRE incluir el tratamiento del contacto** en el saludo si está configurado. Ej. Manrique → "Hola **Dr. Gustavo**" (NO "Hola Gustavo"). Esta regla es **innegociable** — el cliente lo exigió explícitamente.
+6. **NO incluir** la frase "Cualquier ajuste antes de mañana 6:30 pm es bienvenido" ni similares al final del mensaje. El cliente no lo pidió.
+7. **NO incluir** un header tipo "Grilla de contenido para [MARCA]" — el mensaje empieza directo con el saludo personalizado al contacto.
+8. **NO incluir** los días "Sin publicación programada" en el mensaje de texto (sí pueden aparecer visualmente en la pieza si el diseño lo requiere).
+9. **NO incluir** el "Estado Notion" (ej. "Aprobar", "Programar") en el mensaje.
 
 ---
 
@@ -82,7 +83,7 @@ Invocar la skill `marca-X-[cliente]` para tener acceso a:
 Usar la plantilla en `message-template.md`. Estructura:
 
 ```
-@[NUMERO_CONTACTO] Hola [NOMBRE_CONTACTO] 👋
+@[NUMERO_CONTACTO] Hola [TRATAMIENTO] [NOMBRE_CONTACTO] 👋
 
 Envío para ti la grilla de contenido que se publicará la siguiente semana, del [DD] al [DD] de [mes].
 
@@ -92,6 +93,9 @@ Envío para ti la grilla de contenido que se publicará la siguiente semana, del
 
 [Repetir bloque por cada publicación]
 ```
+
+⚠️ **El TRATAMIENTO (Dr., Sr., Lic., etc.) viene de `recipients.md` y es obligatorio**.
+Para Manrique → `Dr. Gustavo`. Nunca solo "Gustavo".
 
 ⚠️ **NO incluir**:
 - Línea "Cualquier ajuste antes de las X es bienvenido"

@@ -5,35 +5,66 @@
 
 ## 📞 Mapeo oficial
 
-| # | Marca | Skill | Contacto cliente | WhatsApp contacto | Grupo destino | Group ID | Alias |
+| # | Marca | Skill | Tratamiento | Nombre | WhatsApp contacto | Grupo destino | chatId |
 |---|---|---|---|---|---|---|---|
-| 1 | Muebles Lozano | `marca-1-muebles-lozano` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 2 | **Manrique ABA** | `marca-2-manrique` | **Gustavo** | `51983852191` ⚠️ | **New team** | `120363427129444398@g.us` | `little-joe` |
-| 3 | Distribuidora Fitness | `marca-3-distribuidora-fitness` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 4 | Little Joe | `marca-4-little-joe` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 5 | Mil Ideas | `marca-5-mil-ideas` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 6 | Kintu | `marca-6-kintu` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 7 | Novalamps | `marca-7-novalamps` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 8 | La Victoria | `marca-8-la-victoria` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
-| 9 | Oral Beauty | `marca-9-oral-beauty` | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` | `little-joe` |
+| 1 | Muebles Lozano | `marca-1-muebles-lozano` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 2 | **Manrique ABA** | `marca-2-manrique` | **Dr.** | **Gustavo** | `51902414745` | **Marketing Manrique ABA** | `120363339856209687@g.us` |
+| 3 | Distribuidora Fitness | `marca-3-distribuidora-fitness` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 4 | Little Joe | `marca-4-little-joe` | _por confirmar_ | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` |
+| 5 | Mil Ideas | `marca-5-mil-ideas` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 6 | Kintu | `marca-6-kintu` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 7 | Novalamps | `marca-7-novalamps` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 8 | La Victoria | `marca-8-la-victoria` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 9 | Oral Beauty | `marca-9-oral-beauty` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+
+## 🎯 IMPORTANTE — Cómo construir el saludo
+
+El saludo se construye combinando **Tratamiento + Nombre**:
+
+```
+Hola [Tratamiento] [Nombre] 👋
+```
+
+### Ejemplos correctos:
+
+- Manrique → "Hola **Dr. Gustavo** 👋" ✅
+- (No usar) → "Hola Gustavo 👋" ❌ (falta el Dr.)
+- (No usar) → "Hola Doctor Gustavo 👋" ❌ (usar "Dr." abreviado)
+
+### Tratamientos posibles
+
+- `Dr.` — profesional médico/psicólogo (caso Manrique)
+- `Sr.` / `Sra.` — tratamiento formal genérico
+- `Lic.` — licenciado/a
+- `Ing.` — ingeniero/a
+- `(vacío)` — saludo informal directo "Hola [Nombre]"
+
+⚠️ **Si una marca no tiene tratamiento confirmado**, preguntar al usuario antes de enviar. No asumir.
+
+---
 
 ## ⚠️ Pendientes
 
-- **Manrique** (Gustavo): el número `51983852191` es el de Pedro (owner agencia). Confirmar si Gustavo tiene un número propio que prefiera para tags, o si efectivamente el destinatario en producción es Pedro y "Gustavo" es solo el saludo. Si Gustavo tiene número propio → reemplazar en la tabla.
-- **Resto de marcas**: completar contactos + números reales antes de operar el skill en producción.
-
-## Reglas
-
-1. **Cuando una marca no tiene contacto confirmado** → preguntar al usuario antes de enviar.
-2. **El grupo "New team"** es el grupo interno de Distinto donde llegan TODAS las grillas (no se envía directo al cliente). El mention en el caption es para que el responsable del cliente reciba notificación dentro del grupo.
-3. **Si en el futuro cada marca tiene su propio grupo cliente** → agregar columna y actualizar este mapa. La skill leerá de aquí.
-
-## Cómo agregar una marca nueva
-
-1. Crear su `marca-X-cliente/SKILL.md` en `skills/`
-2. Agregar una fila en esta tabla
-3. Confirmar con el cliente el contacto y número de WhatsApp
-4. Probar el flujo con preview antes de enviar real
+Solo Manrique está completamente configurada. Las otras 8 marcas necesitan:
+- Confirmar nombre del contacto cliente
+- Confirmar tratamiento (Dr./Sr./etc.)
+- Confirmar número WhatsApp
+- Confirmar grupo destino (puede que cada marca tenga su propio grupo)
 
 ---
-Actualizado: 14 May 2026 · v1.0
+
+## Reglas operativas
+
+1. **Cuando una marca tiene contactos `_por confirmar_`** → la skill NO debe operar para esa marca. Avisar al usuario y pedir los datos.
+2. **El grupo "Marketing [Marca]"** parece ser el patrón de naming para grupos de cada cliente. Verificar este patrón al confirmar las demás marcas.
+3. **El chatId** se obtiene con `whatsapp_list_groups` antes de enviar — siempre validar que el grupo existe y el bot está agregado.
+
+## Cómo agregar/actualizar una marca
+
+1. Confirmar con el cliente: nombre del contacto, tratamiento (Dr./Sr./etc.), número WhatsApp
+2. Verificar el grupo donde llegarán las grillas (consultar `whatsapp_list_groups`)
+3. Actualizar la fila correspondiente en esta tabla
+4. Probar el flujo con preview (no enviar) antes de operar en real
+
+---
+Actualizado: 14 May 2026 · v1.1

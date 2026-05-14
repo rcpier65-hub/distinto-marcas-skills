@@ -6,7 +6,7 @@
 ## ✅ Formato canónico
 
 ```
-@[NUMERO_CONTACTO] Hola [NOMBRE_CONTACTO] 👋
+@[NUMERO_CONTACTO] Hola [TRATAMIENTO] [NOMBRE_CONTACTO] 👋
 
 Envío para ti la grilla de contenido que se publicará la siguiente semana, del [DD] al [DD] de [mes en minúscula].
 
@@ -21,10 +21,12 @@ Envío para ti la grilla de contenido que se publicará la siguiente semana, del
 [...más bloques si hay más publicaciones...]
 ```
 
+⚠️ **CRÍTICO sobre el saludo**: el tratamiento (Dr., Sr., Lic., etc.) y el nombre se obtienen de `recipients.md`. NUNCA omitir el tratamiento si la marca lo tiene configurado.
+
 ## ✅ Ejemplo real (Manrique · semana 14-17 May 2026)
 
 ```
-@51983852191 Hola Gustavo 👋
+@51902414745 Hola Dr. Gustavo 👋
 
 Envío para ti la grilla de contenido que se publicará la siguiente semana, del 14 al 17 de mayo.
 
@@ -41,6 +43,7 @@ Testimonio cerrando el journey de Francesco con la evaluación neuropsicológica
 
 | Elemento | Por qué |
 |---|---|
+| ~~"Hola Gustavo"~~ (sin Dr.) | El cliente exigió el tratamiento "Dr." — usar `Dr. Gustavo` |
 | ~~"Grilla de contenido para [MARCA]"~~ | El grupo ya está dedicado a esa marca |
 | ~~"Estado Notion: Aprobar/Programar/etc."~~ | Es info interna de gestión, no relevante para el cliente |
 | ~~"⚠️ Sin publicación: viernes/domingo"~~ | No mencionar los días vacíos en el texto |
@@ -57,6 +60,7 @@ Testimonio cerrando el journey de Francesco con la evaluación neuropsicológica
 - Fecha en formato `[DD] [MES_ABREV]`: `14 MAY`
 - Título de la pieza tal cual está en Notion (Nombre de la tarea)
 - Resumen de 2 líneas máximo, parafraseando el copy de la pieza en Notion
+- **Tratamiento del contacto** (Dr., Sr., Lic., etc.) si está configurado en `recipients.md`
 
 ## 📝 Cómo generar el "resumen 2 líneas"
 
@@ -72,12 +76,13 @@ Desde el contenido de Notion de la pieza (el copy del post/reel):
 - NO sensacionalista
 - Frases como "psicólogos colegiados", "evaluación neuropsicológica", "diagnóstico preciso" son OK
 - Refuerzo del slogan: *"No estás solo, estamos dispuestos a ayudarte"*
+- **Saludo obligatorio**: "Hola Dr. Gustavo 👋"
 
 ### Otras marcas
 
-Consultar respectivo `01-marca.md` del skill `marca-X` antes de redactar el resumen.
+Consultar respectivo `01-marca.md` del skill `marca-X` antes de redactar el resumen, y `recipients.md` para el tratamiento correcto.
 
 ---
 
-Plantilla validada: 14 May 2026
+Plantilla validada: 14 May 2026 · v1.1
 Próxima revisión: cuando el cliente pida cambios
