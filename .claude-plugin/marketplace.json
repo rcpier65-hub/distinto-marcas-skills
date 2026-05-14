@@ -1,0 +1,19 @@
+{
+  "name": "distinto-marketplace",
+  "owner": {
+    "name": "Agencia Distinto",
+    "email": "team@agenciadistinto.com",
+    "url": "https://www.agenciadistinto.com"
+  },
+  "description": "Marketplace privado de Agencia Distinto — skills, plugins y herramientas internas del equipo.",
+  "plugins": [
+    {
+      "name": "distinto-marcas",
+      "source": "./",
+      "description": "Pack completo de identidad de marca para los 9 clientes activos de Agencia Distinto. Carga automáticamente la voz, audiencia, paleta, KPIs y sensibilidades de cada marca cuando se trabaja contenido, copy, estrategia, atención al cliente o paid media.",
+      "version": "1.0.0",
+      "category": "brand-management",
+      "tags": ["agencia", "marketing", "brands", "social-media"]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "distinto-marcas",
+  "version": "1.0.0",
+  "description": "Pack de skills de marca de los 9 clientes de Agencia Distinto: identidad, voz, audiencia, oferta, KPIs, sensibilidades, competencia y objetivos mensuales para Muebles Lozano, Manrique ABA, Distribuidora Fitness, Little Joe, Mil Ideas, Kintu, Novalamps, La Victoria y Oral Beauty.",
+  "author": {
+    "name": "Agencia Distinto",
+    "email": "team@agenciadistinto.com",
+    "url": "https://www.agenciadistinto.com"
+  },
+  "homepage": "https://github.com/rcpier65-hub/distinto-marcas-skills",
+  "repository": "https://github.com/rcpier65-hub/distinto-marcas-skills",
+  "license": "PROPRIETARY",
+  "keywords": [
+    "agencia-distinto",
+    "brand-skills",
+    "marketing",
+    "social-media",
+    "peru",
+    "marcas-cliente"
+  ]
+}
