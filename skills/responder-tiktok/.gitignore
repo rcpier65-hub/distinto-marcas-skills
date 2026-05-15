@@ -1,0 +1,18 @@
+# NUNCA subir cookies de sesión — son credenciales sensibles
+auth/*.json
+!auth/.gitkeep
+
+# Logs locales
+logs/*.json
+logs/*.html
+!logs/.gitkeep
+
+# Snapshots de debug
+*_snapshot.html
+*_snapshot.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

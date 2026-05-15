@@ -10,10 +10,10 @@
     {
       "name": "distinto-marcas",
       "source": "./",
-      "description": "Pack de identidad de marca para los 9 clientes activos + skill `grilla-semanal` que automatiza el flujo Notion → Plantilla → PNG → WhatsApp. Activá la skill diciendo cosas como 'haz la grilla de [marca]' o 'envía la grilla semanal de [contacto]'.",
-      "version": "1.1.1",
+      "description": "Pack de identidad de las 9 marcas + workflows operativos. Incluye `grilla-semanal` (Notion → Plantilla → PNG → WhatsApp) y `responder-tiktok` (Playwright + sesión persistente para responder comentarios TikTok sin Metricool). Activá diciendo 'haz la grilla de [marca]' o 'responde tiktok de [marca]'.",
+      "version": "1.2.0",
       "category": "brand-management",
-      "tags": ["agencia", "marketing", "brands", "social-media", "workflow-automation"]
+      "tags": ["agencia", "marketing", "brands", "social-media", "workflow-automation", "playwright", "tiktok"]
     }
   ]
 }

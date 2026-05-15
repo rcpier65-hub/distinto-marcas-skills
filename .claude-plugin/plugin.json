@@ -1,7 +1,7 @@
 {
   "name": "distinto-marcas",
-  "version": "1.1.1",
-  "description": "Pack de skills de marca + workflow de grilla semanal para los 9 clientes de Agencia Distinto. Incluye identidad completa por marca (voz, audiencia, oferta, KPIs) y un skill operativo (grilla-semanal) que orquesta Notion → plantilla HTML → PNG → WhatsApp cuando el usuario pide generar la guía semanal de cualquier cliente.",
+  "version": "1.2.0",
+  "description": "Pack de skills de marca + workflows operativos para los 9 clientes de Agencia Distinto. Incluye: identidad completa por marca (voz, audiencia, oferta, KPIs), skill `grilla-semanal` (Notion → plantilla HTML → PNG → WhatsApp) y skill `responder-tiktok` (Playwright + sesión persistente para responder comentarios TikTok de las 9 cuentas sin Metricool).",
   "author": {
     "name": "Agencia Distinto",
     "email": "team@agenciadistinto.com",
@@ -18,6 +18,8 @@
     "peru",
     "marcas-cliente",
     "grilla-semanal",
-    "workflow-automation"
+    "responder-tiktok",
+    "workflow-automation",
+    "playwright"
   ]
 }
