@@ -101,42 +101,100 @@ def main():
         )
 
         page = context.new_page()
-        print("🌐 Abriendo TikTok login...")
-        page.goto("https://www.tiktok.com/login", timeout=60000)
+        print("🌐 Abriendo TikTok login (modo QR directo)...")
+
+        # Ir directo a la página de QR de TikTok
+        try:
+            page.goto("https://www.tiktok.com/login/qrcode", timeout=60000)
+        except Exception:
+            # Fallback: si la URL directa no funciona, ir al login normal
+            page.goto("https://www.tiktok.com/login", timeout=60000)
+
+        # Traer la ventana al frente para que Pedro la vea
+        try:
+            page.bring_to_front()
+        except Exception:
+            pass
+
+        page.wait_for_timeout(2500)
+
+        # Intentar clickear "Use QR code" si la página muestra el selector de método
+        qr_selectors = [
+            'a[href*="qrcode"]',
+            'div:has-text("Usar código QR")',
+            'div:has-text("Use QR code")',
+            'div:has-text("código QR")',
+            '[data-e2e="channel-item"]:has-text("QR")',
+        ]
+        for sel in qr_selectors:
+            try:
+                elem = page.locator(sel).first
+                if elem.count() > 0 and elem.is_visible(timeout=1500):
+                    elem.click(timeout=3000)
+                    print(f"   ✓ Click en selector de QR: {sel}")
+                    page.wait_for_timeout(2000)
+                    break
+            except Exception:
+                continue
 
         print()
         print("👉 INSTRUCCIONES:")
-        print(f"   1. En el Chrome que se abrió, haz login con la cuenta TikTok de '{args.marca}'.")
-        print("   2. Si tiene 2FA, completalo.")
-        print("   3. Espera a que estés DENTRO de TikTok (ya logueado, viendo el feed o studio).")
-        print("   4. NO cierres el navegador.")
-        print("   5. Vuelve a esta terminal y presiona Enter.")
+        print(f"   1. Verás un código QR en el Chromium. Si NO ves el QR aún, presiona Cmd+Tab para encontrar la ventana.")
+        print(f"   2. Abre TikTok en tu celu → Perfil → menú ☰ → Escanear QR.")
+        print(f"   3. Escanea el código y confirma en el celu.")
+        print(f"   4. El script detecta el login automáticamente y guarda las cookies.")
         print()
+        print("⏳ Esperando login... (timeout 5 min)")
 
-        try:
-            input("⌨️  Presiona Enter cuando hayas terminado el login... ")
-        except KeyboardInterrupt:
-            print("\n❌ Cancelado por el usuario")
+        # Detectar login automáticamente: monitorea URL + cookie de sesión
+        login_detectado = False
+        timeout_total = 300  # 5 min
+        intervalo = 3
+        intentos = timeout_total // intervalo
+
+        for i in range(intentos):
+            try:
+                current_url = page.url
+                cookies = context.cookies()
+                tiene_session = any(c.get("name") in ("sessionid", "sid_tt", "sid_guard") and c.get("value") for c in cookies)
+                fuera_de_login = "login" not in current_url.lower() and "signup" not in current_url.lower()
+
+                if tiene_session and fuera_de_login:
+                    # Espera 4 seg adicionales para asegurar que TikTok terminó de setear cookies
+                    print(f"   ✓ Login detectado en URL: {current_url[:80]}")
+                    page.wait_for_timeout(4000)
+                    login_detectado = True
+                    break
+
+                if i % 5 == 0:  # cada 15s un heartbeat
+                    print(f"   ... ({i * intervalo}s) URL actual: {current_url[:60]}")
+
+                page.wait_for_timeout(intervalo * 1000)
+            except KeyboardInterrupt:
+                print("\n❌ Cancelado por el usuario")
+                browser.close()
+                sys.exit(1)
+            except Exception as e:
+                print(f"   ⚠️ Error monitoreando ({i*intervalo}s): {e}")
+                page.wait_for_timeout(intervalo * 1000)
+
+        if not login_detectado:
+            print("⏱️  Timeout de 5 min sin detectar login. Abortando.")
             browser.close()
-            sys.exit(1)
+            sys.exit(2)
 
-        # Intentar detectar el handle real desde la URL o el DOM
+        # Verificar yendo a Studio
         try:
             page.goto("https://www.tiktok.com/tiktokstudio", timeout=30000, wait_until="domcontentloaded")
             page.wait_for_timeout(3000)
             current_url = page.url
-            print(f"📍 URL actual: {current_url}")
+            print(f"📍 URL final: {current_url[:80]}")
 
             if "login" in current_url.lower():
-                print("⚠️  Parece que aún no estás logueado. ¿Completaste el login?")
-                resp = input("¿Continuar y guardar igual? [s/N]: ").strip().lower()
-                if resp != "s":
-                    print("❌ Abortando, no se guardó nada.")
-                    browser.close()
-                    sys.exit(1)
+                print("⚠️  TikTok te re-redirigió a login. Las cookies quedaron débiles.")
+                print("    Guardo igual; si falla en lectura, vuelve a correr este script.")
         except Exception as e:
-            print(f"⚠️  No pude verificar el login: {e}")
-            print("    Guardo cookies igual; si no funciona, vuelve a correr este script.")
+            print(f"⚠️  No pude verificar Studio: {e}")
 
         # Guardar storage_state
         context.storage_state(path=str(auth_file))

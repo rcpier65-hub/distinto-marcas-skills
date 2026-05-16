@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-leer_comentarios.py — Lee comentarios pendientes del inbox TikTok de una marca.
+leer_comentarios.py — Lee comentarios pendientes del inbox TikTok Studio de una marca.
 
 Uso:
     python leer_comentarios.py --marca manrique
-    python leer_comentarios.py --marca manrique --limite 20 --solo-no-respondidos
+    python leer_comentarios.py --marca manrique --limite 20
 
 Output: JSON por stdout con los comentarios encontrados.
 
@@ -15,22 +15,25 @@ Estructura del JSON:
   "total_leidos": 12,
   "comentarios": [
     {
-      "id": "7..." ,
+      "id": "manrique_0_1234567890",
       "video_id": "7...",
-      "video_url": "https://www.tiktok.com/@centro_psic_manrique/video/...",
+      "video_url": "https://www.tiktok.com/@.../video/...",
+      "video_titulo": "¿El colegio te pidió...",
       "username": "@usuario",
       "texto": "...",
-      "timestamp": "hace 3 h",
+      "tiempo_relativo": "hace 3 h",
       "respondido": false,
-      "es_propio": false
+      "posicion_en_inbox": 0
     }
   ],
   "errores": []
 }
 
-NOTA sobre los selectores: TikTok cambia el DOM cada 2-3 meses. Si el script
-deja de encontrar comentarios, revisar manualmente https://www.tiktok.com/tiktokstudio/inbox
-y actualizar los selectores marcados como SELECTOR_*.
+Selectores TikTok Studio (mayo 2026):
+- Container del inbox: [data-tt="components_CommentList_Container"]
+- Card individual: [data-tt="components_CommentCell_FlexColumn"]
+- TikTok cambia el DOM cada 2-3 meses; si deja de funcionar revisar
+  logs/<marca>_inbox_snapshot.html y actualizar el JS de extraerComentarios()
 """
 
 import argparse
@@ -44,7 +47,7 @@ from pathlib import Path
 try:
     from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 except ImportError:
-    print(json.dumps({"error": "Playwright no instalado. pip install playwright && playwright install chromium"}))
+    print(json.dumps({"error": "Playwright no instalado"}))
     sys.exit(1)
 
 
@@ -53,16 +56,91 @@ MARCAS_FILE = SKILL_DIR / "marcas.json"
 AUTH_DIR = SKILL_DIR / "auth"
 LOGS_DIR = SKILL_DIR / "logs"
 
-# Selectores TikTok Studio (actualizar si TikTok cambia el DOM)
-SELECTOR_COMMENT_CARDS = '[data-e2e="comment-item"], div[class*="CommentItem"], div[class*="comment-item"]'
-SELECTOR_COMMENT_TEXT = 'p[class*="Text"], span[class*="text"], div[class*="content"]'
-SELECTOR_USERNAME = 'a[class*="user"], span[class*="user-name"], a[href*="/@"]'
-SELECTOR_VIDEO_LINK = 'a[href*="/video/"]'
-SELECTOR_REPLIED_BADGE = '[data-e2e="replied-badge"], span[class*="Replied"], span[class*="replied"]'
+INBOX_URL_FALLBACK = "https://www.tiktok.com/tiktokstudio/comment"
+
+
+# JavaScript que corre dentro de la página para extraer comentarios estructurados.
+# Más fácil mantener un solo bloque JS que muchos locators encadenados.
+EXTRACT_JS = """
+() => {
+    const cards = Array.from(document.querySelectorAll('[data-tt="components_CommentCell_FlexColumn"]'));
+    const out = [];
+
+    cards.forEach((card, i) => {
+        try {
+            // USERNAME: <a data-tt="components_MessageCell_a" href="/@username">username</a>
+            const userLink = card.querySelector('a[data-tt="components_MessageCell_a"][href^="/@"]');
+            const username = userLink ? userLink.textContent.trim() : '';
+            const username_href = userLink ? userLink.getAttribute('href') : '';
+
+            // TIEMPO: <span data-tt="components_MessageCell_span_20">7h ago</span>
+            const tiempoEl = card.querySelector('span[data-tt="components_MessageCell_span_20"]');
+            const tiempo_relativo = tiempoEl ? tiempoEl.textContent.trim() : '';
+
+            // TEXTO COMENTARIO: <span data-tt="components_TUXTextWithMention_TUXText">...</span>
+            const textoEl = card.querySelector('span[data-tt="components_TUXTextWithMention_TUXText"]')
+                         || card.querySelector('span[data-tt="components_MessageCell_TruncateText"]');
+            const texto = textoEl ? textoEl.textContent.trim() : '';
+
+            // VIDEO: buscar en el row padre (subir hasta MessageCell_FlexRow_3)
+            let row = card.parentElement;
+            for (let k = 0; k < 8 && row; k++) {
+                if (row.getAttribute('data-tt') === 'components_MessageCell_FlexRow_3') break;
+                row = row.parentElement;
+            }
+
+            let video_url = '';
+            let video_titulo = '';
+            if (row) {
+                // El video link está dentro del row, no del card
+                const videoLink = row.querySelector('a[href*="/video/"]');
+                if (videoLink) {
+                    video_url = videoLink.href;
+                }
+                // Título del video: TruncateText fuera del card
+                const titEl = row.querySelector('[data-tt="components_MessageCell_TruncateText"]:not(:has(*))');
+                if (titEl && !card.contains(titEl)) {
+                    video_titulo = titEl.textContent.trim();
+                }
+            }
+
+            // ID del video
+            let video_id = '';
+            if (video_url) {
+                const m = video_url.match(/\\/video\\/(\\d+)/);
+                if (m) video_id = m[1];
+            }
+
+            // Detectar respondido: hay botón "Reply" o el comment ya tiene respuesta
+            const cellText = card.textContent || '';
+            const respondido = card.querySelector('[data-tt*="Replied"]') !== null
+                            || /Respondido/i.test(cellText);
+
+            // Solo agregar si capturamos texto + username
+            if (texto && username) {
+                out.push({
+                    posicion: i,
+                    username: username,
+                    username_href: username_href,
+                    texto: texto,
+                    tiempo_relativo: tiempo_relativo,
+                    video_url: video_url,
+                    video_id: video_id,
+                    video_titulo: video_titulo.substring(0, 200),
+                    respondido: respondido,
+                });
+            }
+        } catch (e) {
+            out.push({posicion: i, error: e.message});
+        }
+    });
+
+    return out;
+}
+"""
 
 
 def human_delay(min_s=2, max_s=5):
-    """Delay aleatorio humano para evitar detección."""
     time.sleep(random.uniform(min_s, max_s))
 
 
@@ -78,17 +156,21 @@ def leer_comentarios(marca_slug: str, limite: int = 50, solo_no_respondidos: boo
 
     cfg = data["marcas"][marca_slug]
     if not cfg.get("activo"):
-        return {"error": f"Marca '{marca_slug}' está marcada como inactiva", "hint": f"Corre: python primer_login.py --marca {marca_slug}"}
+        return {"error": f"Marca '{marca_slug}' inactiva", "hint": f"Corre: python scripts/importar_cookies_chrome.py --marca {marca_slug} --profile Default"}
 
     auth_file = AUTH_DIR / f"{marca_slug}.json"
     if not auth_file.exists():
-        return {"error": f"No existe auth/{marca_slug}.json", "hint": f"Corre: python primer_login.py --marca {marca_slug}"}
+        return {"error": f"Falta auth/{marca_slug}.json"}
 
-    inbox_url = cfg.get("studio_inbox_url", "https://www.tiktok.com/tiktokstudio/inbox?lang=es")
+    # Default a la URL real del inbox de comentarios
+    inbox_url = cfg.get("studio_inbox_url") or INBOX_URL_FALLBACK
+    if "/inbox" in inbox_url and "/comment" not in inbox_url:
+        inbox_url = INBOX_URL_FALLBACK  # corregir URLs viejas
 
     resultado = {
         "marca": marca_slug,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "url_visitada": inbox_url,
         "total_leidos": 0,
         "comentarios": [],
         "errores": [],
@@ -106,94 +188,62 @@ def leer_comentarios(marca_slug: str, limite: int = 50, solo_no_respondidos: boo
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
-            viewport={"width": 1280, "height": 900},
+            viewport={"width": 1400, "height": 900},
             locale="es-ES",
         )
         context.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
-
         page = context.new_page()
 
         try:
             page.goto(inbox_url, timeout=45000, wait_until="domcontentloaded")
-            human_delay(3, 5)
+            human_delay(4, 6)
 
-            # Detectar redirect a login = sesión expirada
-            if "login" in page.url.lower():
+            if "/login" in page.url:
                 resultado["errores"].append("session_expired")
-                resultado["hint"] = f"Corre: python primer_login.py --marca {marca_slug}"
+                resultado["hint"] = f"Corre: python scripts/importar_cookies_chrome.py --marca {marca_slug} --profile Default"
                 browser.close()
                 return resultado
 
-            # Hacer scroll un par de veces para cargar comentarios
+            # Scroll para cargar más comentarios
             for _ in range(3):
                 page.mouse.wheel(0, 800)
                 human_delay(1, 2)
 
-            # Capturar HTML del inbox para análisis posterior si algo falla
-            html_snapshot = page.content()
-            (LOGS_DIR / f"{marca_slug}_inbox_snapshot.html").write_text(html_snapshot, encoding="utf-8")
+            # Capturar HTML para debug
+            LOGS_DIR.mkdir(parents=True, exist_ok=True)
+            (LOGS_DIR / f"{marca_slug}_inbox_snapshot.html").write_text(page.content(), encoding="utf-8")
 
-            # Buscar comment cards
-            cards = page.locator(SELECTOR_COMMENT_CARDS).all()
-            if not cards:
-                resultado["errores"].append("no_selectors_matched")
-                resultado["hint"] = f"Revisar selectores. Snapshot guardado en logs/{marca_slug}_inbox_snapshot.html"
+            # Extraer comentarios con JS
+            raw = page.evaluate(EXTRACT_JS)
 
-            for i, card in enumerate(cards[:limite]):
-                try:
-                    texto = ""
-                    username = ""
-                    video_url = ""
-                    respondido = False
+            for i, c in enumerate(raw[:limite]):
+                if c.get("error"):
+                    resultado["errores"].append(f"card_{c.get('posicion', i)}: {c['error']}")
+                    continue
 
-                    try:
-                        texto = card.locator(SELECTOR_COMMENT_TEXT).first.inner_text(timeout=2000).strip()
-                    except PWTimeout:
-                        pass
+                if solo_no_respondidos and c.get("respondido"):
+                    continue
 
-                    try:
-                        username = card.locator(SELECTOR_USERNAME).first.inner_text(timeout=2000).strip()
-                    except PWTimeout:
-                        pass
-
-                    try:
-                        video_url = card.locator(SELECTOR_VIDEO_LINK).first.get_attribute("href", timeout=2000) or ""
-                        if video_url and not video_url.startswith("http"):
-                            video_url = "https://www.tiktok.com" + video_url
-                    except PWTimeout:
-                        pass
-
-                    try:
-                        respondido = card.locator(SELECTOR_REPLIED_BADGE).count() > 0
-                    except Exception:
-                        pass
-
-                    if solo_no_respondidos and respondido:
-                        continue
-
-                    # Extraer IDs del video y comentario desde la URL
-                    video_id = ""
-                    comment_id = f"{marca_slug}_{i}_{int(time.time())}"  # fallback ID
-                    if "/video/" in video_url:
-                        video_id = video_url.split("/video/")[-1].split("?")[0]
-
-                    if texto:  # solo agregar si capturamos texto
-                        resultado["comentarios"].append({
-                            "id": comment_id,
-                            "video_id": video_id,
-                            "video_url": video_url,
-                            "username": username,
-                            "texto": texto,
-                            "respondido": respondido,
-                            "es_propio": False,
-                            "posicion_en_inbox": i,
-                        })
-                except Exception as e:
-                    resultado["errores"].append(f"card_{i}: {type(e).__name__}: {e}")
+                resultado["comentarios"].append({
+                    "id": f"{marca_slug}_{c.get('video_id') or i}_{int(time.time())}",
+                    "video_id": c.get("video_id", ""),
+                    "video_url": c.get("video_url", ""),
+                    "video_titulo": c.get("video_titulo", ""),
+                    "username": c.get("username", ""),
+                    "username_href": c.get("username_href", ""),
+                    "texto": c.get("texto", ""),
+                    "tiempo_relativo": c.get("tiempo_relativo", ""),
+                    "respondido": c.get("respondido", False),
+                    "posicion_en_inbox": c.get("posicion", i),
+                })
 
             resultado["total_leidos"] = len(resultado["comentarios"])
+
+            if not resultado["comentarios"] and not resultado["errores"]:
+                resultado["errores"].append("no_comments_extracted")
+                resultado["hint"] = f"Revisar snapshot: logs/{marca_slug}_inbox_snapshot.html"
 
         except PWTimeout as e:
             resultado["errores"].append(f"timeout: {e}")
@@ -206,12 +256,12 @@ def leer_comentarios(marca_slug: str, limite: int = 50, solo_no_respondidos: boo
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Lee inbox TikTok de una marca")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--marca", required=True)
     parser.add_argument("--limite", type=int, default=50)
     parser.add_argument("--solo-no-respondidos", action="store_true")
-    parser.add_argument("--no-headless", action="store_true", help="Para debug visual")
-    parser.add_argument("--guardar", help="Guardar resultado en archivo JSON")
+    parser.add_argument("--no-headless", action="store_true")
+    parser.add_argument("--guardar", help="Path para guardar JSON")
     args = parser.parse_args()
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)

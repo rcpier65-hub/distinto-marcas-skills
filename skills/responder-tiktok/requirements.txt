@@ -1,1 +1,2 @@
 playwright>=1.44.0
+browser-cookie3>=0.20.0
