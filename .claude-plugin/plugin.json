@@ -1,7 +1,7 @@
 {
   "name": "distinto-marcas",
-  "version": "1.2.0",
-  "description": "Pack de skills de marca + workflows operativos para los 9 clientes de Agencia Distinto. Incluye: identidad completa por marca (voz, audiencia, oferta, KPIs), skill `grilla-semanal` (Notion → plantilla HTML → PNG → WhatsApp) y skill `responder-tiktok` (Playwright + sesión persistente para responder comentarios TikTok de las 9 cuentas sin Metricool).",
+  "version": "2.0.0",
+  "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive) para los 9 clientes de Agencia Distinto. La skill `responder-tiktok` lee comentarios pendientes de TikTok (Patchright + cookies) y genera hojas de Excel en Drive con borradores on-brand listos para responder manualmente. Activá con 'revisa comentarios y generame la hoja de [marca]'.",
   "author": {
     "name": "Agencia Distinto",
     "email": "team@agenciadistinto.com",

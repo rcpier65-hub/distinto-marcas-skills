@@ -12,7 +12,7 @@
 4. **NUNCA prometer cura** ("te vas a curar", "se va a resolver con..." → ❌)
 5. **Derivar a DM o cita** consultas específicas: "Te invito a escribirnos por DM para conversarlo con más detalle 🌱"
 6. **Cerrar con apertura**: pregunta o invitación a seguir conversando
-7. **Emojis funcionales** (1-2 máximo): 🌿 🌱 💛 ✨ — NO usar 😂 🔥 🤣 (off-tone para psicología)
+7. **Emojis funcionales** (1-2 máximo): 🌿 🌱 💙 ✨ — NO usar 😂 🔥 🤣 (off-tone para psicología)
 8. **Máximo 2-3 líneas**. Si la respuesta necesita más, mejor derivar a DM.
 
 ---
@@ -24,7 +24,7 @@
 
 **Plantilla**:
 > "¡Gracias por tus palabras! Nos alegra saber que el contenido te sirve 🌿"
-> "Qué bonito leerte 💛 Estamos para acompañar."
+> "Qué bonito leerte 💙 Estamos para acompañar."
 
 **Confianza para auto-responder**: ALTA ✅
 
@@ -55,7 +55,7 @@
 
 **Plantilla** (validar + derivar, NO responder técnico en público):
 > "Te leemos. Cada caso es único y merece atención personalizada — te invitamos a escribirnos por DM o agendar una cita para conversarlo con calma 🌱"
-> "Gracias por confiarnos esto. Para acompañarte como mereces, lo mejor es conversarlo en privado — escríbenos por DM cuando puedas 💛"
+> "Gracias por confiarnos esto. Para acompañarte como mereces, lo mejor es conversarlo en privado — escríbenos por DM cuando puedas 💙"
 
 **Confianza para auto-responder**: MEDIA ⚠️ — siempre mostrar borrador antes. NUNCA dar consejo clínico en público.
 
@@ -66,7 +66,7 @@
 
 **Plantilla**:
 > "Gracias por compartirlo, no estás solo/a en esto. Si quieres conversarlo, estamos para acompañarte 🌿"
-> "Qué valiente eres al ponerle palabras. Cualquier cosa, acá estamos 💛"
+> "Qué valiente eres al ponerle palabras. Cualquier cosa, acá estamos 💙"
 
 **Confianza para auto-responder**: ALTA ✅
 
@@ -107,7 +107,7 @@
 **Ej. comentario**: "Esto no sirve", "Los psicólogos solo cobran"
 
 **Plantilla** (validar, no defender, no atacar):
-> "Gracias por compartir tu opinión. Cada experiencia es válida 💛 Si te animas, podemos conversar más a fondo por DM."
+> "Gracias por compartir tu opinión. Cada experiencia es válida 💙 Si te animas, podemos conversar más a fondo por DM."
 
 **Confianza para auto-responder**: ⚠️ ESCALAR — mostrar a Dr. Gustavo antes de responder.
 

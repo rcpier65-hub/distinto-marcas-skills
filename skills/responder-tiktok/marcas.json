@@ -1,8 +1,10 @@
 {
   "_meta": {
     "version": "1.0.0",
-    "actualizado": "2026-05-15",
-    "nota": "Solo Manrique tiene handle confirmado. Los demás se actualizan cuando Pedro confirme. Si una marca no tiene handle, primer_login.py debe pedirlo manualmente."
+    "actualizado": "2026-05-16",
+    "nota": "Solo Manrique tiene handle confirmado. Los demás se actualizan cuando Pedro confirme. Si una marca no tiene handle, primer_login.py debe pedirlo manualmente.",
+    "drive_base_path": "/Users/pedroreyescalderon/Library/CloudStorage/GoogleDrive-team@agenciadistinto.com/Mi unidad/1. GESTIÓN/CUENTAS",
+    "inbox_subfolder": "Inbox TikTok"
   },
   "marcas": {
     "manrique": {
@@ -17,14 +19,15 @@
       "whatsapp_contacto": "51902414745",
       "tono_file": "tonos/manrique.md",
       "auth_file": "auth/manrique.json",
-      "auth_last_login": null,
+      "auth_last_login": "2026-05-15T19:28:51",
       "activo": true,
       "sensibilidades": [
         "Nunca dar diagnóstico médico",
         "Nunca prometer cura",
         "Derivar consultas específicas a DM o cita presencial",
         "Validar emoción antes de responder dato técnico"
-      ]
+      ],
+      "drive_folder_name": "2. Centro Psicológico Manrique ABA"
     },
     "lozano": {
       "skill_marca": "marca-1-muebles-lozano",
@@ -40,7 +43,8 @@
       "auth_file": "auth/lozano.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "1. Muebles Lozano"
     },
     "distribuidora-fitness": {
       "skill_marca": "marca-3-distribuidora-fitness",
@@ -56,7 +60,8 @@
       "auth_file": "auth/distribuidora-fitness.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "3. Distribuidora Fitness Marketing"
     },
     "little-joe": {
       "skill_marca": "marca-4-little-joe",
@@ -70,9 +75,10 @@
       "whatsapp_contacto": null,
       "tono_file": "tonos/little-joe.md",
       "auth_file": "auth/little-joe.json",
-      "auth_last_login": null,
-      "activo": false,
-      "sensibilidades": []
+      "auth_last_login": "2026-05-15T22:24:33",
+      "activo": true,
+      "sensibilidades": [],
+      "drive_folder_name": "4. Little Joe"
     },
     "mil-ideas": {
       "skill_marca": "marca-5-mil-ideas",
@@ -88,7 +94,8 @@
       "auth_file": "auth/mil-ideas.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "5. Mil Ideas"
     },
     "kintu": {
       "skill_marca": "marca-6-kintu",
@@ -104,7 +111,8 @@
       "auth_file": "auth/kintu.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "6. Kintu"
     },
     "novalamps": {
       "skill_marca": "marca-7-novalamps",
@@ -120,7 +128,8 @@
       "auth_file": "auth/novalamps.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "7. NovaLamps"
     },
     "la-victoria": {
       "skill_marca": "marca-8-la-victoria",
@@ -136,7 +145,8 @@
       "auth_file": "auth/la-victoria.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "8. La Victoria"
     },
     "oral-beauty": {
       "skill_marca": "marca-9-oral-beauty",
@@ -152,7 +162,8 @@
       "auth_file": "auth/oral-beauty.json",
       "auth_last_login": null,
       "activo": false,
-      "sensibilidades": []
+      "sensibilidades": [],
+      "drive_folder_name": "9. Oral Beauty"
     }
   }
 }

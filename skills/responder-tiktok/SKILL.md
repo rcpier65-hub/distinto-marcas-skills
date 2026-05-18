@@ -1,184 +1,221 @@
 ---
 name: responder-tiktok
-description: Lee, responde y modera comentarios de TikTok de cualquier marca de Distinto Agencia usando Playwright + sesión persistente (sin re-login). Activar cuando el usuario diga "responde comentarios tiktok de [marca]", "revisa tiktok inbox", "responde tiktok de todas las marcas", "cuántos comentarios pendientes hay en tiktok", "modera tiktok", o variaciones. Soporta operación en paralelo sobre las 9 marcas con un archivo de cookies por marca.
+description: Lee comentarios pendientes de TikTok de cualquier marca de Distinto Agencia y genera un Excel en Drive con borradores on-brand listos para que Pedro responda manualmente. Activar cuando el usuario diga "revisa comentarios y generame la hoja de [marca]", "revisa tiktok de [marca]", "saca los comentarios de [marca]", "actualiza el inbox tiktok de [marca]", o variaciones. Genera/actualiza el archivo "Inbox TikTok - [Marca].xlsx" en `Drive/GESTIÓN/CUENTAS/[Marca]/Inbox TikTok/` con una hoja nueva por cada revisión.
 ---
 
-# Responder TikTok — Workflow autónomo
+# Responder TikTok — Workflow Excel-en-Drive
 
-> Skill que automatiza la respuesta de comentarios de TikTok cuando Metricool no llega (su API TikTok está rota / incompleta). Usa Playwright + storage_state para mantener sesión persistente por marca sin necesidad de re-login constante.
+> Skill que automatiza la **lectura + clasificación + generación de borradores** on-brand para los comentarios de TikTok de cualquier marca. **NO postea automáticamente** (TikTok bloquea silenciosamente toda automatización). El resultado se guarda como hoja de Excel dentro del Drive en la carpeta de cada marca, y Pedro la abre para responder uno por uno manualmente.
+
+## 🚨 LIMITACIÓN TÉCNICA CONFIRMADA (mayo 2026)
+
+TikTok aplica **bloqueo silencioso a nivel backend** para cualquier intento de postear automático — incluso desde Chrome con sesión real del usuario. El frontend muestra "Comentario publicado" pero el POST request es descartado. Esto fue verificado con:
+
+- ❌ Playwright headless con storage_state
+- ❌ Patchright (Playwright undetectable)
+- ❌ Chrome MCP click manual paso a paso (Chrome real del usuario)
+- ❌ TikTok Business API (solo permite responder ads, no comentarios orgánicos)
+
+**Conclusión**: La automatización TikTok se limita a **leer** y **generar borradores**. Postear es manual.
 
 ## ⚡ Cuándo activar
 
 Activar **siempre** que el usuario pida:
 
-- "Responde comentarios TikTok de [marca]"
-- "Revisa el inbox de TikTok de [marca]"
-- "Cuántos comentarios pendientes hay en TikTok"
-- "Modera TikTok de [marca]"
-- "Responde TikTok de todas las marcas"
-- "Saca un resumen del inbox TikTok"
+- "Revisa los comentarios de TikTok de [marca]"
+- "Generame la hoja para responder TikTok de [marca]"
+- "Revisa comentarios y generame la hoja de [marca]"
+- "Saca los comentarios de [marca]"
+- "Actualiza el inbox TikTok de [marca]"
 - "TikTok inbox: [marca]"
 
 Donde `[marca]` puede ser: Manrique, Lozano, Distribuidora Fitness, Kintu, Novalamps, La Victoria, Mil Ideas, Little Joe, Oral Beauty.
 
 ## 📋 Reglas absolutas
 
-1. **NUNCA responder sin mostrar primero el preview** al usuario y esperar aprobación. Excepción: si el usuario dice "responde directo" o "no hace falta preview".
-2. **NUNCA inventar respuestas off-tone** — cada marca tiene su archivo en `tonos/<marca>.md`. Si no hay tono definido para una marca, avisar al usuario y NO operar.
-3. **SIEMPRE leer la skill de marca** (`marca-X-cliente`) para sensibilidades y voz antes de generar respuestas.
-4. **SIEMPRE incluir delays humanos** entre acciones (3-8 segundos). Sin esto, TikTok puede bloquear la cuenta.
-5. **NUNCA responder a trolls, spam o hate** — flagearlos en el resumen para que el cliente decida.
-6. **SIEMPRE escalar a humano** si el comentario menciona: precio especial, queja formal, amenaza de denuncia, consulta sensible (ver `05-cliente.md` de cada marca), tema médico específico.
-7. **NUNCA correr el lote completo (9 marcas) en paralelo** — usar batches de 3 marcas con delays para evitar fingerprint de IP.
-8. **Si una marca tiene cookies expiradas** → reportarlo y skip esa marca, NO bloquear el lote entero.
+1. **NUNCA postear automático** — TikTok bloquea silenciosamente. El trabajo termina cuando el Excel está en Drive.
+2. **NUNCA inventar borradores off-tone** — cada marca tiene su archivo en `tonos/<marca>.md` y su skill `marca-X-<cliente>`. Si no hay tono definido, avisar al usuario y NO operar.
+3. **SIEMPRE leer la skill de marca** (`marca-X-cliente`) para voz, sensibilidades y datos clave (WhatsApp, dirección, productos) antes de generar borradores.
+4. **NUNCA enviar mensajes al WhatsApp del cliente** sin aprobación explícita de Pedro en el chat. Esta regla es **innegociable** (ver `memory/user_pedro_distinto.md`).
+5. **Marca columna "Acción"** en el Excel con uno de: `responder` / `escalar` / `skip`.
+6. **Para "escalar"**: dejar en la columna "Borrador" la razón entre corchetes `[ESCALAR — razón]`.
+7. **Cada respuesta debe respetar el límite TikTok de 150 caracteres**.
+8. **Para comentarios sin match (nuevos / inesperados)**: marcar como `skip` con borrador `[Sin borrador asignado — clasificar manual]`.
 
 ---
 
 ## 🗺️ Workflow completo
 
-### Paso 1 — Identificar marca(s)
+### Paso 1 — Identificar la marca
 
-Extraer del mensaje del usuario qué marca(s). Si dice "todas" → cargar todas las que tengan auth/<marca>.json válido.
+Extraer del mensaje del usuario qué marca. Validar contra `marcas.json`:
 
-Consultar `marcas.json` para verificar:
-- Que la marca tenga handle de TikTok configurado
-- Que `auth/<marca>.json` exista (sesión guardada)
-- Última fecha de login (si > 50 días, advertir que probablemente expire pronto)
-
-### Paso 2 — Leer comentarios pendientes
-
-Ejecutar `scripts/leer_comentarios.py --marca <marca>` que:
-- Carga `auth/<marca>.json` como storage_state
-- Abre TikTok Studio en modo headless
-- Navega a Inbox → Comentarios
-- Extrae: video_id, comment_id, username, texto, timestamp, respondido_si_no
-- Devuelve JSON con todos los pendientes
-- Tiempo aprox: 20-40 segundos por marca
-
-### Paso 3 — Generar respuestas on-tone
-
-Para cada comentario pendiente:
-1. Cargar `tonos/<marca>.md` (patrones aprendidos del cliente)
-2. Cargar skill de marca correspondiente (`marca-X-cliente`)
-3. Clasificar el comentario:
-   - `precio` → respuesta tipo precio (deriva a DM o link)
-   - `compliment` → agradecimiento corto + emoji
-   - `consulta_horario` → dato concreto + invitación
-   - `consulta_tecnica` → si es respondible con info pública, responder; si no, derivar
-   - `queja` → ⚠️ ESCALAR — no auto-responder
-   - `spam` / `troll` → flag, no responder
-4. Generar borrador con el tono específico de esa marca
-
-### Paso 4 — Mostrar preview al usuario
-
-Formato:
-```
-📋 BORRADORES DE RESPUESTA — TikTok [Marca]
-═══════════════════════════════════════════
-
-[1] @usuario | "comentario original" | hace 3h
-    💬 Borrador: "respuesta on-tone"
-    📊 Clasificación: consulta_horario
-    [✅ aprobar] [✏️ editar] [❌ skip]
-
-[2] @usuario2 | "comentario original" | hace 5h
-    ⚠️ ESCALAR (queja) — no se genera respuesta automática
-    Sugerencia: notificar al cliente
-
-...
+```bash
+cat skills/responder-tiktok/marcas.json
 ```
 
-### Paso 5 — Esperar aprobación
+Verificar:
+- `activo: true` (si no, avisar y pedir cookies frescas)
+- `auth_file` existe (`auth/<marca>.json`)
+- `drive_folder_name` configurada (nombre exacto de la carpeta en Drive)
 
-El usuario puede:
-- "Aprueba todos los borradores 1-5"
-- "Aprueba 1, 2, 3. Edita 4 → '[nuevo texto]'. Skip 5"
-- "Responde directo todos los que sean compliments, los demás muéstrame"
+### Paso 2 — Leer comentarios pendientes con Patchright
 
-### Paso 6 — Postear respuestas aprobadas
-
-Ejecutar `scripts/responder.py --marca <marca> --comments <comment_ids> --replies <replies>`:
-- Carga `auth/<marca>.json`
-- Abre TikTok headless
-- Por cada comentario: navega al video → encuentra comentario → click "Reply" → escribe → click "Post"
-- Delay 5-8s entre cada uno
-- Logea resultados en `logs/<marca>_<fecha>.json`
-
-### Paso 7 — Notificar resultado por WhatsApp
-
-Usar `whatsapp_send_message` al grupo correspondiente (ver `recipients.md` del skill `grilla-semanal`):
-
-```
-Hola Dr. Gustavo 👋
-
-📊 TikTok inbox — [fecha]
-
-✅ Respondidos: 5 comentarios
-⚠️ Escalados (decidir tú): 2
-   • @usuario: "[comentario]"
-   • @usuario2: "[comentario]"
-🚫 Spam/troll filtrados: 1
-
-Las respuestas usadas siguen el tono on-brand. Cualquier ajuste posterior lo puedes hacer desde TikTok Studio.
-```
-
----
-
-## 🔑 Sistema de autenticación (storage_state)
-
-### Setup inicial (1 vez por marca, ~2 min cada una)
-
-Pedro corre:
 ```bash
 cd skills/responder-tiktok
-python scripts/primer_login.py --marca manrique
+source .venv/bin/activate
+python scripts/leer_comentarios.py --marca <slug> --limite 200 --solo-no-respondidos
 ```
 
-- Se abre Chrome visible
-- Pedro hace login normal en TikTok (user + pass + 2FA si tiene)
-- Presiona Enter en terminal
-- Se guarda `auth/manrique.json` con todas las cookies
+Esto genera `logs/<marca>_leer_<fecha>.json` y `logs/<marca>_actual.json` con los comentarios sin respuesta.
 
-Repetir para las 9 marcas.
+Características técnicas:
+- Usa **Patchright** (Playwright parcheado para evadir detección DOM)
+- Lee con cookies importadas previamente desde Chrome de Pedro
+- Extracción acumulativa durante scroll (TikTok virtualiza la lista)
+- Aplica filtro "Sin respuesta" del propio TikTok Studio
+- Captura: username, texto, tiempo relativo, posición en inbox
 
-### Re-login cuando expiran cookies (~cada 60 días)
+### Paso 3 — Generar borradores on-brand
 
-Si el skill detecta error "session expired" o redirect a login:
-1. Avisa al usuario: "Cookies de [marca] expiraron, necesito re-login"
-2. Pedro corre `primer_login.py --marca <marca>` otra vez
-3. Listo, 2 minutos
+Cargar la skill de marca correspondiente (`marca-X-<cliente>`) para acceder a:
+- `01-marca.md` (voz, posicionamiento, emojis on-brand)
+- `02-audiencia.md` (perfil de quién comenta)
+- `03-oferta-presencia.md` (productos, precios, WhatsApp, dirección)
+- `05-cliente.md` (sensibilidades, palabras vetadas)
 
----
+Aplicar las reglas y generar borradores estructurados. Cada marca tiene su propio generador en `scripts/_generar_borradores_<marca>.py` (modificar/extender según la marca).
 
-## ⚙️ Modo paralelo (todas las marcas)
-
-Cuando el usuario diga "responde TikTok de todas":
-
-```bash
-python scripts/responder_lote.py --batch-size 3 --delay 10
-```
-
-- Procesa marcas en lotes de 3 (no las 9 al toque)
-- Espera 10s entre lotes
-- Genera reporte consolidado JSON
-- Si alguna marca falla → continúa con las demás
-
----
-
-## 📊 Output esperado por marca
+El generador produce `logs/<marca>_borradores.json` (o `_v2.json`) con la estructura:
 
 ```json
 {
   "marca": "manrique",
-  "fecha": "2026-05-16T09:00:00",
-  "comentarios_leidos": 12,
-  "respondidos_auto": 8,
-  "escalados": 2,
-  "spam_filtrado": 2,
-  "errores": [],
-  "tiempo_total_segundos": 47
+  "generado": "2026-05-16T20:00:00",
+  "total_comentarios": 57,
+  "resumen": {"responder": 54, "escalar": 1, "skip": 2, "sin_match": 0},
+  "borradores": [
+    {
+      "username": "berisa060510",
+      "texto_original": "Pues es lo más acertado lo que comenta...",
+      "tiempo": "hace 2 d",
+      "categoria": "aporte",
+      "accion": "responder",
+      "borrador": "Gracias por el aporte 🌱 Coincidimos en que..."
+    }
+  ]
 }
 ```
+
+Categorías estándar:
+- `compliment` — agradecimiento corto
+- `precio` — derivar a WhatsApp
+- `ubicacion` — dirección + WhatsApp
+- `info_corto` — derivar a WhatsApp
+- `oferta` — pregunta específica (adultos, virtual, etc.)
+- `clinico` — consulta sensible (Manrique) → validar + derivar
+- `aporte` — opinión profesional del usuario → agradecer
+- `respuesta_tecnica` — críticas técnicas → respuesta firme (Manrique)
+- `queja` / `critica_*` → **ESCALAR**
+- `etiqueta` — mención a otro user → SKIP
+
+### Paso 4 — Crear/actualizar Excel en Drive
+
+```bash
+python scripts/generar_hoja_inbox.py --marca <slug>
+```
+
+Esto:
+1. Busca el archivo `Inbox TikTok - [Marca].xlsx` en:
+   ```
+   ~/Library/CloudStorage/GoogleDrive-team@agenciadistinto.com/Mi unidad/1. GESTIÓN/CUENTAS/[N. Marca]/Inbox TikTok/
+   ```
+2. Si no existe: lo crea (con la carpeta padre si hace falta).
+3. Agrega una hoja nueva con timestamp `YYYY-MM-DD HH-MM`.
+4. Pobla 7 columnas:
+   - **Usuario** (con @)
+   - **Tiempo** (ej. "hace 2 d")
+   - **Comentario** (texto original)
+   - **Borrador** (respuesta lista para copiar)
+   - **Acción** (responder/escalar/skip)
+   - **Categoría**
+   - **Video / Link** (vacío por ahora, futuro)
+5. Aplica colores: verde (responder), rojo (escalar), gris (skip).
+6. Freeze panes en header, anchos auto, wrap text.
+
+### Paso 5 — Reportar a Pedro
+
+Mensaje en el chat (NUNCA al WhatsApp del cliente):
+
+```
+✅ Inbox TikTok actualizado para [Marca]
+
+📊 Total comentarios sin respuesta: N
+   ✅ Responder: X
+   🚨 Escalar (tu decisión): Y
+   🚫 Skip: Z
+
+📂 Ubicación:
+   Drive/GESTIÓN/CUENTAS/[N. Marca]/Inbox TikTok/
+   Inbox TikTok - [Marca].xlsx
+
+🗓️ Hoja nueva: '2026-MM-DD HH-MM'
+
+🚨 Para escalar (necesito tu decisión):
+   • @usuario1: "comentario..." — Razón
+   • @usuario2: "comentario..." — Razón
+```
+
+---
+
+## 📂 Estructura final en Drive
+
+```
+Mi unidad/
+└── 1. GESTIÓN/
+    └── CUENTAS/
+        ├── 1. Muebles Lozano/
+        │   └── Inbox TikTok/
+        │       └── Inbox TikTok - Muebles Lozano.xlsx
+        │           ├── Hoja: 2026-05-16 09-00
+        │           ├── Hoja: 2026-05-17 18-30
+        │           └── ...
+        ├── 2. Centro Psicológico Manrique ABA/
+        │   └── Inbox TikTok/
+        │       └── Inbox TikTok - Manrique.xlsx
+        ├── 4. Little Joe/
+        │   └── Inbox TikTok/
+        │       └── Inbox TikTok - Little Joe.xlsx
+        └── ... (las 9 marcas)
+```
+
+**Drive Desktop sincroniza automáticamente** — Pedro abre el archivo desde Drive web, Excel desktop, o Numbers indistintamente.
+
+---
+
+## ⚙️ Setup por marca (una vez)
+
+Para activar una marca:
+
+1. Pedro logea TikTok de esa marca en el perfil Chrome correspondiente
+2. Importar cookies a `auth/<marca>.json`:
+   ```bash
+   python scripts/importar_cookies_chrome.py --marca <slug> --profile "<Chrome Profile>"
+   ```
+3. Marca queda `activo: true` en `marcas.json` automáticamente
+
+Mapeo perfiles Chrome → marcas (validado):
+| Perfil Chrome | Marca |
+|---|---|
+| `Default` (rcpier65@gmail.com) | Manrique |
+| `Profile 6` (littlejoeperu) | Little Joe |
+| `Profile 13` (kintuoils) | Kintu |
+| `Profile 16` (novalamps.mkt) | Novalamps |
+| `Profile 8` (magusminorista) | Mil Ideas (¿?) |
+| `Profile 14` (diplocapsalud03) | Distribuidora Fitness (¿?) |
+| (otros) | _por confirmar_ |
+
+Cookies de TikTok duran ~60 días. Cuando expiren, reimportar con el mismo comando.
 
 ---
 
@@ -186,45 +223,34 @@ python scripts/responder_lote.py --batch-size 3 --delay 10
 
 | Error | Acción |
 |---|---|
-| `auth/<marca>.json` no existe | Avisar y pedir que Pedro corra `primer_login.py` |
-| Cookies expiradas (redirect a /login) | Marcar marca como "necesita re-login", continuar con las demás |
-| Captcha en pantalla | Pausar, screenshot, avisar a Pedro |
-| TikTok bloqueó la cuenta | Detener inmediatamente esa marca, alertar |
-| DOM cambió (selector no encontrado) | Logear screenshot, avisar para actualizar selectores |
-| Más de 5 errores seguidos | Detener todo el lote (probable detección de bot) |
-
----
-
-## 🎯 Triggers que activan la skill
-
-| Frase del usuario | Acción |
-|---|---|
-| "Responde TikTok de Manrique" | Marca: manrique, modo: full workflow |
-| "Cuántos pendientes hay en TikTok Lozano" | Marca: lozano, modo: solo leer (paso 1-2) |
-| "Revisa TikTok de todas las marcas" | Lote completo, paralelo de a 3 |
-| "Modera TikTok de [marca]" | Solo flagear spam/troll, no responder |
-| "Responde directo TikTok [marca]" | Skip paso 4 (preview), auto-aprobar borradores |
-| "TikTok dashboard" | Resumen consolidado de todas las marcas sin responder |
+| `auth/<marca>.json` no existe | Avisar a Pedro: necesita logear en Chrome + importar cookies |
+| Cookies expiradas (redirect a /login) | Avisar a Pedro que reimporte cookies |
+| Carpeta Drive no encontrada | Avisar a Pedro la ruta esperada |
+| Borradores sin tono on-brand | NO operar. Avisar que falta `tonos/<marca>.md` |
+| TikTok cambió el DOM (selectores rotos) | Logear screenshot, avisar para actualizar `leer_comentarios.py` |
+| Skill de marca no existe | NO operar. Avisar a Pedro |
 
 ---
 
 ## 📎 Referencias
 
-- 🧠 Tonos por marca: `tonos/<marca>.md`
-- ⚙️ Config TikTok handles: `marcas.json`
+- ⚙️ Config marcas: `marcas.json`
 - 🔑 Cookies guardadas: `auth/<marca>.json` (gitignored)
+- 🧠 Tonos por marca: `tonos/<marca>.md` (referencia en skill marca-X)
+- 📊 Borradores JSON: `logs/<marca>_borradores.json`
 - 📝 Logs ejecución: `logs/<marca>_<fecha>.json`
-- 📞 WhatsApp groups: `../grilla-semanal/recipients.md`
+- 📁 Excel destino: Drive sincronizado en `~/Library/CloudStorage/...`
 - 🎨 Voz por marca: `../marca-X-<cliente>/01-marca.md`
+- 💛 Memoria de Pedro: `~/.claude/projects/.../memory/user_pedro_distinto.md`
 
 ---
 
 ## ⚠️ Limitaciones honestas
 
-1. **TikTok puede cambiar el DOM**. Si los selectores se rompen, hay que actualizar `scripts/leer_comentarios.py` y `scripts/responder.py`. Tiempo estimado de fix: 15-30 min.
-2. **Detección anti-bot**. Si TikTok empieza a pedir captcha frecuente → bajar el ritmo, usar más delays, o considerar proxy.
-3. **No funciona offline**. Necesita conexión a internet y a `tiktok.com/tiktokstudio`.
-4. **No reemplaza al humano** para decisiones de marca. Los borradores son sugerencias; el cliente puede editarlas en TikTok Studio si quiere refinarlos.
+1. **No se puede postear** automatizado. Solo lectura + borradores.
+2. **TikTok cambia el DOM** cada 2-3 meses. Cuando los selectores en `leer_comentarios.py` se rompan, hay que actualizarlos (15-30 min de fix).
+3. **Detección anti-bot**: Patchright es lo más robusto disponible (mayo 2026). Si en el futuro TikTok bloquea hasta la lectura, evaluar `playwright-stealth` o `rebrowser-playwright`.
+4. **Multi-cuenta limitado a perfiles Chrome separados**: 1 cookie set por marca. Para operar 9 marcas, las 9 cuentas TikTok deben estar logueadas en perfiles Chrome separados.
 
 ---
-Versión: 1.0.0 · Creada: 2026-05-15
+Versión: 2.0.0 · Última actualización: 16 mayo 2026

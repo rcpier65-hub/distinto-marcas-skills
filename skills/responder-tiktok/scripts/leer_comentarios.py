@@ -44,11 +44,16 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# Usamos Patchright (Playwright parcheado para evadir detección TikTok).
+# Misma API, comportamiento idéntico, pero indetectable.
 try:
-    from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    from patchright.sync_api import sync_playwright, TimeoutError as PWTimeout
 except ImportError:
-    print(json.dumps({"error": "Playwright no instalado"}))
-    sys.exit(1)
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        print(json.dumps({"error": "Playwright no instalado. Instala: pip install patchright"}))
+        sys.exit(1)
 
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -176,23 +181,14 @@ def leer_comentarios(marca_slug: str, limite: int = 50, solo_no_respondidos: boo
         "errores": [],
     }
 
+    # Patchright maneja anti-detección internamente — NO pasar args ni
+    # init_scripts personalizados (los romperían). Mantener launch básico.
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=headless,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
+        browser = p.chromium.launch(headless=headless)
         context = browser.new_context(
             storage_state=str(auth_file),
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
             viewport={"width": 1400, "height": 900},
             locale="es-ES",
-        )
-        context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         page = context.new_page()
 
@@ -206,18 +202,102 @@ def leer_comentarios(marca_slug: str, limite: int = 50, solo_no_respondidos: boo
                 browser.close()
                 return resultado
 
-            # Scroll para cargar más comentarios
-            for _ in range(3):
-                page.mouse.wheel(0, 800)
-                human_delay(1, 2)
+            # Aplicar filtro "Sin respuesta" si está pedido (default cuando solo_no_respondidos=True)
+            if solo_no_respondidos:
+                aplicado = page.evaluate("""() => {
+                    // El filtro está en el botón con texto "Todos los comentarios" o similar
+                    const buttons = Array.from(document.querySelectorAll('div, button')).filter(
+                        el => /Todos los comentarios|Sin respuesta|Con respuesta/.test(el.textContent || '')
+                              && el.offsetParent !== null
+                    );
+                    // Buscar el filtro de tipo (no el dropdown abierto)
+                    const filterBtn = buttons.find(el => el.getAttribute('data-tt') === 'components_FilterButton_FlexCenter'
+                                                     || el.className?.toString().includes('FilterButton'));
+                    if (filterBtn) {
+                        filterBtn.click();
+                        return {clicked: 'filter button', text: filterBtn.textContent?.substring(0, 50)};
+                    }
+                    return {clicked: null};
+                }""")
+                resultado["filtro_paso1"] = aplicado
+                page.wait_for_timeout(1500)
+
+                # Ahora clickear "Sin respuesta" en el dropdown
+                aplicado2 = page.evaluate("""() => {
+                    const opts = Array.from(document.querySelectorAll('div, span, li')).filter(
+                        el => el.textContent?.trim() === 'Sin respuesta' && el.offsetParent !== null
+                    );
+                    if (opts.length > 0) {
+                        opts[0].click();
+                        return {clicked: 'Sin respuesta'};
+                    }
+                    return {clicked: null};
+                }""")
+                resultado["filtro_paso2"] = aplicado2
+                human_delay(3, 5)
+
+            # Scroll progresivo + extracción acumulativa.
+            # TikTok virtualiza la lista (solo renderiza ~13 cards), entonces
+            # necesitamos extraer DURANTE el scroll y acumular únicos por (username, texto).
+            acumulador = {}  # clave: f"{username}|{texto[:50]}" → comentario
+            prev_count = 0
+            scroll_estable = 0
+            max_scrolls = 80
+            for s in range(max_scrolls):
+                # Extraer comentarios visibles en este momento
+                visibles = page.evaluate(EXTRACT_JS)
+                for c in visibles:
+                    if c.get("error"):
+                        continue
+                    if solo_no_respondidos and c.get("respondido"):
+                        continue
+                    key = f"{c.get('username','')}|{c.get('texto','')[:80]}"
+                    if key not in acumulador and c.get("username") and c.get("texto"):
+                        acumulador[key] = c
+
+                # Scrollear el container interno
+                page.evaluate("""() => {
+                    const candidatos = [
+                        document.querySelector('[data-tt="components_CommentList_Container"]'),
+                        document.querySelector('[data-tt="components_CommentList_Absolute"]'),
+                        document.querySelector('[data-tt="PageContainer_NewPageContainer_FlexColumn"]'),
+                        document.querySelector('[data-tt="PageContainer_NewPageContainer_SubPageContainer"]'),
+                    ].filter(Boolean);
+                    candidatos.forEach(el => {
+                        let target = el;
+                        for (let i = 0; i < 10 && target; i++) {
+                            const overflow = getComputedStyle(target).overflowY;
+                            if (overflow === 'auto' || overflow === 'scroll') {
+                                // Scroll incremental, no salto al final (para no skip cards)
+                                target.scrollTop += 600;
+                                return;
+                            }
+                            target = target.parentElement;
+                        }
+                    });
+                    window.scrollBy(0, 600);
+                }""")
+                page.mouse.wheel(0, 600)
+                human_delay(0.8, 1.4)
+
+                # Verificar si el conteo acumulado se estabilizó
+                if len(acumulador) == prev_count:
+                    scroll_estable += 1
+                    if scroll_estable >= 5:
+                        break
+                else:
+                    scroll_estable = 0
+                prev_count = len(acumulador)
+
+            resultado["scrolls_realizados"] = s + 1
+            resultado["cards_visibles_dom"] = len(acumulador)
+            raw = list(acumulador.values())
 
             # Capturar HTML para debug
             LOGS_DIR.mkdir(parents=True, exist_ok=True)
             (LOGS_DIR / f"{marca_slug}_inbox_snapshot.html").write_text(page.content(), encoding="utf-8")
 
-            # Extraer comentarios con JS
-            raw = page.evaluate(EXTRACT_JS)
-
+            # `raw` ya viene del acumulador (extracción durante scroll, evita virtualización)
             for i, c in enumerate(raw[:limite]):
                 if c.get("error"):
                     resultado["errores"].append(f"card_{c.get('posicion', i)}: {c['error']}")

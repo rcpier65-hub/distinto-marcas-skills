@@ -10,6 +10,16 @@ logs/*.html
 # Snapshots de debug
 *_snapshot.html
 *_snapshot.png
+logs/*.png
+logs/_*.md
+logs/_*.txt
+logs/_dbg_*
+
+# Scripts ad-hoc con datos reales de clientes (no comparten patrón reutilizable)
+scripts/_generar_borradores.py
+scripts/_generar_borradores_*.py
+scripts/_debug_*.py
+scripts/_verificar_*.py
 
 # Python
 __pycache__/

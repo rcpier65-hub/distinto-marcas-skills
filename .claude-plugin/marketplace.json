@@ -10,10 +10,18 @@
     {
       "name": "distinto-marcas",
       "source": "./",
-      "description": "Pack de identidad de las 9 marcas + workflows operativos. Incluye `grilla-semanal` (Notion → Plantilla → PNG → WhatsApp) y `responder-tiktok` (Playwright + sesión persistente para responder comentarios TikTok sin Metricool). Activá diciendo 'haz la grilla de [marca]' o 'responde tiktok de [marca]'.",
-      "version": "1.2.0",
+      "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive) para los 9 clientes de Agencia Distinto. Activá con 'revisa comentarios y generame la hoja de [marca]'.",
+      "version": "2.0.0",
       "category": "brand-management",
-      "tags": ["agencia", "marketing", "brands", "social-media", "workflow-automation", "playwright", "tiktok"]
+      "tags": [
+        "agencia",
+        "marketing",
+        "brands",
+        "social-media",
+        "workflow-automation",
+        "playwright",
+        "tiktok"
+      ]
     }
   ]
 }
