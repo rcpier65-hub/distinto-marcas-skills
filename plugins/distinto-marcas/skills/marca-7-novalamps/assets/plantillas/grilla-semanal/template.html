@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Grilla Novalamps · 1080×1620</title>
+<!--
+  ============================================================
+  PLANTILLA GRILLA SEMANAL — NOVALAMPS
+  ============================================================
+  Canvas: 1080 × 1620 px (vertical 2:3 · ideal IG historia/post)
+  Paleta oficial: lima #D2DD00 · grafito #262726 · blanco #FFFFFF
+  Tipografía: Inter (sustituto OSS oficial de Arial — del manual)
+  Logo: logo-novalamps-blanco-verde.png.png (versión negativa, oscuro)
+        recortar a 880x280 con: sips -c 280 880 logo.png --out logo-cropped.png
+  ============================================================
+  CÓMO USAR:
+    1) Hacer copia del archivo: cp template.html grilla-YYYY-WW.html
+    2) Buscar/reemplazar TODAS las ocurrencias marcadas con {{ ... }}
+    3) Editar el bloque <!-- CARDS --> agregando/quitando .card según
+       la cantidad de publicaciones (mínimo 3, máximo 5 recomendado;
+       el grid-template-rows se autoajusta).
+    4) Renderizar con: bash build.sh grilla-YYYY-WW.html
+  ============================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
+<style>
+  :root {
+    --lima: #D2DD00;
+    --grafito: #262726;
+    --grafito-2: #1c1d1c;
+    --blanco: #FFFFFF;
+    --gris-bajo: rgba(255,255,255,0.08);
+    --gris-text: rgba(255,255,255,0.65);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0d0e0d;
+    font-family: 'Inter', 'Arimo', 'Liberation Sans', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .poster {
+    width: 1080px; height: 1620px;
+    background: var(--grafito);
+    color: var(--blanco);
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 36px 56px 0 56px;
+  }
+  .pill-rango {
+    background: var(--lima); color: var(--grafito);
+    font-size: 22px; font-weight: 800; letter-spacing: 0.08em;
+    padding: 12px 22px; border-radius: 999px; text-transform: uppercase;
+  }
+  .logo-wordmark { display: flex; align-items: center; }
+  .logo-wordmark img { height: 72px; width: auto; display: block; }
+
+  /* HERO */
+  .hero {
+    padding: 40px 56px 30px 56px;
+    border-bottom: 2px solid var(--gris-bajo);
+  }
+  .hero .kicker {
+    color: var(--lima); font-size: 18px; font-weight: 700;
+    letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .hero h1 {
+    font-size: 64px; line-height: 1.02; font-weight: 900;
+    letter-spacing: -0.025em; margin-bottom: 18px;
+  }
+  .hero h1 em { color: var(--lima); font-style: normal; }
+  .hero .bajada { font-size: 22px; color: var(--gris-text); font-weight: 500; }
+
+  /* GRID DE CARDS */
+  .grid {
+    flex: 1; padding: 26px 56px 24px 56px;
+    display: grid; grid-auto-rows: 1fr; gap: 16px;
+  }
+
+  .card {
+    background: var(--grafito-2);
+    border: 1.5px solid var(--gris-bajo);
+    border-radius: 22px; padding: 22px 28px;
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    align-items: center; gap: 26px;
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute;
+    left: 0; top: 14px; bottom: 14px; width: 5px;
+    background: var(--lima); border-radius: 0 5px 5px 0;
+  }
+
+  .fecha-box { text-align: center; }
+  .fecha-box .dia {
+    font-size: 18px; font-weight: 800; letter-spacing: 0.18em;
+    color: var(--lima); text-transform: uppercase;
+  }
+  .fecha-box .num {
+    font-size: 56px; font-weight: 900; line-height: 0.95;
+    color: var(--blanco); margin-top: 4px; letter-spacing: -0.04em;
+  }
+  .fecha-box .mes {
+    font-size: 16px; font-weight: 700; letter-spacing: 0.22em;
+    color: var(--gris-text); text-transform: uppercase; margin-top: 4px;
+  }
+
+  .body { min-width: 0; }
+  .body .titulo {
+    font-size: 26px; font-weight: 800; line-height: 1.15;
+    letter-spacing: -0.015em; color: var(--blanco); margin-bottom: 10px;
+  }
+  .body .meta {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .chip-tipo {
+    background: var(--lima); color: var(--grafito);
+    font-size: 12px; font-weight: 800; letter-spacing: 0.16em;
+    padding: 5px 10px; border-radius: 6px; text-transform: uppercase;
+  }
+  .plataformas {
+    font-size: 14px; font-weight: 700;
+    color: var(--gris-text); letter-spacing: 0.04em;
+  }
+  .plataformas .dot { color: var(--lima); margin: 0 4px; }
+  .body .desc {
+    font-size: 15px; color: rgba(255,255,255,0.72);
+    line-height: 1.4; font-weight: 400;
+  }
+
+  .hora-box {
+    text-align: right; padding-left: 14px;
+    border-left: 1.5px solid var(--gris-bajo);
+  }
+  .hora-box .label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.2em;
+    color: var(--gris-text); text-transform: uppercase; margin-bottom: 4px;
+  }
+  .hora-box .hora {
+    font-size: 28px; font-weight: 900; color: var(--lima);
+    letter-spacing: -0.02em; line-height: 1;
+  }
+
+  /* FOOTER */
+  .footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 56px 28px 56px;
+    border-top: 2px solid var(--gris-bajo);
+  }
+  .footer .left {
+    font-size: 14px; font-weight: 600; color: var(--gris-text);
+    letter-spacing: 0.05em;
+  }
+  .footer .right {
+    font-size: 13px; font-weight: 700; color: var(--lima);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="poster">
+
+  <!-- ========== HEADER ========== -->
+  <div class="header">
+    <!-- EDITAR: rango de fechas pill — formato "DD — DD MES · AAAA" -->
+    <div class="pill-rango">{{RANGO_FECHAS_PILL}}</div>
+    <!-- Logo: dejar tal cual; el build.sh copia logo-novalamps-blanco-cropped.png al lado -->
+    <div class="logo-wordmark">
+      <img src="logo-novalamps-blanco-cropped.png" alt="Novalamps" />
+    </div>
+  </div>
+
+  <!-- ========== HERO ========== -->
+  <div class="hero">
+    <div class="kicker">Grilla semanal · contenido</div>
+    <!-- EDITAR si querés variante (default deja "Esta semana en Novalamps") -->
+    <h1>Esta semana <em>en Novalamps</em></h1>
+    <!-- EDITAR: cantidad de publicaciones + rango -->
+    <div class="bajada">{{NUM_PUBLICACIONES}} publicaciones programadas · Del {{DIA_INICIO_LARGO}} al {{DIA_FIN_LARGO}} de {{MES_LARGO}}</div>
+  </div>
+
+  <!-- ========== CARDS (1 por publicación) ========== -->
+  <div class="grid">
+
+    <!-- ====== CARD TEMPLATE — duplicar este bloque por cada publicación ====== -->
+    <div class="card">
+      <div class="fecha-box">
+        <!-- EDITAR: día abreviado, número, mes abreviado -->
+        <div class="dia">{{DIA_ABREV}}</div>     <!-- Lun, Mar, Mié, Jue, Vie, Sáb, Dom -->
+        <div class="num">{{DD}}</div>            <!-- 18 -->
+        <div class="mes">{{MES_ABREV}}</div>     <!-- May, Jun, etc. -->
+      </div>
+      <div class="body">
+        <!-- EDITAR: título tal cual aparece en Notion -->
+        <div class="titulo">{{TITULO_PIEZA}}</div>
+        <div class="meta">
+          <!-- EDITAR: tipo (Reel / Carrusel / Post / Story) -->
+          <span class="chip-tipo">{{TIPO}}</span>
+          <!-- EDITAR: plataformas separadas por <span class="dot">·</span> -->
+          <span class="plataformas">IG <span class="dot">·</span> FB <span class="dot">·</span> TikTok</span>
+        </div>
+        <!-- EDITAR: descripción 1-2 líneas máximo, parafraseo del copy de Notion -->
+        <div class="desc">{{DESCRIPCION_2_LINEAS}}</div>
+      </div>
+      <div class="hora-box">
+        <div class="label">Hora</div>
+        <!-- HORA OFICIAL NOVALAMPS = 6:30 pm (validado 18 May 2026) -->
+        <div class="hora">6:30 pm</div>
+      </div>
+    </div>
+    <!-- ====== FIN CARD TEMPLATE ====== -->
+
+  </div>
+
+  <!-- ========== FOOTER ========== -->
+  <div class="footer">
+    <!-- EDITAR: número de semana + mes -->
+    <div class="left">Semana {{NUM_SEMANA}} · {{MES_LARGO}} {{ANIO}}</div>
+    <div class="right">Agencia Distinto</div>
+  </div>
+
+</div>
+
+</body>
+</html>

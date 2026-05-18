@@ -54,6 +54,61 @@ Estructura esperada (replicar de otras marcas Distinto):
 
 ---
 
+## 🎨 Logos oficiales — paths confirmados (Drive)
+
+> ✅ Validado 18 May 2026 al generar la primera grilla semanal automatizada.
+
+**Carpeta raíz Drive del cliente** (cwd típico al trabajar Novalamps):
+```
+Mi unidad/1. GESTIÓN/CUENTAS/7. NovaLamps/
+```
+
+### Archivos oficiales del logo principal
+
+| Versión | Path desde la raíz Novalamps | Uso |
+|---|---|---|
+| **Negro-verde** (sobre fondo claro) | `01 - IDENTIDAD DE MARCA/LOGO/PNG/logo-novalamps-negro-verde.png.png` | Piezas con fondo blanco/claro. Contiene wordmark "novaLamps" + tagline "En iluminación lo tenemos todo" + símbolo lima dentro de la "o". |
+| **Blanco-verde** (sobre fondo oscuro) | `01 - IDENTIDAD DE MARCA/LOGO/PNG/logo-novalamps-blanco-verde.png.png` | Piezas con fondo grafito/oscuro. Versión negativa con texto blanco. **Usado en la grilla semanal canónica.** |
+
+> ⚠️ Ambos archivos tienen **doble extensión `.png.png`** — no es typo, está así en Drive. Respetar el nombre exacto.
+
+> ⚠️ Dimensiones nativas: **1081 × 1081 px** con mucho whitespace alrededor del wordmark. Para usar en composición, recortar al área útil con:
+> ```bash
+> sips -c 280 880 logo-novalamps-blanco-verde.png.png --out logo-cropped.png
+> ```
+
+### 🪤 Trampa documentada — PNG blanco transparente
+
+El archivo `logo-novalamps-blanco-verde.png.png` tiene el wordmark en **blanco sobre fondo transparente**. Al previsualizarlo en herramientas con fondo claro (como `Read` de Claude Code, Preview en macOS sin tema oscuro, GitHub PR diffs), **solo se ve el isotipo lima** y el wordmark blanco queda invisible — lo que puede llevar a descartarlo creyendo que es solo el símbolo.
+
+**Verificación correcta**: componerlo sobre un fondo grafito antes de descartar. Ejemplo rápido:
+```html
+<body style="background:#262726;"><img src="logo-novalamps-blanco-verde.png.png" width="600"></body>
+```
+
+### ⛔ Archivos que NO son el logo principal
+
+La carpeta `01 - IDENTIDAD DE MARCA/LOGOS MARCAS NOVALAMPS/PNG/` contiene archivos llamados **"Mesa de trabajo 1 copia X"** (nombres genéricos de Adobe Illustrator). Estos son logos de **sub-marcas y líneas de producto**, no del logo principal:
+
+- `Mesa de trabajo 1.png` → logo "novaLamps eléctrika" (sub-marca, con símbolo naranja casita/wifi)
+- `Mesa de trabajo 1 copia.png` → logo línea QUIMERA
+- `Mesa de trabajo 1 copia 2.png` → logo línea AMBER PLUS
+- (etc. — cada uno es una línea distinta)
+
+⚠️ **Nunca usar archivos "Mesa de trabajo X" como logo principal.** Para el logo principal usar siempre los `logo-novalamps-*.png.png` documentados arriba.
+
+### Paleta oficial complementaria
+
+| Color | Hex | Pantone | Uso |
+|---|---|---|---|
+| Verde lima | `#D2DD00` | 389 C | Acentos, símbolo, predominar |
+| Grafito | `#262726` | 419 C | Fondos oscuros, texto principal |
+| Blanco | `#FFFFFF` | — | Fondos claros, versión negativa |
+
+**Combinación canónica del manual** (la que usa la grilla semanal): verde lima `#D2DD00` sobre grafito `#262726` → "impacto de marca".
+
+---
+
 ## 🎬 Producciones / series identificadas
 
 ### Programa colab arquitectas/diseñadoras (activo)

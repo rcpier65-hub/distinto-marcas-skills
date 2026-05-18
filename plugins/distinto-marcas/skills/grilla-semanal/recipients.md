@@ -13,7 +13,7 @@
 | 4 | Little Joe | `marca-4-little-joe` | _por confirmar_ | _por confirmar_ | `51________` | New team | `120363427129444398@g.us` |
 | 5 | Mil Ideas | `marca-5-mil-ideas` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
 | 6 | Kintu | `marca-6-kintu` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
-| 7 | Novalamps | `marca-7-novalamps` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
+| 7 | **Novalamps** | `marca-7-novalamps` | _(sin tratamiento)_ | **Cynthia** | `51987672233` | **Novalamps** | `120363407777030884@g.us` |
 | 8 | La Victoria | `marca-8-la-victoria` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
 | 9 | Oral Beauty | `marca-9-oral-beauty` | _por confirmar_ | _por confirmar_ | `51________` | _por confirmar_ | _por confirmar_ |
 
@@ -43,11 +43,26 @@ Hola [Tratamiento] [Nombre] 👋
 
 ---
 
+## ✅ Configuraciones operativas confirmadas
+
+### Manrique ABA
+- Hora oficial publicación: **6:30 pm**
+- Saludo: **"Hola Dr. Gustavo 👋"** (tratamiento "Dr." obligatorio)
+- Validado: 14 May 2026
+
+### Novalamps
+- Hora oficial publicación: **6:30 pm**
+- Saludo: **"Hola Cynthia 👋"** (sin tratamiento — relación informal)
+- Plantilla HTML lista: `marca-7-novalamps/assets/plantillas/grilla-semanal/`
+- Validado: 18 May 2026 · primera grilla enviada (messageId `3EB02A52FF3F31E041A82B`)
+
+---
+
 ## ⚠️ Pendientes
 
-Solo Manrique está completamente configurada. Las otras 8 marcas necesitan:
+Manrique y Novalamps están operativas. Las otras 7 marcas necesitan:
 - Confirmar nombre del contacto cliente
-- Confirmar tratamiento (Dr./Sr./etc.)
+- Confirmar tratamiento (Dr./Sr./etc. o sin tratamiento)
 - Confirmar número WhatsApp
 - Confirmar grupo destino (puede que cada marca tenga su propio grupo)
 
@@ -67,4 +82,4 @@ Solo Manrique está completamente configurada. Las otras 8 marcas necesitan:
 4. Probar el flujo con preview (no enviar) antes de operar en real
 
 ---
-Actualizado: 14 May 2026 · v1.1
+Actualizado: 18 May 2026 · v1.2 (Novalamps operativa)
