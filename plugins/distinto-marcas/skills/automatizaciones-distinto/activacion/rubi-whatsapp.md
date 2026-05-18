@@ -74,30 +74,83 @@ Convención: empezar con `>>` o `/distinto` para que Rubi/Claude sepa que es un 
 >> help                # lista de comandos
 ```
 
-## 🔧 Setup técnico (cuando armemos)
+## 🔧 Setup técnico (YA ARMADO ✅)
 
-### Opción A — Cron poll cada minuto (más simple)
+### Arquitectura real
 
-Cron job en la Mac:
-```bash
-# /var/cron del usuario o launchd
-* * * * * /Users/pedroreyescalderon/.../scripts/escuchar_rubi.py
+Como Rubi MCP solo es invocable desde dentro de una sesión Claude (no desde scripts Python), el listener funciona así:
+
+```
+launchd (cada 60s)
+   ↓
+scripts/escuchar_rubi.py (wrapper Python)
+   ↓
+spawn `claude --print --dangerously-skip-permissions`
+   ↓
+sesión Claude efímera ejecuta prompts/poll_rubi.md:
+   - llama whatsapp_get_recent_events
+   - filtra por Pedro + prefijo >>
+   - parsea con router_comandos.py
+   - ejecuta acción correspondiente
+   - responde a Pedro vía Rubi
+   ↓
+logs en ~/.distinto/rubi.log
 ```
 
-`escuchar_rubi.py`:
-1. Llama a `mcp__1a1b3384...__whatsapp_get_recent_events` filtro `event_type=message`
-2. Filtra mensajes de últimos 90 segundos
-3. Filtra remitente = `51983852191@s.whatsapp.net`
-4. Para cada mensaje que empiece con `>>` o `/distinto`:
-   - Parse del comando
-   - Spawn Claude CLI con el prompt construido (o llama script Python directo)
-5. Después de ejecutar, manda confirmación a Pedro por Rubi (DM)
+### Archivos del sistema
 
-### Opción B — Webhook (más reactivo, requiere ngrok o similar)
+```
+scripts/
+├── escuchar_rubi.py             # wrapper que invoca claude CLI cada minuto
+├── router_comandos.py           # parser determinístico (tabla canónica)
+├── test_escuchar.sh             # validación manual antes de instalar
+├── com.distinto.escuchar-rubi.plist  # launchd config
+└── prompts/
+    └── poll_rubi.md             # "código en lenguaje natural" para Claude
+```
 
-Rubi puede tener un webhook configurado que llame a un endpoint local de la Mac (vía ngrok / tailscale / cloudflare tunnel). Respuesta en <2 segundos.
+### Pasos de instalación
 
-Más complejo de setear pero más rápido. Recomendado solo si las respuestas necesitan ser instantáneas.
+```bash
+cd "/Users/pedroreyescalderon/Downloads/1. DISTINTO AGENCIA/distinto-marcas-skills/skills/automatizaciones-distinto/scripts"
+
+# 1. Probar el parser (instantáneo, no toca Rubi)
+./test_escuchar.sh parser
+
+# 2. Probar 1 polling real (invoca Claude CLI ~30-60s)
+./test_escuchar.sh once
+
+# 3. Si todo OK, instalar el launchd
+cp com.distinto.escuchar-rubi.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.distinto.escuchar-rubi.plist
+
+# 4. Verificar que está corriendo
+launchctl list | grep distinto
+
+# 5. Pedro hace prueba desde el celu:
+#    Por WhatsApp a Rubi: ">> status"
+#    Debería responder en ~60-90 segundos
+
+# 6. Para parar el listener:
+launchctl unload ~/Library/LaunchAgents/com.distinto.escuchar-rubi.plist
+```
+
+### Carpetas de estado
+
+```
+~/.distinto/
+├── rubi.log                  # log principal con timestamps
+├── rubi.lock                 # lock para evitar 2 polls simultáneos
+├── rubi_last_poll.txt        # última vez que corrió
+├── rubi_procesados.json      # message_ids ya procesados (24h)
+├── rubi_err_<ts>.log         # errores guardados aparte
+├── launchd_out.log           # stdout del launchd
+└── launchd_err.log           # stderr del launchd
+```
+
+### Alternativa futura — Webhook reactivo
+
+Si en algún momento queremos respuestas instantáneas (<2s en vez de hasta 60s), se puede pasar a webhook con Cloudflare Tunnel + FastAPI. Documentado en `shortcuts-ios.md`. Por ahora, polling cada minuto es más que suficiente.
 
 ## 🛡️ Reglas de seguridad
 
@@ -166,20 +219,24 @@ Más complejo de setear pero más rápido. Recomendado solo si las respuestas ne
 - ✅ Rubi MCP conectado y funcionando
 - ✅ Comando `whatsapp_send_with_mentions` validado
 - ✅ Comando `whatsapp_get_recent_events` disponible
-- 🟡 Script `escuchar_rubi.py` pendiente de armar
-- ⏳ Cron job pendiente de configurar
-- ⏳ Plantillas de comandos pendientes (este doc es la base)
+- ✅ Script `escuchar_rubi.py` creado (wrapper de claude CLI headless)
+- ✅ `router_comandos.py` con 7/7 tests pasando
+- ✅ Plist launchd `com.distinto.escuchar-rubi.plist` listo
+- ✅ Prompt template `prompts/poll_rubi.md` listo
+- 🟡 Pedro debe correr `./test_escuchar.sh once` para validar end-to-end
+- 🟡 Pedro debe `launchctl load` el plist cuando esté satisfecho
+- ⏳ Sub-skills que el listener invoca (revisar-tiktok, grilla, etc.) requieren cada una su propia validación
 
 ---
 
 ## 🚀 Siguiente paso
 
-Cuando armemos esto:
+1. ✅ Crear `scripts/escuchar_rubi.py` (loop de polling cada 60s)
+2. ✅ Crear `scripts/router_comandos.py` (mapeo comando → acción)
+3. 🟡 **TU TURNO**: correr `./test_escuchar.sh once` para validar
+4. 🟡 Si OK: instalar plist con `launchctl load`
+5. 🟡 Pedro hace prueba mandando `>> status` desde su celu
+6. 🟡 Validar que responde en <2 minutos
+7. ⏳ Iterar con casos reales y refinar el prompt
 
-1. Crear `scripts/escuchar_rubi.py` (loop de polling cada 60s)
-2. Crear `scripts/router_comandos.py` (mapeo comando → acción)
-3. Configurar cron en Mac
-4. Pedro hace prueba mandando `>> status` desde su celu
-5. Validar que responde en <2 minutos
-
-Versión: 0.1.0 · Última actualización: 17 mayo 2026
+Versión: 0.2.0 · Última actualización: 17 mayo 2026

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.distinto.escuchar-rubi</string>
+
+  <!-- Comando a ejecutar -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/pedroreyescalderon/Downloads/1. DISTINTO AGENCIA/distinto-marcas-skills/skills/automatizaciones-distinto/scripts/escuchar_rubi.py</string>
+  </array>
+
+  <!-- Cada 60 segundos -->
+  <key>StartInterval</key>
+  <integer>60</integer>
+
+  <!-- No correr en boot inmediatamente, esperar 30s -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Solo 1 a la vez -->
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <!-- Logs (además del log interno del script) -->
+  <key>StandardOutPath</key>
+  <string>/Users/pedroreyescalderon/.distinto/launchd_out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/pedroreyescalderon/.distinto/launchd_err.log</string>
+
+  <!-- Variables de entorno -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    <key>HOME</key>
+    <string>/Users/pedroreyescalderon</string>
+  </dict>
+
+  <!-- No reiniciar si crashea (preferimos que falle silencioso un ciclo) -->
+  <key>KeepAlive</key>
+  <false/>
+</dict>
+</plist>

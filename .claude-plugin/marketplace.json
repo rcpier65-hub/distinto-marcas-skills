@@ -1,25 +1,27 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "distinto-marketplace",
-  "description": "Marketplace privado de Agencia Distinto — skills, plugins y herramientas internas del equipo.",
   "owner": {
     "name": "Agencia Distinto",
     "email": "team@agenciadistinto.com",
     "url": "https://www.agenciadistinto.com"
   },
+  "metadata": {
+    "description": "Marketplace privado de Agencia Distinto — skills, plugins y herramientas internas del equipo.",
+    "version": "2.4.0"
+  },
   "plugins": [
     {
       "name": "distinto-marcas",
-      "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive) para los 9 clientes de Agencia Distinto. Activar con 'revisa comentarios y generame la hoja de [marca]'.",
+      "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive + Rubi WhatsApp) para los 9 clientes de Agencia Distinto. Incluye reglas operativas: principio de proactividad, resolución de rangos temporales, queries exhaustivas vs muestreo. Activar con 'revisa comentarios y generame la hoja de [marca]'.",
       "author": {
         "name": "Agencia Distinto",
         "email": "team@agenciadistinto.com",
         "url": "https://www.agenciadistinto.com"
       },
       "homepage": "https://github.com/rcpier65-hub/distinto-marcas-skills",
-      "version": "2.3.1",
+      "version": "2.4.0",
       "category": "brand-management",
-      "source": "./",
+      "source": "./plugins/distinto-marcas",
       "tags": [
         "agencia",
         "marketing",
