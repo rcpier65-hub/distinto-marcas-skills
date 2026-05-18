@@ -62,37 +62,53 @@ para **Muebles Lozano** con consistencia, sin pedir contexto adicional.
 
 
 <!-- INBOX_TIKTOK_SECTION -->
-## 📨 Inbox TikTok (workflow Excel-en-Drive)
+## 📨 Inbox TikTok (workflow Excel-en-Drive + Rubi WhatsApp)
 
-Para revisar comentarios pendientes de TikTok y generar borradores on-brand para esta marca, activar la skill **`responder-tiktok`** con frases como:
+Para revisar comentarios pendientes de TikTok y generar borradores on-brand para esta marca, activar la skill **`responder-tiktok`**.
+
+### Trigger MODO 1 — Generar Excel con borradores
 
 - *"Revisa los comentarios de TikTok de Muebles Lozano"*
 - *"Generame la hoja para responder TikTok de Muebles Lozano"*
 - *"Saca los comentarios de Muebles Lozano"*
 
-El workflow:
-1. Lee comentarios sin respuesta del inbox de TikTok Studio (vía Patchright + cookies guardadas)
-2. Genera borradores aplicando la voz de marca documentada acá (`01-marca.md`, `04-contenido.md`, `05-cliente.md`)
-3. Escribe una **hoja nueva** en el Excel:
+Workflow:
+1. Lee comentarios sin respuesta del inbox de TikTok Studio (Patchright + cookies)
+2. Genera borradores aplicando voz de marca documentada acá (`01-marca.md`, `04-contenido.md`, `05-cliente.md`)
+3. Escribe **hoja nueva** en el Excel:
    ```
    Drive/Mi unidad/1. GESTIÓN/CUENTAS/1. Muebles Lozano/Inbox TikTok/
    Inbox TikTok - Muebles Lozano.xlsx
    ```
 4. Cada sesión = 1 hoja con timestamp `YYYY-MM-DD HH-MM`
 5. Columnas: Usuario · Tiempo · Comentario · Borrador · Acción · Categoría · Video/Link
-6. Pedro abre el Excel y responde manualmente (TikTok bloquea automatización del POST)
 
-**Reglas para los borradores**:
-- Respetar voz de marca de `01-marca.md`
-- Aplicar sensibilidades de `05-cliente.md`
-- Derivar consultas comerciales/sensibles al WhatsApp del cliente (ver `03-oferta-presencia.md`)
-- NO postear automático (TikTok bloquea silenciosamente — limitación técnica confirmada)
+### Trigger MODO 2 — Confirmar respuestas + Rubi WhatsApp
+
+Cuando Pedro confirme que respondió todos los comentarios:
+
+- *"Ya respondí los comentarios de Muebles Lozano"*
+- *"Ya terminé con TikTok de Muebles Lozano"*
+
+Workflow:
+1. Verifica el inbox actual (re-lectura para confirmar cuántos quedan sin responder)
+2. Compara con el último log
+3. Si todo OK → envía resumen al grupo WhatsApp **"_por confirmar_"** mencionando al contacto del cliente (datos en `marcas.json`)
+4. Si quedan nuevos → avisa a Pedro antes de enviar
+
+**Grupo WhatsApp configurado**: `_por confirmar_`
+
+### Reglas críticas
+
+- Respetar voz de `01-marca.md` y sensibilidades de `05-cliente.md`
+- Derivar consultas comerciales al WhatsApp del cliente (ver `03-oferta-presencia.md`)
+- NO postear automático en TikTok (TikTok bloquea silenciosamente)
+- NUNCA mandar mensaje al WhatsApp del cliente sin que Pedro lo haya pedido explícitamente
 - Marcar quejas/críticas duras como `escalar` (decisión de cliente)
 
-Detalle técnico completo y limitaciones: ver skill `responder-tiktok` en `../responder-tiktok/SKILL.md`.
+Detalle técnico completo: ver skill `responder-tiktok` en `../responder-tiktok/SKILL.md`.
 
 <!-- /INBOX_TIKTOK_SECTION -->
-
 ## 📁 Estructura del skill
 
 ```

@@ -41,8 +41,8 @@
       "whatsapp_contacto": null,
       "tono_file": "tonos/lozano.md",
       "auth_file": "auth/lozano.json",
-      "auth_last_login": null,
-      "activo": false,
+      "auth_last_login": "2026-05-17T20:54:33",
+      "activo": true,
       "sensibilidades": [],
       "drive_folder_name": "1. Muebles Lozano"
     },
@@ -58,8 +58,8 @@
       "whatsapp_contacto": null,
       "tono_file": "tonos/distribuidora-fitness.md",
       "auth_file": "auth/distribuidora-fitness.json",
-      "auth_last_login": null,
-      "activo": false,
+      "auth_last_login": "2026-05-17T20:54:33",
+      "activo": true,
       "sensibilidades": [],
       "drive_folder_name": "3. Distribuidora Fitness Marketing"
     },
@@ -95,7 +95,9 @@
       "auth_last_login": null,
       "activo": false,
       "sensibilidades": [],
-      "drive_folder_name": "5. Mil Ideas"
+      "drive_folder_name": "5. Mil Ideas",
+      "no_trabajado": true,
+      "nota_no_trabajado": "Distinto Agencia no opera TikTok inbox para esta marca"
     },
     "kintu": {
       "skill_marca": "marca-6-kintu",
@@ -109,8 +111,8 @@
       "whatsapp_contacto": null,
       "tono_file": "tonos/kintu.md",
       "auth_file": "auth/kintu.json",
-      "auth_last_login": null,
-      "activo": false,
+      "auth_last_login": "2026-05-17T20:58:11",
+      "activo": true,
       "sensibilidades": [],
       "drive_folder_name": "6. Kintu"
     },
@@ -126,8 +128,8 @@
       "whatsapp_contacto": null,
       "tono_file": "tonos/novalamps.md",
       "auth_file": "auth/novalamps.json",
-      "auth_last_login": null,
-      "activo": false,
+      "auth_last_login": "2026-05-17T21:00:45",
+      "activo": true,
       "sensibilidades": [],
       "drive_folder_name": "7. NovaLamps"
     },
@@ -143,8 +145,8 @@
       "whatsapp_contacto": null,
       "tono_file": "tonos/la-victoria.md",
       "auth_file": "auth/la-victoria.json",
-      "auth_last_login": null,
-      "activo": false,
+      "auth_last_login": "2026-05-17T20:54:32",
+      "activo": true,
       "sensibilidades": [],
       "drive_folder_name": "8. La Victoria"
     },
@@ -163,7 +165,9 @@
       "auth_last_login": null,
       "activo": false,
       "sensibilidades": [],
-      "drive_folder_name": "9. Oral Beauty"
+      "drive_folder_name": "9. Oral Beauty",
+      "no_trabajado": true,
+      "nota_no_trabajado": "Distinto Agencia no opera TikTok inbox para esta marca"
     }
   }
 }

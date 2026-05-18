@@ -1,6 +1,6 @@
 ---
 name: responder-tiktok
-description: Lee comentarios pendientes de TikTok de cualquier marca de Distinto Agencia y genera un Excel en Drive con borradores on-brand listos para que Pedro responda manualmente. Activar cuando el usuario diga "revisa comentarios y generame la hoja de [marca]", "revisa tiktok de [marca]", "saca los comentarios de [marca]", "actualiza el inbox tiktok de [marca]", o variaciones. Genera/actualiza el archivo "Inbox TikTok - [Marca].xlsx" en `Drive/GESTIÓN/CUENTAS/[Marca]/Inbox TikTok/` con una hoja nueva por cada revisión.
+description: Lee comentarios pendientes de TikTok de cualquier marca de Distinto Agencia, genera un Excel en Drive con borradores on-brand para responder manualmente, y envía un aviso al cliente vía WhatsApp (Rubi) cuando Pedro confirma que terminó. Activar cuando el usuario diga "revisa comentarios y generame la hoja de [marca]", "revisa tiktok de [marca]", "saca los comentarios de [marca]", "actualiza el inbox tiktok de [marca]", "ya respondí los comentarios de [marca]", "ya terminé con tiktok [marca]", o variaciones. Genera/actualiza el archivo "Inbox TikTok - [Marca].xlsx" en `Drive/GESTIÓN/CUENTAS/[Marca]/Inbox TikTok/` con una hoja nueva por cada revisión. Cuando Pedro confirma "ya respondí a todos", verifica el inbox y envía resumen vía Rubi al grupo de WhatsApp del cliente.
 ---
 
 # Responder TikTok — Workflow Excel-en-Drive
@@ -20,7 +20,11 @@ TikTok aplica **bloqueo silencioso a nivel backend** para cualquier intento de p
 
 ## ⚡ Cuándo activar
 
-Activar **siempre** que el usuario pida:
+Tiene **dos modos de operación** según el trigger:
+
+### MODO 1 — Generar hoja Excel con borradores (lectura)
+
+Activar cuando el usuario pida:
 
 - "Revisa los comentarios de TikTok de [marca]"
 - "Generame la hoja para responder TikTok de [marca]"
@@ -29,7 +33,22 @@ Activar **siempre** que el usuario pida:
 - "Actualiza el inbox TikTok de [marca]"
 - "TikTok inbox: [marca]"
 
-Donde `[marca]` puede ser: Manrique, Lozano, Distribuidora Fitness, Kintu, Novalamps, La Victoria, Mil Ideas, Little Joe, Oral Beauty.
+→ Flujo: leer comentarios + generar borradores + crear/actualizar Excel en Drive
+
+### MODO 2 — Confirmar respuestas + avisar al cliente vía Rubi WhatsApp
+
+Activar cuando el usuario diga:
+
+- "Ya respondí a todos los comentarios de [marca]"
+- "Ya respondí los comentarios de [marca]"
+- "Ya terminé con TikTok de [marca]"
+- "Listo, respondí todo TikTok de [marca]"
+- "Avisa al cliente de [marca] que respondí"
+
+→ Flujo: verificar inbox (cuántos quedan sin respuesta) + enviar resumen al grupo WhatsApp del cliente con Rubi MCP
+
+**Marcas disponibles**: Manrique, Lozano, Distribuidora Fitness, Kintu, Novalamps, La Victoria, Little Joe.
+**Marcas excluidas** (NO se trabaja TikTok inbox): Mil Ideas, Oral Beauty.
 
 ## 📋 Reglas absolutas
 
@@ -145,7 +164,7 @@ Esto:
 
 ### Paso 5 — Reportar a Pedro
 
-Mensaje en el chat (NUNCA al WhatsApp del cliente):
+Mensaje en el chat (NUNCA al WhatsApp del cliente en MODO 1):
 
 ```
 ✅ Inbox TikTok actualizado para [Marca]
@@ -165,6 +184,114 @@ Mensaje en el chat (NUNCA al WhatsApp del cliente):
    • @usuario1: "comentario..." — Razón
    • @usuario2: "comentario..." — Razón
 ```
+
+---
+
+## 🤖 MODO 2 — Confirmar respuestas + Rubi WhatsApp
+
+Cuando Pedro confirma que ya respondió todos los comentarios de una marca, la skill verifica el inbox de TikTok y envía un resumen al grupo de WhatsApp del cliente vía Rubi MCP (`mcp__1a1b3384-1b85-4bee-96da-aed9167ef41d__whatsapp_send_*`).
+
+### ⚠️ REGLA CRÍTICA INVIOLABLE
+
+**Este modo SOLO se activa cuando Pedro lo pide EXPLÍCITAMENTE en el chat** con frases como "ya respondí los comentarios de [marca]". NUNCA enviar mensaje al cliente automáticamente, ni en errores, ni en confirmaciones del MODO 1. Esta es la regla operativa más importante de la skill (ver `~/.claude/projects/.../memory/user_pedro_distinto.md`).
+
+### Paso 1 — Identificar marca y validar grupo WhatsApp
+
+Leer `marcas.json` y verificar que la marca tenga:
+- `whatsapp_grupo` (nombre del grupo)
+- `whatsapp_chat_id` (chatId formato `120363...@g.us`)
+- `whatsapp_contacto` (número del contacto principal para mention, ej. `51902414745`)
+- `tratamiento_cliente` y `nombre_cliente` (para saludo personalizado, ej. "Dr. Gustavo")
+
+Si falta alguno → avisar a Pedro y NO mandar nada al cliente.
+
+### Paso 2 — Verificar inbox (releer)
+
+```bash
+python scripts/leer_comentarios.py --marca <slug> --solo-no-respondidos
+```
+
+Comparar:
+- **Lo que había antes** (último log `logs/<marca>_actual.json` o el más reciente)
+- **Lo que queda ahora**
+
+Calcular:
+- `respondidos_pedro = anterior - actual` (cuántos respondió Pedro entre lecturas)
+- `quedan_pendientes = actual` (los que todavía no respondió)
+
+### Paso 3 — Decidir si enviar o avisar a Pedro
+
+| Condición | Acción |
+|---|---|
+| `quedan_pendientes == 0` | ✅ Enviar mensaje al grupo (caso ideal) |
+| `quedan_pendientes <= 3` y son escalados | ✅ Enviar mensaje mencionando los escalados |
+| `quedan_pendientes > 0` y son nuevos comentarios | ⚠️ NO enviar. Avisar a Pedro: "Quedan N nuevos sin responder, ¿igual aviso al cliente?" |
+| `respondidos_pedro == 0` (no cambió nada) | ⚠️ NO enviar. Avisar a Pedro: "No detecto cambios desde la última lectura, ¿estás seguro?" |
+
+### Paso 4 — Componer mensaje on-brand para el grupo
+
+Saludo: `Hola [tratamiento] @[whatsapp_contacto]`
+
+Cuerpo:
+```
+Hola [tratamiento] @[número] 👋
+
+📊 *TikTok inbox — [fecha]*
+
+✅ Respondidos: N comentarios
+
+[Si hay escalados:]
+🚨 *Pendiente tu decisión* (no se respondieron, son críticas o quejas):
+• @user1: "comentario abreviado..."
+• @user2: "comentario abreviado..."
+
+[Si todo OK sin escalados:]
+Inbox limpio 🌿 Cualquier ajuste posterior lo puedes hacer desde TikTok Studio.
+
+Las respuestas siguieron el tono on-brand de [Marca].
+```
+
+Ajustar tono al de cada cliente:
+- **Manrique**: profesional, usa 🌿/🌱/💙, dirige al Dr. Gustavo
+- **Little Joe**: cálido juguetón, usa 💙/😊
+- **Lozano**: profesional comercial
+- **Otros**: tono cordial estándar
+
+### Paso 5 — Enviar con Rubi MCP
+
+```python
+# Tool: mcp__1a1b3384-1b85-4bee-96da-aed9167ef41d__whatsapp_send_with_mentions
+{
+  "group_name": "<whatsapp_grupo>",
+  "mentions": ["<whatsapp_contacto>"],
+  "text": "<mensaje compuesto>"
+}
+```
+
+Si el grupo no se encuentra → reintentar con `whatsapp_send_message` usando `group_name` o `alias`.
+
+### Paso 6 — Reportar a Pedro lo enviado
+
+```
+✅ Mensaje enviado al grupo "[whatsapp_grupo]"
+📨 messageId: <id>
+👤 Mention: @[whatsapp_contacto] ([tratamiento] [nombre])
+
+Contenido enviado:
+[mensaje completo]
+```
+
+Si fallo → reportar SOLO a Pedro en el chat (NO al cliente).
+
+---
+
+## 🛡️ Salvaguardas adicionales del MODO 2
+
+1. **Idempotencia**: si Pedro dice "ya respondí" dos veces seguidas, no enviar 2 mensajes al cliente. Avisar: "Ya envié hace X min, ¿reenviar?"
+2. **Hora prudente**: si son < 8am o > 10pm hora Perú, advertir antes de enviar (el cliente puede preferir no recibir noche tarde).
+3. **Marca sin grupo**: si la marca no tiene `whatsapp_chat_id` configurado, NO operar. Avisar a Pedro qué falta.
+4. **Mensaje seco sin avance**: nunca enviar mensaje genérico "todo bien". Siempre incluir N respondidos + escalados pendientes si los hay.
+5. **Mensaje al WhatsApp NUNCA dice "no se pudo X"** — los problemas técnicos se reportan SOLO a Pedro en el chat (regla de memoria).
 
 ---
 
