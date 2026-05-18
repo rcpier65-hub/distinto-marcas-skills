@@ -11,7 +11,7 @@
       "name": "distinto-marcas",
       "source": "./",
       "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive) para los 9 clientes de Agencia Distinto. Activá con 'revisa comentarios y generame la hoja de [marca]'.",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "category": "brand-management",
       "tags": [
         "agencia",

@@ -188,6 +188,40 @@ automatizaciones-distinto/
 
 ---
 
+## 🧭 Principio de proactividad (regla dura, aplica a TODA conversación de la agencia)
+
+Cuando Pedro use frases como:
+- *"ya tienes la plantilla"*
+- *"ya tienes el contexto"*
+- *"ya sabes cómo va"*
+- *"solo debes [acción]"*
+- *"haz lo de siempre"*
+- *"como la vez pasada"*
+- *"con la info que ya conoces"*
+
+**NO PREGUNTAR** dónde está la plantilla, qué formato usar, ni pedir clarificaciones que se pueden resolver buscando. **ACTUAR** en este orden:
+
+1. **Buscar en serio** los recursos en este orden de prioridad:
+   - Skills del plugin (`marca-X-<cliente>/`, `grilla-semanal/`, `responder-tiktok/`, esta skill)
+   - Notion (con query filtrado o búsqueda por título)
+   - Google Drive (carpeta `1. GESTIÓN/CUENTAS/[marca]/`)
+   - Canva (templates marca)
+   - Conversaciones previas del proyecto (memoria)
+
+2. **Si lo encuentras** → ejecutar la tarea y entregar resultado.
+
+3. **Si NO lo encuentras** después de buscar en al menos 3 fuentes → recién entonces preguntar, **especificando dónde ya buscaste** (ej: *"Busqué en skill marca-manrique, en Notion 'plantillas Manrique' y en Drive '4. PLANTILLAS' — no encontré la plantilla. ¿En qué carpeta está?"*).
+
+**Filtro antes de cada pregunta:** *"¿esto se puede deducir del contexto o buscar en algún lado al que tengo acceso?"*. Si la respuesta es sí → buscar primero, no preguntar.
+
+**Antipatrones prohibidos:**
+- Preguntar dónde está algo que Pedro acaba de decir *"ya tienes"*
+- Listar 2 opciones cuando una está claramente implícita en el mensaje original
+- Ofrecer *"¿quieres que haga X?"* después de no hacer X (si X era lo pedido)
+- Devolver una muestra cuando Pedro pidió la lista completa
+
+---
+
 ## 🚦 Estado actual del proyecto
 
 - ✅ Skill `responder-tiktok` v2.1.0 funcional (lectura + Excel + Rubi MODO 2)
@@ -206,4 +240,4 @@ automatizaciones-distinto/
 - `credito-peru-pedro` — finanzas personales Pedro (separado de agencia)
 
 ---
-Versión: 0.1.0 (en armado) · Última actualización: 17 mayo 2026
+Versión: 0.2.0 (en armado) · Última actualización: 18 mayo 2026

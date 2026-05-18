@@ -172,4 +172,36 @@ Al finalizar exitosamente, reportar al usuario:
 
 ---
 
-Skill creado por Agencia Distinto · v1.0
+## 📅 Resolución de rangos temporales (regla dura)
+
+Cuando Pedro pida un rango temporal en lenguaje natural, **calcular las fechas exactas sin preguntar**:
+
+| Pedro dice... | Interpretar como... |
+|---|---|
+| "esta semana" | lunes a domingo de la semana en curso |
+| "la próxima semana" / "la siguiente semana" | lunes a domingo de la semana siguiente |
+| "desde mañana hasta el domingo" | mañana + cada día hasta el próximo domingo (rango exacto) |
+| "este mes" | día 1 al último día del mes en curso |
+| "el próximo mes" | día 1 al último día del mes siguiente |
+| "esta quincena" | día 1-15 o 16-fin según fecha actual |
+| "hoy" | solo el día actual |
+
+**Solo preguntar** si hay ambigüedad real e irresoluble (ej: viernes y dice "el lunes" sin más contexto). En ese caso, tomar la interpretación más cercana, ejecutar, y mencionar la suposición en una línea: *"Interpretando lunes 19 may. Si te referías a otro, avísame."*
+
+---
+
+## 🔎 Queries exhaustivas vs muestreo (regla dura)
+
+Cuando Pedro pida **"todo"**, **"todas"**, **"exacto"**, **"lista completa"**, **"cuántas hay"**, **"el total de"** → activar modo barrido completo. **NUNCA muestreo.**
+
+1. **NO usar** `notion-search` (búsqueda semántica, devuelve "relevantes").
+2. **SÍ usar** `notion-fetch` con query filtrado por las propiedades exactas (fecha, estado, marca).
+3. **Paginar** hasta agotar el dataset completo. Si la DB tiene 200+ registros, hacer múltiples calls hasta cubrir todo.
+4. **Devolver la lista exacta** con conteo total al final (*"Total: N publicaciones"*).
+5. **Nunca cerrar** con *"¿quieres que haga el barrido completo?"* — si Pedro pidió "todo", hacerlo de entrada.
+
+Si el filtro devuelve 0 resultados, confirmar la query con Pedro **después de haber intentado el barrido**, no antes.
+
+---
+
+Skill creado por Agencia Distinto · v1.1
