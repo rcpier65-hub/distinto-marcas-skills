@@ -1,6 +1,6 @@
 {
   "name": "distinto-marcas",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive + Rubi WhatsApp) para los 9 clientes de Agencia Distinto. La skill `responder-tiktok` lee comentarios pendientes de TikTok (Patchright + cookies) y genera hojas de Excel en Drive con borradores on-brand listos para responder manualmente. Activá con 'revisa comentarios y generame la hoja de [marca]'.",
   "author": {
     "name": "Agencia Distinto",
