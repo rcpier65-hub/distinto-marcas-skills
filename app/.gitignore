@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local debug scripts (no commit — pueden contener credenciales)
+/scripts/check.mjs
+/scripts/debug-check.mjs
+/scripts/debug-prep.mjs
+/scripts/reset.mjs

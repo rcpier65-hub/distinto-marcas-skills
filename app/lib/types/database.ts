@@ -51,6 +51,7 @@ export interface MarcaRow {
   color_primario_hex: string | null
   emoji_marca: string | null
   activa: boolean
+  notion_proyecto_id: string | null
   created_at: string
   updated_at: string
 }
@@ -68,6 +69,7 @@ export interface MarcaInsert {
   color_primario_hex?: string | null
   emoji_marca?: string | null
   activa?: boolean
+  notion_proyecto_id?: string | null
   created_at?: string
   updated_at?: string
 }

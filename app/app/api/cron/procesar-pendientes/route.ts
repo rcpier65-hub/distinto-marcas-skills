@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sendWhatsAppToPhone } from '@/lib/integrations/rubi'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
+import { queryGrillaForBrand, buildTitulosPorDia, type GrillaPublicacion } from '@/lib/integrations/notion'
 import type { GrillaPendienteUpdate, AprobacionInsert } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     errores: [] as string[],
   }
 
-  type MarcaRow = { slug: string; nombre: string; emoji_marca: string | null; color_primario_hex: string | null }
+  type MarcaRow = { slug: string; nombre: string; emoji_marca: string | null; color_primario_hex: string | null; notion_proyecto_id: string | null }
   type GrillaRow = {
     id: string
     semana_inicio: string
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
     .from('grillas_pendientes')
     .select(`
       id, semana_inicio, semana_fin, pedida_at,
-      marca:marcas(slug, nombre, emoji_marca, color_primario_hex)
+      marca:marcas(slug, nombre, emoji_marca, color_primario_hex, notion_proyecto_id)
     `)
     .eq('estado', 'pendiente')
     .order('pedida_at', { ascending: true })
@@ -76,7 +77,22 @@ export async function GET(request: Request) {
       .update(updateProcesando)
       .eq('id', g.id)
 
-    // 2b. Generar PNG con plantilla
+    // 2b. Fetch publicaciones de Notion (best-effort: si falla, sigue con datos vacíos)
+    let publicaciones: GrillaPublicacion[] = []
+    if (marca.notion_proyecto_id && process.env.NOTION_TOKEN && process.env.NOTION_GRILLA_DB_ID) {
+      try {
+        publicaciones = await queryGrillaForBrand({
+          notionProyectoId: marca.notion_proyecto_id,
+          semanaInicio: g.semana_inicio,
+          semanaFin: g.semana_fin,
+        })
+      } catch (e) {
+        console.error(`[cron] Notion query failed for ${marca.slug}:`, e)
+      }
+    }
+    const titulosPorDia = buildTitulosPorDia(publicaciones, g.semana_inicio)
+
+    // 2c. Generar PNG con plantilla
     let pngUrl: string | null = null
     let pngPath: string | null = null
     try {
@@ -88,7 +104,8 @@ export async function GET(request: Request) {
         },
         semanaInicio: g.semana_inicio,
         semanaFin: g.semana_fin,
-        publicaciones: 0,
+        publicaciones: publicaciones.length,
+        titulosPorDia,
       })
       const upload = await uploadGrillaPNG(pngBuffer, marca.slug, g.semana_inicio)
       if (upload.ok) {

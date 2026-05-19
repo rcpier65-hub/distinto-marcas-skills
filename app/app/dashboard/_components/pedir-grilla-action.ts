@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
 import { buildCaptionDefault } from '@/lib/grilla/build-caption'
+import { queryGrillaForBrand, buildTitulosPorDia, type GrillaPublicacion } from '@/lib/integrations/notion'
 import { revalidatePath } from 'next/cache'
 
 type PedirGrillaResult =
@@ -16,12 +17,11 @@ type PedirGrillaResult =
 /**
  * Genera la grilla COMPLETA en una sola transacción:
  * 1. INSERT en grillas_pendientes
- * 2. Genera PNG con @vercel/og
- * 3. Sube PNG a Supabase Storage
- * 4. Genera caption sugerido (editable después)
- * 5. UPDATE con png_url + caption + estado=esperando_aprobacion
- *
- * Devuelve el marca_slug para que el cliente pueda redirigir a /marca/[slug]
+ * 2. Lee publicaciones reales de Notion (filtradas por proyecto + Grilla de FIT)
+ * 3. Genera PNG con @vercel/og usando los títulos reales por día
+ * 4. Sube PNG a Supabase Storage
+ * 5. Genera caption con bloque por publicación (real, no template)
+ * 6. UPDATE con png_url + caption + estado=esperando_aprobacion
  */
 export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult> {
   const user = await requireUser()
@@ -29,10 +29,10 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // 1. Buscar marca
+  // 1. Buscar marca (incluyendo notion_proyecto_id)
   const { data: marca, error: marcaError } = await supabase
     .from('marcas')
-    .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz')
+    .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz, notion_proyecto_id')
     .eq('slug', marcaSlug)
     .eq('activa', true)
     .single()
@@ -84,7 +84,43 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
     grillaId = grillaInsert!.id
   }
 
-  // 4. Generar PNG
+  // 4. Fetch Notion (puede fallar — manejamos cada caso)
+  let publicaciones: GrillaPublicacion[] = []
+  let notionErrorMsg: string | null = null
+
+  if (!marca.notion_proyecto_id) {
+    notionErrorMsg = `Marca '${marca.slug}' no tiene notion_proyecto_id configurado en BD.`
+  } else if (!process.env.NOTION_TOKEN || !process.env.NOTION_GRILLA_DB_ID) {
+    notionErrorMsg = 'NOTION_TOKEN o NOTION_GRILLA_DB_ID no configurados en Vercel.'
+  } else {
+    try {
+      publicaciones = await queryGrillaForBrand({
+        notionProyectoId: marca.notion_proyecto_id,
+        semanaInicio: semana_inicio,
+        semanaFin: semana_fin,
+      })
+    } catch (e) {
+      notionErrorMsg = `Error consultando Notion: ${(e as Error).message}`
+      console.error('[pedirGrilla] Notion error:', e)
+    }
+  }
+
+  if (notionErrorMsg) {
+    // No bloqueamos: dejamos que Pedro vea el preview con error visible.
+    // Pero marcamos la grilla con error para que el dashboard lo muestre.
+    console.warn('[pedirGrilla]', notionErrorMsg)
+  }
+
+  if (!notionErrorMsg && publicaciones.length === 0) {
+    notionErrorMsg = 'Notion devolvió 0 publicaciones para esta semana. Revisá que las páginas tengan "Grilla de FIT" en el rango y proyecto correcto.'
+    console.warn('[pedirGrilla]', notionErrorMsg)
+  }
+
+  // 5. Construir títulos por día (lun-vie) para PNG
+  const titulosPorDia = buildTitulosPorDia(publicaciones, semana_inicio)
+  const totalPubs = publicaciones.length
+
+  // 6. Generar PNG
   let pngUrl: string | null = null
   let pngPath: string | null = null
   try {
@@ -96,7 +132,8 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
       },
       semanaInicio: semana_inicio,
       semanaFin: semana_fin,
-      publicaciones: 5,  // TODO Plan 7: leer de Notion
+      publicaciones: totalPubs,
+      titulosPorDia,
     })
     const upload = await uploadGrillaPNG(pngBuffer, marca.slug, semana_inicio)
     if (upload.ok) {
@@ -109,7 +146,7 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
     console.error('[pedirGrilla] PNG generation failed:', e)
   }
 
-  // 5. Generar caption
+  // 7. Generar caption usando publicaciones reales
   const caption = buildCaptionDefault({
     marca: {
       nombre: marca.nombre,
@@ -120,9 +157,10 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
     },
     semana_inicio,
     semana_fin,
+    publicaciones,
   })
 
-  // 6. UPDATE con todo
+  // 8. UPDATE con todo (y error si lo hubo)
   await service
     .from('grillas_pendientes')
     .update({
@@ -131,16 +169,17 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
       png_url: pngUrl,
       png_storage_path: pngPath,
       caption,
+      error: notionErrorMsg,
     })
     .eq('id', grillaId)
 
-  // 7. Log auditoría
+  // 9. Log auditoría
   await service.from('aprobaciones').insert({
     grilla_id: grillaId,
     usuario_id: user.id,
     accion: 'solicitar',
     via: 'dashboard',
-    comentario: 'Grilla generada via dashboard',
+    comentario: `Grilla generada via dashboard. ${totalPubs} publicaciones de Notion.`,
   })
 
   revalidatePath('/dashboard')

@@ -32,12 +32,13 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Si NO hay user y la ruta NO es /login, /auth, /api/cron, ni /, redirigir a /login.
-  // /api/cron/* hace su propia auth con Bearer token (no requiere sesión user).
+  // Si NO hay user y la ruta NO es /login, /auth, /api/*, ni /, redirigir a /login.
+  // /api/cron/* y /api/render-grilla hacen su propia auth con Bearer token (no requiere sesión user).
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||
+    request.nextUrl.pathname.startsWith('/api/render-grilla') ||
     request.nextUrl.pathname === '/'
 
   if (!user && !isPublicPath) {
