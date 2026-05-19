@@ -170,6 +170,8 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
       png_storage_path: pngPath,
       caption,
       error: notionErrorMsg,
+      publicaciones_count: totalPubs,
+      notion_grilla_ids: publicaciones.map((p) => p.notion_id),
     })
     .eq('id', grillaId)
 
