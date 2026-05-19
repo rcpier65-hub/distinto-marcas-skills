@@ -1,7 +1,8 @@
+// app/app/dashboard/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth/get-user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { MarcaCard, type MarcaCardData } from './_components/marca-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,57 +10,78 @@ export default async function DashboardPage() {
   const user = await requireUser()
   const supabase = await createClient()
 
+  // Calcular semana actual para filtrar grillas
+  const { semana_inicio } = calcularSemanaActual()
+
+  // Query: marcas activas + grilla de esta semana (si existe)
   const { data: marcas, error } = await supabase
     .from('marcas')
-    .select('slug, nombre, emoji_marca, activa, color_primario_hex')
+    .select(`
+      slug,
+      nombre,
+      emoji_marca,
+      color_primario_hex,
+      activa,
+      grillas_pendientes(estado, semana_inicio)
+    `)
     .eq('activa', true)
     .order('slug')
+
+  if (error) {
+    return (
+      <main className="container mx-auto p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>❌ Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-sm">{error.message}</pre>
+          </CardContent>
+        </Card>
+      </main>
+    )
+  }
+
+  // Transformar a MarcaCardData (solo la grilla de la semana actual)
+  const cards: MarcaCardData[] = (marcas ?? []).map((m) => {
+    const grillas = Array.isArray(m.grillas_pendientes) ? m.grillas_pendientes : (m.grillas_pendientes ? [m.grillas_pendientes] : [])
+    const grillaSemana = grillas.find(
+      (g) => g.semana_inicio === semana_inicio
+    )
+    return {
+      slug: m.slug,
+      nombre: m.nombre,
+      emoji_marca: m.emoji_marca,
+      color_primario_hex: m.color_primario_hex,
+      estado_grilla: (grillaSemana?.estado as MarcaCardData['estado_grilla']) ?? null,
+      semana_inicio: grillaSemana?.semana_inicio ?? null,
+    }
+  })
 
   return (
     <main className="container mx-auto p-8 max-w-6xl">
       <header className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
         <p className="text-muted-foreground">
-          Hola {user.email}. Estas son las marcas activas.
+          Hola {user.email}. {cards.length} marcas activas · Semana del {semana_inicio}.
         </p>
       </header>
 
-      {error && (
-        <Card className="border-destructive mb-4">
-          <CardHeader>
-            <CardTitle>❌ Error de Supabase</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="text-sm">{error.message}</pre>
-          </CardContent>
-        </Card>
-      )}
-
-      {marcas && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {marcas.map((m) => (
-            <Card key={m.slug} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <span className="text-3xl">{m.emoji_marca}</span>
-                  <span className="text-base">{m.nombre}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="outline" className="font-mono text-xs">
-                  {m.slug}
-                </Badge>
-                {m.color_primario_hex && (
-                  <div
-                    className="w-6 h-6 rounded border mt-3"
-                    style={{ backgroundColor: m.color_primario_hex }}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {cards.map((m) => (
+          <MarcaCard key={m.slug} marca={m} />
+        ))}
+      </div>
     </main>
   )
+}
+
+function calcularSemanaActual(): { semana_inicio: string } {
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diffToMonday)
+  monday.setHours(0, 0, 0, 0)
+  return { semana_inicio: monday.toISOString().slice(0, 10) }
 }
