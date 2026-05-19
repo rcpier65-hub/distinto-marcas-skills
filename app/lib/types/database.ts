@@ -34,6 +34,32 @@ export type TipoEnvio = 'whatsapp_grupo' | 'whatsapp_dm' | 'email'
 
 export type RolUsuario = 'admin' | 'colaborador' | 'cliente'
 
+export type EstadoPublicacion =
+  | 'tareas'
+  | 'idear'
+  | 'editando'
+  | 'editar'
+  | 'disenar'
+  | 'enviado'
+  | 'aprobar'
+  | 'programar'
+  | 'programar_anuncios'
+  | 'archivado'
+
+// Labels en español para UI
+export const ESTADO_PUBLICACION_LABEL: Record<EstadoPublicacion, string> = {
+  tareas: 'Tareas',
+  idear: 'Idear',
+  editando: 'Editando',
+  editar: 'Editar',
+  disenar: 'Diseñar',
+  enviado: 'Enviado',
+  aprobar: 'Aprobar',
+  programar: 'Programar',
+  programar_anuncios: 'Programar anuncios',
+  archivado: 'Archivado',
+}
+
 // ============================================================
 // TABLAS — Row, Insert y Update types
 // ============================================================
@@ -75,6 +101,76 @@ export interface MarcaInsert {
 }
 
 export type MarcaUpdate = Partial<MarcaRow>
+
+// --------------------------------------------------------
+
+export interface PublicacionRow {
+  id: string
+  marca_id: string
+  nombre: string
+  estado: EstadoPublicacion
+  fecha_publicacion: string | null  // date ISO YYYY-MM-DD
+  fecha_edicion: string | null
+  fecha_diseno: string | null
+  plataformas: string[]
+  tipo_contenido: string[]
+  objetivos: string[]
+  copy: string | null
+  guion: string | null
+  enlace_tomas: string | null
+  enlace_musica: string | null
+  portada_cruda_url: string | null
+  portada_editada_url: string | null
+  copy_listo: boolean
+  musica_lista: boolean
+  portada_lista: boolean
+  disenado: boolean
+  editado: boolean
+  video_aprobado: boolean
+  editor_nombre: string | null
+  notion_original_id: string | null
+  notion_url: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+}
+
+export interface PublicacionInsert {
+  id?: string
+  marca_id: string
+  nombre: string
+  estado?: EstadoPublicacion
+  fecha_publicacion?: string | null
+  fecha_edicion?: string | null
+  fecha_diseno?: string | null
+  plataformas?: string[]
+  tipo_contenido?: string[]
+  objetivos?: string[]
+  copy?: string | null
+  guion?: string | null
+  enlace_tomas?: string | null
+  enlace_musica?: string | null
+  portada_cruda_url?: string | null
+  portada_editada_url?: string | null
+  copy_listo?: boolean
+  musica_lista?: boolean
+  portada_lista?: boolean
+  disenado?: boolean
+  editado?: boolean
+  video_aprobado?: boolean
+  editor_nombre?: string | null
+  notion_original_id?: string | null
+  notion_url?: string | null
+  notas?: string | null
+  created_at?: string
+  updated_at?: string
+  created_by?: string | null
+  updated_by?: string | null
+}
+
+export type PublicacionUpdate = Partial<PublicacionRow>
 
 // --------------------------------------------------------
 

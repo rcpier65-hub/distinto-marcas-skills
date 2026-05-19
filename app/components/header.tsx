@@ -33,6 +33,12 @@ export async function Header() {
             Dashboard
           </Link>
           <Link
+            href="/publicaciones"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Publicaciones
+          </Link>
+          <Link
             href="/historial"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
