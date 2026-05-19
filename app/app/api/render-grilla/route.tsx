@@ -14,13 +14,8 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import chromium from '@sparticuz/chromium-min'
+import chromium from '@sparticuz/chromium'
 import puppeteer, { type Browser } from 'puppeteer-core'
-
-// URL del binary completo (con shared libs) que se descarga en runtime.
-// Match con la versión del paquete @sparticuz/chromium-min instalada.
-const CHROMIUM_PACK_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -107,14 +102,18 @@ export async function GET(request: Request) {
     .replaceAll('{{DATE_SUB}}', dateSub)
     .replaceAll('{{CARDS_HTML}}', cardsHtml)
 
+  // Setup recomendado @sparticuz/chromium
+  chromium.setHeadlessMode = true
+  chromium.setGraphicsMode = false
+
   // Lanzar Chromium y renderizar
   let browser: Browser | null = null
   try {
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: { width: 1080, height: 1620, deviceScaleFactor: 1 },
-      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
-      headless: true,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     })
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'networkidle0' })

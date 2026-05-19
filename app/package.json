@@ -2,6 +2,9 @@
   "name": "app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +13,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
-    "@sparticuz/chromium-min": "^123.0.1",
+    "@sparticuz/chromium": "^123.0.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.0",
     "@vercel/og": "^0.11.1",
