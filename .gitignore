@@ -26,3 +26,20 @@
 # Descomentar si querés excluir:
 # documentos/*.pdf
 # documentos/*.xlsx
+
+# === Next.js app (monorepo) ===
+app/.env*.local
+app/.env
+app/node_modules/
+app/.next/
+app/out/
+app/build/
+app/dist/
+
+# Vercel
+.vercel
+app/.vercel
+
+# Supabase
+app/supabase/.branches
+app/supabase/.temp
