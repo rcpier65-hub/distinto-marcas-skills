@@ -1,11 +1,56 @@
 // app/app/api/render-grilla/route.tsx
-// Route handler edge para generar PNG con @vercel/og.
-// Satori (motor de @vercel/og) requiere display: 'flex' EXPLÍCITO en TODOS los divs con >1 hijo.
-// No soporta: display: '-webkit-box', algunas propiedades modernas de CSS.
-import { ImageResponse } from 'next/og'
-import { NextResponse } from 'next/server'
+// Renderer Chromium-based para grillas semanales pixel-perfect.
+//
+// Por qué Chromium en vez de @vercel/og:
+//  - @vercel/og usa satori, que NO soporta Google Fonts auto-load,
+//    SVG inline complejo, blobs orgánicos, ni masks. Las plantillas
+//    de marca requieren todo eso.
+//  - Chromium real renderiza HTML+CSS+SVG+Fonts pixel-perfect.
+//
+// Runtime: Node.js (NO edge — Chromium no corre en edge runtime).
+// Memoria: 1024MB en vercel.json (ver config).
+// Timeout: 60s (Vercel Hobby Free permite hasta 60s en Node runtime).
 
-export const runtime = 'edge'
+import { NextResponse } from 'next/server'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import chromium from '@sparticuz/chromium'
+import { chromium as playwrightChromium, type Browser } from 'playwright-core'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+const DIAS_LONG = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const DIAS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const MESES_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const MESES_UP = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
+
+// Rotación de colores de cards (para variedad visual)
+const CARD_COLOR_CLASSES = ['is-white', 'is-rose', 'is-blue', 'is-cream', 'is-pink']
+
+// SVG icon de "video" — para publicaciones tipo REEL/Video
+const VIDEO_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="34" rx="3"/><path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/><path d="M22 52h20"/><path d="M32 46v6"/></svg>`
+// SVG icon de "imagen" — para POST estático
+const IMAGE_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="40" rx="3"/><circle cx="22" cy="26" r="5"/><path d="M8 44l14-14 10 10 10-8 14 14"/></svg>`
+// SVG icon de "mensaje" — para Testimonios o Stories
+const MESSAGE_ICON_SVG = `<svg viewBox="0 0 64 64"><path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/></svg>`
+// SVG icon de "empty" — círculo con guión
+const EMPTY_ICON_SVG = `<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="20"/><path d="M22 32h20"/></svg>`
+
+function pickIcon(tipo: string[]): string {
+  const t = tipo.join(' ').toLowerCase()
+  if (t.includes('reel') || t.includes('video') || t.includes('tiktok')) return VIDEO_ICON_SVG
+  if (t.includes('story') || t.includes('testimon')) return MESSAGE_ICON_SVG
+  return IMAGE_ICON_SVG
+}
+
+type Publicacion = {
+  fecha: string // YYYY-MM-DD
+  titulo: string
+  plataformas: string
+  tipo: string
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -16,188 +61,166 @@ export async function GET(request: Request) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
 
-  const nombre = url.searchParams.get('nombre') ?? 'Marca'
-  const emoji = url.searchParams.get('emoji') ?? '📊'
-  const color = url.searchParams.get('color') ?? '#283B6F'
-  const semanaInicio = url.searchParams.get('inicio') ?? '2026-01-01'
-  const semanaFin = url.searchParams.get('fin') ?? '2026-01-07'
-  const publicaciones = parseInt(url.searchParams.get('pubs') ?? '5', 10)
-  const titulos = [
-    url.searchParams.get('dia1') ?? '',
-    url.searchParams.get('dia2') ?? '',
-    url.searchParams.get('dia3') ?? '',
-    url.searchParams.get('dia4') ?? '',
-    url.searchParams.get('dia5') ?? '',
-  ]
-
-  const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
-  const fechaInicio = new Date(semanaInicio + 'T12:00:00Z')
-  const formatRange = (d1: Date, d2: Date): string => {
-    const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', timeZone: 'UTC' }
-    return `${d1.toLocaleDateString('es-PE', opts)} → ${d2.toLocaleDateString('es-PE', opts)}`
+  const slug = url.searchParams.get('slug') ?? 'manrique'
+  const semanaInicio = url.searchParams.get('inicio') ?? '2026-05-18'
+  const semanaFin = url.searchParams.get('fin') ?? '2026-05-24'
+  // Publicaciones vienen como JSON serializado en query param
+  const pubsJson = url.searchParams.get('pubs') ?? '[]'
+  let publicaciones: Publicacion[] = []
+  try {
+    publicaciones = JSON.parse(pubsJson) as Publicacion[]
+  } catch {
+    publicaciones = []
   }
 
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '1080px',
-          height: '1620px',
-          background: color,
-          padding: '80px 70px',
-          display: 'flex',
-          flexDirection: 'column',
-          fontFamily: 'sans-serif',
-          color: 'white',
-        }}
-      >
-        {/* HEADER ROW — pill marca + pill fecha */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: 'rgba(255,255,255,0.18)',
-              borderRadius: 999,
-              padding: '20px 36px',
-              border: '2px solid rgba(255,255,255,0.3)',
-            }}
-          >
-            <span style={{ fontSize: 56, marginRight: 16 }}>{emoji}</span>
-            <span style={{ fontSize: 36, fontWeight: 700 }}>{nombre}</span>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 26,
-              fontWeight: 600,
-              padding: '14px 24px',
-              background: 'rgba(255,255,255,0.12)',
-              borderRadius: 16,
-            }}
-          >
-            {formatRange(fechaInicio, new Date(semanaFin + 'T12:00:00Z'))}
-          </div>
-        </div>
+  // Cargar plantilla por slug
+  let templateHtml: string
+  try {
+    const templatePath = join(process.cwd(), 'lib', 'grilla', 'templates', `${slug}.html`)
+    templateHtml = await readFile(templatePath, 'utf8')
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, error: `Plantilla no encontrada para slug '${slug}'`, detail: (e as Error).message },
+      { status: 404 },
+    )
+  }
 
-        {/* HERO — gran "¿Qué se viene?" */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flex: 1,
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 170,
-              fontWeight: 900,
-              fontStyle: 'italic',
-              lineHeight: 1,
-              letterSpacing: -3,
-            }}
-          >
-            ¿Qué se
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 170,
-              fontWeight: 900,
-              fontStyle: 'italic',
-              lineHeight: 1,
-              letterSpacing: -3,
-              marginTop: 6,
-            }}
-          >
-            viene?
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 32,
-              fontWeight: 500,
-              marginTop: 50,
-              opacity: 0.92,
-            }}
-          >
-            Esta semana · {publicaciones} {publicaciones === 1 ? 'publicación' : 'publicaciones'}
-          </div>
-        </div>
+  // Construir URL absoluta del logo (Chromium necesita URLs accesibles)
+  const proto = url.protocol
+  const host = url.host
+  const logoUrl = `${proto}//${host}/marcas/${slug}/logo.png`
 
-        {/* MINI-CARDS días */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 30 }}>
-          {dias.map((dia, i) => {
-            const fecha = new Date(fechaInicio)
-            fecha.setUTCDate(fecha.getUTCDate() + i)
-            const titulo = titulos[i]
-            return (
-              <div
-                key={dia}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  flex: 1,
-                  background: 'rgba(255,255,255,0.15)',
-                  borderRadius: 18,
-                  padding: '22px 14px',
-                  border: '2px solid rgba(255,255,255,0.25)',
-                  minHeight: 220,
-                }}
-              >
-                <div style={{ display: 'flex', fontSize: 22, opacity: 0.85, fontWeight: 600 }}>{dia}</div>
-                <div
-                  style={{
-                    display: 'flex',
-                    fontSize: 56,
-                    fontWeight: 800,
-                    marginTop: 4,
-                    lineHeight: 1,
-                  }}
-                >
-                  {fecha.getUTCDate()}
-                </div>
-                {titulo && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      fontSize: 18,
-                      marginTop: 14,
-                      textAlign: 'center',
-                      opacity: 0.9,
-                      lineHeight: 1.2,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {titulo.length > 60 ? titulo.slice(0, 57) + '...' : titulo}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+  // Sustituir tokens
+  const datePill = buildDatePill(semanaInicio, semanaFin)
+  const dateSub = buildDateSub(semanaInicio, semanaFin)
+  const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones)
 
-        {/* FOOTER */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 22,
-            opacity: 0.75,
-            paddingTop: 24,
-            borderTop: '1px solid rgba(255,255,255,0.3)',
-          }}
-        >
-          <div style={{ display: 'flex' }}>Distinto Agencia · Grilla semanal</div>
-          <div style={{ display: 'flex' }}>distinto-app.vercel.app</div>
-        </div>
+  const html = templateHtml
+    .replaceAll('{{TITLE}}', `Grilla ${slug} ${semanaInicio} → ${semanaFin}`)
+    .replaceAll('{{LOGO_URL}}', logoUrl)
+    .replaceAll('{{DATE_PILL}}', datePill)
+    .replaceAll('{{DATE_SUB}}', dateSub)
+    .replaceAll('{{CARDS_HTML}}', cardsHtml)
+
+  // Lanzar Chromium y renderizar
+  let browser: Browser | null = null
+  try {
+    browser = await playwrightChromium.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    })
+    const context = await browser.newContext({
+      viewport: { width: 1080, height: 1620 },
+      deviceScaleFactor: 1,
+    })
+    const page = await context.newPage()
+    await page.setContent(html, { waitUntil: 'networkidle' })
+    // Esperar a que las Google Fonts terminen de cargar
+    await page.evaluate(() => document.fonts.ready)
+    // Screenshot del .poster (el contenedor principal)
+    const poster = page.locator('.poster')
+    const pngBuffer = await poster.screenshot({ type: 'png', omitBackground: false })
+
+    await browser.close()
+    browser = null
+
+    return new NextResponse(new Uint8Array(pngBuffer), {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    })
+  } catch (e) {
+    if (browser) await browser.close().catch(() => {})
+    console.error('[render-grilla] Chromium error:', e)
+    return NextResponse.json(
+      { ok: false, error: 'Render failed', detail: (e as Error).message?.slice(0, 500) },
+      { status: 500 },
+    )
+  }
+}
+
+function buildDatePill(inicio: string, fin: string): string {
+  const d1 = new Date(inicio + 'T12:00:00Z')
+  const d2 = new Date(fin + 'T12:00:00Z')
+  const mes = MESES_UP[d1.getUTCMonth()]
+  const año = d1.getUTCFullYear()
+  return `${d1.getUTCDate()} — ${d2.getUTCDate()} ${mes} · ${año}`
+}
+
+function buildDateSub(inicio: string, fin: string): string {
+  const d1 = new Date(inicio + 'T12:00:00Z')
+  const d2 = new Date(fin + 'T12:00:00Z')
+  const mes = MESES_LONG[d1.getUTCMonth()]
+  const diaIni = DIAS_LONG[d1.getUTCDay()].toLowerCase()
+  const diaFin = DIAS_LONG[d2.getUTCDay()].toLowerCase()
+  return `${mes.charAt(0).toUpperCase() + mes.slice(1)} · Del ${diaIni} ${d1.getUTCDate()} al ${diaFin} ${d2.getUTCDate()}`
+}
+
+function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[]): string {
+  const d1 = new Date(inicio + 'T12:00:00Z')
+  const d2 = new Date(fin + 'T12:00:00Z')
+  const numDays = Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)) + 1
+
+  // Indexar publicaciones por fecha
+  const pubsByFecha = new Map<string, Publicacion[]>()
+  for (const p of publicaciones) {
+    const arr = pubsByFecha.get(p.fecha) ?? []
+    arr.push(p)
+    pubsByFecha.set(p.fecha, arr)
+  }
+
+  const cards: string[] = []
+  let colorIdx = 0
+
+  for (let i = 0; i < numDays; i++) {
+    const d = new Date(d1)
+    d.setUTCDate(d1.getUTCDate() + i)
+    const iso = d.toISOString().slice(0, 10)
+    const day = d.getUTCDate()
+    const dayShort = DIAS_SHORT[d.getUTCDay()]
+    const pubs = pubsByFecha.get(iso) ?? []
+
+    if (pubs.length === 0) {
+      cards.push(`
+    <article class="card empty">
+      <div class="date"><div class="day">${day}</div><div class="month">${dayShort}</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Sin publicación programada</div>
+        <div class="meta">— Día sin contenido en grilla —</div>
       </div>
-    ),
-    { width: 1080, height: 1620 }
-  )
+      <div class="icon">${EMPTY_ICON_SVG}</div>
+    </article>`)
+    } else {
+      for (const pub of pubs) {
+        const colorClass = CARD_COLOR_CLASSES[colorIdx % CARD_COLOR_CLASSES.length]
+        colorIdx++
+        const icon = pickIcon([pub.tipo])
+        cards.push(`
+    <article class="card ${colorClass}">
+      <div class="date"><div class="day">${day}</div><div class="month">${dayShort}</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">${escapeHtml(pub.titulo)}</div>
+        <div class="meta">${escapeHtml(pub.plataformas)}${pub.tipo ? ' · ' + escapeHtml(pub.tipo) : ''}</div>
+      </div>
+      <div class="icon">${icon}</div>
+    </article>`)
+      }
+    }
+  }
+
+  return cards.join('\n')
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }

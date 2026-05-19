@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sendWhatsAppToPhone } from '@/lib/integrations/rubi'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
-import { queryGrillaForBrand, buildTitulosPorDia, type GrillaPublicacion } from '@/lib/integrations/notion'
+import { queryGrillaForBrand, type GrillaPublicacion } from '@/lib/integrations/notion'
 import type { GrillaPendienteUpdate, AprobacionInsert } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -90,22 +90,20 @@ export async function GET(request: Request) {
         console.error(`[cron] Notion query failed for ${marca.slug}:`, e)
       }
     }
-    const titulosPorDia = buildTitulosPorDia(publicaciones, g.semana_inicio)
-
-    // 2c. Generar PNG con plantilla
+    // 2c. Generar PNG con plantilla (Chromium real)
     let pngUrl: string | null = null
     let pngPath: string | null = null
     try {
       const pngBuffer = await generateGrillaPNG({
         marca: {
+          slug: marca.slug,
           nombre: marca.nombre,
           emoji: marca.emoji_marca ?? '📊',
           color: marca.color_primario_hex ?? '#283B6F',
         },
         semanaInicio: g.semana_inicio,
         semanaFin: g.semana_fin,
-        publicaciones: publicaciones.length,
-        titulosPorDia,
+        publicaciones,
       })
       const upload = await uploadGrillaPNG(pngBuffer, marca.slug, g.semana_inicio)
       if (upload.ok) {

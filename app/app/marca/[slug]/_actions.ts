@@ -156,16 +156,38 @@ export async function regenerarPng(grillaId: string, marcaSlug: string): Promise
   const marca = Array.isArray(grilla.marca) ? grilla.marca[0] : grilla.marca
   if (!marca) return
 
+  // Re-query Notion para obtener publicaciones actualizadas
+  const { queryGrillaForBrand } = await import('@/lib/integrations/notion')
+  let publicaciones: import('@/lib/integrations/notion').GrillaPublicacion[] = []
+  // marca puede no traer notion_proyecto_id desde el JOIN; lo re-fetcheamos
+  const { data: marcaFull } = await supabase
+    .from('marcas')
+    .select('notion_proyecto_id')
+    .eq('slug', marca.slug)
+    .single()
+  if (marcaFull?.notion_proyecto_id && process.env.NOTION_TOKEN && process.env.NOTION_GRILLA_DB_ID) {
+    try {
+      publicaciones = await queryGrillaForBrand({
+        notionProyectoId: marcaFull.notion_proyecto_id,
+        semanaInicio: grilla.semana_inicio,
+        semanaFin: grilla.semana_fin,
+      })
+    } catch (e) {
+      console.error('[regenerarPng] Notion error:', e)
+    }
+  }
+
   try {
     const pngBuffer = await generateGrillaPNG({
       marca: {
+        slug: marca.slug,
         nombre: marca.nombre,
         emoji: marca.emoji_marca ?? '📊',
         color: marca.color_primario_hex ?? '#283B6F',
       },
       semanaInicio: grilla.semana_inicio,
       semanaFin: grilla.semana_fin,
-      publicaciones: 5,
+      publicaciones,
     })
     const upload = await uploadGrillaPNG(pngBuffer, marca.slug, grilla.semana_inicio)
     if (upload.ok) {

@@ -4,10 +4,14 @@
 //
 // Usa la API REST de Notion v1: https://developers.notion.com/reference/post-database-query
 // Requiere env vars:
-//   NOTION_TOKEN          — Internal integration secret (secret_xxx)
-//   NOTION_GRILLA_DB_ID   — UUID de la base de datos "📅 GRILLA DE CONTENIDO"
-//                           (sin dashes: 116885410ddd83d38e56873a2ca08fb9
-//                            o con dashes: 11688541-0ddd-83d3-8e56-873a2ca08fb9)
+//   NOTION_TOKEN          — Internal integration secret (ntn_xxx o secret_xxx)
+//   NOTION_GRILLA_DB_ID   — UUID del database "📅 GRILLA DE CONTENIDO"
+//                           Valor correcto: cf388541-0ddd-8350-acf1-01666ea5208e
+//                           (validado 2026-05-19 con curl POST /databases/{id}/query)
+//
+// NOTA: el ID 11688541-0ddd-83d3-8e56-873a2ca08fb9 que aparece en `collection://`
+// en el MCP de Notion es el *data source ID* interno, NO el database ID.
+// La REST API NO acepta data source IDs en `/databases/{id}/query`.
 
 const NOTION_API = 'https://api.notion.com/v1'
 const NOTION_VERSION = '2022-06-28'

@@ -7,7 +7,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
 import { buildCaptionDefault } from '@/lib/grilla/build-caption'
-import { queryGrillaForBrand, buildTitulosPorDia, type GrillaPublicacion } from '@/lib/integrations/notion'
+import { queryGrillaForBrand, type GrillaPublicacion } from '@/lib/integrations/notion'
 import { revalidatePath } from 'next/cache'
 
 type PedirGrillaResult =
@@ -116,24 +116,22 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
     console.warn('[pedirGrilla]', notionErrorMsg)
   }
 
-  // 5. Construir títulos por día (lun-vie) para PNG
-  const titulosPorDia = buildTitulosPorDia(publicaciones, semana_inicio)
   const totalPubs = publicaciones.length
 
-  // 6. Generar PNG
+  // 5. Generar PNG con Chromium real (plantilla HTML por marca)
   let pngUrl: string | null = null
   let pngPath: string | null = null
   try {
     const pngBuffer = await generateGrillaPNG({
       marca: {
+        slug: marca.slug,
         nombre: marca.nombre,
         emoji: marca.emoji_marca ?? '📊',
         color: marca.color_primario_hex ?? '#283B6F',
       },
       semanaInicio: semana_inicio,
       semanaFin: semana_fin,
-      publicaciones: totalPubs,
-      titulosPorDia,
+      publicaciones,
     })
     const upload = await uploadGrillaPNG(pngBuffer, marca.slug, semana_inicio)
     if (upload.ok) {

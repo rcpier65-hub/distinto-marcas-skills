@@ -1,19 +1,19 @@
 // app/lib/grilla/generate-png.tsx
-// Wrapper que hace fetch al endpoint edge /api/render-grilla.
-// Razón arquitectónica: @vercel/og REQUIERE edge runtime, pero Server Actions y
-// Route Handlers default corren en nodejs runtime. La solución estándar es separar
-// el render a un endpoint edge dedicado y hacer fetch desde nodejs.
+// Wrapper que hace fetch al endpoint /api/render-grilla (Node runtime + Chromium).
+//
+// El endpoint corre Chromium real para renderizar la plantilla HTML de cada marca
+// pixel-perfect. Pasamos: slug, semana, y publicaciones (JSON serializado).
+
+import type { GrillaPublicacion } from '@/lib/integrations/notion'
 
 export type GrillaData = {
-  marca: { nombre: string; emoji: string; color: string }
+  marca: { slug: string; nombre: string; emoji: string; color: string }
   semanaInicio: string
   semanaFin: string
-  publicaciones: number
-  titulosPorDia?: string[]  // opcional: títulos para mostrar en cada card (lun-vie)
+  publicaciones: GrillaPublicacion[]
 }
 
 function getBaseUrl(): string {
-  // En Vercel production hay VERCEL_URL; en local usar NEXT_PUBLIC_APP_URL
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   }
@@ -25,21 +25,21 @@ function getBaseUrl(): string {
 
 export async function generateGrillaPNG(data: GrillaData): Promise<Buffer> {
   const baseUrl = getBaseUrl()
+
+  // Adaptar publicaciones al shape esperado por el endpoint
+  const pubs = data.publicaciones.map((p) => ({
+    fecha: p.fecha,
+    titulo: p.titulo,
+    plataformas: p.plataformas.join(' · '),
+    tipo: p.tipo_contenido.join(' · '),
+  }))
+
   const params = new URLSearchParams({
-    nombre: data.marca.nombre,
-    emoji: data.marca.emoji,
-    color: data.marca.color,
+    slug: data.marca.slug,
     inicio: data.semanaInicio,
     fin: data.semanaFin,
-    pubs: String(data.publicaciones),
+    pubs: JSON.stringify(pubs),
   })
-
-  // Títulos por día (lun-vie) si se proveen
-  if (data.titulosPorDia) {
-    data.titulosPorDia.slice(0, 5).forEach((t, i) => {
-      if (t) params.set(`dia${i + 1}`, t)
-    })
-  }
 
   const url = `${baseUrl}/api/render-grilla?${params.toString()}`
   const secret = process.env.CRON_SECRET
