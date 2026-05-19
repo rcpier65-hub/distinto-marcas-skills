@@ -15,7 +15,7 @@ import { NextResponse } from 'next/server'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import chromium from '@sparticuz/chromium'
-import { chromium as playwrightChromium, type Browser } from 'playwright-core'
+import puppeteer, { type Browser } from 'puppeteer-core'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -105,22 +105,20 @@ export async function GET(request: Request) {
   // Lanzar Chromium y renderizar
   let browser: Browser | null = null
   try {
-    browser = await playwrightChromium.launch({
+    browser = await puppeteer.launch({
       args: chromium.args,
+      defaultViewport: { width: 1080, height: 1620, deviceScaleFactor: 1 },
       executablePath: await chromium.executablePath(),
       headless: true,
     })
-    const context = await browser.newContext({
-      viewport: { width: 1080, height: 1620 },
-      deviceScaleFactor: 1,
-    })
-    const page = await context.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle' })
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: 'networkidle0' })
     // Esperar a que las Google Fonts terminen de cargar
     await page.evaluate(() => document.fonts.ready)
     // Screenshot del .poster (el contenedor principal)
-    const poster = page.locator('.poster')
-    const pngBuffer = await poster.screenshot({ type: 'png', omitBackground: false })
+    const posterElement = await page.$('.poster')
+    if (!posterElement) throw new Error('.poster element not found in template')
+    const pngBuffer = await posterElement.screenshot({ type: 'png', omitBackground: false })
 
     await browser.close()
     browser = null
