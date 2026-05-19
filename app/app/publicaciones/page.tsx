@@ -94,11 +94,19 @@ export default async function PublicacionesPage({
 
   return (
     <main className="container mx-auto p-6 max-w-7xl">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold mb-1">Publicaciones</h1>
-        <p className="text-sm text-muted-foreground">
-          {filteredPubs.length} publicaciones · {desde} → {hasta}
-        </p>
+      <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold mb-1">Publicaciones</h1>
+          <p className="text-sm text-muted-foreground">
+            {filteredPubs.length} publicaciones · {desde} → {hasta}
+          </p>
+        </div>
+        <Link
+          href={`/publicaciones/calendario?mes=${desde.slice(0, 7)}${sp.marca ? `&marca=${sp.marca}` : ''}`}
+          className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center gap-1"
+        >
+          📅 Vista calendario
+        </Link>
       </header>
 
       {/* Filtros */}
