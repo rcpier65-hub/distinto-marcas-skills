@@ -1,7 +1,9 @@
 // app/app/dashboard/_components/marca-card.tsx
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,20 +22,22 @@ export type MarcaCardData = {
 }
 
 export function MarcaCard({ marca }: { marca: MarcaCardData }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [optimisticState, setOptimisticState] = useState<EstadoGrilla | null>(marca.estado_grilla)
 
-  const yaTieneGrilla = optimisticState !== null && optimisticState !== 'cancelada'
+  const estado = marca.estado_grilla
+  const yaTieneGrillaActiva =
+    estado === 'esperando_aprobacion' || estado === 'aprobada' || estado === 'enviada'
 
   function handlePedir() {
     startTransition(async () => {
-      setOptimisticState('pendiente')
+      toast.loading(`Generando grilla de ${marca.nombre}...`, { id: marca.slug })
       const result = await pedirGrilla(marca.slug)
       if (!result.ok) {
-        setOptimisticState(marca.estado_grilla)
-        toast.error(result.error)
+        toast.error(result.error, { id: marca.slug })
       } else {
-        toast.success(`Grilla pedida para ${marca.nombre}`)
+        toast.success(`Grilla lista — revisá el preview`, { id: marca.slug })
+        router.push(`/marca/${marca.slug}`)
       }
     })
   }
@@ -47,11 +51,11 @@ export function MarcaCard({ marca }: { marca: MarcaCardData }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="font-mono text-xs">
             {marca.slug}
           </Badge>
-          <GrillaStatusBadge estado={optimisticState} />
+          <GrillaStatusBadge estado={estado} />
         </div>
 
         {marca.color_primario_hex && (
@@ -66,18 +70,20 @@ export function MarcaCard({ marca }: { marca: MarcaCardData }) {
           </div>
         )}
 
-        <Button
-          onClick={handlePedir}
-          disabled={isPending || yaTieneGrilla}
-          className="w-full"
-          variant={yaTieneGrilla ? 'secondary' : 'default'}
-        >
-          {isPending
-            ? 'Pidiendo...'
-            : yaTieneGrilla
-              ? 'Ya pedida esta semana'
-              : '🟢 Pedir grilla'}
-        </Button>
+        {yaTieneGrillaActiva ? (
+          <Link
+            href={`/marca/${marca.slug}`}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
+          >
+            {estado === 'esperando_aprobacion' && '👀 Ver preview y aprobar'}
+            {estado === 'aprobada' && '✅ Aprobada — ver detalle'}
+            {estado === 'enviada' && '📤 Enviada — ver detalle'}
+          </Link>
+        ) : (
+          <Button onClick={handlePedir} disabled={isPending} className="w-full">
+            {isPending ? 'Generando...' : '🟢 Pedir grilla'}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
