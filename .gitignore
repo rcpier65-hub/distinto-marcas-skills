@@ -35,11 +35,13 @@ app/.next/
 app/out/
 app/build/
 app/dist/
+app/*.tsbuildinfo
+app/coverage/
 
 # Vercel
 .vercel
 app/.vercel
 
 # Supabase
-app/supabase/.branches
-app/supabase/.temp
+app/supabase/.branches/
+app/supabase/.temp/
