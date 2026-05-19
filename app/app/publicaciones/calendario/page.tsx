@@ -159,6 +159,12 @@ export default async function CalendarioPage({
           >
             📋 Tabla
           </Link>
+          <Link
+            href={`/publicaciones/nueva${sp.marca ? `?marca=${sp.marca}` : ''}`}
+            className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center"
+          >
+            + Nueva
+          </Link>
         </div>
       </header>
 
@@ -215,17 +221,31 @@ export default async function CalendarioPage({
             {cells.map((cell, idx) => {
               const isToday = cell.day === todayKey
               const pubsDia = cell.day !== null ? (pubsByDay[cell.day] ?? []) : []
+              // Fecha ISO de la celda (para quick-add)
+              const cellIsoDate = cell.day !== null
+                ? `${year}-${String(month).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`
+                : null
               return (
                 <div
                   key={idx}
-                  className={`min-h-[140px] border-b border-r p-1.5 ${
+                  className={`group relative min-h-[140px] border-b border-r p-1.5 ${
                     cell.day === null ? 'bg-muted/20' : 'bg-background'
                   } ${isToday ? 'ring-2 ring-primary ring-inset' : ''}`}
                 >
                   {cell.day !== null && (
                     <>
-                      <div className={`text-xs font-medium mb-1 ${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
-                        {cell.day}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`text-xs font-medium ${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
+                          {cell.day}
+                        </div>
+                        {/* Quick-add: aparece solo on hover (desktop) o siempre en celdas vacías */}
+                        <Link
+                          href={`/publicaciones/nueva?fecha=${cellIsoDate}${sp.marca ? `&marca=${sp.marca}` : ''}`}
+                          className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                          title={`Crear publicación para ${cellIsoDate}`}
+                        >
+                          +
+                        </Link>
                       </div>
                       <div className="flex flex-col gap-1">
                         {pubsDia.map((p) => {

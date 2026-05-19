@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { updatePublicacion, deletePublicacion, togglePublicacionField } from '../_actions'
+import { duplicarPublicacion } from '../../_actions'
 import { ESTADO_PUBLICACION_LABEL, type EstadoPublicacion, type PublicacionRow } from '@/lib/types/database'
 
 const ESTADOS: EstadoPublicacion[] = [
@@ -36,6 +37,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDelete] = useTransition()
+  const [isDuplicating, startDuplicate] = useTransition()
   const [form, setForm] = useState({
     nombre: initial.nombre,
     estado: initial.estado,
@@ -124,6 +126,17 @@ export function PublicacionDetailForm({ publicacion: initial, marca }: Props) {
     })
   }
 
+  function handleDuplicate() {
+    startDuplicate(async () => {
+      try {
+        await duplicarPublicacion(initial.id)
+        toast.success('Publicación duplicada — editá la copia')
+      } catch (e) {
+        toast.error(`Error: ${(e as Error).message}`)
+      }
+    })
+  }
+
   const marcaColor = marca?.color_primario_hex ?? '#283B6F'
 
   return (
@@ -153,6 +166,14 @@ export function PublicacionDetailForm({ publicacion: initial, marca }: Props) {
         <div className="flex flex-col gap-2 shrink-0">
           <Button onClick={handleSave} disabled={isPending} size="sm">
             {isPending ? 'Guardando…' : '💾 Guardar'}
+          </Button>
+          <Button
+            onClick={handleDuplicate}
+            disabled={isDuplicating}
+            variant="outline"
+            size="sm"
+          >
+            {isDuplicating ? 'Duplicando…' : '📋 Duplicar'}
           </Button>
           <Button
             onClick={handleDelete}

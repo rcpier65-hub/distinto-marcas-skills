@@ -101,12 +101,20 @@ export default async function PublicacionesPage({
             {filteredPubs.length} publicaciones · {desde} → {hasta}
           </p>
         </div>
-        <Link
-          href={`/publicaciones/calendario?mes=${desde.slice(0, 7)}${sp.marca ? `&marca=${sp.marca}` : ''}`}
-          className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center gap-1"
-        >
-          📅 Vista calendario
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/publicaciones/calendario?mes=${desde.slice(0, 7)}${sp.marca ? `&marca=${sp.marca}` : ''}`}
+            className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center gap-1"
+          >
+            📅 Calendario
+          </Link>
+          <Link
+            href={`/publicaciones/nueva${sp.marca ? `?marca=${sp.marca}` : ''}`}
+            className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1"
+          >
+            + Nueva publicación
+          </Link>
+        </div>
       </header>
 
       {/* Filtros */}
