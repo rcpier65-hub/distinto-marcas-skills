@@ -72,7 +72,7 @@ export interface MarcaInsert {
   updated_at?: string
 }
 
-export type MarcaUpdate = Partial<MarcaInsert>
+export type MarcaUpdate = Partial<MarcaRow>
 
 // --------------------------------------------------------
 
@@ -126,7 +126,7 @@ export interface GrillaPendienteInsert {
   updated_at?: string
 }
 
-export type GrillaPendienteUpdate = Partial<GrillaPendienteInsert>
+export type GrillaPendienteUpdate = Partial<GrillaPendienteRow>
 
 // --------------------------------------------------------
 
@@ -152,7 +152,7 @@ export interface AprobacionInsert {
   created_at?: string
 }
 
-export type AprobacionUpdate = Partial<AprobacionInsert>
+export type AprobacionUpdate = Partial<AprobacionRow>
 
 // --------------------------------------------------------
 
@@ -184,7 +184,7 @@ export interface EnvioInsert {
   created_at?: string
 }
 
-export type EnvioUpdate = Partial<EnvioInsert>
+export type EnvioUpdate = Partial<EnvioRow>
 
 // ============================================================
 // DATABASE — formato compat con @supabase/supabase-js typed client
@@ -197,23 +197,29 @@ export interface Database {
         Row: MarcaRow
         Insert: MarcaInsert
         Update: MarcaUpdate
+        Relationships: []
       }
       grillas_pendientes: {
         Row: GrillaPendienteRow
         Insert: GrillaPendienteInsert
         Update: GrillaPendienteUpdate
+        Relationships: []
       }
       aprobaciones: {
         Row: AprobacionRow
         Insert: AprobacionInsert
         Update: AprobacionUpdate
+        Relationships: []
       }
       envios: {
         Row: EnvioRow
         Insert: EnvioInsert
         Update: EnvioUpdate
+        Relationships: []
       }
     }
+    Views: Record<string, never>
+    Functions: Record<string, never>
     Enums: {
       estado_grilla: EstadoGrilla
       accion_aprobacion: AccionAprobacion
