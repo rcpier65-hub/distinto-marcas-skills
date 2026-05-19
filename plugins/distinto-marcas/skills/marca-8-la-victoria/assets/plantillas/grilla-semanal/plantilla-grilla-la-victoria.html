@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Plantilla Grilla Semanal — La Victoria · Distribuidora de Pino</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* =========================================================
+     LA VICTORIA · DISTRIBUIDORA DE PINO
+     Fuente: Brochure La Victoria 2025
+     ⚠️ Hex APROXIMADOS — confirmar con cliente cuando se levante
+     manual oficial. Mientras tanto basados en brochure visual:
+       - Verde bosque oscuro #1B4332
+       - Crema cálido #F5F0E8
+       - Madera natural #B5926D
+     Tipografía: Serif moderna (Calluna-like) + Sans tracking ancho
+     Substitutos OSS: Cormorant Garamond + Inter
+     ========================================================= */
+  :root {
+    --forest:  #1B4332;
+    --forest-dark: #0F3D2A;
+    --cream:   #F5F0E8;
+    --wood:    #B5926D;
+    --wood-light: #D4BA94;
+    --ink:     #2A2A2A;
+    --white:   #FFFFFF;
+    --display: 'Cormorant Garamond', Georgia, serif;
+    --body:    'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #2c2c2c; font-family: var(--body); color: var(--ink);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { display: flex; justify-content: center; padding: 40px 0; }
+  .poster { width: 1080px; height: 1620px; background: var(--cream); position: relative;
+    overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .green-block { position: absolute; top: 0; left: 0; width: 100%; height: 14px;
+    background: var(--forest); }
+  .header { display: flex; align-items: center; justify-content: space-between;
+    gap: 30px; margin-bottom: 24px; margin-top: 14px; }
+  .logo-placeholder { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
+  .logo-placeholder .circle { width: 90px; height: 90px; border: 2px solid var(--forest);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: var(--cream); flex-shrink: 0; }
+  .logo-placeholder .circle svg { width: 50px; height: 50px; color: var(--forest); }
+  .logo-placeholder .text-block { display: flex; flex-direction: column; gap: 2px; }
+  .logo-placeholder .text-block .name { font-family: var(--display); font-weight: 600;
+    font-size: 36px; color: var(--forest); line-height: 1; letter-spacing: -.5px; }
+  .logo-placeholder .text-block .tag { font-family: var(--body); font-size: 11px;
+    font-weight: 600; color: var(--forest); letter-spacing: 3px; text-transform: uppercase; }
+  .date-pill { background: var(--forest); color: var(--cream); font-family: var(--body);
+    font-weight: 600; font-size: 20px; letter-spacing: 2px; padding: 14px 28px;
+    border-radius: 0; white-space: nowrap; line-height: 1; text-transform: uppercase; }
+  .hero { text-align: center; margin: 50px 0 40px; position: relative; }
+  .hero .preheader { font-family: var(--body); font-size: 16px; font-weight: 600;
+    color: var(--wood); letter-spacing: 6px; text-transform: uppercase; margin-bottom: 18px; }
+  .hero h1 { font-family: var(--display); font-weight: 600; font-size: 158px;
+    color: var(--forest); line-height: .95; letter-spacing: -3px; }
+  .hero h1 em { font-style: italic; font-weight: 500; color: var(--wood); }
+  .hero .sub { font-family: var(--body); font-size: 18px; font-weight: 500;
+    color: var(--ink); margin-top: 22px; letter-spacing: 5px; text-transform: uppercase; }
+  .divider { width: 60px; height: 1px; background: var(--wood); margin: 22px auto 0; }
+  .cards { display: flex; flex-direction: column; gap: 14px; margin-top: 5px; }
+  .card { background: var(--card-bg, var(--white)); border: 1px solid var(--card-border, transparent);
+    padding: 22px 36px; display: flex; align-items: center; gap: 26px; min-height: 116px; }
+  .card .date { flex-shrink: 0; min-width: 100px; }
+  .card .date .day { font-family: var(--display); font-weight: 600; font-size: 68px;
+    color: var(--day-color, var(--forest)); line-height: .9; letter-spacing: -1px; }
+  .card .date .month { font-family: var(--body); font-size: 13px; font-weight: 600;
+    color: var(--month-color, var(--wood)); letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 4px; }
+  .card .bar { width: 1px; height: 76px; background: var(--bar-color, var(--wood)); flex-shrink: 0; }
+  .card .body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .card .body .title { font-family: var(--display); font-weight: 600; font-size: 34px;
+    color: var(--title-color, var(--forest)); line-height: 1.1; letter-spacing: -.5px; }
+  .card .body .meta { font-family: var(--body); font-size: 14px; font-weight: 500;
+    color: var(--meta-color, var(--ink)); letter-spacing: 2px;
+    text-transform: uppercase; opacity: .65; }
+  .card .icon { flex-shrink: 0; width: 64px; height: 64px; color: var(--icon-color, var(--wood)); }
+  .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .card.v1 { --card-bg: var(--white); --card-border: var(--wood-light); }
+  .card.v2 { --card-bg: var(--cream); --card-border: var(--wood-light); }
+  .card.v3 { --card-bg: var(--forest); --day-color: var(--cream);
+    --month-color: var(--wood-light); --title-color: var(--cream);
+    --meta-color: var(--wood-light); --bar-color: var(--wood); --icon-color: var(--wood-light); }
+  .card.v4 { --card-bg: var(--white); --card-border: var(--wood-light); }
+  .card.v5 { --card-bg: var(--cream); --card-border: var(--wood-light); }
+  .footer { margin-top: auto; padding-top: 32px; text-align: center; }
+  .footer-mark { font-family: var(--display); font-style: italic; font-size: 16px;
+    color: var(--wood); margin-bottom: 14px; letter-spacing: 2px; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 14px; font-family: var(--body);
+    font-size: 20px; font-weight: 600; color: var(--forest); letter-spacing: 4px;
+    text-transform: uppercase; }
+  .footer .agency svg { width: auto; height: 36px; flex-shrink: 0; display: block; }
+  .footer .url { font-family: var(--body); font-size: 14px; font-weight: 400;
+    color: var(--ink); margin-top: 6px; letter-spacing: 2px; opacity: .7; }
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="green-block"></div>
+
+  <header class="header">
+    <!-- ⚠️ Placeholder de logo. Cuando llegue el manual oficial,
+         reemplazar el div completo por <img class="logo" src="la-victoria-logo.png"> -->
+    <div class="logo-placeholder">
+      <div class="circle">
+        <svg viewBox="0 0 64 64" fill="currentColor">
+          <path d="M32 8L20 26h6l-8 12h6l-8 12h24l-8-12h6l-8-12h6L32 8z"/>
+          <rect x="29" y="50" width="6" height="6"/>
+        </svg>
+      </div>
+      <div class="text-block">
+        <div class="name">La Victoria</div>
+        <div class="tag">DISTRIBUIDORA DE PINO</div>
+      </div>
+    </div>
+    <!-- ✏️ EDITABLE: fechas de la semana -->
+    <div class="date-pill">11 — 17 MAY · 2026</div>
+  </header>
+
+  <section class="hero">
+    <div class="preheader">— Calendario semanal —</div>
+    <h1>¿Qué se <em>viene?</em></h1>
+    <!-- ✏️ EDITABLE: subtítulo del mes y rango de fechas -->
+    <div class="sub">Mayo · Semana del 11 al 17</div>
+    <div class="divider"></div>
+  </section>
+
+  <!-- ============================================================
+       CARDS — Editar título + meta + icono según grilla Notion
+       ============================================================ -->
+  <section class="cards">
+
+    <article class="card v1">
+      <div class="date"><div class="day">11</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Producto destacado · Pino</div>
+        <div class="meta">6:30 pm · IG · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M32 8L20 26h6l-8 12h6l-8 12h24l-8-12h6l-8-12h6L32 8z"/>
+          <rect x="29" y="50" width="6" height="6"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v2">
+      <div class="date"><div class="day">12</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Medidas para muebles</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="10" y="20" width="44" height="24"/>
+          <path d="M10 28h44"/><path d="M16 20v8"/><path d="M22 20v8"/>
+          <path d="M28 20v8"/><path d="M34 20v8"/><path d="M40 20v8"/>
+          <path d="M46 20v8"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v3">
+      <div class="date"><div class="day">13</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Oferta · Distribución mayorista</div>
+        <div class="meta">6:30 pm · Solo TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M14 14h22l16 16-22 22-16-16z"/>
+          <circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v4">
+      <div class="date"><div class="day">14</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Tour por el aserradero</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="8" y="12" width="48" height="34" rx="2"/>
+          <path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/>
+          <path d="M22 52h20"/><path d="M32 46v6"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v5">
+      <div class="date"><div class="day">16</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Testimonio · Industria mueblera</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/>
+          <text x="22" y="38" font-family="Inter, sans-serif" font-weight="700"
+                font-size="18" fill="currentColor" stroke="none">99</text>
+        </svg>
+      </div>
+    </article>
+
+  </section>
+
+  <footer class="footer">
+    <div class="footer-mark">— ESTABLECIDOS EN CONFIANZA —</div>
+    <div class="agency">
+      <svg viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+        <defs><mask id="distintoBite"><rect width="200" height="110" fill="white"/>
+          <circle cx="168" cy="92" r="20" fill="black"/></mask></defs>
+        <circle cx="135" cy="58" r="46" fill="#C5A82D" mask="url(#distintoBite)"/>
+        <circle cx="60" cy="55" r="50" fill="#8B2DC9"/>
+      </svg>
+      <span>DISTINTO · AGENCIA</span>
+    </div>
+    <div class="url">www.agenciadistinto.com</div>
+  </footer>
+</div>
+
+</body>
+</html>

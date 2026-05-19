@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Plantilla Grilla Semanal — Novalamps Eléctrika</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* =========================================================
+     NOVALAMPS ELÉCTRIKA — Identidad oficial
+     Manual: Verde lima #D2DD00 + Grafito #262726 + Blanco
+     Tipografía: Arial Regular + Arial Bold
+     Substituto OSS: Inter Regular + Inter Bold/Black
+     ⚠️ NO MODIFICAR colores ni tipografía — vienen del manual
+     ========================================================= */
+  :root {
+    --lime:    #D2DD00;
+    --graphite: #262726;
+    --white:   #FFFFFF;
+    --gray-1:  #F4F4F2;
+    --gray-2:  #E0E0DC;
+    --lime-soft: #F5F8C8;
+    --font: 'Inter', 'Arimo', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #2c2c2c; font-family: var(--font); color: var(--graphite);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { display: flex; justify-content: center; padding: 40px 0; }
+  .poster { width: 1080px; height: 1620px; background: var(--white); position: relative;
+    overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .bolt-bg { position: absolute; width: 380px; height: 380px; top: -120px; right: -120px;
+    background: var(--graphite); transform: rotate(45deg); z-index: 0; }
+  .header { display: flex; align-items: center; justify-content: space-between;
+    gap: 30px; margin-bottom: 24px; position: relative; z-index: 2; }
+  .logo { width: 280px; height: auto; flex-shrink: 0; }
+  .date-pill { background: var(--lime); color: var(--graphite); font-family: var(--font);
+    font-weight: 900; font-size: 22px; letter-spacing: 1px; padding: 14px 26px;
+    line-height: 1; white-space: nowrap; text-transform: uppercase; }
+  .hero { text-align: left; margin: 40px 0 32px; position: relative; z-index: 2; }
+  .hero h1 { font-family: var(--font); font-weight: 900; font-size: 168px;
+    color: var(--graphite); line-height: .85; letter-spacing: -4px; text-transform: uppercase; }
+  .hero h1 .lime { background: var(--lime); padding: 0 14px; display: inline-block; line-height: 1; }
+  .hero .sub { font-family: var(--font); font-size: 22px; font-weight: 500;
+    color: var(--graphite); margin-top: 22px; letter-spacing: 6px; text-transform: uppercase; }
+  .hero .sub .accent { display: inline-block; width: 14px; height: 14px;
+    background: var(--lime); margin-right: 12px; vertical-align: middle; border-radius: 0; }
+  .cards { display: flex; flex-direction: column; gap: 12px; margin-top: 8px;
+    position: relative; z-index: 2; }
+  .card { background: var(--card-bg, var(--white)); border: 2px solid var(--card-border, var(--gray-2));
+    border-left: 8px solid var(--card-accent, var(--lime)); padding: 22px 32px;
+    display: flex; align-items: center; gap: 26px; min-height: 118px; }
+  .card .date { flex-shrink: 0; min-width: 100px; }
+  .card .date .day { font-family: var(--font); font-weight: 900; font-size: 76px;
+    color: var(--day-color, var(--graphite)); line-height: .85; letter-spacing: -3px; }
+  .card .date .month { font-family: var(--font); font-size: 14px; font-weight: 700;
+    color: var(--month-color, var(--graphite)); letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 4px; }
+  .card .bar { width: 1px; height: 76px; background: var(--bar-color, var(--graphite));
+    opacity: .3; flex-shrink: 0; }
+  .card .body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .card .body .title { font-family: var(--font); font-weight: 800; font-size: 36px;
+    color: var(--title-color, var(--graphite)); line-height: 1.05; letter-spacing: -.8px;
+    text-transform: uppercase; }
+  .card .body .meta { font-family: var(--font); font-size: 14px; font-weight: 500;
+    color: var(--meta-color, var(--graphite)); letter-spacing: 2px;
+    text-transform: uppercase; opacity: .65; }
+  .card .icon { flex-shrink: 0; width: 70px; height: 70px; color: var(--icon-color, var(--graphite)); }
+  .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
+    stroke-width: 2.5; stroke-linecap: square; stroke-linejoin: miter; }
+  .card.v1 { --card-bg: var(--white); --card-border: var(--gray-2); --card-accent: var(--lime); }
+  .card.v2 { --card-bg: var(--gray-1); --card-border: var(--gray-1); --card-accent: var(--graphite); }
+  .card.v3 { --card-bg: var(--graphite); --card-border: var(--graphite); --card-accent: var(--lime);
+    --day-color: var(--lime); --month-color: var(--white); --title-color: var(--white);
+    --meta-color: var(--white); --icon-color: var(--lime); }
+  .card.v4 { --card-bg: var(--lime-soft); --card-border: var(--lime-soft); --card-accent: var(--lime); }
+  .card.v5 { --card-bg: var(--white); --card-border: var(--gray-2); --card-accent: var(--graphite); }
+  .footer { margin-top: auto; padding-top: 30px; text-align: center; position: relative; z-index: 2; }
+  .footer-bar { width: 100%; height: 4px; background: var(--graphite); margin-bottom: 22px; position: relative; }
+  .footer-bar::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 80px; background: var(--lime); }
+  .footer .agency { display: inline-flex; align-items: center; gap: 14px; font-family: var(--font);
+    font-size: 22px; font-weight: 800; color: var(--graphite); letter-spacing: 4px;
+    text-transform: uppercase; }
+  .footer .agency svg { width: auto; height: 38px; flex-shrink: 0; display: block; }
+  .footer .url { font-family: var(--font); font-size: 16px; font-weight: 500;
+    color: var(--graphite); margin-top: 8px; letter-spacing: 2px; opacity: .7; }
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="bolt-bg"></div>
+
+  <header class="header">
+    <!-- ⚠️ NO TOCAR: logo oficial Novalamps -->
+    <img class="logo" src="novalamps-logo.png" alt="Novalamps Eléctrika" />
+    <!-- ✏️ EDITABLE: fechas de la semana -->
+    <div class="date-pill">11—17 MAY · 2026</div>
+  </header>
+
+  <section class="hero">
+    <h1>¿Qué se<br><span class="lime">viene?</span></h1>
+    <!-- ✏️ EDITABLE: subtítulo del mes y rango de fechas -->
+    <div class="sub"><span class="accent"></span>Mayo · Semana del 11 al 17</div>
+  </section>
+
+  <!-- ============================================================
+       CARDS — Editar título + meta + icono según grilla Notion
+       ============================================================ -->
+  <section class="cards">
+
+    <article class="card v1">
+      <div class="date"><div class="day">11</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Nueva línea LED</div>
+        <div class="meta">6:30 pm · IG · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M32 10c-8 0-14 6-14 14 0 6 4 10 6 14h16c2-4 6-8 6-14 0-8-6-14-14-14z"/>
+          <path d="M26 42v6h12v-6"/>
+          <path d="M28 52h8"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v2">
+      <div class="date"><div class="day">12</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Instalación profesional</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M14 14l8 8"/>
+          <path d="M50 14l-22 22"/>
+          <rect x="36" y="34" width="14" height="14" transform="rotate(-45 43 41)"/>
+          <path d="M14 38l12 12"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v3">
+      <div class="date"><div class="day">13</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Ahorro energético · Tip</div>
+        <div class="meta">6:30 pm · Solo TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M22 12l-8 22h16l-6 18 22-28h-18z"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v4">
+      <div class="date"><div class="day">14</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Tour por el showroom</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="8" y="12" width="48" height="34"/>
+          <path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/>
+          <path d="M22 52h20"/><path d="M32 46v6"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v5">
+      <div class="date"><div class="day">16</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Testimonio · Proyecto real</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/>
+          <text x="22" y="38" font-family="Inter, sans-serif" font-weight="800"
+                font-size="18" fill="currentColor" stroke="none">99</text>
+        </svg>
+      </div>
+    </article>
+
+  </section>
+
+  <footer class="footer">
+    <div class="footer-bar"></div>
+    <div class="agency">
+      <svg viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+        <defs><mask id="distintoBite"><rect width="200" height="110" fill="white"/>
+          <circle cx="168" cy="92" r="20" fill="black"/></mask></defs>
+        <circle cx="135" cy="58" r="46" fill="#C5A82D" mask="url(#distintoBite)"/>
+        <circle cx="60" cy="55" r="50" fill="#8B2DC9"/>
+      </svg>
+      <span>DISTINTO · AGENCIA</span>
+    </div>
+    <div class="url">www.agenciadistinto.com</div>
+  </footer>
+</div>
+
+</body>
+</html>

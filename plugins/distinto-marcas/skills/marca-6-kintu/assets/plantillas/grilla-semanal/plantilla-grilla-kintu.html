@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Plantilla Grilla Semanal — Kintu Essential Oils</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* =========================================================
+     KINTU ESSENTIAL OILS — Identidad oficial
+     Manual: Verde Kintu #45B787 + Verde profundo #1A3E42 + Menta #BBE0CD + Blanco
+     Tipografía: Montserrat (ExtraBold / SemiBold / Medium / Regular tracking)
+     ⚠️ NO MODIFICAR colores ni tipografía — vienen del manual de marca
+     ========================================================= */
+  :root {
+    --deep:    #1A3E42;
+    --green:   #45B787;
+    --mint:    #BBE0CD;
+    --white:   #FFFFFF;
+    --cream:   #F7FBF9;
+    --mint-soft: #DCEFE6;
+    --font: 'Montserrat', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #2c2c2c; font-family: var(--font); color: var(--deep);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { display: flex; justify-content: center; padding: 40px 0; }
+  .poster { width: 1080px; height: 1620px; background: var(--cream); position: relative;
+    overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .leaf { position: absolute; width: 200px; height: 200px; background: var(--mint);
+    opacity: .25; border-radius: 0 100% 0 100%; pointer-events: none; }
+  .leaf.tr { top: -60px; right: -60px; transform: rotate(20deg); }
+  .leaf.bl { bottom: -60px; left: -60px; transform: rotate(200deg); }
+  .header { display: flex; align-items: center; justify-content: space-between;
+    gap: 30px; margin-bottom: 20px; position: relative; z-index: 1; }
+  .logo { width: 240px; height: auto; flex-shrink: 0; }
+  .date-pill { background: var(--deep); color: var(--white); font-family: var(--font);
+    font-weight: 700; font-size: 22px; letter-spacing: 2px; padding: 16px 30px;
+    border-radius: 999px; white-space: nowrap; line-height: 1; }
+  .date-pill .accent { color: var(--mint); }
+  .hero { text-align: center; margin: 20px 0 24px; position: relative; z-index: 1; }
+  .hero h1 { font-family: var(--font); font-weight: 900; font-size: 116px;
+    color: var(--deep); line-height: .95; letter-spacing: -2px; white-space: nowrap; }
+  .hero h1 .green { color: var(--green); }
+  .hero .sub { font-family: var(--font); font-size: 20px; font-weight: 500;
+    color: var(--deep); margin-top: 18px; letter-spacing: 6px;
+    text-transform: uppercase; opacity: .8; }
+  .divider { display: inline-block; width: 100px; height: 3px; background: var(--green);
+    margin-top: 24px; position: relative; }
+  .divider::before, .divider::after { content: ''; position: absolute; top: 50%;
+    width: 10px; height: 10px; background: var(--green); border-radius: 50%;
+    transform: translateY(-50%); }
+  .divider::before { left: -22px; }
+  .divider::after { right: -22px; }
+  .cards { display: flex; flex-direction: column; gap: 16px; margin-top: 10px;
+    position: relative; z-index: 1; }
+  .card { background: var(--card-bg, var(--white)); border: 1px solid var(--card-border, transparent);
+    border-radius: 20px; padding: 24px 36px; display: flex; align-items: center;
+    gap: 28px; min-height: 120px; }
+  .card .date { flex-shrink: 0; min-width: 110px; }
+  .card .date .day { font-family: var(--font); font-weight: 900; font-size: 72px;
+    color: var(--day-color, var(--deep)); line-height: .9; letter-spacing: -2px; }
+  .card .date .month { font-family: var(--font); font-size: 16px; font-weight: 700;
+    color: var(--month-color, var(--green)); letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 4px; }
+  .card .bar { width: 2px; height: 78px; background: var(--bar-color, var(--green)); flex-shrink: 0; }
+  .card .body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .card .body .title { font-family: var(--font); font-weight: 800; font-size: 34px;
+    color: var(--title-color, var(--deep)); line-height: 1.1; letter-spacing: -.5px; }
+  .card .body .meta { font-family: var(--font); font-size: 16px; font-weight: 500;
+    color: var(--meta-color, var(--deep)); letter-spacing: 1.5px;
+    text-transform: uppercase; opacity: .65; }
+  .card .icon { flex-shrink: 0; width: 70px; height: 70px; color: var(--icon-color, var(--green)); }
+  .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .card.v1 { --card-bg: var(--mint-soft); --bar-color: var(--green); }
+  .card.v2 { --card-bg: var(--white); --card-border: var(--mint); --bar-color: var(--green); }
+  .card.v3 { --card-bg: var(--deep); --day-color: var(--white); --month-color: var(--mint);
+    --title-color: var(--white); --meta-color: var(--mint); --bar-color: var(--green); --icon-color: var(--mint); }
+  .card.v4 { --card-bg: var(--white); --card-border: var(--mint); --bar-color: var(--green); }
+  .card.v5 { --card-bg: var(--mint); --bar-color: var(--deep); --icon-color: var(--deep); }
+  .footer { margin-top: auto; padding-top: 32px; text-align: center; position: relative; z-index: 1; }
+  .footer-divider { width: 60px; height: 2px; background: var(--green); margin: 0 auto 22px; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 14px; font-family: var(--font);
+    font-size: 22px; font-weight: 700; color: var(--deep); letter-spacing: 4px; text-transform: uppercase; }
+  .footer .agency svg { width: auto; height: 38px; flex-shrink: 0; display: block; }
+  .footer .url { font-family: var(--font); font-size: 16px; font-weight: 400;
+    color: var(--deep); margin-top: 8px; letter-spacing: 2px; opacity: .7; }
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="leaf tr"></div>
+  <div class="leaf bl"></div>
+
+  <header class="header">
+    <!-- ⚠️ NO TOCAR: logo oficial Kintu -->
+    <img class="logo" src="kintu-logo.png" alt="Kintu Essential Oils" />
+    <!-- ✏️ EDITABLE: fechas de la semana -->
+    <div class="date-pill">11 <span class="accent">—</span> 17 MAY · 2026</div>
+  </header>
+
+  <section class="hero">
+    <h1>¿Qué se <span class="green">viene?</span></h1>
+    <!-- ✏️ EDITABLE: subtítulo del mes y rango de fechas -->
+    <div class="sub">Mayo · Semana del 11 al 17</div>
+    <div class="divider"></div>
+  </section>
+
+  <!-- ============================================================
+       CARDS — Editar título + meta + icono según grilla Notion
+       NO CAMBIAR: clases v1-v5 ni el orden
+       ============================================================ -->
+  <section class="cards">
+
+    <article class="card v1">
+      <div class="date"><div class="day">11</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Nuevo aceite esencial</div>
+        <div class="meta">6:30 pm · IG · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M32 54c-8-12-14-18-14-28 0-7 6-12 14-12s14 5 14 12c0 10-6 16-14 28z"/>
+          <path d="M32 20v20"/><path d="M26 28c2 2 6 2 6 6"/>
+          <path d="M38 28c-2 2-6 2-6 6"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v2">
+      <div class="date"><div class="day">12</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Tip · Aromaterapia diaria</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="10"/>
+          <path d="M32 10v6"/><path d="M32 48v6"/>
+          <path d="M10 32h6"/><path d="M48 32h6"/>
+          <path d="M16 16l4 4"/><path d="M48 48l-4-4"/>
+          <path d="M16 48l4-4"/><path d="M48 16l-4 4"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v3">
+      <div class="date"><div class="day">13</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Combo bienestar · 20% OFF</div>
+        <div class="meta">6:30 pm · Solo TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="14" y="20" width="36" height="32" rx="3"/>
+          <path d="M22 20v-6h20v6"/>
+          <path d="M28 32h8"/><path d="M28 40h8"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v4">
+      <div class="date"><div class="day">14</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Reel · Cómo usar el aceite</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="8" y="12" width="48" height="34" rx="3"/>
+          <path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/>
+          <path d="M22 52h20"/><path d="M32 46v6"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v5">
+      <div class="date"><div class="day">16</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Testimonio · Cliente real</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/>
+          <text x="22" y="38" font-family="Montserrat, sans-serif" font-weight="800"
+                font-size="18" fill="currentColor" stroke="none">99</text>
+        </svg>
+      </div>
+    </article>
+
+  </section>
+
+  <footer class="footer">
+    <div class="footer-divider"></div>
+    <div class="agency">
+      <svg viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+        <defs><mask id="distintoBite"><rect width="200" height="110" fill="white"/>
+          <circle cx="168" cy="92" r="20" fill="black"/></mask></defs>
+        <circle cx="135" cy="58" r="46" fill="#C5A82D" mask="url(#distintoBite)"/>
+        <circle cx="60" cy="55" r="50" fill="#8B2DC9"/>
+      </svg>
+      <span>DISTINTO · AGENCIA</span>
+    </div>
+    <div class="url">www.agenciadistinto.com</div>
+  </footer>
+</div>
+
+</body>
+</html>

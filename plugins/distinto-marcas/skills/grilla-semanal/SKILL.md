@@ -19,6 +19,37 @@ Activar **siempre** que el usuario pida:
 
 Donde `[marca]` puede ser: Manrique, Lozano, Distribuidora Fitness, Kintu, Novalamps, La Victoria, Mil Ideas, Little Joe, Oral Beauty (o variaciones).
 
+## 🗂️ Tabla canónica de plantillas por marca
+
+Las plantillas viven dentro del plugin en cada skill de marca. **NO inventar paths nuevos** — usar exactamente estos:
+
+| Marca | Slug skill | Path plantilla | Tipo | Tamaño output |
+|---|---|---|---|---|
+| Muebles Lozano | `marca-1-muebles-lozano` | `assets/plantillas/grilla-semanal/plantilla-grilla-lozano.html` | HTML+CSS | 1080×1620 PNG |
+| Manrique ABA | `marca-2-manrique` | `assets/plantillas/grilla-semanal/plantilla.html` | HTML+CSS | 1080×1620 PNG |
+| Distribuidora Fitness | `marca-3-distribuidora-fitness` | `assets/plantillas/grilla-semanal/plantilla-grilla-distribuidora-fitness.html` | HTML+CSS | 1080×1620 PNG |
+| Little Joe | `marca-4-little-joe` | `assets/plantillas/grilla-semanal/generar_grilla_little_joe.py` | **Python + PIL** | 1200×1500 PNG |
+| Kintu | `marca-6-kintu` | `assets/plantillas/grilla-semanal/plantilla-grilla-kintu.html` | HTML+CSS | 1080×1620 PNG |
+| Novalamps | `marca-7-novalamps` | `assets/plantillas/grilla-semanal/plantilla-grilla-novalamps.html` | HTML+CSS | 1080×1620 PNG |
+| La Victoria | `marca-8-la-victoria` | `assets/plantillas/grilla-semanal/plantilla-grilla-la-victoria.html` | HTML+CSS | 1080×1620 PNG |
+
+**Cada carpeta de plantilla tiene además un `README.md`** con:
+- Qué se puede editar cada semana (pill fecha, subtítulo hero, cards)
+- Qué NO se puede tocar (colores oficiales, tipografía, layout)
+- FAQ del manual de marca específico
+
+**SIEMPRE leer ese README antes de editar la plantilla** — cada marca tiene reglas distintas (ej. Lozano: amarillo solo en 1 card; Manrique: no usar 🔥 ni 💛, sí 💙; Little Joe: usa Python PIL, no HTML).
+
+### Caso especial Little Joe (Python)
+
+Para Little Joe, en lugar de editar HTML:
+1. Editar `grilla-semanal-ejemplo.json` con los datos de la semana
+2. Ejecutar `python3 generar_grilla_little_joe.py`
+3. El script produce `plantilla-grilla-semanal-little-joe.png` (1200×1500)
+4. Requiere PIL/Pillow instalado (`pip install pillow`)
+
+---
+
 ## 📋 Reglas absolutas
 
 1. **NUNCA inventar datos** — todo viene de Notion. Si Notion no tiene contenido para un día, dejar la card como "Sin publicación programada" o omitirla del mensaje (según preferencia del cliente).
@@ -204,4 +235,45 @@ Si el filtro devuelve 0 resultados, confirmar la query con Pedro **después de h
 
 ---
 
-Skill creado por Agencia Distinto · v1.1
+## 🎯 Frases reconocidas como trigger (referencia para Pedro)
+
+Cualquiera de estas frases activa esta skill automáticamente. NO hace falta nombrarla explícitamente:
+
+### Para iniciar el diseño (lectura Notion + generar PNG)
+- "haz la grilla de [marca]"
+- "armá la grilla de [marca] para esta semana"
+- "diseño de grilla [marca]"
+- "grilla semanal de [marca]"
+- "[marca]: grilla de la semana"
+- "haz el diseño que se viene con los contenidos de [rango] para [marca]"
+
+### Para iniciar diseño + envío al cliente
+- "envía la grilla semanal de [marca]"
+- "manda la grilla a [contacto del cliente]"
+- "grilla [marca] al grupo"
+- "publicá la grilla de [marca]"
+
+### Para regenerar/ajustar
+- "regenera la grilla de [marca]" — vuelve a leer Notion y rehace
+- "rehacé la grilla con [cambio]" — itera sobre la última versión
+
+### Rangos temporales aceptados (sin pedir clarificación)
+Se combinan con cualquiera de los triggers de arriba:
+- "esta semana" / "de esta semana"
+- "la próxima semana" / "la siguiente semana"
+- "desde mañana hasta el domingo"
+- "del [día] al [día]" (ej: "del 19 al 24")
+- "para mayo" / "para junio" (mes completo)
+
+### Marcas reconocidas (con aliases)
+- Manrique | Centro Psicológico Manrique | Manrique ABA
+- Lozano | Muebles Lozano
+- Distribuidora Fitness | Distri Fitness | Fitness | DF
+- Little Joe | Joe | LJ
+- Kintu
+- Novalamps | Nova | NovaLamps
+- La Victoria | Victoria | LV
+
+---
+
+Skill creado por Agencia Distinto · v1.2

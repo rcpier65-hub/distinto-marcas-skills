@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Plantilla Grilla Semanal — Distribuidora Fitness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@100;200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* =========================================================
+     DISTRIBUIDORA FITNESS MAYORISTA — Identidad oficial
+     Manual: Naranja #F54922 + Negro #333333 + Blanco
+     Tipografía: Stretch Pro (display) + Infinite Light + Infinite Thin
+     Substitutos OSS: Bebas Neue + Inter Light + Inter Thin
+     ⚠️ NO MODIFICAR colores ni tipografía — vienen del manual de marca
+     ========================================================= */
+  :root {
+    --orange:  #F54922;
+    --black:   #333333;
+    --white:   #FFFFFF;
+    --gray-1:  #F8F8F8;
+    --gray-2:  #E8E8E8;
+    --display: 'Bebas Neue', 'Oswald', sans-serif;
+    --body:    'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #2c2c2c; font-family: var(--body); color: var(--black);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { display: flex; justify-content: center; padding: 40px 0; }
+  .poster { width: 1080px; height: 1620px; background: var(--white); position: relative;
+    overflow: hidden; padding: 60px 80px 50px; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .accent-shape { position: absolute; top: -100px; right: -100px; width: 320px; height: 320px;
+    background: var(--orange); transform: rotate(45deg); z-index: 0; }
+  .header { display: flex; align-items: center; justify-content: space-between;
+    gap: 30px; margin-bottom: 24px; position: relative; z-index: 1; }
+  .logo { width: 320px; height: auto; flex-shrink: 0; }
+  .date-pill { background: var(--black); color: var(--white); font-family: var(--display);
+    font-size: 30px; letter-spacing: 3px; padding: 14px 28px; border-radius: 0;
+    white-space: nowrap; line-height: 1; border-left: 6px solid var(--orange); }
+  .hero { text-align: center; margin: 40px 0 36px; position: relative; z-index: 1; }
+  .hero h1 { font-family: var(--display); font-weight: 400; font-size: 190px; color: var(--black);
+    line-height: .85; letter-spacing: 3px; text-transform: uppercase; }
+  .hero h1 .orange { color: var(--orange); }
+  .hero .sub { font-family: var(--body); font-size: 22px; font-weight: 300; color: var(--black);
+    margin-top: 22px; letter-spacing: 4px; text-transform: uppercase; opacity: .85; }
+  .divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 24px; }
+  .divider .bar-orange { width: 60px; height: 4px; background: var(--orange); }
+  .divider .bar-black { width: 20px; height: 4px; background: var(--black); }
+  .cards { display: flex; flex-direction: column; gap: 14px; margin-top: 5px; position: relative; z-index: 1; }
+  .card { background: var(--card-bg, var(--white)); border: var(--card-border, 2px solid var(--gray-2));
+    padding: 22px 36px; display: flex; align-items: center; gap: 28px; min-height: 120px; position: relative; }
+  .card.has-accent::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 8px; background: var(--orange); }
+  .card .date { flex-shrink: 0; min-width: 110px; }
+  .card .date .day { font-family: var(--display); font-size: 88px; font-weight: 400;
+    color: var(--day-color, var(--black)); line-height: .85; letter-spacing: 2px; }
+  .card .date .month { font-family: var(--body); font-size: 18px; font-weight: 700;
+    color: var(--month-color, var(--orange)); letter-spacing: 4px; text-transform: uppercase; margin-top: 6px; }
+  .card .bar { width: 2px; height: 80px; background: var(--bar-color, var(--orange)); flex-shrink: 0; }
+  .card .body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .card .body .title { font-family: var(--display); font-size: 44px; font-weight: 400;
+    color: var(--title-color, var(--black)); line-height: 1; letter-spacing: 1.5px; text-transform: uppercase; }
+  .card .body .meta { font-family: var(--body); font-size: 16px; font-weight: 300;
+    color: var(--meta-color, var(--black)); letter-spacing: 1.5px; text-transform: uppercase; opacity: .7; }
+  .card .icon { flex-shrink: 0; width: 70px; height: 70px; color: var(--icon-color, var(--black)); }
+  .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
+    stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .card.v1 { --card-bg: var(--white); --card-border: 2px solid var(--gray-2); }
+  .card.v2 { --card-bg: var(--gray-1); --card-border: 2px solid var(--gray-1); }
+  .card.v3 { --card-bg: var(--orange); --card-border: 2px solid var(--orange);
+    --day-color: var(--white); --month-color: var(--black); --title-color: var(--white);
+    --meta-color: var(--white); --bar-color: var(--white); --icon-color: var(--white); }
+  .card.v4 { --card-bg: var(--white); --card-border: 2px solid var(--black); }
+  .card.v5 { --card-bg: var(--gray-1); --card-border: 2px solid var(--gray-1); }
+  .footer { margin-top: auto; padding-top: 28px; text-align: center;
+    border-top: 3px solid var(--orange); position: relative; z-index: 1; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 14px; font-family: var(--body);
+    font-size: 22px; font-weight: 700; color: var(--black); letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 22px; }
+  .footer .agency svg { width: auto; height: 38px; flex-shrink: 0; display: block; }
+  .footer .url { font-family: var(--body); font-size: 18px; font-weight: 300;
+    color: var(--black); margin-top: 8px; letter-spacing: 1.5px; opacity: .7; }
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="accent-shape"></div>
+
+  <header class="header">
+    <!-- ⚠️ NO TOCAR: logo oficial — descargar distribuidora-fitness-logo.png de esta carpeta -->
+    <img class="logo" src="distribuidora-fitness-logo.png" alt="Distribuidora Fitness Mayorista" />
+    <!-- ✏️ EDITABLE: fechas de la semana -->
+    <div class="date-pill">11—17 MAY · 2026</div>
+  </header>
+
+  <section class="hero">
+    <h1>¿Qué se <span class="orange">viene?</span></h1>
+    <!-- ✏️ EDITABLE: subtítulo del mes y rango de fechas -->
+    <div class="sub">Mayo · Semana del 11 al 17</div>
+    <div class="divider">
+      <span class="bar-orange"></span><span class="bar-black"></span><span class="bar-orange"></span>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CARDS — Editar título + meta + icono según grilla Notion
+       NO CAMBIAR: clases v1-v5 ni el orden
+       ============================================================ -->
+  <section class="cards">
+
+    <article class="card v1 has-accent">
+      <div class="date"><div class="day">11</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Combo Proteína + Creatina</div>
+        <div class="meta">6:30 pm · IG · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M14 26h4v12h-4z"/><path d="M46 26h4v12h-4z"/>
+          <path d="M18 30h4v4h-4z"/><path d="M42 30h4v4h-4z"/>
+          <rect x="22" y="22" width="20" height="20"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v2">
+      <div class="date"><div class="day">12</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Tip · Hidratación pre-workout</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M32 10c-8 12-12 18-12 26 0 7 5 12 12 12s12-5 12-12c0-8-4-14-12-26z"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v3">
+      <div class="date"><div class="day">13</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Promo Flash · 25% OFF</div>
+        <div class="meta">6:30 pm · Solo TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M14 14h22l16 16-22 22-16-16z"/>
+          <circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v4">
+      <div class="date"><div class="day">14</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Rutina full body</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <rect x="8" y="12" width="48" height="34" rx="2"/>
+          <path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/>
+          <path d="M22 52h20"/><path d="M32 46v6"/>
+        </svg>
+      </div>
+    </article>
+
+    <article class="card v5 has-accent">
+      <div class="date"><div class="day">16</div><div class="month">May</div></div>
+      <div class="bar"></div>
+      <div class="body">
+        <div class="title">Testimonio · Cliente real</div>
+        <div class="meta">6:30 pm · IG · FB · TikTok · Reel</div>
+      </div>
+      <div class="icon">
+        <svg viewBox="0 0 64 64">
+          <path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/>
+          <text x="22" y="38" font-family="Inter, sans-serif" font-weight="700"
+                font-size="18" fill="currentColor" stroke="none">99</text>
+        </svg>
+      </div>
+    </article>
+
+  </section>
+
+  <footer class="footer">
+    <div class="agency">
+      <svg viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+        <defs><mask id="distintoBite"><rect width="200" height="110" fill="white"/>
+          <circle cx="168" cy="92" r="20" fill="black"/></mask></defs>
+        <circle cx="135" cy="58" r="46" fill="#C5A82D" mask="url(#distintoBite)"/>
+        <circle cx="60" cy="55" r="50" fill="#8B2DC9"/>
+      </svg>
+      <span>DISTINTO · AGENCIA</span>
+    </div>
+    <div class="url">www.agenciadistinto.com</div>
+  </footer>
+</div>
+
+</body>
+</html>

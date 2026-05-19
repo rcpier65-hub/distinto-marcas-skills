@@ -1,255 +1,119 @@
-# Plantilla — Grilla Semanal Novalamps
+# Plantilla Grilla Semanal — Novalamps Eléctrika
 
-> Plantilla operativa para generar la pieza visual 1080×1620 de la grilla
-> semanal de contenido de Novalamps, lista para enviar por WhatsApp.
->
-> Validada el **18 May 2026** con la primera grilla automatizada
-> (semana 18–24 may 2026, messageId `3EB02A52FF3F31E041A82B`).
+Pieza vertical 1080×1620 (formato IG/TikTok story).
 
----
+## Archivos en esta carpeta
 
-## 📦 Contenido de esta carpeta
-
-| Archivo | Qué hace |
-|---|---|
-| `template.html` | HTML base con paleta oficial Novalamps y placeholders `{{...}}` |
-| `build.sh` | Script bash que renderiza el HTML a PNG 1080×1620 con Chrome headless + downscale 2x |
-| `README.md` | Este manual operativo |
+- `plantilla-grilla-novalamps.html` — Plantilla editable
+- `novalamps-logo.png` — Logo oficial (wordmark + símbolo casa con wifi + tagline eléctrika)
+- `README - instrucciones de uso.md` — Este archivo
 
 ---
 
-## 🚦 Workflow paso a paso
+## ✅ QUÉ SE PUEDE EDITAR cada semana
 
-### 1. Consultar Notion para la grilla de la semana
+Según lo definido en la grilla fit de Notion:
 
-Database **"GRILLA DE CONTENIDO"**:
-```
-collection://11688541-0ddd-83d3-8e56-873a2ca08fb9
-```
-
-Filtrar por:
-- `proyecto` = `fba88541-0ddd-824b-8dce-01c538c171ea` (proyecto Novalamps)
-- `date:Grilla de FIT:start` en el rango lun–dom de la semana objetivo
-
-> ⚠️ **Trampa**: la búsqueda semántica de Notion (`notion-search`) puede saltarse cards
-> recién creadas o cuyo texto no menciona "Novalamps" explícitamente.
-> **Validar siempre contra el calendario visual de Notion** antes de armar la grilla.
-> Esto incluye revisar el calendario en pantalla con captura/screenshot.
-
-### 2. Copiar el template y editarlo
-
-```bash
-cp template.html grilla-2026-W21.html
+### 1. Pill de fecha — verde lima
+```html
+<div class="date-pill">11—17 MAY · 2026</div>
 ```
 
-Buscar/reemplazar TODAS las ocurrencias `{{...}}`:
-
-| Placeholder | Valor de ejemplo (semana 18–24 may) |
-|---|---|
-| `{{RANGO_FECHAS_PILL}}` | `18 — 24 MAY · 2026` |
-| `{{NUM_PUBLICACIONES}}` | `5` |
-| `{{DIA_INICIO_LARGO}}` | `lun 18` |
-| `{{DIA_FIN_LARGO}}` | `dom 24` |
-| `{{MES_LARGO}}` | `mayo` |
-| `{{DIA_ABREV}}` | `Lun`, `Mar`, `Mié`, `Jue`, `Vie`, `Sáb`, `Dom` |
-| `{{DD}}` | `18` |
-| `{{MES_ABREV}}` | `May`, `Jun`, etc. |
-| `{{TITULO_PIEZA}}` | `1. Max — voz en off` |
-| `{{TIPO}}` | `Reel`, `Carrusel`, `Post`, `Story` |
-| `{{DESCRIPCION_2_LINEAS}}` | parafraseo del copy de Notion, 2 líneas máximo |
-| `{{NUM_SEMANA}}` | `21` |
-| `{{ANIO}}` | `2026` |
-
-**Duplicar el bloque `<div class="card">...</div>`** una vez por cada publicación.
-El grid se autoajusta — funciona bien con 3 a 5 cards.
-
-**Días sin publicación NO se incluyen** (regla del cliente).
-
-### 3. Renderizar a PNG
-
-```bash
-bash build.sh grilla-2026-W21.html grilla-novalamps-W21.png
+### 2. Subtítulo del hero
+```html
+<div class="sub"><span class="accent"></span>Mayo · Semana del 11 al 17</div>
 ```
 
-El script:
-1. Copia el logo oficial desde Drive (`logo-novalamps-blanco-verde.png.png`)
-2. Lo recorta al área útil (880×280) con `sips`
-3. Renderiza el HTML con Chrome headless a 2x para tipografía crisp
-4. Downscale a 1080×1620 con `sips`
-5. Output: `/tmp/distinto-grilla/<output-name>.png`
+### 3. Las 5 cards
+- `<div class="day">11</div>` → número del día
+- `<div class="title">Nueva línea LED</div>` → título de la pieza
+- `<div class="meta">6:30 pm · IG · TikTok · Reel</div>` → hora + plataformas + formato
+- `<svg>...</svg>` → ícono representativo
 
-### 4. Validar visualmente
-
-```bash
-open /tmp/distinto-grilla/grilla-novalamps-W21.png
-```
-
-Checklist:
-- [ ] Tamaño exacto 1080×1620
-- [ ] Logo "novaLamps" blanco visible (no solo el isotipo lima)
-- [ ] 6:30 pm en todas las cards
-- [ ] Sin días vacíos (jue/sáb si no hay publicación)
-- [ ] Texto de descripciones no se corta
-
-### 5. Mostrar preview al usuario y esperar OK
-
-Antes de enviar, mostrar al usuario:
-- La imagen
-- El caption completo
-- El grupo destino + contacto a mencionar
-
-**Esperar confirmación explícita** ("OK", "aprobado", "mandalo") antes de proceder.
-
-Opcional: enviar **prueba primero** a número personal del operador para validar el render
-final tal cual lo verá el cliente.
-
-### 6. Subir PNG a URL pública y enviar
-
-```bash
-REPO="/Users/pedroreyescalderon/Downloads/1. DISTINTO AGENCIA/distinto-marcas-skills"
-cp /tmp/distinto-grilla/grilla-novalamps-W21.png "$REPO/tmp-demo/"
-cd "$REPO"
-git add tmp-demo/grilla-novalamps-W21.png
-git commit -m "tmp: grilla novalamps W21" --quiet
-git push origin main --quiet
-```
-
-URL resultante:
-```
-https://github.com/rcpier65-hub/distinto-marcas-skills/raw/main/tmp-demo/grilla-novalamps-W21.png
-```
-
-Enviar con `whatsapp_send_image`:
-
-```json
-{
-  "chatId": "120363407777030884@g.us",
-  "media": {
-    "url": "https://github.com/rcpier65-hub/distinto-marcas-skills/raw/main/tmp-demo/grilla-novalamps-W21.png",
-    "filename": "grilla-novalamps-W21.png",
-    "mimetype": "image/png"
-  },
-  "caption": "..."
-}
-```
+### 4. Banco de íconos sugeridos para Novalamps
+- Foco/bombilla (productos LED)
+- Cable cruzado (instalación profesional)
+- Rayo (ahorro energético, electricidad)
+- Pantalla con play (tour, demos)
+- Burbuja con `99` (testimonios)
 
 ---
 
-## 💬 Caption WhatsApp — formato canónico (validado)
+## 🚫 QUÉ NO SE PUEDE TOCAR
 
-```
-@51987672233 Hola Cynthia 👋
+### Colores — manual oficial Novalamps
 
-Envío para ti la grilla de contenido que se publicará esta semana, del DD al DD de MES.
-
-📍 *DÍA DD MES · TÍTULO PIEZA*
-PLATAFORMAS · 6:30 pm
-Descripción 2 líneas máximo.
-
-📍 *DÍA DD MES · TÍTULO PIEZA*
-PLATAFORMAS · 6:30 pm
-Descripción 2 líneas máximo.
-
-[...más bloques según cantidad de publicaciones...]
+```css
+--lime:     #D2DD00   /* Verde lima Pantone 389 C - color principal */
+--graphite: #262726   /* Verde negro/grafito Pantone 419 C */
+--white:    #FFFFFF
 ```
 
-### Reglas del caption (Novalamps)
+Vienen del Manual de Identidad Corporativa Novalamps (página 7-8).
 
-- **Saludo**: `Hola Cynthia 👋` — sin tratamiento ("Sr.", "Dr." NO)
-- **Mention**: `@51987672233` al inicio (texto plano — push real solo con
-  `whatsapp_send_with_mentions`, que no soporta imagen → usar `whatsapp_send_image` y aceptar
-  que el `@` es solo texto)
-- **Día abreviado**: 3 letras MAYÚSCULAS — `LUN MAR MIÉ JUE VIE SÁB DOM`
-- **Mes abreviado**: `ENE FEB MAR ABR MAY JUN JUL AGO SEP OCT NOV DIC`
-- **Hora**: `6:30 pm` con espacio antes de `pm`, minúscula
-- **Plataformas**: separadas por ` · ` (punto medio U+00B7)
-- **NO incluir**: "Estado: Aprobar/Editar", "Cualquier ajuste antes de…",
-  header "Grilla de contenido para [marca]", emojis decorativos en exceso
+### Tipografía — manual oficial
 
----
+```css
+--font: 'Inter'   /* Substituto OSS de Arial Regular/Bold */
+```
 
-## 🎨 Decisiones de diseño documentadas
+⚠️ Usar **siempre Inter Black (900) en uppercase** para titulares
+— matchea Arial Bold con peso máximo, que es la directiva del manual.
 
-### Por qué logo blanco-verde sobre grafito (no plaqueta blanca)
+⚠️ **No usar serif ni tipografías premium** — el manual lo prohíbe
+explícitamente para identidad base. Solo si una campaña específica
+de interiorismo lo pide.
 
-El manual define la **"versión principal negativo"** del logo específicamente para fondos
-oscuros. El archivo `logo-novalamps-blanco-verde.png.png` ES esa versión.
+### Layout — estructura fija
 
-Una versión anterior usó una "plaqueta blanca" con el logo negro adentro — funciona pero
-es menos limpia. La versión actual (logo blanco directo) es la composición canónica del
-manual.
+- Lienzo: 1080×1620
+- Logo arriba a la izquierda (280px ancho)
+- Cuadrado diagonal grafito en esquina superior derecha (efecto eléctrico)
+- Pill de fecha lima sin border-radius (técnico)
+- Título "¿QUÉ SE / VIENE?" con "VIENE?" sobre fondo lima (sticker style)
+- 5 cards con border-left de 8px lime/grafito (técnico)
+- Footer con barra grafito + acento lima izquierdo
 
-### Por qué Inter como tipografía
+### Variantes de cards (v1 a v5)
 
-El manual oficial dice **Arial Regular/Bold**. Como Arial no está garantizada en todos los
-sistemas/CDN, se usa **Inter** — explícitamente documentada en
-`assets/colores-fuentes.txt` como sustituto OSS aprobado.
+- `v1` → blanca con border-left lime (lanzamiento)
+- `v2` → gris claro con border-left grafito (educativo)
+- `v3` → **GRAFITO STATEMENT con texto LIME** (oferta / tip más importante)
+- `v4` → lime soft con border-left lime (visual / video)
+- `v5` → blanca con border-left grafito (testimonio / cierre)
 
-### Por qué render 2x + downscale
+⚠️ **La card grafito (v3) solo aparece UNA vez por grilla**.
 
-Chrome renderiza a 2160×3240 px con `--force-device-scale-factor=2`, luego `sips` lo baja
-a 1080×1620. Resultado: bordes anti-aliasing más limpios que un render directo a 1x.
-Especialmente notable en la tipografía pequeña de las descripciones.
-
-### Por qué `--virtual-time-budget=8000`
-
-Le da 8 segundos virtuales al navegador para cargar la fuente Inter desde Google Fonts
-antes de tomar el screenshot. Sin este flag, Chrome puede capturar antes de que la fuente
-esté disponible y se renderiza con Arial/system fallback.
+### Footer de Distinto — fijo
+No modificar firma ni URL.
 
 ---
 
-## ⚠️ Trampas conocidas
+## 🛠️ Cómo exportar a PNG
 
-### 1. PNG blanco transparente "parece vacío"
-
-`logo-novalamps-blanco-verde.png.png` tiene texto blanco sobre fondo transparente.
-Al previsualizarlo en herramientas con fondo claro (Read de Claude Code, Preview macOS sin
-tema oscuro, GitHub PR diff), **solo se ve el isotipo lima** y el wordmark blanco queda
-invisible — lo que puede llevar a descartarlo creyendo que es solo el símbolo.
-
-**Validar siempre sobre fondo grafito antes de descartar.**
-
-### 2. Archivos "Mesa de trabajo X" NO son el logo principal
-
-En `01 - IDENTIDAD DE MARCA/LOGOS MARCAS NOVALAMPS/PNG/` hay archivos con nombres
-genéricos de Illustrator (`Mesa de trabajo 1.png`, etc.). Son logos de **sub-marcas**:
-- "novaLamps eléctrika" (con casita naranja)
-- Líneas de producto: QUIMERA, AMBER PLUS, etc.
-
-**El logo principal está en `01 - IDENTIDAD DE MARCA/LOGO/PNG/`** (carpeta singular,
-nombres descriptivos `logo-novalamps-*-verde.png.png`).
-
-### 3. Cards muy recientes pueden no aparecer en notion-search
-
-La búsqueda semántica de Notion tiene latencia de indexación. Si una card fue creada
-hace menos de unas horas, puede no aparecer en `notion-search`. **Validar contra el
-calendario visual de Notion antes de armar la grilla**, no confiar solo en la búsqueda.
-
-### 4. El proyecto Maderera La Victoria tiene cards homónimas
-
-Cards como "1. MEDIDAS" o "7. SALTO DE TIGRE" pueden aparecer al buscar Novalamps por
-similitud semántica, pero su `proyecto` apunta a `6c5885410ddd8278963a01e4b84595fc`
-(Maderera La Victoria, no Novalamps).
-
-**Filtrar siempre por el ID del proyecto** (`fba88541-0ddd-824b-8dce-01c538c171ea`),
-no por nombre.
+1. Abrir `plantilla-grilla-novalamps.html` en Google Chrome
+2. Asegurarse que `novalamps-logo.png` esté en la misma carpeta
+3. F12 → Cmd+Shift+P → "Capture full size screenshot"
+4. Chrome descarga PNG 1080×1620
 
 ---
 
-## 📞 Datos operativos confirmados
+## ❓ FAQ
 
-| Campo | Valor |
-|---|---|
-| Contacto cliente | **Cynthia** |
-| WhatsApp Cynthia | `51987672233` |
-| Tratamiento | _(sin tratamiento — informal)_ |
-| Grupo WhatsApp | **Novalamps** |
-| chatId del grupo | `120363407777030884@g.us` |
-| Miembros del grupo | 6 |
-| Hora oficial publicación | **6:30 pm** |
-| Plataformas habituales | Instagram · Facebook · TikTok |
+**¿Puedo usar el lima en fondos grandes?**
+No es ideal. El verde lima #D2DD00 es muy intenso/saturado y cansa
+la vista en fondos grandes. Por eso se usa como STICKER en "VIENE?",
+en el pill de fecha y en bordes/acentos pequeños.
+
+**¿Puedo agregar serif para el título?**
+No. El manual oficial prohíbe explícitamente serif/Playfair en
+identidad base de Novalamps. Mantener Inter (sans-serif técnico).
+
+**¿Por qué el título alineado a la izquierda (no centrado)?**
+Refuerza la sensación técnica/industrial de la marca. La marca es
+eléctrica, técnica, ingenieril — no decorativa. El centrado se siente
+más residencial/cálido, la izquierda más industrial/profesional.
 
 ---
 
-Plantilla creada y validada: 18 May 2026 · v1.0
+Plantilla creada por Agencia Distinto · 2026

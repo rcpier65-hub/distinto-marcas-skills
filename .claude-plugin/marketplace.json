@@ -7,7 +7,7 @@
   },
   "metadata": {
     "description": "Marketplace privado de Agencia Distinto — skills, plugins y herramientas internas del equipo.",
-    "version": "2.5.0"
+    "version": "2.6.0"
   },
   "plugins": [
     {
@@ -19,7 +19,7 @@
         "url": "https://www.agenciadistinto.com"
       },
       "homepage": "https://github.com/rcpier65-hub/distinto-marcas-skills",
-      "version": "2.5.0",
+      "version": "2.6.0",
       "category": "brand-management",
       "source": "./plugins/distinto-marcas",
       "tags": [
