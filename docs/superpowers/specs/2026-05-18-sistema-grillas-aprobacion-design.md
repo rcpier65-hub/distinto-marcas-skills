@@ -4,8 +4,16 @@
 
 - **Fecha**: 2026-05-18
 - **Autor**: Pedro Reyes Calderón (Agencia Distinto) + Claude (sesión brainstorm)
-- **Estado**: Borrador para revisión
+- **Estado**: ✅ Aprobado, listo para writing-plans
 - **Tiempo estimado de implementación**: 37-54 horas (~3-5 semanas con dedicación parcial)
+
+## 🔑 Decisiones de infraestructura confirmadas
+
+| Recurso | Decisión |
+|---|---|
+| **Supabase** | **Cuenta distinta a la actual** — Pedro la creará. Cuando el agente necesite hacer algo en Supabase (crear tablas, configurar RLS, webhooks, storage buckets, etc.) **debe detenerse y pedir a Pedro lo que necesite** (URL, anon key, service role key, project_id). NO usar el proyecto `doipvvygamnmupdyajjk` ni `mcwfnmrflnnwmlsiiwap` |
+| **Repo GitHub** | **Mismo repo actual**: `rcpier65-hub/distinto-marcas-skills`. La app Next.js convive con el plugin como **monorepo**. Estructura propuesta: `/app/` para Next.js, `/plugins/` ya existente para skill. **⚠️ Considerar**: el repo es público para el marketplace — secretos van solo en Vercel env vars, NUNCA en código commiteado |
+| **Vercel** | Cuenta personal de Pedro (rcpier65@gmail.com). Proyecto nuevo conectado al monorepo, root dir = `/app/` |
 
 ---
 
@@ -286,11 +294,13 @@ costo estimado:
 ## 🚀 Plan de implementación por fases
 
 ### Fase 0 — Setup infra (1-2h) 🔴 BLOQUEANTE
-- [ ] Despertar proyecto Supabase `doipvvygamnmupdyajjk`
-- [ ] Crear repo GitHub `distinto-app` (privado)
-- [ ] Conectar Vercel al repo → deploy automático
-- [ ] Crear `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] Setup Next.js 15 con `npx create-next-app@latest` + Tailwind + shadcn
+- [ ] **Pedro crea proyecto Supabase nuevo** (cuenta distinta) y pasa al agente: `project_id`, `url`, `anon key`, `service role key`
+- [ ] Crear carpeta `/app/` en el repo `distinto-marcas-skills` (monorepo con el plugin)
+- [ ] Setup Next.js 15 dentro de `/app/`: `npx create-next-app@latest app/ --typescript --tailwind --app`
+- [ ] Instalar shadcn/ui: `npx shadcn@latest init` dentro de `/app/`
+- [ ] Conectar Vercel a `rcpier65-hub/distinto-marcas-skills` con root dir = `/app/`
+- [ ] Configurar Vercel env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `COWORK_WEBHOOK_URL`
+- [ ] Actualizar `.gitignore` del repo para excluir `app/.env.local`
 
 ### Fase 1 — Diseño BD (3-5h) 🔴 BLOQUEANTE
 - [ ] Migración inicial: crear tablas `marcas`, `grillas_pendientes`, `aprobaciones`, `envios`
