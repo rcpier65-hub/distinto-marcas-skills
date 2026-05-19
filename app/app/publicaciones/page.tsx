@@ -228,7 +228,9 @@ export default async function PublicacionesPage({
                         </td>
                         <td className="p-3 whitespace-nowrap font-mono text-xs">{p.fecha_publicacion ?? '—'}</td>
                         <td className="p-3 max-w-md">
-                          <div className="font-medium leading-tight">{p.nombre}</div>
+                          <Link href={`/publicaciones/${p.id}`} className="font-medium leading-tight hover:underline">
+                            {p.nombre}
+                          </Link>
                           {p.editor_nombre && (
                             <div className="text-xs text-muted-foreground">por {p.editor_nombre}</div>
                           )}

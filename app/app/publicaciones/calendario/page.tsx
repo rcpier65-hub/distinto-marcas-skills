@@ -231,9 +231,10 @@ export default async function CalendarioPage({
                         {pubsDia.map((p) => {
                           const marca = Array.isArray(p.marca) ? p.marca[0] : p.marca
                           return (
-                            <div
+                            <Link
                               key={p.id}
-                              className={`text-[11px] p-1.5 rounded border-l-2 bg-muted/40 hover:bg-muted/70 cursor-default ${ESTADO_BORDER[p.estado]}`}
+                              href={`/publicaciones/${p.id}`}
+                              className={`block text-[11px] p-1.5 rounded border-l-2 bg-muted/40 hover:bg-muted/70 transition-colors ${ESTADO_BORDER[p.estado]}`}
                               title={`${p.nombre}\n${ESTADO_PUBLICACION_LABEL[p.estado]} · ${(p.plataformas ?? []).join(' · ')}`}
                             >
                               <div className="flex items-start gap-1">
@@ -247,7 +248,7 @@ export default async function CalendarioPage({
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                            </Link>
                           )
                         })}
                       </div>
