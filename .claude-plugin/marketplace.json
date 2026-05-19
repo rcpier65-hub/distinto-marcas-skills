@@ -7,19 +7,19 @@
   },
   "metadata": {
     "description": "Marketplace privado de Agencia Distinto — skills, plugins y herramientas internas del equipo.",
-    "version": "2.4.0"
+    "version": "2.5.0"
   },
   "plugins": [
     {
       "name": "distinto-marcas",
-      "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive + Rubi WhatsApp) para los 9 clientes de Agencia Distinto. Incluye reglas operativas: principio de proactividad, resolución de rangos temporales, queries exhaustivas vs muestreo. Activar con 'revisa comentarios y generame la hoja de [marca]'.",
+      "description": "Pack de skills de marca + workflow Inbox TikTok (Excel-en-Drive + Rubi WhatsApp) para los 9 clientes de Agencia Distinto. Incluye plantilla de grilla semanal para Little Joe (generador Python + PNG). Reglas operativas: principio de proactividad, resolución de rangos temporales, queries exhaustivas vs muestreo.",
       "author": {
         "name": "Agencia Distinto",
         "email": "team@agenciadistinto.com",
         "url": "https://www.agenciadistinto.com"
       },
       "homepage": "https://github.com/rcpier65-hub/distinto-marcas-skills",
-      "version": "2.4.0",
+      "version": "2.5.0",
       "category": "brand-management",
       "source": "./plugins/distinto-marcas",
       "tags": [

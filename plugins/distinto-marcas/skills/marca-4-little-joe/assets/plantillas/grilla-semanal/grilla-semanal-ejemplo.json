@@ -1,0 +1,69 @@
+{
+  "brand": "Little Joe",
+  "date_range": "11 - 17 MAY · 2026",
+  "title": "¿Qué se viene?",
+  "subtitle": "Mayo · Semana del 11 al 17",
+  "footer": "Agencia Distinto · Grilla semanal de contenidos",
+  "items": [
+    {
+      "date": "2026-05-11",
+      "day": "Lunes",
+      "date_label": "11 MAY",
+      "name": "¿Cuál Joe eres?",
+      "time": "6:30 pm",
+      "platforms": "TikTok + Instagram",
+      "type": "Reel",
+      "description": "Video entretenido para conectar tipos de personalidad con aromas Joe.",
+      "accent": "blue",
+      "image": "01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/BANCO DE IMAGENES/3D-FRONTE - OK JOE WITH FACE - EU - STRAWBERRY.png"
+    },
+    {
+      "date": "2026-05-13",
+      "day": "Miércoles",
+      "date_label": "13 MAY",
+      "name": "Glow up auto",
+      "time": "7:00 pm",
+      "platforms": "Todas las redes",
+      "type": "Reel",
+      "description": "Pieza visual sobre como un detalle pequeno cambia la experiencia en el auto.",
+      "accent": "pink",
+      "image": "01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/BANCO DE IMAGENES/3D-FRONTE - OK JOE WITH FACE - FLOWER.png"
+    },
+    {
+      "date": "2026-05-14",
+      "day": "Jueves",
+      "date_label": "14 MAY",
+      "name": "Favorito Joe",
+      "time": "12:30 pm",
+      "platforms": "Instagram + Facebook",
+      "type": "Carrusel",
+      "description": "Contenido educativo/cercano para destacar aromas favoritos de la comunidad.",
+      "accent": "yellow",
+      "image": "01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/BANCO DE IMAGENES/3D-FRONTE - OK JOE WITH FACE - VANILLA.png"
+    },
+    {
+      "date": "2026-05-16",
+      "day": "Sábado",
+      "date_label": "16 MAY",
+      "name": "POV Unboxing ASMR",
+      "time": "6:30 pm",
+      "platforms": "Solo TikTok",
+      "type": "Reel",
+      "description": "Video sensorial de empaque y producto para reforzar el detalle/regalo.",
+      "accent": "mint",
+      "image": "01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/BANCO DE IMAGENES/3D-FRONTE - LITTLE PUP - NEW CAR.jpg"
+    },
+    {
+      "date": "2026-05-17",
+      "day": "Domingo",
+      "date_label": "17 MAY",
+      "name": "Little Dog",
+      "time": "11:00 am",
+      "platforms": "Instagram",
+      "type": "Post",
+      "description": "Pieza de producto para presentar la linea Little Dog de forma tierna y clara.",
+      "accent": "cream",
+      "image": "01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/BANCO DE IMAGENES/dog azul.png"
+    }
+  ]
+}

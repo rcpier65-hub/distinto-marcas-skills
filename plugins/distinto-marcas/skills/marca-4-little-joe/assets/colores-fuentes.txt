@@ -2,51 +2,110 @@
 COLORES Y FUENTES — Little Joe
 ═══════════════════════════════════════════════════════════
 
-Archivo de consulta rápida con los códigos exactos.
-Para reglas de uso completas: assets/brand-book-extract.md
+Datos extraídos del sistema operativo de grilla semanal en Drive:
+  Drive: 1. GESTIÓN/CUENTAS/4. Little Joe/17 - PLANTILLAS/GRILLA SEMANAL/
+  Código fuente:  generar_grilla_little_joe.py
+  Plantilla:      plantilla-grilla-semanal-little-joe.png
 
 
 ─── COLORES ───────────────────────────────────────────────
 
-PRIMARIOS:
-[Nombre 1]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 2]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-
-SECUNDARIOS:
-[Nombre 3]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-[Nombre 4]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
-
-ACENTOS:
-[Nombre 5]    HEX: #XXXXXX    RGB: rgb(X,X,X)    CMYK: cmyk(X,X,X,X)
+PRIMARIOS (identidad de marca):
+Cielo / Sky Blue        HEX: #61B3D1    RGB: rgb(97, 179, 209)   ← Fondo principal de todas las piezas
+Azul Profundo / Deep    HEX: #02467C    RGB: rgb(2, 70, 124)     ← Header pill, texto sobre fondo claro, brand text
 
 NEUTROS:
-Blanco        HEX: #FFFFFF    RGB: rgb(255,255,255)
-Negro         HEX: #000000    RGB: rgb(0,0,0)
-Gris claro    HEX: #XXXXXX    RGB: rgb(X,X,X)
-Gris oscuro   HEX: #XXXXXX    RGB: rgb(X,X,X)
+Blanco                  HEX: #FFFFFF    RGB: rgb(255, 255, 255)
+Tinta / Ink             HEX: #202A35    RGB: rgb(32, 42, 53)     ← Texto principal sobre cards claras
+Azul muy claro / Soft   HEX: #F4FBFE    RGB: rgb(244, 251, 254)  ← Acentos blanco azulado
+
+ACENTOS (paleta planner — cards por día):
+Fucsia / Pink           HEX: #F54275    RGB: rgb(245, 66, 117)   ← Card pink (jueves/sábado típicamente)
+Amarillo / Yellow       HEX: #F7D86B    RGB: rgb(247, 216, 107)  ← Card yellow
+Menta / Mint            HEX: #A7E7D7    RGB: rgb(167, 231, 215)  ← Card mint (verde menta)
+Crema / Cream           HEX: #FFF0C9    RGB: rgb(255, 240, 201)  ← Card cream
+Azul Claro Card / Pale  HEX: #EAF7FC    RGB: rgb(234, 247, 252)  ← Card blue (fondo de card celeste)
+
+COLORES DE TEXTO SOBRE CARDS (por accent):
+  blue card:    fecha y texto en #02467C (deep blue)
+  pink card:    fecha y texto en #FFFFFF (blanco — alto contraste)
+  yellow card:  fecha en #5B4638, texto en #4B3E37 (marrón cálido)
+  mint card:    fecha y texto en #02467C (deep blue)
+  cream card:   fecha en #5B4638, texto en #4B3E37 (marrón cálido)
 
 
 ─── TIPOGRAFÍAS ───────────────────────────────────────────
 
-PRIMARIA (titulares):
-  Nombre exacto:  [TODO: ej. "Inter"]
-  Pesos:          [TODO: ej. Light 300, Regular 400, Bold 700]
-  Fuente:         [Google Fonts / Adobe / archivo propio]
-  Link:           [URL]
+PRIMARIA (todos los textos):
+  Nombre exacto:  Big Shoulders Display
+  Pesos usados:   Black (900), Bold (700), SemiBold (600)
+  Fuente:         Google Fonts
+  Link:           https://fonts.google.com/specimen/Big+Shoulders+Display
+  Archivos del kit (en Drive):
+    01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/LOGO/
+      BigShouldersDisplay-Black.ttf
+      BigShouldersDisplay-Bold.ttf
+      BigShouldersDisplay-SemiBold.ttf
 
-SECUNDARIA (cuerpo):
-  Nombre exacto:  [TODO]
-  Pesos:          [TODO]
-  Link:           [URL]
+  Uso por tamaño (del script generar_grilla_little_joe.py):
+    Title hero:       104px Black     ("¿Qué se viene?")
+    Title small:       42px SemiBold  ("Mayo · Semana del 11 al 17")
+    Date range pill:   36px Bold
+    Brand pill:        42px Black     ("Little Joe")
+    Card date num:     68px Black     ("11", "13", etc.)
+    Card month:        40px Black     ("MAY")
+    Card name:         50px Bold      (título de la publicación)
+    Card meta:         33px SemiBold  (hora · plataforma · tipo)
+    Card label:        26px Bold      (día de la semana)
+    Footer:            25px SemiBold
 
-ACENTO (highlights):
-  Nombre exacto:  [TODO]
-  Link:           [URL]
+
+─── LOGO ──────────────────────────────────────────────────
+
+Logo oficial de uso en grilla:
+  Path Drive: 01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/LOGO/LOGO BLANCO PNG.png
+  Variante: blanco (para usar sobre fondo azul cielo o pills oscuras)
+  Tamaño en plantilla: contenido en bounding 166x78 px
+
+  Otras variantes del kit (revisar Drive):
+    - Logo color completo
+    - Logo monocromo
+    - Isotipo / mascota Joe
+
+
+─── BANCO DE IMÁGENES DE PRODUCTO ─────────────────────────
+
+Imágenes 3D oficiales para las cards (PNG con fondo transparente):
+  Path Drive: 01 - IDENTIDAD DE MARCA/KIT DE MARCA 2025/BANCO DE IMAGENES/
+  Convenciones de nombre observadas:
+    3D-FRONTE - OK JOE WITH FACE - EU - [SABOR].png
+    3D-FRONTE - OK JOE WITH FACE - [VARIANTE].png
+    3D-FRONTE - LITTLE PUP - NEW CAR.jpg
+    dog azul.png  (Little Dog)
+
+  Sabores/variantes vistos: STRAWBERRY, FLOWER, VANILLA + ediciones (CHRISTMAS, APPLE CINNAMON, FROSTY DELIGHT, HOLIDAY SPARKLE, FRESH PINE)
 
 
 ─── REFERENCIAS RÁPIDAS ───────────────────────────────────
 
+Plantilla de grilla semanal:   assets/plantillas/grilla-semanal/
+  README.md
+  generar_grilla_little_joe.py  ← script generador (PIL/Pillow)
+  grilla-semanal-ejemplo.json   ← datos editables
+  plantilla-grilla-semanal-little-joe.png  ← output ejemplo
+  mensaje-whatsapp-template.md  ← copy para enviar al cliente
+
 Para reglas de combinación:    assets/brand-book-extract.md
-Para logos en alta:            assets/logos/
-Para dirección de arte:        assets/fotografia-guia/
-Para PDF original completo:    documentos/manual-de-marca.pdf
+Para logos en alta:            assets/logos/  (pendiente: copiar desde Drive)
+Para PDF original completo:    documentos/manual-de-marca.pdf (pendiente)
+
+
+─── NOTAS ─────────────────────────────────────────────────
+
+- Tono visual: cute / playful + premium italiano. NO confundir con "infantil".
+- Fondo azul cielo es el background canónico de todas las piezas.
+- En la grilla, cada día tiene un color de card distinto (rotación blue→pink→yellow→mint→cream) para variedad visual.
+- El logo blanco SIEMPRE va sobre el pill azul profundo del header.
+- El producto 3D (Joe con cara) acompaña cada card en el lado derecho como elemento visual de respaldo.
+
+Versión: 1.0 · Capturado: 18 mayo 2026
