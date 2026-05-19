@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth/get-user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MarcaCard, type MarcaCardData } from './_components/marca-card'
+import { RealtimeWatcher } from './_components/realtime-watcher'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,6 +73,7 @@ export default async function DashboardPage() {
           <MarcaCard key={m.slug} marca={m} />
         ))}
       </div>
+      <RealtimeWatcher />
     </main>
   )
 }
