@@ -5,11 +5,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import type { EstadoPublicacion } from '@/lib/types/database'
+import type { EstadoPublicacion, EstadoTarea } from '@/lib/types/database'
 
 export type UpdatePublicacionInput = {
   nombre?: string
   estado?: EstadoPublicacion
+  estado_tarea?: EstadoTarea
   fecha_publicacion?: string | null
   fecha_edicion?: string | null
   fecha_diseno?: string | null
@@ -29,6 +30,8 @@ export type UpdatePublicacionInput = {
   editado?: boolean
   video_aprobado?: boolean
   editor_nombre?: string | null
+  editor_id?: string | null
+  opcion_2?: string | null
   notas?: string | null
 }
 

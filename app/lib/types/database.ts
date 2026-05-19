@@ -46,6 +46,14 @@ export type EstadoPublicacion =
   | 'programar_anuncios'
   | 'archivado'
 
+export type EstadoTarea = 'sin_empezar' | 'en_progreso' | 'listo'
+
+export const ESTADO_TAREA_LABEL: Record<EstadoTarea, string> = {
+  sin_empezar: 'Sin empezar',
+  en_progreso: 'En progreso',
+  listo: 'Listo',
+}
+
 // Labels en español para UI
 export const ESTADO_PUBLICACION_LABEL: Record<EstadoPublicacion, string> = {
   tareas: 'Tareas',
@@ -128,6 +136,9 @@ export interface PublicacionRow {
   editado: boolean
   video_aprobado: boolean
   editor_nombre: string | null
+  editor_id: string | null
+  estado_tarea: EstadoTarea
+  opcion_2: string | null
   notion_original_id: string | null
   notion_url: string | null
   notas: string | null
@@ -161,6 +172,9 @@ export interface PublicacionInsert {
   editado?: boolean
   video_aprobado?: boolean
   editor_nombre?: string | null
+  editor_id?: string | null
+  estado_tarea?: EstadoTarea
+  opcion_2?: string | null
   notion_original_id?: string | null
   notion_url?: string | null
   notas?: string | null
@@ -171,6 +185,22 @@ export interface PublicacionInsert {
 }
 
 export type PublicacionUpdate = Partial<PublicacionRow>
+
+// --------------------------------------------------------
+
+export interface EditorRow {
+  id: string
+  nombre: string
+  activo: boolean
+  created_at: string
+}
+
+export interface EditorInsert {
+  id?: string
+  nombre: string
+  activo?: boolean
+  created_at?: string
+}
 
 // --------------------------------------------------------
 
