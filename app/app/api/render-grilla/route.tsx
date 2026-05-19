@@ -14,8 +14,13 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import chromium from '@sparticuz/chromium'
+import chromium from '@sparticuz/chromium-min'
 import puppeteer, { type Browser } from 'puppeteer-core'
+
+// URL del binary completo (con shared libs) que se descarga en runtime.
+// Match con la versión del paquete @sparticuz/chromium-min instalada.
+const CHROMIUM_PACK_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -108,7 +113,7 @@ export async function GET(request: Request) {
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: { width: 1080, height: 1620, deviceScaleFactor: 1 },
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
       headless: true,
     })
     const page = await browser.newPage()
