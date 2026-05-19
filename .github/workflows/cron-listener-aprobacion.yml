@@ -1,0 +1,29 @@
+name: Cron — Listener aprobación WhatsApp
+
+on:
+  schedule:
+    - cron: '*/5 12-23 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  listener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call listener endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ENDPOINT_URL: https://distinto-app.vercel.app/api/cron/listener-aprobacion
+        run: |
+          set -e
+          response=$(curl -sS -w "\n%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$ENDPOINT_URL")
+          body=$(echo "$response" | head -n -1)
+          status=$(echo "$response" | tail -n 1)
+          echo "Status: $status"
+          echo "Body: $body"
+          if [ "$status" != "200" ]; then
+            echo "::error::Listener returned non-200 status"
+            exit 1
+          fi

@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendWhatsAppToPhone } from '@/lib/integrations/rubi'
+import { generateGrillaPNG } from '@/lib/grilla/generate-png'
+import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
 import type { GrillaPendienteUpdate, AprobacionInsert } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
     errores: [] as string[],
   }
 
-  type MarcaRow = { slug: string; nombre: string; emoji_marca: string | null }
+  type MarcaRow = { slug: string; nombre: string; emoji_marca: string | null; color_primario_hex: string | null }
   type GrillaRow = {
     id: string
     semana_inicio: string
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
     .from('grillas_pendientes')
     .select(`
       id, semana_inicio, semana_fin, pedida_at,
-      marca:marcas(slug, nombre, emoji_marca)
+      marca:marcas(slug, nombre, emoji_marca, color_primario_hex)
     `)
     .eq('estado', 'pendiente')
     .order('pedida_at', { ascending: true })
@@ -74,24 +76,61 @@ export async function GET(request: Request) {
       .update(updateProcesando)
       .eq('id', g.id)
 
-    // 2b. Construir mensaje
+    // 2b. Generar PNG con plantilla
+    let pngUrl: string | null = null
+    let pngPath: string | null = null
+    try {
+      const pngBuffer = await generateGrillaPNG({
+        marca: {
+          nombre: marca.nombre,
+          emoji: marca.emoji_marca ?? '📊',
+          color: marca.color_primario_hex ?? '#283B6F',
+        },
+        semanaInicio: g.semana_inicio,
+        semanaFin: g.semana_fin,
+        publicaciones: 0,
+      })
+      const upload = await uploadGrillaPNG(pngBuffer, marca.slug, g.semana_inicio)
+      if (upload.ok) {
+        pngUrl = upload.url
+        pngPath = upload.path
+      } else {
+        console.error(`[cron] PNG upload failed for ${marca.slug}: ${upload.error}`)
+      }
+    } catch (e) {
+      console.error(`[cron] PNG generation failed for ${marca.slug}:`, e)
+    }
+
+    // 2c. Construir mensaje (con link al PNG si existe)
     const text = [
       `${marca.emoji_marca ?? '📊'} *Grilla pendiente — ${marca.nombre}*`,
       `Semana ${g.semana_inicio} → ${g.semana_fin}`,
       ``,
       `Pedida hace ${minutosAtras(g.pedida_at)} minutos.`,
       ``,
-      `_Por ahora solo notificación. PNG + envío automático al cliente en Plan 4._`,
+      pngUrl ? `🖼️ Preview: ${pngUrl}` : '',
+      ``,
+      `Responde:`,
+      `  ✅ "ok ${marca.slug}" → enviar al cliente`,
+      `  ❌ "no ${marca.slug}" → cancelar`,
+      `  🔄 "redo ${marca.slug}" → regenerar`,
       ``,
       `Dashboard: https://distinto-app.vercel.app/marca/${marca.slug}`,
-    ].join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
 
-    // 2c. Enviar a Pedro
+    // 2d. Enviar a Pedro
     const sendResult = await sendWhatsAppToPhone(PEDRO_WHATSAPP, text)
 
     if (sendResult.ok) {
-      // 2d. Marcar como esperando_aprobacion
-      const updateEsperando: GrillaPendienteUpdate = { estado: 'esperando_aprobacion' }
+      // 2e. Marcar como esperando_aprobacion + guardar PNG path
+      const updateEsperando: GrillaPendienteUpdate = {
+        estado: 'esperando_aprobacion',
+        png_url: pngUrl,
+        png_storage_path: pngPath,
+        caption: text,
+      }
       await supabase
         .from('grillas_pendientes')
         .update(updateEsperando)
