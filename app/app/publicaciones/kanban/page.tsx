@@ -100,8 +100,8 @@ export default async function KanbanPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/publicaciones" className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center">📋 Tabla</Link>
-          <Link href="/publicaciones/calendario" className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center">📅 Calendario</Link>
+          <Link href="/publicaciones/tabla" className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center">📋 Tabla</Link>
+          <Link href="/publicaciones" className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center">📅 Calendario</Link>
           <Link
             href={`/publicaciones/nueva${sp.marca ? `?marca=${sp.marca}` : ''}`}
             className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center"

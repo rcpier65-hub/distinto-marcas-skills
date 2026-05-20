@@ -68,7 +68,7 @@ export async function updatePublicacion(
 
   revalidatePath(`/publicaciones/${id}`)
   revalidatePath('/publicaciones')
-  revalidatePath('/publicaciones/calendario')
+  revalidatePath('/publicaciones/tabla')
   return { ok: true }
 }
 
@@ -111,6 +111,6 @@ export async function deletePublicacion(id: string): Promise<void> {
   }
 
   revalidatePath('/publicaciones')
-  revalidatePath('/publicaciones/calendario')
+  revalidatePath('/publicaciones/tabla')
   redirect('/publicaciones')
 }

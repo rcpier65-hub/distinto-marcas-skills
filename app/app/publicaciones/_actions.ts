@@ -33,7 +33,7 @@ export async function cambiarEstadoPublicacion(
 
   revalidatePath('/publicaciones/kanban')
   revalidatePath('/publicaciones')
-  revalidatePath('/publicaciones/calendario')
+  revalidatePath('/publicaciones/tabla')
   revalidatePath(`/publicaciones/${id}`)
   return { ok: true }
 }
@@ -79,7 +79,7 @@ export async function createPublicacion(input: CreatePublicacionInput): Promise<
   }
 
   revalidatePath('/publicaciones')
-  revalidatePath('/publicaciones/calendario')
+  revalidatePath('/publicaciones/tabla')
 
   // Redirect al detail para que llene el resto (plataformas, tipo, copy, etc.)
   redirect(`/publicaciones/${data.id}`)
@@ -163,6 +163,6 @@ export async function duplicarPublicacion(sourceId: string): Promise<void> {
   if (insertErr || !nueva) throw new Error(`No se pudo duplicar: ${insertErr?.message ?? 'unknown'}`)
 
   revalidatePath('/publicaciones')
-  revalidatePath('/publicaciones/calendario')
+  revalidatePath('/publicaciones/tabla')
   redirect(`/publicaciones/${nueva.id}`)
 }
