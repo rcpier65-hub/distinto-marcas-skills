@@ -96,55 +96,68 @@ export function GrillaLittleJoe({
 
       {/* CONTENT WRAPPER */}
       <div style={{ flex: 1, padding: '50px 70px 30px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {/* Mascot smile decorativo en esquina superior derecha */}
+        {/* Mascot smile decorativo en esquina superior derecha — más grande y vistoso */}
         <div
           style={{
             position: 'absolute',
-            top: 40,
-            right: 40,
-            width: 130,
-            height: 130,
+            top: 30,
+            right: 30,
+            width: 170,
+            height: 170,
             borderRadius: '50%',
             background: MUSTARD,
-            border: `4px solid ${INK}`,
+            border: `5px solid ${INK}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: `6px 6px 0 ${SHADOW}`,
+            boxShadow: `8px 8px 0 ${SHADOW}`,
+            transform: 'rotate(8deg)',
           }}
         >
-          {/* Cara smiley simple CSS */}
-          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-            <circle cx="28" cy="32" r="4" fill={INK} />
-            <circle cx="52" cy="32" r="4" fill={INK} />
-            <path d="M22 48 Q40 64, 58 48" stroke={INK} strokeWidth="4" strokeLinecap="round" fill="none" />
+          {/* Cara smiley con cachetes coral */}
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            {/* Cachetes */}
+            <circle cx="32" cy="68" r="9" fill={CORAL} opacity="0.6" />
+            <circle cx="88" cy="68" r="9" fill={CORAL} opacity="0.6" />
+            {/* Ojos */}
+            <circle cx="42" cy="48" r="6" fill={INK} />
+            <circle cx="78" cy="48" r="6" fill={INK} />
+            {/* Sonrisa */}
+            <path d="M34 72 Q60 96, 86 72" stroke={INK} strokeWidth="6" strokeLinecap="round" fill="none" />
           </svg>
         </div>
 
-        {/* HEADER */}
-        <header style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 30, maxWidth: 720 }}>
-          {/* Logo cuadrado coral rotado con J */}
+        {/* HEADER con logo PNG real adentro de cuadrado coral */}
+        <header style={{ display: 'flex', alignItems: 'center', gap: 28, marginBottom: 30, maxWidth: 720 }}>
+          {/* Logo lockup: cuadrado coral rotado con LOGO PNG BLANCO real */}
           <div
             style={{
-              width: 80,
-              height: 80,
+              width: 130,
+              height: 130,
               background: CORAL,
               transform: 'rotate(-6deg)',
-              border: `3px solid ${INK}`,
+              border: `4px solid ${INK}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: `4px 4px 0 ${SHADOW}`,
+              boxShadow: `6px 6px 0 ${SHADOW}`,
               flexShrink: 0,
+              padding: 12,
             }}
           >
-            <span style={{ fontFamily: 'Archivo Black, sans-serif', fontSize: 56, color: '#FFFFFF', lineHeight: 1, paddingBottom: 6 }}>J</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoUrl}
+              alt="Little Joe"
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              crossOrigin="anonymous"
+            />
           </div>
           <div>
-            <div style={{ fontFamily: 'Archivo Black, sans-serif', fontSize: 56, color: INK, lineHeight: 1, letterSpacing: -1 }}>
+            <div style={{ fontFamily: 'Archivo Black, sans-serif', fontSize: 64, color: INK, lineHeight: 1, letterSpacing: -1.5 }}>
               LITTLE JOE
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: INK, letterSpacing: 2, marginTop: 6, opacity: 0.7 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: INK, letterSpacing: 2, marginTop: 8, opacity: 0.7 }}>
               HECHO EN ITALIA · PERÚ
             </div>
           </div>
@@ -320,19 +333,34 @@ export function GrillaLittleJoe({
           )}
         </section>
 
-        {/* FOOTER — claim oficial */}
-        <footer style={{ marginTop: 30, paddingTop: 24, borderTop: `2px solid ${INK}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{
-            fontFamily: 'Archivo Black, sans-serif',
-            fontSize: 22,
-            color: INK,
-            letterSpacing: 1,
-            textTransform: 'uppercase',
-          }}>
-            Pon una sonrisa <span style={{ color: CORAL, fontStyle: 'italic' }}>en el aire</span>
+        {/* FOOTER — estilo Manrique: logo Distinto + web agenciadistinto.com */}
+        <footer style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 14,
+              fontSize: 22,
+              fontWeight: 700,
+              color: INK,
+              letterSpacing: 4,
+              textTransform: 'uppercase',
+            }}
+          >
+            <svg viewBox="0 0 200 110" style={{ width: 'auto', height: 38 }}>
+              <defs>
+                <mask id="distintoBiteLittleJoe">
+                  <rect width="200" height="110" fill="white" />
+                  <circle cx="168" cy="92" r="20" fill="black" />
+                </mask>
+              </defs>
+              <circle cx="135" cy="58" r="46" fill="#C5A82D" mask="url(#distintoBiteLittleJoe)" />
+              <circle cx="60" cy="55" r="50" fill="#8B2DC9" />
+            </svg>
+            <span>DISTINTO · AGENCIA</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, letterSpacing: 2 }}>
-            DISTINTO · AGENCIA
+          <div style={{ fontSize: 18, fontWeight: 300, color: INK, marginTop: 6, letterSpacing: 0.8, opacity: 0.85 }}>
+            www.agenciadistinto.com
           </div>
         </footer>
       </div>
