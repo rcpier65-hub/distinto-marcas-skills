@@ -7,6 +7,36 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import type { EstadoPublicacion } from '@/lib/types/database'
+
+/**
+ * Cambia el estado de una publicación (workflow). Optimizado para Kanban drag-and-drop.
+ * Devuelve Result en vez de throw — el cliente hace optimistic update y rollback si falla.
+ */
+export async function cambiarEstadoPublicacion(
+  id: string,
+  nuevoEstado: EstadoPublicacion,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { error } = await service
+    .from('publicaciones')
+    .update({ estado: nuevoEstado, updated_by: user.id })
+    .eq('id', id)
+
+  if (error) {
+    console.error('[cambiarEstadoPublicacion] error:', error)
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/publicaciones/kanban')
+  revalidatePath('/publicaciones')
+  revalidatePath('/publicaciones/calendario')
+  revalidatePath(`/publicaciones/${id}`)
+  return { ok: true }
+}
 
 type CreatePublicacionInput = {
   marca_id: string

@@ -109,6 +109,12 @@ export default async function PublicacionesPage({
             📅 Calendario
           </Link>
           <Link
+            href={`/publicaciones/kanban${sp.marca ? `?marca=${sp.marca}` : ''}`}
+            className="h-9 px-3 rounded-md border text-sm hover:bg-muted flex items-center gap-1"
+          >
+            📋 Kanban
+          </Link>
+          <Link
             href={`/publicaciones/nueva${sp.marca ? `?marca=${sp.marca}` : ''}`}
             className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1"
           >
