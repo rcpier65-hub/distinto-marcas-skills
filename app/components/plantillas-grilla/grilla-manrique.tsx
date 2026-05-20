@@ -1,10 +1,6 @@
 // app/components/plantillas-grilla/grilla-manrique.tsx
-// Plantilla "¿Qué se viene?" Manrique como componente React.
-// Replica exactamente el HTML original de plugins/distinto-marcas/skills/marca-2-manrique/
-// Renderiza con datos reales de publicaciones (semana actual).
-//
-// El componente está pensado para ser renderizado dentro de un <div ref={...}>
-// que luego se pasa a html2canvas para generar el PNG.
+// Plantilla "¿Qué se viene?" Manrique — versión refinada (18-24 may pattern)
+// Réplica fiel del PNG tmp-demo/manrique-grilla-18-24-may-2026.png
 'use client'
 
 import type { GrillaPublicacionLite } from './types'
@@ -13,10 +9,23 @@ const NAVY = '#283B6F'
 const RASPBERRY = '#D9536C'
 const SKY = '#9AC2E8'
 const CANVAS = '#FBF6F2'
-const CARD_WHITE = '#FFFFFF'
-const CARD_ROSE = '#F4C9D2'
-const ACC_SKY = '#9AC2E8'
-const ACC_ROSE = '#D9536C'
+
+// 4 variantes de color de card (cíclico)
+const CARD_BG = {
+  blue: '#E5EEF8',
+  rose: '#F4C9D2',
+  cream: '#FBF1DC',
+  white: '#FFFFFF',
+} as const
+
+const CARD_ACC = {
+  blue: '#6FAEDB',
+  rose: '#D9536C',
+  cream: '#D4A93E',
+  white: '#9AC2E8',
+} as const
+
+const CARD_VARIANTS: Array<keyof typeof CARD_BG> = ['blue', 'rose', 'cream', 'white']
 
 const DIAS_SHORT_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MESES_UP = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
@@ -24,56 +33,43 @@ const MESES_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'juli
 const DIAS_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
 type Props = {
-  semanaInicio: string  // YYYY-MM-DD
+  semanaInicio: string
   semanaFin: string
   publicaciones: GrillaPublicacionLite[]
-  logoUrl?: string  // default: /marcas/manrique/logo.png
+  logoUrl?: string
+  horaDefault?: string  // ej "6:30 pm"
 }
 
-// Color rotation por card (alternancia visual)
-const CARD_VARIANTS = ['white', 'rose', 'white', 'rose'] as const
+// Inferir icono según keywords del título (más expresivo que solo por tipo)
+type IconKey = 'video' | 'heart' | 'price' | 'question' | 'message' | 'image'
 
-function pickIconForTipo(tipo: string[]): 'video' | 'message' | 'image' {
-  const t = tipo.join(' ').toLowerCase()
+function inferIconFromTitle(titulo: string, tipos: string[]): IconKey {
+  const lower = titulo.toLowerCase()
+  // Por título keywords
+  if (/famil|amor|cariñ|abrazo|afecto|amig/.test(lower)) return 'heart'
+  if (/cuánto|cuesta|precio|paquete|costo|valor/.test(lower)) return 'price'
+  if (/pregunta|cómo|qué|cuál|por qué|\?/.test(lower)) return 'question'
+  if (/testimon|experiencia|historia|frase|reseña/.test(lower)) return 'message'
+  // Por tipo
+  const t = tipos.join(' ').toLowerCase()
   if (t.includes('reel') || t.includes('video') || t.includes('tiktok')) return 'video'
-  if (t.includes('story') || t.includes('testimon')) return 'message'
-  return 'image'
+  if (t.includes('story')) return 'message'
+  return 'video'
 }
 
-export function GrillaManrique({ semanaInicio, semanaFin, publicaciones, logoUrl = '/marcas/manrique/logo.png' }: Props) {
-  // Calcular días del rango
+export function GrillaManrique({
+  semanaInicio, semanaFin, publicaciones,
+  logoUrl = '/marcas/manrique/logo.png',
+  horaDefault = '6:30 pm',
+}: Props) {
+  // Solo publicaciones con fecha (filtramos días vacíos)
+  const pubsConFecha = publicaciones.filter((p) => p.fecha).sort((a, b) => a.fecha.localeCompare(b.fecha))
+
   const d1 = new Date(semanaInicio + 'T12:00:00Z')
   const d2 = new Date(semanaFin + 'T12:00:00Z')
-  const numDias = Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)) + 1
-
-  // Indexar publicaciones por fecha (YYYY-MM-DD)
-  const pubsByFecha = new Map<string, GrillaPublicacionLite[]>()
-  for (const p of publicaciones) {
-    const arr = pubsByFecha.get(p.fecha) ?? []
-    arr.push(p)
-    pubsByFecha.set(p.fecha, arr)
-  }
-
-  // Date pill: "18 — 24 MAY · 2026"
   const datePill = `${d1.getUTCDate()} — ${d2.getUTCDate()} ${MESES_UP[d1.getUTCMonth()]} · ${d1.getUTCFullYear()}`
-  // Subheader: "Mayo · Del lunes 18 al domingo 24"
   const mesName = MESES_LONG[d1.getUTCMonth()]
   const subHeader = `${mesName.charAt(0).toUpperCase() + mesName.slice(1)} · Del ${DIAS_LONG[d1.getUTCDay()]} ${d1.getUTCDate()} al ${DIAS_LONG[d2.getUTCDay()]} ${d2.getUTCDate()}`
-
-  // Build cards (una por día)
-  const cards: Array<{ dia: number; diaShort: string; pubs: GrillaPublicacionLite[] }> = []
-  let colorIdx = 0
-  for (let i = 0; i < numDias; i++) {
-    const d = new Date(d1)
-    d.setUTCDate(d1.getUTCDate() + i)
-    const iso = d.toISOString().slice(0, 10)
-    const pubs = pubsByFecha.get(iso) ?? []
-    cards.push({
-      dia: d.getUTCDate(),
-      diaShort: DIAS_SHORT_ES[d.getUTCDay()],
-      pubs,
-    })
-  }
 
   return (
     <div
@@ -93,10 +89,9 @@ export function GrillaManrique({ semanaInicio, semanaFin, publicaciones, logoUrl
         textRendering: 'optimizeLegibility',
       }}
     >
-      {/* Google Fonts inline */}
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,500;1,600&family=Poppins:wght@300;400;500;600;700;800&display=swap" />
 
-      {/* Blobs decorativos */}
+      {/* Blobs decorativos raspberry */}
       <div
         style={{
           position: 'absolute',
@@ -133,21 +128,15 @@ export function GrillaManrique({ semanaInicio, semanaFin, publicaciones, logoUrl
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={logoUrl}
-          alt="Centro Psicológico Manrique ABA"
-          style={{
-            width: 200,
-            height: 200,
-            flexShrink: 0,
-            objectFit: 'contain',
-            margin: '-30px -20px -30px -30px',
-          }}
+          alt="Manrique"
+          style={{ width: 160, height: 160, flexShrink: 0, objectFit: 'contain', margin: '-20px -10px -20px -20px' }}
           crossOrigin="anonymous"
         />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 26, fontWeight: 400, letterSpacing: 1, color: NAVY, lineHeight: 1, marginBottom: 4 }}>
+          <div style={{ fontSize: 22, fontWeight: 400, letterSpacing: 1, color: NAVY, lineHeight: 1, marginBottom: 4 }}>
             CENTRO PSICOLÓGICO
           </div>
-          <div style={{ fontSize: 58, fontWeight: 800, letterSpacing: 1, color: NAVY, lineHeight: 1 }}>
+          <div style={{ fontSize: 56, fontWeight: 800, letterSpacing: 1, color: NAVY, lineHeight: 1 }}>
             MANRIQUE
           </div>
         </div>
@@ -156,9 +145,9 @@ export function GrillaManrique({ semanaInicio, semanaFin, publicaciones, logoUrl
             background: NAVY,
             color: '#FFFFFF',
             fontWeight: 600,
-            fontSize: 24,
+            fontSize: 22,
             letterSpacing: 0.8,
-            padding: '18px 30px',
+            padding: '16px 28px',
             borderRadius: 999,
             whiteSpace: 'nowrap',
             alignSelf: 'center',
@@ -195,95 +184,80 @@ export function GrillaManrique({ semanaInicio, semanaFin, publicaciones, logoUrl
         </div>
       </section>
 
-      {/* CARDS */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 10 }}>
-        {cards.map((card, idx) => {
-          const isEmpty = card.pubs.length === 0
-          // Para cards con publicación, alternar color (rotación)
-          let variant = 'empty'
-          if (!isEmpty) {
-            variant = CARD_VARIANTS[colorIdx % CARD_VARIANTS.length]
-            colorIdx++
-          }
+      {/* CARDS — solo publicaciones reales, color cíclico */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 10 }}>
+        {pubsConFecha.map((pub, idx) => {
+          const variant = CARD_VARIANTS[idx % CARD_VARIANTS.length]
+          const bg = CARD_BG[variant]
+          const acc = CARD_ACC[variant]
+          const fechaDate = new Date(pub.fecha + 'T12:00:00Z')
+          const dia = fechaDate.getUTCDate()
+          const diaShort = DIAS_SHORT_ES[fechaDate.getUTCDay()]
+          const icon = inferIconFromTitle(pub.titulo, pub.tipo_contenido)
+          const plataformasShort = pub.plataformas
+            .map((p) => p === 'Instagram' ? 'IG' : p === 'Facebook' ? 'FB' : p === 'Tiktok' ? 'TikTok' : p)
+            .join(' · ')
+          const tipoShort = pub.tipo_contenido[0]?.replace(/REEL.*/, 'Reel') ?? ''
+          const meta = [horaDefault, plataformasShort, tipoShort].filter(Boolean).join(' · ')
 
-          const cardBg = variant === 'rose' ? CARD_ROSE : CARD_WHITE
-          const acc = variant === 'rose' ? ACC_ROSE : ACC_SKY
+          return (
+            <article
+              key={pub.id}
+              style={{
+                background: bg,
+                borderRadius: 24,
+                padding: '24px 32px',
+                minHeight: 130,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 26,
+              }}
+            >
+              {/* Fecha */}
+              <div style={{ flexShrink: 0, textAlign: 'left', minWidth: 110 }}>
+                <div style={{ fontSize: 78, fontWeight: 700, color: NAVY, lineHeight: 0.9, letterSpacing: -1 }}>
+                  {dia}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: acc, letterSpacing: 2, textTransform: 'uppercase', marginTop: 4 }}>
+                  {diaShort}
+                </div>
+              </div>
 
-          if (isEmpty) {
-            return (
-              <article
-                key={idx}
-                style={{
-                  background: 'transparent',
-                  border: '2px dashed rgba(40,59,111,0.18)',
-                  borderRadius: 24,
-                  padding: '20px 36px',
-                  minHeight: 90,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 28,
-                }}
-              >
-                <div style={{ flexShrink: 0, textAlign: 'left', minWidth: 120 }}>
-                  <div style={{ fontSize: 58, fontWeight: 700, color: NAVY, lineHeight: 0.9, letterSpacing: -1, opacity: 0.35 }}>
-                    {card.dia}
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: NAVY, letterSpacing: 2, textTransform: 'uppercase', marginTop: 4, opacity: 0.35 }}>
-                    {card.diaShort}
-                  </div>
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 26, fontWeight: 500, color: NAVY, opacity: 0.5, lineHeight: 1.1 }}>
-                    Sin publicación programada
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 400, color: NAVY, opacity: 0.4 }}>
-                    — Día sin contenido en grilla —
-                  </div>
-                </div>
-              </article>
-            )
-          }
+              {/* Bar */}
+              <div style={{ width: 3, height: 90, background: acc, borderRadius: 2, opacity: 0.9, flexShrink: 0 }} />
 
-          // Card con publicación(es)
-          return card.pubs.map((pub, pubIdx) => {
-            const iconType = pickIconForTipo(pub.tipo_contenido)
-            return (
-              <article
-                key={`${idx}-${pubIdx}`}
-                style={{
-                  background: cardBg,
-                  borderRadius: 24,
-                  padding: '28px 36px',
-                  minHeight: 140,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 28,
-                }}
-              >
-                <div style={{ flexShrink: 0, textAlign: 'left', minWidth: 120 }}>
-                  <div style={{ fontSize: 82, fontWeight: 700, color: NAVY, lineHeight: 0.9, letterSpacing: -1 }}>
-                    {card.dia}
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: acc, letterSpacing: 2, textTransform: 'uppercase', marginTop: 4 }}>
-                    {card.diaShort}
-                  </div>
+              {/* Body */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: NAVY, lineHeight: 1.15, letterSpacing: -0.3 }}>
+                  {pub.titulo}
                 </div>
-                <div style={{ width: 3, height: 100, background: acc, borderRadius: 2, opacity: 0.9, flexShrink: 0 }} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700, color: NAVY, lineHeight: 1.1, letterSpacing: -0.3 }}>
-                    {pub.titulo}
-                  </div>
-                  <div style={{ fontSize: 20, fontWeight: 400, color: NAVY, opacity: 0.9, letterSpacing: 0.2 }}>
-                    {pub.plataformas.join(' · ')}{pub.tipo_contenido.length > 0 ? ' · ' + pub.tipo_contenido.join(' · ') : ''}
-                  </div>
+                <div style={{ fontSize: 19, fontWeight: 400, color: NAVY, opacity: 0.85, letterSpacing: 0.2 }}>
+                  {meta}
                 </div>
-                <div style={{ flexShrink: 0, width: 90, height: 90, color: NAVY }}>
-                  <IconSvg type={iconType} />
-                </div>
-              </article>
-            )
-          })
+              </div>
+
+              {/* Icon */}
+              <div style={{ flexShrink: 0, width: 80, height: 80, color: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <IconSvg type={icon} />
+              </div>
+            </article>
+          )
         })}
+
+        {pubsConFecha.length === 0 && (
+          <div style={{
+            background: 'transparent',
+            border: '2px dashed rgba(40,59,111,0.18)',
+            borderRadius: 24,
+            padding: 60,
+            textAlign: 'center',
+            color: NAVY,
+            opacity: 0.5,
+            fontSize: 28,
+          }}>
+            Sin publicaciones programadas esta semana
+          </div>
+        )}
       </section>
 
       {/* FOOTER */}
@@ -320,10 +294,23 @@ export function GrillaManrique({ semanaInicio, semanaFin, publicaciones, logoUrl
   )
 }
 
-function IconSvg({ type }: { type: 'video' | 'message' | 'image' }) {
+// ============================================================
+// Icons SVG — uno por tipo de tema
+// ============================================================
+function IconSvg({ type }: { type: 'video' | 'heart' | 'price' | 'question' | 'message' | 'image' }) {
+  const common = {
+    viewBox: '0 0 64 64',
+    width: '100%',
+    height: '100%',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.4,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  }
   if (type === 'video') {
     return (
-      <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <svg {...common}>
         <rect x="8" y="12" width="48" height="34" rx="3" />
         <path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none" />
         <path d="M22 52h20" />
@@ -331,15 +318,41 @@ function IconSvg({ type }: { type: 'video' | 'message' | 'image' }) {
       </svg>
     )
   }
+  if (type === 'heart') {
+    return (
+      <svg {...common}>
+        <path d="M32 54s-20-11.5-20-26a10 10 0 0120-3 10 10 0 0120 3c0 14.5-20 26-20 26z" />
+      </svg>
+    )
+  }
+  if (type === 'price') {
+    return (
+      <svg {...common}>
+        <circle cx="32" cy="32" r="22" />
+        <path d="M32 16v32" />
+        <path d="M40 24c0-3-4-4-8-4s-8 1-8 5 4 5 8 6 8 2 8 6-4 5-8 5-8-1-8-4" />
+      </svg>
+    )
+  }
+  if (type === 'question') {
+    return (
+      <svg {...common}>
+        <circle cx="32" cy="32" r="22" />
+        <path d="M24 26c0-4 4-8 8-8s8 4 8 8c0 6-8 6-8 12" />
+        <circle cx="32" cy="46" r="1.5" fill="currentColor" stroke="none" />
+      </svg>
+    )
+  }
   if (type === 'message') {
     return (
-      <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <svg {...common}>
         <path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z" />
+        <text x="32" y="36" fontFamily="Poppins, sans-serif" fontWeight="700" fontSize="14" fill="currentColor" stroke="none" textAnchor="middle">99</text>
       </svg>
     )
   }
   return (
-    <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <svg {...common}>
       <rect x="8" y="12" width="48" height="40" rx="3" />
       <circle cx="22" cy="26" r="5" />
       <path d="M8 44l14-14 10 10 10-8 14 14" />

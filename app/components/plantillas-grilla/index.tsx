@@ -4,6 +4,8 @@
 'use client'
 
 import { GrillaManrique } from './grilla-manrique'
+import { GrillaLittleJoe } from './grilla-little-joe'
+import { GrillaNovaLamps } from './grilla-novalamps'
 import { GrillaGenerica } from './grilla-generica'
 import type { GrillaPublicacionLite } from './types'
 
@@ -33,9 +35,25 @@ export function GrillaPlantilla({ marca, semanaInicio, semanaFin, publicaciones 
         />
       )
 
-    // TODO: agregar más plantillas específicas
-    // case 'lozano': return <GrillaLozano ... />
-    // case 'kintu': return <GrillaKintu ... />
+    case 'little-joe':
+      return (
+        <GrillaLittleJoe
+          semanaInicio={semanaInicio}
+          semanaFin={semanaFin}
+          publicaciones={publicaciones}
+        />
+      )
+
+    case 'novalamps':
+      return (
+        <GrillaNovaLamps
+          semanaInicio={semanaInicio}
+          semanaFin={semanaFin}
+          publicaciones={publicaciones}
+        />
+      )
+
+    // TODO: agregar más plantillas específicas (lozano, kintu, la-victoria, distribuidora-fitness)
 
     default:
       return (
