@@ -7,7 +7,8 @@ import { notFound } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { PublicacionDetailForm } from './_components/publicacion-detail-form'
-import type { PublicacionRow, EditorRow } from '@/lib/types/database'
+import { GuionTecnicoTable } from './_components/guion-tecnico-table'
+import type { PublicacionRow, EditorRow, EscenaRow } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  const [pubResult, editoresResult] = await Promise.all([
+  const [pubResult, editoresResult, escenasResult] = await Promise.all([
     service
       .from('publicaciones')
       .select(`
@@ -33,11 +34,17 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
       .select('id, nombre, activo, created_at')
       .eq('activo', true)
       .order('nombre'),
+    service
+      .from('escenas')
+      .select('*')
+      .eq('publicacion_id', id)
+      .order('escena_num', { ascending: true }),
   ])
 
   if (pubResult.error || !pubResult.data) notFound()
   const pub = pubResult.data
   const editores = (editoresResult.data ?? []) as EditorRow[]
+  const escenas = (escenasResult.data ?? []) as EscenaRow[]
 
   const marca = Array.isArray(pub.marca) ? pub.marca[0] : pub.marca
 
@@ -68,6 +75,11 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
         marca={marca}
         editores={editores}
       />
+
+      {/* GUION TÉCNICO — tabla editable de escenas */}
+      <div className="mt-6">
+        <GuionTecnicoTable publicacionId={id} initialEscenas={escenas} />
+      </div>
     </main>
   )
 }

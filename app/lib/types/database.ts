@@ -204,6 +204,36 @@ export interface EditorInsert {
 
 // --------------------------------------------------------
 
+export interface EscenaRow {
+  id: string
+  publicacion_id: string
+  escena_num: number
+  dialogo: string | null
+  plano: string | null
+  duracion_seg: number | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+}
+
+export interface EscenaInsert {
+  id?: string
+  publicacion_id: string
+  escena_num: number
+  dialogo?: string | null
+  plano?: string | null
+  duracion_seg?: number | null
+  notas?: string | null
+  created_by?: string | null
+  updated_by?: string | null
+}
+
+export type EscenaUpdate = Partial<Omit<EscenaRow, 'id' | 'publicacion_id' | 'created_at'>>
+
+// --------------------------------------------------------
+
 export interface GrillaPendienteRow {
   id: string
   marca_id: string
