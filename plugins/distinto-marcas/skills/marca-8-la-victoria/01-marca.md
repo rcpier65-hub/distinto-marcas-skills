@@ -165,3 +165,32 @@ Posicionarse como **la distribuidora de pino radiata #1 del Perú** — el refer
 - 🚫 Sensibilidades: `05-cliente.md`
 - 🎨 Brand book detalle: `assets/brand-book-extract.md`
 - 📋 Catálogos PDF originales: `assets/catalogos-pdf/`
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 8. La Victoria > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `1IenWPwFfuTqkZv4w_NaJ1fQwSls9uIwg`
+> Sub-folder: `01 - IDENTIDAD DE MARCA` (15v6e9FWEZ2FRJ4X-CpG2odHZIBymnEC6)
+
+### Logos disponibles
+
+| Asset | File ID | Status |
+|---|---|---|
+| **Logo oficial La Victoria** | `???` | ⏳ Pendiente — carpeta IDENTIDAD aún sin logos PNG directos. Posible logo embebido en `BROCHURE-LA-VICTORIA.pdf` |
+
+### Notas
+- Brochure local: `assets/catalogos-pdf/BROCHURE-LA-VICTORIA.pdf` — el logo se podría extraer de ahí
+- Logo de DEYJIM (marca hermana) también necesario para co-branding
+
+### Cómo descargarlo al sistema (cuando se complete el file ID)
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=la-victoria
+# El logo queda en app/public/marcas/la-victoria/logo.png
+```
+
+Mientras tanto la plantilla `app/lib/grilla/templates/la-victoria.html`
+usa el placeholder SVG en `app/public/marcas/la-victoria/logo.svg`.

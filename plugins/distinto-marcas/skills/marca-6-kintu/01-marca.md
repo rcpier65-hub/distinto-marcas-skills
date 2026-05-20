@@ -159,3 +159,28 @@ Posicionarse como **la marca peruana #1 de aceites esenciales conscientes** — 
 - ✍️ Pilares y estilo de copy: `04-contenido.md`
 - 🚫 Lista de palabras vetadas / sensibilidades: `05-cliente.md`
 - 🎨 Brand book detalle: `assets/brand-book-extract.md`
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 6. Kintu > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `14xhorhp6fp5lJ7bB_XWKjvTI4-D4cvKv`
+> Sub-folders: `KINTU` (1zw5DymRDI8KMc6iZ0OjP8D9RP51ODKn5) · `KIT DE MARCA 2026` (1OJnlemdNp9JUOOts8xWf1LPn-NYmDKuy) · `BRANDING` (1JwIFxYv91i0hrwiJV-pdFWCMp1Txu2cW) · `MARCA` (1xkZTX8cCia7C99CJ__ozgtGFTJRb-jpX)
+
+### Logos disponibles
+
+| Asset | File ID | Status |
+|---|---|---|
+| **Logo oficial Kintu** | `???` | ⏳ Pendiente confirmar file ID — buscar en BRANDING o KIT DE MARCA 2026 |
+
+### Cómo descargarlo al sistema (cuando se complete el file ID)
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=kintu
+# El logo queda en app/public/marcas/kintu/logo.png
+```
+
+Mientras tanto la plantilla `app/lib/grilla/templates/kintu.html`
+usa el placeholder SVG en `app/public/marcas/kintu/logo.svg`.

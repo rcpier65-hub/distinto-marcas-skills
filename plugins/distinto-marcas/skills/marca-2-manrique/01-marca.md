@@ -170,3 +170,27 @@ Fundado el **15 de mayo de 2023** por Daniel Manrique (psicólogo) en Lince, Lim
 - 📄 Documento de voz: `assets/voz-extracto.md`
 - 🎨 Logos PNG/JPG (30 archivos): `assets/logos/`
 - 🎯 Cómo diferenciarse: `08-competencia.md`
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 2. Centro Psicológico Manrique ABA > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `1penkWthHbPHMraU7Zu6wug6aEEMWoKNc`
+
+### Logos disponibles
+
+| Asset | File ID | Tamaño | Notas |
+|---|---|---|---|
+| **logo-manrique.png** | `1QnCURrdr9wwNmbkSSFZ0Y_DlPb92r2Tz` | 153 KB | ✅ Versión principal PNG — usada en plantilla grilla |
+| manrique_logo.svg | `1PZsN-xJnmVVMfKFo8CqH7dpZqth3jr1H` | 8 KB | Vector escalable |
+
+### Cómo descargarlo al sistema
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=manrique
+# El logo queda en app/public/marcas/manrique/logo.png
+```
+
+La plantilla `app/lib/grilla/templates/manrique.html` lo carga automáticamente al generar la grilla.

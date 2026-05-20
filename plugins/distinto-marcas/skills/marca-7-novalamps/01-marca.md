@@ -149,3 +149,29 @@ Posicionarse como **la primera opción nacional** en iluminación de calidad y g
 - ✍️ Pilares y estilo de copy: `04-contenido.md`
 - 🚫 Lista de palabras vetadas / sensibilidades: `05-cliente.md`
 - 🎨 Brand book detalle: `assets/brand-book-extract.md`
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 7. NovaLamps > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `15BY95V0wC-PcAl5Ko5bcO7DTJvz_Jit9`
+> Sub-folder LOGO: `14oOLMVyhTlFJWVpQAzuGIKYaiKiYSFia`
+
+### Logos disponibles
+
+| Asset | File ID | Tamaño | Notas |
+|---|---|---|---|
+| **logo-novalamps-negro-verde.png** | `1F-tGrsUowAb1EQpUq-jlrBFwU2kwAb-n` | 11 KB | ✅ Versión negro+verde lima — usada en plantilla grilla (fondo oscuro) |
+| logo-novalamps-blanco-verde.png | `1FZS25abGjRBy8QDBv4M5KraxroHB0nr5` | 11 KB | Variante para fondos claros |
+| LOGOS MARCAS NOVALAMPS (folder) | `1VpSOOSEOFedkC7swdpBheq3pMXQRzCgs` | — | Logos co-branding con marcas que distribuyen |
+
+### Cómo descargarlo al sistema
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=novalamps
+# El logo queda en app/public/marcas/novalamps/logo.png
+```
+
+La plantilla `app/lib/grilla/templates/novalamps.html` lo carga automáticamente.

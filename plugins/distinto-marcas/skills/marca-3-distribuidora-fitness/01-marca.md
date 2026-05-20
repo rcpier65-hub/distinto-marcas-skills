@@ -170,3 +170,28 @@ Distribuidora peruana de suplementos deportivos. Web propia (distribuidorafitnes
   - Instagram: https://www.instagram.com/distribuidorafitness.pe/
   - Carpeta serie "El que no muestra, no vende" en Drive
   - Carpeta serie "POV Tu ex viene a comprar" en Drive
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 3. Distribuidora Fitness Marketing > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `1Nqk6ozerCHUweOQqFKe8bHFb9fe_4bwn`
+> Sub-folders identificadas: `MARCA` (1Rpz074WeJZWWG9VA0c4m_loh9poCAgVP) · `KIT DE MARCA 2025` · `KIT DE MARCA 2026`
+
+### Logos disponibles
+
+| Asset | File ID | Status |
+|---|---|---|
+| **Logo oficial DF** | `???` | ⏳ Pendiente confirmar file ID exacto del logo principal — buscar en KIT DE MARCA 2026 o MARCA subfolder |
+
+### Cómo descargarlo al sistema (cuando se complete el file ID)
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=distribuidora-fitness
+# El logo queda en app/public/marcas/distribuidora-fitness/logo.png
+```
+
+Mientras tanto la plantilla `app/lib/grilla/templates/distribuidora-fitness.html`
+usa el placeholder SVG en `app/public/marcas/distribuidora-fitness/logo.svg`.

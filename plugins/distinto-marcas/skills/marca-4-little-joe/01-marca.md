@@ -117,3 +117,32 @@ Posicionar a Little Joe como **el aromatizante premium #1 de Perú**, asociado a
 - ✍️ Pilares y estilo de copy: `04-contenido.md`
 - 🚫 Lista de palabras vetadas / sensibilidades: `05-cliente.md`
 - 🎨 Brand book detalle: `assets/brand-book-extract.md`
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 4. Little Joe > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `1Noc-_cfl9XVGm8LCW99xSpVxsjRypT0d`
+> Sub-folders: `KIT DE MARCA 2025` (1XjG27JLmr8SYAW3Iku6ojJTYwwHC2WSL) · `KIT DE MARCA 2026` (1z7jFY85G9hWCFsp3-nA6KKtuzs7xddE-)
+
+### Logos disponibles
+
+| Asset | File ID | Status |
+|---|---|---|
+| **Logo oficial Little Joe** | `???` | ⏳ Pendiente confirmar file ID — marca italiana, logo en KIT DE MARCA 2026 |
+
+### Notas
+- Drive global de la matriz: `marketing.drive-int.ch` (auth con jsanchez@aresenterpriseperu.com)
+- Logo blanco PNG está embebido como icono en página Notion del proyecto
+
+### Cómo descargarlo al sistema (cuando se complete el file ID)
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=little-joe
+# El logo queda en app/public/marcas/little-joe/logo.png
+```
+
+Mientras tanto la plantilla `app/lib/grilla/templates/little-joe.html`
+usa el placeholder SVG en `app/public/marcas/little-joe/logo.svg`.

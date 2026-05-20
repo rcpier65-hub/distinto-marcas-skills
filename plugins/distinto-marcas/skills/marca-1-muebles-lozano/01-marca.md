@@ -182,3 +182,29 @@ Empresa peruana con sede en **Villa María del Triunfo, Lima**. Fundada por la f
 - 🎨 Logos: `assets/logos/`
 - 🎯 Cómo diferenciarse: `08-competencia.md`
 - 📱 Inspiración tono: feed real https://www.instagram.com/muebleslozanosac/
+
+---
+
+## 📦 Assets Drive — Logos y identidad visual
+
+> Carpeta principal en Drive: `1. GESTIÓN > CUENTAS > 1. Muebles Lozano > 01 - IDENTIDAD DE MARCA/`
+> Drive folder ID: `1TTrX8bKz63QhYNFstVUB_nTmmf6Xw4om`
+> Sub-folder LOGO: `1VCI1xvtplzHbrRcTN-btBRYSMtLzo7f3`
+
+### Logos disponibles
+
+| Asset | File ID | Tamaño | Notas |
+|---|---|---|---|
+| **logo-lozano.png** | `1JcGAEzTRvvphkoa_kHnVrfMHBHmPr0VE` | 120 KB | ✅ Logo completo con wordmark — usado en plantilla grilla |
+| LOGO ML EDITABLE.ai | `1u6VKxQpRceSa3zvFDjzN9MO20GnLyrGi` | 283 KB | Vector Illustrator editable |
+| KIT DE MARCA 2025 (folder) | `1RNuwc7pS1nypidTRdDLXE5TFAVIysuXY` | — | 12+ variantes en LOGO/ |
+
+### Cómo descargarlo al sistema
+
+```bash
+cd app
+node scripts/download-marca-logos.mjs --only=lozano
+# El logo queda en app/public/marcas/lozano/logo.png
+```
+
+La plantilla `app/lib/grilla/templates/lozano.html` lo carga automáticamente.

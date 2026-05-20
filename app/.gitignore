@@ -45,3 +45,7 @@ next-env.d.ts
 /scripts/debug-check.mjs
 /scripts/debug-prep.mjs
 /scripts/reset.mjs
+
+# Drive API auth (NUNCA committear)
+/scripts/credentials.json
+/scripts/token.json
