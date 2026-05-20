@@ -5,17 +5,22 @@
 <title>{{TITLE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,500;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --primary:   #1B4332;  /* Verde bosque oscuro (asumido) */
-    --deep:      #0F2C20;
-    --canvas:    #F5EDD8;  /* Crema madera natural */
-    --cream:     #EFE2C2;  /* Crema más saturada */
-    --white:     #FFFFFF;
-    --wood:      #8B6F47;  /* Marrón madera */
-    --card-cream: #FDF6E3;
+    --primary:    #1B4332;  /* Verde bosque oscuro */
+    --primary-deep: #0F2E22;
+    --primary-light: #2D5A40;
+    --wood-dark:  #5C4A2E;  /* Marrón madera oscuro */
+    --wood:       #8B6F47;
+    --wood-light: #C9A87A;
+    --canvas:     #F5EDD8;  /* Crema madera */
+    --canvas-deep: #EBE0C2;
+    --cream:      #FFFCEB;
+    --white:      #FFFFFF;
+    --card-cream: #FFFAE8;
     --card-wood:  #E8D4B0;
+    --card-deep:  #1B4332;
     --serif:    'Playfair Display', Georgia, serif;
     --sans:     'Inter', system-ui, -apple-system, sans-serif;
   }
@@ -26,107 +31,183 @@
   .poster { width: 1080px; height: 1620px; background: var(--canvas); position: relative;
     overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column; }
 
-  /* Decoración: bloques rectangulares (vetas de madera apilada) */
+  /* Pattern de vetas de madera (líneas horizontales sutiles) */
+  .wood-grain { position: absolute; inset: 0; pointer-events: none; opacity: .12;
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0, transparent 30px, var(--wood) 30px, var(--wood) 31px,
+                                transparent 31px, transparent 80px, var(--wood-dark) 80px, var(--wood-dark) 81px); }
+
+  /* Bloques verdes corporativos */
   .deco { position: absolute; pointer-events: none; }
-  .deco.tr { top: 0; right: 0; width: 320px; height: 320px;
-    background: var(--primary); opacity: .08; transform: rotate(0deg); }
-  .deco.lines { position: absolute; top: 30px; right: 30px; display: flex; flex-direction: column; gap: 6px;
-    opacity: .15; }
-  .deco.lines span { display: block; width: 60px; height: 2px; background: var(--primary); }
-  .deco.bl { bottom: -60px; left: -40px; width: 280px; height: 140px;
-    background: var(--wood); opacity: .12; }
+  .deco.green-tr { top: 0; right: 0; width: 220px; height: 220px;
+    background: var(--primary); opacity: 1; }
+  .deco.green-tr-stripe { top: 0; right: 220px; width: 8px; height: 220px;
+    background: var(--wood); opacity: 1; }
+  .deco.cir-frame { position: absolute; top: 60px; right: 30px; width: 160px; height: 160px;
+    border: 2px solid var(--canvas); border-radius: 50%; opacity: .25; }
+  .deco.green-bl { bottom: 0; left: 0; width: 380px; height: 80px;
+    background: var(--primary); opacity: .15; }
+  .deco.wood-block { position: absolute; bottom: 80px; right: 50px; width: 180px; height: 100px;
+    background: var(--wood); opacity: .15; }
+  .deco.tree-ring { position: absolute; bottom: 50px; left: 80px; width: 140px; height: 140px;
+    border: 2px solid var(--wood); border-radius: 50%; opacity: .2; }
+  .deco.tree-ring-2 { position: absolute; bottom: 70px; left: 100px; width: 100px; height: 100px;
+    border: 2px solid var(--wood); border-radius: 50%; opacity: .25; }
+  .deco.tree-ring-3 { position: absolute; bottom: 90px; left: 120px; width: 60px; height: 60px;
+    border: 2px solid var(--wood); border-radius: 50%; opacity: .3; }
 
-  .header { display: flex; align-items: center; gap: 24px; margin-bottom: 10px;
-    position: relative; z-index: 1; }
+  /* HEADER */
+  .header { display: flex; align-items: center; gap: 26px; margin-bottom: 18px;
+    position: relative; z-index: 2; }
   .logo { width: 170px; height: 170px; flex-shrink: 0; object-fit: contain;
-    margin: -15px -10px -15px -15px; }
+    background: var(--white); border-radius: 4px; padding: 14px;
+    box-shadow: 0 6px 16px rgba(27,67,50,.15); }
   .brand-name { flex: 1; }
-  .brand-name .small { font-size: 20px; font-weight: 500; letter-spacing: 8px;
-    color: var(--primary); line-height: 1; margin-bottom: 10px; text-transform: uppercase; }
-  .brand-name .big { font-family: var(--serif); font-size: 70px; font-weight: 700;
-    letter-spacing: -1px; color: var(--primary); line-height: .95; font-style: italic; }
+  .brand-name .small { font-family: var(--sans); font-size: 13px; font-weight: 600;
+    letter-spacing: 10px; color: var(--wood-dark); line-height: 1; margin-bottom: 12px;
+    text-transform: uppercase; }
+  .brand-name .big { font-family: var(--serif); font-style: italic; font-weight: 700;
+    font-size: 72px; letter-spacing: -2px; color: var(--primary); line-height: .95; }
+  .brand-name .tag { font-family: var(--sans); font-size: 14px; font-weight: 500;
+    color: var(--primary); letter-spacing: 4px; text-transform: uppercase;
+    margin-top: 8px; opacity: .7; }
   .date-pill { background: var(--primary); color: var(--canvas); font-weight: 700;
-    font-size: 22px; letter-spacing: 1.5px; padding: 14px 26px; border-radius: 4px;
-    white-space: nowrap; align-self: center; text-transform: uppercase; }
+    font-size: 18px; letter-spacing: 2px; padding: 14px 24px;
+    white-space: nowrap; align-self: flex-start; text-transform: uppercase;
+    font-family: var(--sans); border-radius: 2px;
+    box-shadow: 4px 4px 0 var(--wood); }
 
-  .hero { text-align: center; margin: 60px 0 50px; position: relative; z-index: 1; }
-  .hero h1 { font-family: var(--serif); font-style: italic; font-weight: 600;
-    font-size: 148px; color: var(--primary); line-height: .92; letter-spacing: -2px; }
-  .hero h1 .accent { color: var(--wood); }
-  .hero .sub { font-size: 20px; font-weight: 500; color: var(--primary);
-    margin-top: 22px; letter-spacing: 5px; text-transform: uppercase; opacity: .8; }
+  /* Sello bosques reforestados */
+  .badge-forest { position: absolute; top: 310px; left: 60px; z-index: 2;
+    width: 150px; height: 150px; background: var(--primary); border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: var(--canvas); transform: rotate(-10deg);
+    box-shadow: 0 12px 24px rgba(27,67,50,.3);
+    border: 3px dashed var(--canvas); }
+  .badge-forest .tree { font-size: 28px; line-height: 1; }
+  .badge-forest .text { font-family: var(--serif); font-style: italic; font-weight: 700;
+    font-size: 16px; color: var(--canvas); line-height: 1.1; margin-top: 2px; }
+  .badge-forest .sub { font-family: var(--sans); font-size: 9px; font-weight: 700;
+    color: var(--canvas); letter-spacing: 2px; margin-top: 4px;
+    text-transform: uppercase; opacity: .85; }
+
+  /* HERO */
+  .hero { text-align: center; margin: 80px 0 50px; position: relative; z-index: 2; }
+  .hero h1 { font-family: var(--serif); font-style: italic; font-weight: 700;
+    font-size: 156px; color: var(--primary); line-height: .9; letter-spacing: -3px; }
+  .hero h1 .accent { color: var(--wood-dark); }
+  .hero .sub { font-family: var(--sans); font-size: 16px; font-weight: 500;
+    color: var(--primary); margin-top: 22px; letter-spacing: 6px;
+    text-transform: uppercase; opacity: .8; }
+  .hero .tagline { font-family: var(--serif); font-style: italic; font-size: 22px;
+    color: var(--wood-dark); margin-top: 8px; }
   .divider { display: flex; align-items: center; justify-content: center;
-    gap: 16px; margin-top: 22px; }
-  .divider .line { width: 240px; height: 2px; background: var(--wood); }
-  .divider .dot  { width: 8px; height: 8px; background: var(--wood); transform: rotate(45deg); }
+    gap: 14px; margin-top: 22px; }
+  .divider .line { width: 200px; height: 1px; background: var(--wood-dark); }
+  .divider .dia { width: 10px; height: 10px; background: var(--wood-dark);
+    transform: rotate(45deg); }
 
-  .cards { display: flex; flex-direction: column; gap: 20px; margin-top: 10px;
-    position: relative; z-index: 1; }
+  /* CARDS */
+  .cards { display: flex; flex-direction: column; gap: 16px; margin-top: 6px;
+    position: relative; z-index: 2; }
   .card { background: var(--card-bg, var(--card-cream)); border-radius: 2px;
-    padding: 26px 36px; display: flex; align-items: center; gap: 28px;
-    min-height: 140px; position: relative;
-    border-left: 6px solid var(--acc, var(--primary)); }
-  .card .date { flex-shrink: 0; text-align: left; min-width: 120px; }
-  .card .date .day { font-family: var(--serif); font-size: 86px; font-weight: 700;
-    color: var(--primary); line-height: .9; letter-spacing: -1px; font-style: italic; }
-  .card .date .month { font-size: 20px; font-weight: 600;
-    color: var(--acc, var(--primary)); letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
-  .card .bar { display: none; }
+    padding: 24px 32px; display: flex; align-items: center; gap: 26px;
+    min-height: 132px; position: relative;
+    border-left: 6px solid var(--acc, var(--primary));
+    box-shadow: 0 4px 12px rgba(27,67,50,.08); }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--acc, var(--primary)) 50%, transparent 100%);
+    opacity: .3; }
+  .card::after { content: ''; position: absolute; top: 14px; right: 18px;
+    width: 32px; height: 1px; background: var(--acc, var(--primary)); opacity: .4; }
+  .card .date { flex-shrink: 0; text-align: left; min-width: 110px;
+    border-right: 1px solid rgba(27,67,50,.15); padding-right: 22px; }
+  .card .date .day { font-family: var(--serif); font-style: italic; font-size: 84px;
+    font-weight: 700; color: var(--primary); line-height: .9; letter-spacing: -1px; }
+  .card .date .month { font-family: var(--sans); font-size: 12px; font-weight: 700;
+    color: var(--acc, var(--wood-dark)); letter-spacing: 5px;
+    text-transform: uppercase; margin-top: 4px; }
   .card .body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .card .body .title { font-size: 30px; font-weight: 700; color: var(--primary);
-    line-height: 1.15; letter-spacing: -.3px; }
-  .card .body .meta { font-size: 16px; font-weight: 500; color: var(--primary);
-    letter-spacing: 3px; opacity: .75; text-transform: uppercase; }
-  .card .icon { flex-shrink: 0; width: 76px; height: 76px; color: var(--primary); }
+  .card .body .title { font-family: var(--serif); font-weight: 700; font-size: 28px;
+    color: var(--primary); line-height: 1.15; letter-spacing: -.3px; }
+  .card .body .meta { font-family: var(--sans); font-size: 11px; font-weight: 700;
+    color: var(--primary); letter-spacing: 4px; opacity: .65; text-transform: uppercase; }
+  .card .icon { flex-shrink: 0; width: 64px; height: 64px; color: var(--primary);
+    background: var(--canvas-deep); border-radius: 2px; padding: 14px;
+    border: 1px solid var(--wood);
+    display: flex; align-items: center; justify-content: center; }
   .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
-    stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  .card.empty { background: transparent; border: 2px dashed rgba(27,67,50,.15);
-    border-left: 6px dashed rgba(27,67,50,.15);
-    min-height: 80px; padding: 18px 36px; }
-  .card.empty .body .title { font-size: 22px; opacity: .4; }
-  .card.empty .body .meta { font-size: 14px; opacity: .3; }
-  .card.empty .date .day { font-size: 52px; opacity: .3; }
+  .card.empty { background: transparent; border: 1.5px dashed rgba(27,67,50,.15);
+    border-left: 6px dashed rgba(27,67,50,.15); min-height: 72px; padding: 12px 32px;
+    box-shadow: none; }
+  .card.empty::before, .card.empty::after { display: none; }
+  .card.empty .body .title { font-family: var(--sans); font-style: normal;
+    font-size: 16px; font-weight: 500; opacity: .35; }
+  .card.empty .body .meta { display: none; }
+  .card.empty .date { border: none; }
+  .card.empty .date .day { font-size: 48px; opacity: .3; }
   .card.empty .date .month { opacity: .3; }
-  .card.empty .icon { opacity: .25; width: 44px; height: 44px; }
+  .card.empty .icon { opacity: .2; background: transparent; border: none; padding: 0; }
 
   .card.is-cream { --card-bg: var(--card-cream); --acc: var(--primary); }
-  .card.is-wood  { --card-bg: var(--card-wood);  --acc: var(--wood); }
-  .card.is-deep  { --card-bg: var(--primary);    --acc: var(--wood); color: var(--canvas); }
-  .card.is-deep .body .title, .card.is-deep .date .day { color: var(--canvas); }
-  .card.is-deep .body .meta { color: var(--canvas); }
-  .card.is-deep .icon { color: var(--canvas); }
+  .card.is-wood  { --card-bg: var(--card-wood);  --acc: var(--wood-dark); }
+  .card.is-deep  { --card-bg: var(--card-deep);  --acc: var(--wood-light); color: var(--canvas); }
+  .card.is-deep .date .day, .card.is-deep .body .title { color: var(--canvas); }
+  .card.is-deep .body .meta { color: var(--canvas); opacity: .7; }
+  .card.is-deep .date { border-right-color: rgba(255,255,255,.2); }
+  .card.is-deep .icon { background: rgba(255,255,255,.1); border-color: var(--wood-light); color: var(--canvas); }
 
-  .footer { margin-top: auto; padding-top: 24px; text-align: center;
-    position: relative; z-index: 1; border-top: 2px solid var(--wood); }
-  .footer .agency { display: inline-flex; align-items: center; gap: 14px;
-    font-size: 22px; font-weight: 700; color: var(--primary);
-    letter-spacing: 5px; text-transform: uppercase; margin-top: 18px; }
-  .footer .url { font-size: 14px; font-weight: 400; color: var(--primary);
-    margin-top: 6px; letter-spacing: 2px; opacity: .65; }
-  .footer .tagline { font-family: var(--serif); font-size: 22px; font-style: italic;
-    color: var(--wood); margin-bottom: 8px; }
+  /* FOOTER */
+  .footer { margin-top: auto; padding-top: 24px; position: relative; z-index: 2;
+    border-top: 2px solid var(--wood-dark); }
+  .footer .row { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; }
+  .footer .left { display: flex; flex-direction: column; gap: 4px; }
+  .footer .tagline { font-family: var(--serif); font-style: italic; font-weight: 700;
+    font-size: 22px; color: var(--primary); }
+  .footer .sub { font-family: var(--sans); font-size: 11px; font-weight: 600;
+    color: var(--wood-dark); letter-spacing: 3px; text-transform: uppercase; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--serif); font-weight: 700; font-size: 22px; color: var(--primary);
+    letter-spacing: 4px; text-transform: uppercase; }
+  .footer .agency .dia { width: 8px; height: 8px; background: var(--wood-dark);
+    transform: rotate(45deg); }
 </style>
 </head>
 <body>
 <div class="poster">
-  <div class="deco tr"></div>
-  <div class="deco lines"><span></span><span></span><span></span><span></span></div>
-  <div class="deco bl"></div>
+  <div class="wood-grain"></div>
+  <div class="deco green-tr"></div>
+  <div class="deco green-tr-stripe"></div>
+  <div class="deco cir-frame"></div>
+  <div class="deco green-bl"></div>
+  <div class="deco wood-block"></div>
+  <div class="deco tree-ring"></div>
+  <div class="deco tree-ring-2"></div>
+  <div class="deco tree-ring-3"></div>
 
   <header class="header">
     <img class="logo" src="{{LOGO_URL}}" alt="La Victoria" />
     <div class="brand-name">
       <div class="small">Distribuidora de Pino</div>
       <div class="big">La Victoria</div>
+      <div class="tag">Pino radiata · Importación directa · Lima Perú</div>
     </div>
     <div class="date-pill">{{DATE_PILL}}</div>
   </header>
 
+  <div class="badge-forest">
+    <div class="tree">🌲</div>
+    <div class="text">Bosques<br>reforestados</div>
+    <div class="sub">— 15+ años —</div>
+  </div>
+
   <section class="hero">
     <h1>¿Qué se <span class="accent">viene?</span></h1>
     <div class="sub">{{DATE_SUB}}</div>
-    <div class="divider"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
+    <div class="tagline">— 15 años abasteciendo la industria peruana —</div>
+    <div class="divider"><span class="line"></span><span class="dia"></span><span class="line"></span></div>
   </section>
 
   <section class="cards">
@@ -134,9 +215,13 @@
   </section>
 
   <footer class="footer">
-    <div class="tagline">15 años abasteciendo la industria peruana</div>
-    <div class="agency">DISTINTO · AGENCIA</div>
-    <div class="url">www.agenciadistinto.com</div>
+    <div class="row">
+      <div class="left">
+        <div class="tagline">Pino radiata · Secado en cámara al 15% humedad</div>
+        <div class="sub">Corporación Deyjim S.A.C · Villa El Salvador</div>
+      </div>
+      <div class="agency"><span class="dia"></span>DISTINTO · AGENCIA<span class="dia"></span></div>
+    </div>
   </footer>
 </div>
 </body>

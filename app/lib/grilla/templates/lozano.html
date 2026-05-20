@@ -5,20 +5,23 @@
 <title>{{TITLE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:ital,wght@0,500;0,700;1,500;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --primary:   #DCC32C;  /* Amarillo dorado oficial Lozano */
-    --primary-soft: #F4E180;
-    --black:     #0C0C12;  /* Negro con tendencia azulada */
-    --canvas:    #FAF8F2;  /* Crema cálido */
-    --white:     #FFFFFF;
-    --card-white: #FFFFFF;
-    --card-yellow: #FBF4D0;
-    --card-cream: #F5EFE0;
+    --primary:    #DCC32C;  /* Amarillo dorado oficial */
+    --primary-deep: #B5A026;
+    --black:      #0C0C12;
+    --warm-black: #1A1A22;
+    --canvas:     #FAF6EC;  /* Crema cálido (tono madera clara) */
+    --canvas-deep: #F4EBD0;
+    --white:      #FFFFFF;
+    --card-cream: #FFFCF0;
+    --card-yellow: #F8E790;
+    --card-dark:  #1F1F26;
     --acc-yellow: #DCC32C;
     --acc-black:  #0C0C12;
     --display:  'Bebas Neue', Impact, sans-serif;
+    --serif:    'Playfair Display', Georgia, serif;
     --sans:     'Inter', system-ui, -apple-system, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,100 +31,179 @@
   .poster { width: 1080px; height: 1620px; background: var(--canvas); position: relative;
     overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column; }
 
-  /* Decoración: bloques geométricos amarillos (mueble silhouette) */
+  /* Background pattern sutil: grid de mediciones (referencia "a medida") */
+  .grid-bg { position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(12,12,18,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(12,12,18,.04) 1px, transparent 1px);
+    background-size: 60px 60px; opacity: .8; }
+
+  /* Decoraciones: bloques geométricos estilo mueble blueprint */
   .deco { position: absolute; pointer-events: none; }
-  .deco.tr { top: -60px; right: -80px; width: 320px; height: 320px;
-    background: var(--primary); opacity: .12; transform: rotate(35deg); border-radius: 30px; }
-  .deco.bl { bottom: -100px; left: -100px; width: 260px; height: 380px;
-    background: var(--black); opacity: .06; transform: rotate(-20deg); border-radius: 20px; }
+  .deco.cube-tr { top: -40px; right: -60px; width: 300px; height: 300px;
+    background: var(--primary); opacity: .85; transform: rotate(8deg);
+    border-radius: 8px; box-shadow: 20px 20px 0 var(--black); }
+  .deco.cube-tr-inner { top: 20px; right: 30px; width: 240px; height: 240px;
+    border: 3px solid var(--black); transform: rotate(8deg); border-radius: 4px; }
+  .deco.measure { position: absolute; top: 380px; right: 60px; width: 180px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px; opacity: .35; }
+  .deco.measure .tick { width: 100%; height: 1px; background: var(--black); }
+  .deco.measure .tick.major { height: 2px; width: 40px; background: var(--black); }
+  .deco.bl-block { bottom: -120px; left: -100px; width: 380px; height: 280px;
+    background: var(--black); opacity: .04; transform: rotate(-8deg); border-radius: 12px; }
+  .deco.dot-grid { position: absolute; bottom: 200px; right: 80px; width: 120px; height: 120px;
+    background-image: radial-gradient(circle, var(--black) 1.5px, transparent 1.5px);
+    background-size: 16px 16px; opacity: .15; }
 
-  .header { display: flex; align-items: center; gap: 24px; margin-bottom: 10px;
-    position: relative; z-index: 1; }
-  .logo { width: 180px; height: 180px; flex-shrink: 0; object-fit: contain;
-    margin: -20px -10px -20px -20px; }
+  /* HEADER */
+  .header { display: flex; align-items: center; gap: 28px; margin-bottom: 14px;
+    position: relative; z-index: 2; }
+  .logo { width: 170px; height: 170px; flex-shrink: 0; object-fit: contain;
+    background: var(--white); border-radius: 8px; padding: 16px;
+    box-shadow: 0 4px 12px rgba(12,12,18,.08); }
   .brand-name { flex: 1; }
-  .brand-name .small { font-size: 24px; font-weight: 500; letter-spacing: 4px;
-    color: var(--black); line-height: 1; margin-bottom: 8px; text-transform: uppercase; }
-  .brand-name .big { font-family: var(--display); font-size: 86px; font-weight: 400;
-    letter-spacing: 2px; color: var(--black); line-height: .9; }
+  .brand-name .small { font-family: var(--sans); font-size: 18px; font-weight: 500;
+    letter-spacing: 6px; color: var(--black); line-height: 1; margin-bottom: 12px;
+    text-transform: uppercase; opacity: .7; }
+  .brand-name .big { font-family: var(--display); font-size: 78px; font-weight: 400;
+    letter-spacing: 1px; color: var(--black); line-height: .88; }
+  .brand-name .tag { font-family: var(--serif); font-style: italic; font-weight: 500;
+    font-size: 22px; color: var(--primary-deep); margin-top: 8px; letter-spacing: .3px; }
   .date-pill { background: var(--black); color: var(--primary); font-weight: 700;
-    font-size: 22px; letter-spacing: 1.5px; padding: 16px 26px; border-radius: 0;
-    white-space: nowrap; align-self: center; text-transform: uppercase;
-    font-family: var(--sans); }
+    font-size: 20px; letter-spacing: 1.5px; padding: 14px 24px;
+    white-space: nowrap; align-self: flex-start; text-transform: uppercase;
+    font-family: var(--sans); border-radius: 4px;
+    box-shadow: 4px 4px 0 var(--primary); }
 
-  .hero { text-align: center; margin: 60px 0 50px; position: relative; z-index: 1; }
+  /* SELLO experiencia */
+  .seal { position: absolute; top: 320px; left: 60px; z-index: 2;
+    width: 130px; height: 130px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--primary); border-radius: 50%; color: var(--black);
+    text-align: center; transform: rotate(-12deg);
+    box-shadow: 0 8px 20px rgba(220,195,44,.4); }
+  .seal .num { font-family: var(--display); font-size: 56px; line-height: .9; }
+  .seal .label { font-family: var(--sans); font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+  /* HERO */
+  .hero { text-align: center; margin: 70px 0 50px; position: relative; z-index: 2; }
   .hero h1 { font-family: var(--display); font-weight: 400;
-    font-size: 178px; color: var(--black); line-height: .88; letter-spacing: 2px;
+    font-size: 188px; color: var(--black); line-height: .85; letter-spacing: 3px;
     text-transform: uppercase; }
-  .hero h1 .accent { color: var(--primary); }
-  .hero .sub { font-size: 24px; font-weight: 500; color: var(--black);
-    margin-top: 18px; letter-spacing: 1px; text-transform: uppercase; }
+  .hero h1 .accent { display: inline-block; position: relative; color: var(--black); }
+  .hero h1 .accent::before { content: ''; position: absolute; bottom: 8px; left: -8px; right: -8px;
+    height: 30px; background: var(--primary); z-index: -1; transform: rotate(-1deg); }
+  .hero .sub { font-family: var(--serif); font-style: italic; font-weight: 500;
+    font-size: 24px; color: var(--black); margin-top: 22px; letter-spacing: .3px; }
   .divider { display: flex; align-items: center; justify-content: center;
     gap: 14px; margin-top: 22px; }
-  .divider .line { width: 220px; height: 4px; background: var(--primary); }
-  .divider .dot  { width: 12px; height: 12px; background: var(--primary); }
+  .divider .line { width: 100px; height: 3px; background: var(--black); }
+  .divider .diamond { width: 12px; height: 12px; background: var(--primary);
+    transform: rotate(45deg); border: 2px solid var(--black); }
 
-  .cards { display: flex; flex-direction: column; gap: 22px; margin-top: 10px;
-    position: relative; z-index: 1; }
-  .card { background: var(--card-bg, var(--card-white)); border-radius: 6px;
-    padding: 28px 36px; display: flex; align-items: center; gap: 28px;
-    min-height: 140px; position: relative;
-    border-left: 8px solid var(--acc, var(--primary)); }
-  .card .date { flex-shrink: 0; text-align: left; min-width: 120px; }
-  .card .date .day { font-family: var(--display); font-size: 90px; font-weight: 400;
+  /* CARDS */
+  .cards { display: flex; flex-direction: column; gap: 18px; margin-top: 10px;
+    position: relative; z-index: 2; }
+  .card { background: var(--card-bg, var(--card-cream)); border-radius: 4px;
+    padding: 26px 32px; display: flex; align-items: center; gap: 26px;
+    min-height: 132px; position: relative;
+    border-left: 8px solid var(--acc, var(--primary));
+    box-shadow: 0 2px 8px rgba(12,12,18,.08); }
+  .card::after { content: ''; position: absolute; top: 12px; right: 16px;
+    width: 24px; height: 24px;
+    background-image: radial-gradient(circle, var(--acc, var(--primary)) 1.5px, transparent 1.5px);
+    background-size: 6px 6px; opacity: .25; }
+  .card .date { flex-shrink: 0; text-align: left; min-width: 100px;
+    border-right: 1px solid rgba(12,12,18,.12); padding-right: 22px; }
+  .card .date .day { font-family: var(--display); font-size: 86px; font-weight: 400;
     color: var(--black); line-height: .85; letter-spacing: 1px; }
-  .card .date .month { font-size: 22px; font-weight: 700;
-    color: var(--acc, var(--primary)); letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
-  .card .bar { display: none; }
+  .card .date .month { font-family: var(--sans); font-size: 14px; font-weight: 800;
+    color: var(--acc, var(--primary-deep)); letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 2px; }
   .card .body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .card .body .title { font-size: 38px; font-weight: 700; color: var(--black);
-    line-height: 1.1; letter-spacing: -.3px; }
-  .card .body .meta { font-size: 18px; font-weight: 500; color: var(--black);
-    letter-spacing: 1px; opacity: .75; text-transform: uppercase; }
-  .card .icon { flex-shrink: 0; width: 80px; height: 80px; color: var(--black); }
+  .card .body .title { font-family: var(--serif); font-size: 30px; font-weight: 700;
+    color: var(--black); line-height: 1.15; letter-spacing: -.3px; }
+  .card .body .meta { font-family: var(--sans); font-size: 14px; font-weight: 600;
+    color: var(--black); letter-spacing: 2.5px; opacity: .65; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px; }
+  .card .body .meta .badge { display: inline-block; padding: 2px 8px;
+    background: var(--acc, var(--primary)); color: var(--black); border-radius: 2px;
+    font-size: 11px; letter-spacing: 1.5px; font-weight: 800; }
+  .card .icon { flex-shrink: 0; width: 72px; height: 72px; color: var(--black);
+    background: var(--canvas-deep); border-radius: 50%; padding: 16px;
+    display: flex; align-items: center; justify-content: center; }
   .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
-    stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   .card.empty { background: transparent; border: 2px dashed rgba(12,12,18,.15);
-    border-left: 8px dashed rgba(12,12,18,.15);
-    min-height: 90px; padding: 20px 36px; }
-  .card.empty .body .title { font-size: 26px; font-weight: 500; opacity: .5; }
-  .card.empty .body .meta { font-size: 16px; opacity: .4; }
-  .card.empty .date .day { font-size: 58px; opacity: .3; }
+    border-left: 8px dashed rgba(12,12,18,.15); min-height: 80px; padding: 16px 32px;
+    box-shadow: none; }
+  .card.empty::after { display: none; }
+  .card.empty .body .title { font-family: var(--sans); font-size: 18px; font-weight: 500;
+    opacity: .4; text-transform: none; letter-spacing: 0; }
+  .card.empty .body .meta { display: none; }
+  .card.empty .date { border: none; }
+  .card.empty .date .day { font-size: 52px; opacity: .3; }
   .card.empty .date .month { opacity: .3; }
-  .card.empty .icon { opacity: .25; width: 50px; height: 50px; }
+  .card.empty .icon { opacity: .2; width: 44px; height: 44px; background: transparent; padding: 0; }
 
-  .card.is-white  { --card-bg: var(--card-white); --acc: var(--acc-yellow); }
-  .card.is-yellow { --card-bg: var(--card-yellow); --acc: var(--acc-yellow); }
-  .card.is-cream  { --card-bg: var(--card-cream);  --acc: var(--acc-black); }
+  .card.is-cream  { --card-bg: var(--card-cream);   --acc: var(--primary-deep); }
+  .card.is-yellow { --card-bg: var(--card-yellow);  --acc: var(--black); }
+  .card.is-dark   { --card-bg: var(--card-dark);    --acc: var(--primary); color: var(--white); }
+  .card.is-dark .date .day, .card.is-dark .body .title { color: var(--canvas); }
+  .card.is-dark .body .meta { color: var(--canvas); opacity: .7; }
+  .card.is-dark .date { border-right-color: rgba(255,255,255,.2); }
+  .card.is-dark .icon { background: rgba(255,255,255,.1); color: var(--primary); }
 
-  .footer { margin-top: auto; padding-top: 24px; text-align: center;
-    position: relative; z-index: 1; border-top: 2px solid var(--primary); }
-  .footer .agency { display: inline-flex; align-items: center; gap: 14px;
-    font-family: var(--display); font-size: 28px; font-weight: 400; color: var(--black);
-    letter-spacing: 5px; text-transform: uppercase; margin-top: 18px; }
-  .footer .url { font-size: 16px; font-weight: 400; color: var(--black);
-    margin-top: 6px; letter-spacing: 1px; opacity: .7; }
+  /* FOOTER con sello */
+  .footer { margin-top: auto; padding-top: 24px; position: relative; z-index: 2;
+    border-top: 2px solid var(--black); }
+  .footer .row { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; }
+  .footer .left { display: flex; flex-direction: column; gap: 4px; }
+  .footer .tagline { font-family: var(--serif); font-style: italic; font-size: 20px;
+    color: var(--black); }
+  .footer .ruc { font-family: var(--sans); font-size: 12px; font-weight: 500;
+    color: var(--black); opacity: .55; letter-spacing: 1px; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--display); font-size: 24px; font-weight: 400; color: var(--black);
+    letter-spacing: 5px; text-transform: uppercase; }
+  .footer .agency .dot { width: 8px; height: 8px; background: var(--primary);
+    border-radius: 50%; }
 </style>
 </head>
 <body>
 <div class="poster">
-  <div class="deco tr"></div>
-  <div class="deco bl"></div>
+  <div class="grid-bg"></div>
+  <div class="deco cube-tr"></div>
+  <div class="deco cube-tr-inner"></div>
+  <div class="deco measure">
+    <span class="tick major"></span><span class="tick"></span><span class="tick"></span>
+    <span class="tick major"></span><span class="tick"></span><span class="tick"></span>
+    <span class="tick major"></span>
+  </div>
+  <div class="deco bl-block"></div>
+  <div class="deco dot-grid"></div>
 
   <header class="header">
     <img class="logo" src="{{LOGO_URL}}" alt="Muebles Lozano" />
     <div class="brand-name">
-      <div class="small">Muebles a medida · Lima</div>
+      <div class="small">Muebles a medida · Lima Perú</div>
       <div class="big">MUEBLES LOZANO</div>
+      <div class="tag">Convierte tu espacio en un lugar único</div>
     </div>
     <div class="date-pill">{{DATE_PILL}}</div>
   </header>
 
+  <div class="seal">
+    <div class="num">15+</div>
+    <div class="label">Años<br>de oficio</div>
+  </div>
+
   <section class="hero">
-    <h1>¿QUÉ SE <span class="accent">VIENE?</span></h1>
+    <h1>¿Qué se<br><span class="accent">viene?</span></h1>
     <div class="sub">{{DATE_SUB}}</div>
-    <div class="divider"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
+    <div class="divider"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
   </section>
 
   <section class="cards">
@@ -129,8 +211,13 @@
   </section>
 
   <footer class="footer">
-    <div class="agency">DISTINTO · AGENCIA</div>
-    <div class="url">www.agenciadistinto.com</div>
+    <div class="row">
+      <div class="left">
+        <div class="tagline">Diseño · Fabricación · Instalación</div>
+        <div class="ruc">RUC 20551446051 · Villa María del Triunfo</div>
+      </div>
+      <div class="agency"><span class="dot"></span>DISTINTO · AGENCIA<span class="dot"></span></div>
+    </div>
   </footer>
 </div>
 </body>

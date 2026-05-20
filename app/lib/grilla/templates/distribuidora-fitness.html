@@ -5,19 +5,21 @@
 <title>{{TITLE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;500;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --primary:   #F54922;  /* Naranja DF oficial */
-    --primary-bright: #FF6B45;
-    --black:     #1A1A1A;  /* Negro suave (no #000) */
-    --gray:      #333333;
-    --canvas:    #0F0F12;  /* Casi negro — feel gym oscuro */
-    --white:     #FFFFFF;
-    --card-dark:  #1F1F22;
-    --card-darker: #161618;
-    --acc-orange: #F54922;
+    --primary:    #F54922;  /* Naranja DF oficial */
+    --primary-hot: #FF6B45;
+    --primary-deep: #C33815;
+    --black:      #1A1A1F;
+    --canvas:     #0E0E12;  /* Casi negro gym */
+    --gray:       #2A2A30;
+    --gray-light: #3A3A42;
+    --white:      #FFFFFF;
+    --card-dark:  #1F1F25;
+    --card-darker: #15151A;
     --display:  'Bebas Neue', Impact, sans-serif;
+    --condensed: 'Oswald', sans-serif;
     --sans:     'Inter', system-ui, -apple-system, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,112 +29,173 @@
   .poster { width: 1080px; height: 1620px; background: var(--canvas); position: relative;
     overflow: hidden; padding: 70px 80px 55px; display: flex; flex-direction: column; }
 
-  /* Decoración: líneas diagonales dinámicas + gradient naranja */
-  .deco { position: absolute; pointer-events: none; }
-  .deco.glow { top: -200px; right: -150px; width: 600px; height: 600px;
-    background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
-    opacity: .25; }
-  .deco.line { position: absolute; top: 30%; right: 0; width: 400px; height: 4px;
-    background: var(--primary); transform: rotate(-12deg); opacity: .4; }
-  .deco.line2 { position: absolute; bottom: 25%; left: -100px; width: 500px; height: 3px;
-    background: var(--primary); transform: rotate(8deg); opacity: .3; }
+  /* Background pattern: barras verticales sutiles (pesas/equipamiento) */
+  .bg-pattern { position: absolute; inset: 0; pointer-events: none; opacity: .04;
+    background-image:
+      repeating-linear-gradient(90deg, var(--white) 0, var(--white) 1px, transparent 1px, transparent 100px); }
 
-  .header { display: flex; align-items: center; gap: 24px; margin-bottom: 10px;
-    position: relative; z-index: 1; }
-  .logo { width: 170px; height: 170px; flex-shrink: 0; object-fit: contain;
-    margin: -15px -10px -15px -15px; }
+  /* Decoraciones: glow naranja + líneas de motion */
+  .deco { position: absolute; pointer-events: none; }
+  .deco.glow-tr { top: -250px; right: -200px; width: 700px; height: 700px;
+    background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+    opacity: .35; }
+  .deco.glow-bl { bottom: -200px; left: -150px; width: 500px; height: 500px;
+    background: radial-gradient(circle, var(--primary) 0%, transparent 65%);
+    opacity: .18; }
+  .deco.motion-line { position: absolute; height: 4px; background: var(--primary);
+    transform: rotate(-12deg); }
+  .deco.motion-1 { top: 22%; right: -50px; width: 380px; opacity: .6; }
+  .deco.motion-2 { top: 22%; right: 360px; width: 180px; opacity: .35; height: 2px; }
+  .deco.motion-3 { bottom: 30%; left: -50px; width: 260px; opacity: .4; transform: rotate(8deg); }
+  .deco.hex-frame { position: absolute; top: 380px; right: 50px; width: 110px; height: 110px;
+    border: 3px solid var(--primary); transform: rotate(45deg); opacity: .25; }
+  .deco.hex-frame-inner { position: absolute; top: 410px; right: 80px; width: 60px; height: 60px;
+    border: 2px solid var(--primary); transform: rotate(45deg); opacity: .35; }
+
+  /* HEADER */
+  .header { display: flex; align-items: center; gap: 24px; margin-bottom: 14px;
+    position: relative; z-index: 2; }
+  .logo { width: 160px; height: 160px; flex-shrink: 0; object-fit: contain;
+    background: var(--white); border-radius: 8px; padding: 14px; }
   .brand-name { flex: 1; }
-  .brand-name .small { font-size: 22px; font-weight: 200; letter-spacing: 6px;
-    color: var(--white); line-height: 1; margin-bottom: 8px; text-transform: uppercase; opacity: .7; }
+  .brand-name .small { font-family: var(--sans); font-size: 12px; font-weight: 800;
+    letter-spacing: 6px; color: var(--primary); line-height: 1; margin-bottom: 14px;
+    text-transform: uppercase; }
   .brand-name .big { font-family: var(--display); font-size: 78px; font-weight: 400;
     letter-spacing: 1px; color: var(--white); line-height: .9; }
   .brand-name .big .accent { color: var(--primary); }
-  .date-pill { background: var(--primary); color: var(--white); font-weight: 700;
-    font-size: 22px; letter-spacing: 1.5px; padding: 16px 26px;
-    transform: skew(-8deg);
-    white-space: nowrap; align-self: center; text-transform: uppercase;
-    font-family: var(--sans); }
-  .date-pill span { display: inline-block; transform: skew(8deg); }
+  .brand-name .tag { font-family: var(--condensed); font-weight: 300; font-size: 18px;
+    color: var(--white); letter-spacing: 4px; text-transform: uppercase;
+    margin-top: 6px; opacity: .7; }
+  .date-pill { font-family: var(--display); background: var(--primary); color: var(--white);
+    font-size: 24px; letter-spacing: 2px; padding: 18px 24px 14px 24px;
+    transform: skew(-10deg); white-space: nowrap; align-self: flex-start;
+    text-transform: uppercase; box-shadow: 6px 6px 0 var(--white); }
+  .date-pill span { display: inline-block; transform: skew(10deg); }
 
-  .hero { text-align: center; margin: 60px 0 50px; position: relative; z-index: 1; }
+  /* SELLO en arriba izquierda */
+  .badge-stock { position: absolute; top: 280px; left: 70px; z-index: 2;
+    background: var(--primary); color: var(--white); padding: 14px 22px;
+    font-family: var(--display); font-size: 32px; letter-spacing: 2px;
+    transform: rotate(-6deg); box-shadow: 0 8px 16px rgba(245,73,34,.4); }
+  .badge-stock .label { display: block; font-family: var(--sans); font-size: 11px;
+    letter-spacing: 4px; margin-top: 2px; opacity: .85; }
+
+  /* HERO */
+  .hero { text-align: center; margin: 70px 0 50px; position: relative; z-index: 2; }
   .hero h1 { font-family: var(--display); font-weight: 400;
-    font-size: 188px; color: var(--white); line-height: .85; letter-spacing: 2px;
+    font-size: 200px; color: var(--white); line-height: .85; letter-spacing: 2px;
     text-transform: uppercase; }
-  .hero h1 .accent { color: var(--primary); }
-  .hero h1 .strikethrough { position: relative; display: inline-block; }
-  .hero h1 .strikethrough::after { content: ''; position: absolute; top: 50%;
-    left: -10px; right: -10px; height: 8px; background: var(--primary); transform: rotate(-3deg); }
-  .hero .sub { font-size: 24px; font-weight: 800; color: var(--primary);
-    margin-top: 22px; letter-spacing: 2px; text-transform: uppercase; }
+  .hero h1 .accent { color: var(--primary); display: inline-block; position: relative; }
+  .hero h1 .accent::after { content: ''; position: absolute; left: -6px; right: -6px;
+    bottom: 14px; height: 8px; background: var(--white); transform: skew(-12deg); opacity: .8; }
+  .hero .sub { font-family: var(--condensed); font-weight: 700; font-size: 22px;
+    color: var(--primary); margin-top: 22px; letter-spacing: 6px; text-transform: uppercase; }
+  .hero .hashtag { font-family: var(--sans); font-weight: 800; font-size: 14px;
+    color: var(--white); margin-top: 4px; letter-spacing: 4px; opacity: .5; }
   .divider { display: flex; align-items: center; justify-content: center;
     gap: 12px; margin-top: 18px; }
-  .divider .line { width: 200px; height: 3px; background: var(--white); opacity: .3; }
-  .divider .dot  { width: 14px; height: 14px; background: var(--primary); transform: rotate(45deg); }
+  .divider .line { width: 80px; height: 2px; background: var(--white); opacity: .4; }
+  .divider .bolt { color: var(--primary); font-size: 24px; transform: skew(-12deg); }
 
-  .cards { display: flex; flex-direction: column; gap: 18px; margin-top: 10px;
-    position: relative; z-index: 1; }
+  /* CARDS */
+  .cards { display: flex; flex-direction: column; gap: 16px; margin-top: 6px;
+    position: relative; z-index: 2; }
   .card { background: var(--card-bg, var(--card-dark)); border-radius: 4px;
-    padding: 26px 34px; display: flex; align-items: center; gap: 24px;
-    min-height: 130px; position: relative;
-    border-left: 6px solid var(--acc, var(--primary)); }
-  .card .date { flex-shrink: 0; text-align: left; min-width: 110px; }
-  .card .date .day { font-family: var(--display); font-size: 88px; font-weight: 400;
+    padding: 24px 32px; display: flex; align-items: center; gap: 24px;
+    min-height: 128px; position: relative;
+    border-left: 6px solid var(--acc, var(--primary));
+    box-shadow: 0 4px 16px rgba(245,73,34,.08); }
+  .card::before { content: ''; position: absolute; top: 0; right: 0; width: 4px;
+    height: 30px; background: var(--acc, var(--primary)); }
+  .card .date { flex-shrink: 0; text-align: left; min-width: 100px;
+    border-right: 1px solid rgba(255,255,255,.1); padding-right: 22px; }
+  .card .date .day { font-family: var(--display); font-size: 92px; font-weight: 400;
     color: var(--white); line-height: .85; letter-spacing: 1px; }
-  .card .date .month { font-size: 20px; font-weight: 700;
-    color: var(--primary); letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
-  .card .bar { display: none; }
-  .card .body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .card .body .title { font-size: 34px; font-weight: 800; color: var(--white);
-    line-height: 1.05; letter-spacing: -.3px; text-transform: uppercase; }
-  .card .body .meta { font-size: 16px; font-weight: 500; color: var(--white);
-    letter-spacing: 1.5px; opacity: .7; text-transform: uppercase; }
-  .card .icon { flex-shrink: 0; width: 70px; height: 70px; color: var(--primary); }
+  .card .date .month { font-family: var(--sans); font-size: 12px; font-weight: 800;
+    color: var(--acc, var(--primary)); letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 2px; }
+  .card .body { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .card .body .title { font-family: var(--display); font-size: 34px; font-weight: 400;
+    color: var(--white); line-height: .95; letter-spacing: 1px; text-transform: uppercase; }
+  .card .body .meta { font-family: var(--sans); font-size: 12px; font-weight: 800;
+    color: var(--white); letter-spacing: 3px; opacity: .6; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px; }
+  .card .body .meta .tag { display: inline-block; padding: 4px 10px;
+    background: var(--primary); color: var(--white); border-radius: 2px;
+    font-size: 11px; letter-spacing: 2px; opacity: 1; }
+  .card .icon { flex-shrink: 0; width: 64px; height: 64px; color: var(--primary);
+    background: rgba(245,73,34,.12); border-radius: 4px; padding: 12px;
+    display: flex; align-items: center; justify-content: center; }
   .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
     stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
-  .card.empty { background: transparent; border: 2px dashed rgba(255,255,255,.12);
-    border-left: 6px dashed rgba(245,73,34,.3);
-    min-height: 80px; padding: 18px 34px; }
-  .card.empty .body .title { font-size: 22px; opacity: .4; text-transform: none; }
-  .card.empty .body .meta { font-size: 14px; opacity: .3; }
-  .card.empty .date .day { font-size: 52px; opacity: .25; }
+  .card.empty { background: transparent; border: 2px dashed rgba(255,255,255,.08);
+    border-left: 6px dashed rgba(245,73,34,.25); min-height: 70px; padding: 14px 32px;
+    box-shadow: none; }
+  .card.empty::before { display: none; }
+  .card.empty .body .title { font-family: var(--sans); font-size: 16px; font-weight: 500;
+    opacity: .35; text-transform: none; letter-spacing: 0; }
+  .card.empty .body .meta { display: none; }
+  .card.empty .date { border: none; }
+  .card.empty .date .day { font-size: 48px; opacity: .25; }
   .card.empty .date .month { opacity: .25; }
-  .card.empty .icon { opacity: .2; width: 44px; height: 44px; }
+  .card.empty .icon { opacity: .2; background: transparent; padding: 0; }
 
-  .card.is-dark   { --card-bg: var(--card-dark);   --acc: var(--primary); }
-  .card.is-darker { --card-bg: var(--card-darker); --acc: var(--white); }
-  .card.is-orange { --card-bg: var(--primary);     --acc: var(--white); color: var(--white); }
-  .card.is-orange .body .title, .card.is-orange .date .day { color: var(--white); }
-  .card.is-orange .date .month { color: var(--canvas); }
+  .card.is-dark   { --card-bg: var(--card-dark);    --acc: var(--primary); }
+  .card.is-darker { --card-bg: var(--card-darker);  --acc: var(--white); }
+  .card.is-orange { --card-bg: var(--primary);      --acc: var(--white); }
+  .card.is-orange .date .day, .card.is-orange .body .title { color: var(--white); }
+  .card.is-orange .body .meta { opacity: .85; }
+  .card.is-orange .date { border-right-color: rgba(255,255,255,.25); }
+  .card.is-orange .icon { background: rgba(255,255,255,.15); color: var(--white); }
 
-  .footer { margin-top: auto; padding-top: 24px; text-align: center;
-    position: relative; z-index: 1; border-top: 2px solid var(--primary); }
-  .footer .agency { display: inline-flex; align-items: center; gap: 14px;
-    font-family: var(--display); font-size: 28px; font-weight: 400; color: var(--white);
-    letter-spacing: 5px; text-transform: uppercase; margin-top: 18px; }
-  .footer .url { font-size: 15px; font-weight: 400; color: var(--white);
-    margin-top: 6px; letter-spacing: 1px; opacity: .5; }
+  /* FOOTER */
+  .footer { margin-top: auto; padding-top: 24px; position: relative; z-index: 2;
+    border-top: 3px solid var(--primary); }
+  .footer .row { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; }
+  .footer .left { display: flex; flex-direction: column; gap: 4px; }
+  .footer .tagline { font-family: var(--display); font-size: 26px; color: var(--white);
+    letter-spacing: 2px; text-transform: uppercase; }
+  .footer .web { font-family: var(--sans); font-size: 12px; font-weight: 600;
+    color: var(--primary); letter-spacing: 2px; }
+  .footer .agency { display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--display); font-size: 22px; color: var(--white);
+    letter-spacing: 5px; text-transform: uppercase; }
+  .footer .agency .bolt { color: var(--primary); transform: skew(-12deg); display: inline-block; }
 </style>
 </head>
 <body>
 <div class="poster">
-  <div class="deco glow"></div>
-  <div class="deco line"></div>
-  <div class="deco line2"></div>
+  <div class="bg-pattern"></div>
+  <div class="deco glow-tr"></div>
+  <div class="deco glow-bl"></div>
+  <div class="deco motion-line motion-1"></div>
+  <div class="deco motion-line motion-2"></div>
+  <div class="deco motion-line motion-3"></div>
+  <div class="deco hex-frame"></div>
+  <div class="deco hex-frame-inner"></div>
 
   <header class="header">
     <img class="logo" src="{{LOGO_URL}}" alt="Distribuidora Fitness" />
     <div class="brand-name">
-      <div class="small">Suplementación premium · Perú</div>
+      <div class="small">Suplementación premium</div>
       <div class="big">DISTRIBUIDORA <span class="accent">FITNESS</span></div>
+      <div class="tag">10+ marcas internacionales · Perú</div>
     </div>
     <div class="date-pill"><span>{{DATE_PILL}}</span></div>
   </header>
 
+  <div class="badge-stock">
+    STOCK
+    <span class="label">DISPONIBLE</span>
+  </div>
+
   <section class="hero">
-    <h1>¿QUÉ SE <span class="accent">VIENE?</span></h1>
-    <div class="sub">{{DATE_SUB}} · #ProgresoNoStop</div>
-    <div class="divider"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
+    <h1>¿QUÉ SE<br><span class="accent">VIENE?</span></h1>
+    <div class="sub">{{DATE_SUB}}</div>
+    <div class="hashtag">#PROGRESONOSTOP · #EQUENOMUESTRANOVENDE</div>
+    <div class="divider"><span class="line"></span><span class="bolt">⚡</span><span class="line"></span></div>
   </section>
 
   <section class="cards">
@@ -140,8 +203,13 @@
   </section>
 
   <footer class="footer">
-    <div class="agency">DISTINTO · AGENCIA</div>
-    <div class="url">www.agenciadistinto.com</div>
+    <div class="row">
+      <div class="left">
+        <div class="tagline">Tu progreso · Nuestro suplemento</div>
+        <div class="web">distribuidorafitness.pe</div>
+      </div>
+      <div class="agency"><span class="bolt">⚡</span>DISTINTO · AGENCIA<span class="bolt">⚡</span></div>
+    </div>
   </footer>
 </div>
 </body>
