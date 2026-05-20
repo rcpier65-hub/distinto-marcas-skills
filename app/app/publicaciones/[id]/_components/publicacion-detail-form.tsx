@@ -6,7 +6,7 @@
 //  - ZONA INFERIOR: checklist a la izquierda bonito + resto a la derecha
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useLayoutEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -101,6 +101,19 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
   }, [openPopover])
+
+  // Auto-resize del textarea: crece con el contenido (no rows fijo)
+  function autoResizeTextarea() {
+    const ta = copyTextareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = Math.min(Math.max(ta.scrollHeight, 180), 600) + 'px'
+  }
+
+  // Resize inicial al montar (para pubs con copy largo precargado)
+  useLayoutEffect(() => {
+    autoResizeTextarea()
+  }, [])
 
   const [form, setForm] = useState({
     nombre: initial.nombre,
@@ -281,16 +294,19 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
       <div className="grid lg:grid-cols-[1fr_400px] gap-4">
         <Card>
           <CardContent className="p-0">
-            {/* Copy textarea */}
+            {/* Copy textarea con auto-resize */}
             <div className="px-3 pt-3">
               <textarea
                 ref={copyTextareaRef}
                 value={form.copy}
-                onChange={(e) => setForm((s) => ({ ...s, copy: e.target.value }))}
+                onChange={(e) => {
+                  setForm((s) => ({ ...s, copy: e.target.value }))
+                  autoResizeTextarea()
+                }}
                 placeholder="Escribí el copy de la publicación aquí…"
-                rows={16}
                 maxLength={COPY_MAX}
-                className="w-full p-3 rounded-md border-0 bg-background text-sm focus:outline-none resize-none"
+                style={{ minHeight: '180px', maxHeight: '600px' }}
+                className="w-full p-3 rounded-md border-0 bg-background text-sm focus:outline-none resize-none overflow-y-auto"
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground px-2 pb-2">
                 <div className="flex items-center gap-3">
