@@ -19,9 +19,10 @@ import puppeteer, { type Browser } from 'puppeteer-core'
 
 // URL del binary compilado con shared libs incluidas (libnss3, etc).
 // Cambiar al actualizar @sparticuz/chromium-min — match con el major version.
-// Ver: https://github.com/Sparticuz/chromium/releases
+// IMPORTANTE: desde v131+ las URLs incluyen sufijo de arquitectura (.x64.tar).
+// Vercel Lambda corre en x64. Ver: https://github.com/Sparticuz/chromium/releases
 const CHROMIUM_PACK_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v138.0.0/chromium-v138.0.0-pack.tar'
+  'https://github.com/Sparticuz/chromium/releases/download/v138.0.0/chromium-v138.0.0-pack.x64.tar'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
