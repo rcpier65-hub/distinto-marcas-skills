@@ -1,12 +1,12 @@
 // app/app/publicaciones/[id]/_components/publicacion-detail-form.tsx
-// Layout Metricool-style 2 zonas verticales:
-//  - ZONA SUPERIOR (split): copy + preview lado a lado
-//  - ZONA INFERIOR (grid): configuración completa visible — plataformas,
-//    recursos, checklist, fechas, editor, notas. NO en accordion.
-// Preview: portada_editada > portada_cruda > Drive folder embed (tomas crudas) > placeholder
+// Layout estilo Metricool refinado:
+//  - HEADER: marca + badges + título + tabs de plataformas debajo del título
+//  - SPLIT: copy + preview
+//  - TOOLBAR: cada icono abre popover hacia arriba (tipo, objetivos, música, tomas, etc.)
+//  - ZONA INFERIOR: checklist a la izquierda bonito + resto a la derecha
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -51,8 +51,9 @@ const EMOJI_PICKER = [
   '🌿', '🌱', '☀️', '🌙', '🪑', '🛋️', '💡', '🏠', '🏗️', '🪴',
 ]
 
-// Helper: extrae el folder ID de un Drive URL
-// Soporta: /folders/ID o ?id=ID
+// Tipos de popover (solo uno abierto a la vez)
+type PopoverKey = 'tipo' | 'objetivos' | 'portada' | 'musica' | 'tomas' | 'emoji' | null
+
 function extractDriveFolderId(url: string): string | null {
   if (!url) return null
   const m1 = url.match(/\/folders\/([a-zA-Z0-9_-]+)/)
@@ -81,12 +82,25 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDelete] = useTransition()
   const [isDuplicating, startDuplicate] = useTransition()
-  const [showEmoji, setShowEmoji] = useState(false)
+  const [openPopover, setOpenPopover] = useState<PopoverKey>(null)
   const [previewPlatform, setPreviewPlatform] = useState<string>(
     initial.plataformas?.[0] ?? 'Instagram',
   )
 
   const copyTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+
+  // Cierra popover al click fuera
+  useEffect(() => {
+    if (!openPopover) return
+    function onClick(e: MouseEvent) {
+      if (!toolbarRef.current?.contains(e.target as Node)) {
+        setOpenPopover(null)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [openPopover])
 
   const [form, setForm] = useState({
     nombre: initial.nombre,
@@ -154,41 +168,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     }, 0)
   }
 
-  function handleAddHashtag() { insertAtCursor(' #') }
-  function handleAddLink() {
-    const url = prompt('URL del enlace:')
-    if (url) insertAtCursor(' ' + url + ' ')
-  }
-  function handleAddImage() {
-    const url = prompt('URL de la imagen / portada:\n(podés pegar link de Drive, Imgur, o cualquier URL pública)')
-    if (!url) return
-    if (form.portada_cruda_url) {
-      setForm((s) => ({ ...s, portada_editada_url: url }))
-      toast.success('Portada editada actualizada')
-    } else {
-      setForm((s) => ({ ...s, portada_cruda_url: url }))
-      toast.success('Portada cruda actualizada')
-    }
-  }
-  function handleAddAttach() {
-    const url = prompt('URL de Google Drive / archivo:\n(se guarda en "Enlace tomas")')
-    if (url) {
-      setForm((s) => ({ ...s, enlace_tomas: url }))
-      toast.success('Enlace de tomas actualizado')
-    }
-  }
-  function handleAddMusic() {
-    const url = prompt('URL de música (TikTok / Spotify):')
-    if (url) {
-      setForm((s) => ({ ...s, enlace_musica: url }))
-      toast.success('Música agregada')
-    }
-  }
-  function handleEmojiSelect(emoji: string) {
-    insertAtCursor(emoji)
-    setShowEmoji(false)
-  }
-
   function handleSave() {
     startTransition(async () => {
       const result = await updatePublicacion(initial.id, {
@@ -234,7 +213,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
   const COPY_MAX = 2200
   const hashtagCount = (form.copy.match(/#\w+/g) ?? []).length
 
-  // PREVIEW LOGIC: jerarquía de qué mostrar
+  // Preview adaptativo
   const driveFolderId = extractDriveFolderId(form.enlace_tomas)
   const previewMode: 'editada' | 'cruda' | 'drive' | 'empty' =
     form.portada_editada_url ? 'editada'
@@ -254,17 +233,43 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             <Badge variant={form.estado === 'programar' || form.estado === 'enviado' ? 'default' : 'secondary'}>
               {ESTADO_PUBLICACION_LABEL[form.estado]}
             </Badge>
-            <Badge variant="outline" className="text-xs">
-              {ESTADO_TAREA_LABEL[form.estado_tarea]}
-            </Badge>
+            <Badge variant="outline" className="text-xs">{ESTADO_TAREA_LABEL[form.estado_tarea]}</Badge>
           </div>
           <input
             type="text"
             value={form.nombre}
             onChange={(e) => setForm((s) => ({ ...s, nombre: e.target.value }))}
             placeholder="Nombre de la publicación…"
-            className="w-full text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-muted focus:border-primary focus:outline-none transition-colors py-1"
+            className="w-full text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-muted focus:border-primary focus:outline-none transition-colors py-1 mb-3"
           />
+
+          {/* Tabs plataformas debajo del título (estilo Metricool) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {PLATAFORMAS.map((p) => {
+              const isSelected = form.plataformas.includes(p.key)
+              const isPreview = previewPlatform === p.key
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => {
+                    toggleArrayItem('plataformas', p.key)
+                    if (!isSelected) setPreviewPlatform(p.key)
+                  }}
+                  onDoubleClick={() => setPreviewPlatform(p.key)}
+                  title={`${p.label} — click: activar/desactivar · doble-click: previsualizar`}
+                  className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-all border ${
+                    isSelected
+                      ? 'bg-primary/10 border-primary text-foreground'
+                      : 'bg-background border-border text-muted-foreground opacity-60 hover:opacity-100'
+                  } ${isPreview && isSelected ? 'ring-2 ring-primary/40' : ''}`}
+                >
+                  <span className="text-base leading-none">{p.icon}</span>
+                  <span>{p.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button onClick={handleDuplicate} disabled={isDuplicating} variant="outline" size="sm">📋 Duplicar</Button>
@@ -272,12 +277,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         </div>
       </div>
 
-      {/* ZONA SUPERIOR: editor (copy) + preview */}
+      {/* SPLIT — copy + preview */}
       <div className="grid lg:grid-cols-[1fr_400px] gap-4">
-        {/* Editor copy */}
         <Card>
           <CardContent className="p-0">
-            <div className="px-3 pt-3 relative">
+            {/* Copy textarea */}
+            <div className="px-3 pt-3">
               <textarea
                 ref={copyTextareaRef}
                 value={form.copy}
@@ -287,21 +292,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 maxLength={COPY_MAX}
                 className="w-full p-3 rounded-md border-0 bg-background text-sm focus:outline-none resize-none"
               />
-
-              {showEmoji && (
-                <div className="absolute bottom-full left-3 mb-2 z-10 bg-background border rounded-lg shadow-lg p-2 w-[280px]">
-                  <div className="flex justify-between items-center mb-2 px-1">
-                    <span className="text-xs font-semibold text-muted-foreground">Insertar emoji</span>
-                    <button type="button" onClick={() => setShowEmoji(false)} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
-                  </div>
-                  <div className="grid grid-cols-10 gap-1">
-                    {EMOJI_PICKER.map((e) => (
-                      <button key={e} type="button" onClick={() => handleEmojiSelect(e)} className="w-6 h-6 flex items-center justify-center hover:bg-muted rounded text-base">{e}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div className="flex items-center justify-between text-xs text-muted-foreground px-2 pb-2">
                 <div className="flex items-center gap-3">
                   <span className={hashtagCount > 30 ? 'text-orange-600 font-medium' : ''}>{hashtagCount} / 30 #</span>
@@ -311,16 +301,199 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               </div>
             </div>
 
-            {/* TOOLBAR funcional con labels */}
-            <div className="border-t bg-muted/20 px-2 py-2">
+            {/* TOOLBAR con popovers expandibles */}
+            <div ref={toolbarRef} className="border-t bg-muted/20 px-2 py-2 relative">
               <div className="flex items-end justify-start gap-1 flex-wrap">
-                <ToolbarBtn label="Imagen" icon="🖼️" onClick={handleAddImage} title="Pegar URL de portada" />
-                <ToolbarBtn label="Emoji" icon="😊" onClick={() => setShowEmoji((v) => !v)} title="Insertar emoji" active={showEmoji} />
-                <ToolbarBtn label="Hashtag" icon="#" onClick={handleAddHashtag} title="Agregar # al copy" />
-                <ToolbarBtn label="Enlace" icon="🔗" onClick={handleAddLink} title="Pegar URL en el copy" />
-                <ToolbarBtn label="Tomas" icon="📎" onClick={handleAddAttach} title="Pegar URL de Drive / tomas" />
-                <ToolbarBtn label="Música" icon="🎵" onClick={handleAddMusic} title="Pegar URL de música" />
-                <ToolbarBtn label="IA" icon="🤖" disabled title="Asistente IA (próximo)" />
+                {/* Tipo de contenido */}
+                <ToolbarBtnPopover
+                  icon="🎬"
+                  label="Tipo"
+                  title="Tipo de contenido"
+                  active={openPopover === 'tipo'}
+                  onClick={() => setOpenPopover(openPopover === 'tipo' ? null : 'tipo')}
+                  badge={form.tipo_contenido[0]}
+                >
+                  <div className="font-semibold text-xs mb-2 text-muted-foreground">Tipo de contenido</div>
+                  <div className="flex flex-wrap gap-1.5 max-w-[280px]">
+                    {TIPO_OPTS.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => toggleArrayItem('tipo_contenido', t)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          form.tipo_contenido.includes(t)
+                            ? 'bg-secondary text-secondary-foreground border-secondary'
+                            : 'bg-background hover:bg-muted border-border'
+                        }`}
+                      >{t}</button>
+                    ))}
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* Objetivos */}
+                <ToolbarBtnPopover
+                  icon="🎯"
+                  label="Objetivo"
+                  title="Objetivos de la publicación"
+                  active={openPopover === 'objetivos'}
+                  onClick={() => setOpenPopover(openPopover === 'objetivos' ? null : 'objetivos')}
+                  badge={form.objetivos[0]}
+                >
+                  <div className="font-semibold text-xs mb-2 text-muted-foreground">Objetivos</div>
+                  <div className="flex flex-wrap gap-1.5 max-w-[260px]">
+                    {OBJETIVO_OPTS.map((o) => (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => toggleArrayItem('objetivos', o)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          form.objetivos.includes(o)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background hover:bg-muted border-border'
+                        }`}
+                      >{o}</button>
+                    ))}
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* Portada (imagen) */}
+                <ToolbarBtnPopover
+                  icon="🖼️"
+                  label="Portada"
+                  title="Portada cruda y editada"
+                  active={openPopover === 'portada'}
+                  onClick={() => setOpenPopover(openPopover === 'portada' ? null : 'portada')}
+                  badge={form.portada_editada_url ? '✓' : form.portada_cruda_url ? '~' : undefined}
+                >
+                  <div className="space-y-2 w-[280px]">
+                    <div className="font-semibold text-xs text-muted-foreground">Portada</div>
+                    <label className="block text-xs">
+                      <span className="text-muted-foreground">🖼️ Cruda (sin editar)</span>
+                      <input
+                        type="url"
+                        value={form.portada_cruda_url}
+                        onChange={(e) => setForm((s) => ({ ...s, portada_cruda_url: e.target.value }))}
+                        placeholder="https://drive.google.com/…"
+                        className="w-full h-8 px-2 rounded border bg-background text-xs mt-1"
+                      />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="text-muted-foreground">🎨 Editada (final)</span>
+                      <input
+                        type="url"
+                        value={form.portada_editada_url}
+                        onChange={(e) => setForm((s) => ({ ...s, portada_editada_url: e.target.value }))}
+                        placeholder="https://drive.google.com/…"
+                        className="w-full h-8 px-2 rounded border bg-background text-xs mt-1"
+                      />
+                    </label>
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* Música */}
+                <ToolbarBtnPopover
+                  icon="🎵"
+                  label="Música"
+                  title="Enlace de música"
+                  active={openPopover === 'musica'}
+                  onClick={() => setOpenPopover(openPopover === 'musica' ? null : 'musica')}
+                  badge={form.enlace_musica ? '✓' : undefined}
+                >
+                  <div className="space-y-2 w-[280px]">
+                    <div className="font-semibold text-xs text-muted-foreground">Música</div>
+                    <input
+                      type="url"
+                      value={form.enlace_musica}
+                      onChange={(e) => setForm((s) => ({ ...s, enlace_musica: e.target.value }))}
+                      placeholder="https://vt.tiktok.com/… o Spotify"
+                      className="w-full h-9 px-2 rounded border bg-background text-xs"
+                      autoFocus
+                    />
+                    {form.enlace_musica && (
+                      <a href={form.enlace_musica} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                        ↗ Abrir música
+                      </a>
+                    )}
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* Tomas */}
+                <ToolbarBtnPopover
+                  icon="📎"
+                  label="Tomas"
+                  title="Enlace de tomas (Drive)"
+                  active={openPopover === 'tomas'}
+                  onClick={() => setOpenPopover(openPopover === 'tomas' ? null : 'tomas')}
+                  badge={form.enlace_tomas ? '✓' : undefined}
+                >
+                  <div className="space-y-2 w-[280px]">
+                    <div className="font-semibold text-xs text-muted-foreground">Carpeta de tomas</div>
+                    <input
+                      type="url"
+                      value={form.enlace_tomas}
+                      onChange={(e) => setForm((s) => ({ ...s, enlace_tomas: e.target.value }))}
+                      placeholder="https://drive.google.com/drive/folders/…"
+                      className="w-full h-9 px-2 rounded border bg-background text-xs"
+                      autoFocus
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Si compartís el folder como público, vas a ver las tomas en el preview →
+                    </p>
+                    {form.enlace_tomas && (
+                      <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                        ↗ Abrir carpeta
+                      </a>
+                    )}
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* Hashtag */}
+                <ToolbarBtn
+                  icon="#"
+                  label="Hashtag"
+                  title="Agregar # en el copy"
+                  onClick={() => insertAtCursor(' #')}
+                />
+
+                {/* Enlace */}
+                <ToolbarBtn
+                  icon="🔗"
+                  label="Enlace"
+                  title="Pegar URL en el copy"
+                  onClick={() => {
+                    const url = prompt('URL del enlace:')
+                    if (url) insertAtCursor(' ' + url + ' ')
+                  }}
+                />
+
+                {/* Emoji */}
+                <ToolbarBtnPopover
+                  icon="😊"
+                  label="Emoji"
+                  title="Insertar emoji en el copy"
+                  active={openPopover === 'emoji'}
+                  onClick={() => setOpenPopover(openPopover === 'emoji' ? null : 'emoji')}
+                >
+                  <div className="w-[280px]">
+                    <div className="font-semibold text-xs mb-2 text-muted-foreground">Insertar emoji</div>
+                    <div className="grid grid-cols-10 gap-1">
+                      {EMOJI_PICKER.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => {
+                            insertAtCursor(e)
+                            setOpenPopover(null)
+                          }}
+                          className="w-6 h-6 flex items-center justify-center hover:bg-muted rounded text-base"
+                        >{e}</button>
+                      ))}
+                    </div>
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* IA */}
+                <ToolbarBtn icon="🤖" label="IA" title="Asistente IA (próximo)" disabled />
               </div>
             </div>
           </CardContent>
@@ -349,7 +522,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                     {' · '}{PLATAFORMAS.find((p) => p.key === previewPlatform)?.label}
                   </div>
                 </div>
-                {/* Indicador modo preview */}
                 <Badge variant="outline" className="text-[9px]">
                   {previewMode === 'editada' && '✅ Editada'}
                   {previewMode === 'cruda' && '🖼️ Cruda'}
@@ -357,8 +529,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   {previewMode === 'empty' && '➖'}
                 </Badge>
               </div>
-
-              {/* MEDIA AREA — adaptativa según jerarquía */}
               <div className="aspect-[9/16] bg-black flex items-center justify-center relative">
                 {previewMode === 'editada' || previewMode === 'cruda' ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -378,13 +548,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   <div className="text-white/60 text-sm text-center px-4">
                     Imagen/vídeo no disponible
                     <div className="text-[10px] mt-1 text-white/40">
-                      Pegá URL desde la toolbar 🖼️ o agregá link a Drive en 📎 Tomas
+                      Pegá URL en 🖼️ Portada o 📎 Tomas
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Caption preview */}
               {form.copy && (
                 <div className="p-3 text-xs whitespace-pre-wrap line-clamp-6">
                   <span className="font-semibold">{brandHandle}</span> {form.copy}
@@ -392,219 +560,144 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               )}
             </CardContent>
           </Card>
-
-          {/* Link directo a Drive si está en modo "drive" */}
           {previewMode === 'drive' && form.enlace_tomas && (
-            <a
-              href={form.enlace_tomas}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block mt-2 text-center text-xs text-blue-600 hover:underline"
-            >
+            <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="block mt-2 text-center text-xs text-blue-600 hover:underline">
               ↗ Abrir carpeta de tomas en Drive
             </a>
           )}
         </div>
       </div>
 
-      {/* ZONA INFERIOR — Configuración completa visible (estilo Metricool) */}
-      <Card>
-        <CardContent className="p-4 space-y-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            ⚙️ Configuración de la publicación
-          </h2>
-
-          {/* SECTION 1: Plataformas (los iconos ahora viven acá) */}
-          <Section title="📱 Plataformas">
-            <div className="flex items-center gap-2 flex-wrap">
-              {PLATAFORMAS.map((p) => {
-                const isSelected = form.plataformas.includes(p.key)
-                const isPreview = previewPlatform === p.key
-                return (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => {
-                      toggleArrayItem('plataformas', p.key)
-                      if (!isSelected) setPreviewPlatform(p.key)
-                    }}
-                    onDoubleClick={() => setPreviewPlatform(p.key)}
-                    title={`${p.label} — click: agregar/quitar · doble-click: previsualizar`}
-                    className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border transition-all ${
-                      isSelected
-                        ? 'bg-primary/10 border-primary ring-2 ring-primary/30'
-                        : 'bg-background border-border opacity-50 hover:opacity-100'
-                    } ${isPreview ? 'scale-105' : ''}`}
-                  >
-                    <span className="text-2xl">{p.icon}</span>
-                    <span className="text-[10px] font-medium">{p.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </Section>
-
-          {/* SECTION 2: Tipo + Objetivos */}
-          <div className="grid md:grid-cols-2 gap-5">
-            <Section title="🎬 Tipo de contenido">
-              <div className="flex flex-wrap gap-1.5">
-                {TIPO_OPTS.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => toggleArrayItem('tipo_contenido', t)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      form.tipo_contenido.includes(t)
-                        ? 'bg-secondary text-secondary-foreground border-secondary'
-                        : 'bg-background hover:bg-muted border-border'
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
+      {/* ZONA INFERIOR — checklist a la izquierda, resto a la derecha */}
+      <div className="grid lg:grid-cols-[320px_1fr] gap-4">
+        {/* IZQUIERDA: Checklist + Asignación */}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                ✓ Progreso del workflow
+              </h3>
+              <div className="space-y-1.5">
+                <ChecklistRow label="Copy listo" icon="📝" value={checklist.copy_listo} onToggle={() => toggleCheck('copy_listo')} />
+                <ChecklistRow label="Música" icon="🎵" value={checklist.musica_lista} onToggle={() => toggleCheck('musica_lista')} />
+                <ChecklistRow label="Portada lista" icon="🖼️" value={checklist.portada_lista} onToggle={() => toggleCheck('portada_lista')} />
+                <ChecklistRow label="Diseñado" icon="🎨" value={checklist.disenado} onToggle={() => toggleCheck('disenado')} />
+                <ChecklistRow label="Editado" icon="✂️" value={checklist.editado} onToggle={() => toggleCheck('editado')} />
+                <ChecklistRow label="Aprobado" icon="✅" value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
               </div>
-            </Section>
+            </CardContent>
+          </Card>
 
-            <Section title="🎯 Objetivos">
-              <div className="flex flex-wrap gap-1.5">
-                {OBJETIVO_OPTS.map((o) => (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => toggleArrayItem('objetivos', o)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      form.objetivos.includes(o)
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background hover:bg-muted border-border'
-                    }`}
-                  >
-                    {o}
-                  </button>
-                ))}
-              </div>
-            </Section>
-          </div>
-
-          {/* SECTION 3: Recursos / Enlaces */}
-          <Section title="🔗 Recursos / Enlaces">
-            <div className="grid md:grid-cols-2 gap-2">
-              <UrlField label="🎬 Tomas (Drive)" value={form.enlace_tomas} onChange={(v) => setForm((s) => ({ ...s, enlace_tomas: v }))} />
-              <UrlField label="🎵 Música" value={form.enlace_musica} onChange={(v) => setForm((s) => ({ ...s, enlace_musica: v }))} />
-              <UrlField label="🖼️ Portada cruda" value={form.portada_cruda_url} onChange={(v) => setForm((s) => ({ ...s, portada_cruda_url: v }))} />
-              <UrlField label="🎨 Portada editada" value={form.portada_editada_url} onChange={(v) => setForm((s) => ({ ...s, portada_editada_url: v }))} />
-            </div>
-          </Section>
-
-          {/* SECTION 4: Checklist + Editor + Sub-estado */}
-          <div className="grid md:grid-cols-3 gap-5">
-            <Section title="✓ Checklist (auto-guarda)" className="md:col-span-2">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <ChecklistItem label="📝 Copy listo" value={checklist.copy_listo} onToggle={() => toggleCheck('copy_listo')} />
-                <ChecklistItem label="🎵 Música" value={checklist.musica_lista} onToggle={() => toggleCheck('musica_lista')} />
-                <ChecklistItem label="🖼️ Portada" value={checklist.portada_lista} onToggle={() => toggleCheck('portada_lista')} />
-                <ChecklistItem label="🎨 Diseñado" value={checklist.disenado} onToggle={() => toggleCheck('disenado')} />
-                <ChecklistItem label="✂️ Editado" value={checklist.editado} onToggle={() => toggleCheck('editado')} />
-                <ChecklistItem label="✅ Aprobado" value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
-              </div>
-            </Section>
-
-            <Section title="👤 Asignación">
-              <div className="space-y-2">
-                <label className="block text-xs">
-                  <span className="text-muted-foreground">Editor</span>
-                  <select
-                    value={form.editor_id}
-                    onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
-                    className="w-full h-9 px-2 rounded border border-input bg-background mt-1"
-                  >
-                    <option value="">— Sin asignar —</option>
-                    {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
-                  </select>
-                </label>
-                <div className="block text-xs">
-                  <span className="text-muted-foreground block mb-1">Sub-estado</span>
-                  <div className="flex gap-1">
-                    {ESTADOS_TAREA.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
-                        className={`flex-1 h-7 px-1 rounded text-[10px] border transition-colors ${
-                          form.estado_tarea === e
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background hover:bg-muted border-border'
-                        }`}
-                      >
-                        {ESTADO_TAREA_LABEL[e]}
-                      </button>
-                    ))}
-                  </div>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                👤 Asignación
+              </h3>
+              <label className="block text-xs">
+                <span className="text-muted-foreground">Editor</span>
+                <select
+                  value={form.editor_id}
+                  onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
+                  className="w-full h-9 px-2 rounded border border-input bg-background mt-1"
+                >
+                  <option value="">— Sin asignar —</option>
+                  {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
+                </select>
+              </label>
+              <div className="block text-xs">
+                <span className="text-muted-foreground block mb-1">Sub-estado</span>
+                <div className="flex gap-1">
+                  {ESTADOS_TAREA.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
+                      className={`flex-1 h-7 px-1 rounded text-[10px] border transition-colors ${
+                        form.estado_tarea === e
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted border-border'
+                      }`}
+                    >{ESTADO_TAREA_LABEL[e]}</button>
+                  ))}
                 </div>
               </div>
-            </Section>
-          </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* SECTION 5: Fechas */}
-          <Section title="📅 Fechas">
-            <div className="grid grid-cols-3 gap-3">
+        {/* DERECHA: Estado workflow + fechas + textareas */}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4 grid md:grid-cols-2 gap-4">
               <label className="block text-xs">
-                <span className="text-muted-foreground">Publicación</span>
+                <span className="text-muted-foreground">🎯 Estado workflow</span>
+                <select
+                  value={form.estado}
+                  onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
+                  className="w-full h-9 px-2 rounded border border-input bg-background mt-1"
+                >
+                  {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs">
+                <span className="text-muted-foreground">📅 Fecha publicación</span>
                 <input type="date" value={form.fecha_publicacion} onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))} className="w-full h-9 px-2 rounded border border-input bg-background mt-1" />
               </label>
               <label className="block text-xs">
-                <span className="text-muted-foreground">Edición</span>
+                <span className="text-muted-foreground">✂️ Fecha edición</span>
                 <input type="date" value={form.fecha_edicion} onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))} className="w-full h-9 px-2 rounded border border-input bg-background mt-1" />
               </label>
               <label className="block text-xs">
-                <span className="text-muted-foreground">Diseño</span>
+                <span className="text-muted-foreground">🎨 Fecha diseño</span>
                 <input type="date" value={form.fecha_diseno} onChange={(e) => setForm((s) => ({ ...s, fecha_diseno: e.target.value }))} className="w-full h-9 px-2 rounded border border-input bg-background mt-1" />
               </label>
-            </div>
-          </Section>
+            </CardContent>
+          </Card>
 
-          {/* SECTION 6: Estado workflow */}
-          <Section title="🎯 Estado del workflow">
-            <select
-              value={form.estado}
-              onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
-              className="w-full h-9 px-3 rounded border border-input bg-background text-sm"
-            >
-              {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
-            </select>
-          </Section>
-
-          {/* SECTION 7: Guión + Opción 2 + Notas */}
-          <div className="grid md:grid-cols-3 gap-5">
-            <Section title="🎬 Guión / Indicaciones">
-              <textarea
-                value={form.guion}
-                onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
-                rows={5}
-                placeholder="Gancho, escenas, tomas, voz en off…"
-                className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </Section>
-            <Section title="🧐 Opción 2 (variante)">
-              <textarea
-                value={form.opcion_2}
-                onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
-                rows={5}
-                placeholder="Versión B del copy o guión alternativo…"
-                className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </Section>
-            <Section title="📝 Notas internas">
-              <textarea
-                value={form.notas}
-                onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
-                rows={5}
-                placeholder="Notas privadas del equipo (no se publican)…"
-                className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </Section>
-          </div>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-2">
+                  🎬 Guión / Indicaciones
+                </label>
+                <textarea
+                  value={form.guion}
+                  onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
+                  rows={4}
+                  placeholder="Gancho, escenas, tomas, voz en off…"
+                  className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-2">
+                    🧐 Opción 2
+                  </label>
+                  <textarea
+                    value={form.opcion_2}
+                    onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
+                    rows={3}
+                    placeholder="Versión B del copy o guión alternativo…"
+                    className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-2">
+                    📝 Notas internas
+                  </label>
+                  <textarea
+                    value={form.notas}
+                    onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
+                    rows={3}
+                    placeholder="Notas privadas del equipo…"
+                    className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* META footer */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -634,15 +727,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 // ============================================================
 // Sub-componentes
 // ============================================================
-
-function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{title}</h3>
-      {children}
-    </div>
-  )
-}
 
 function ToolbarBtn({
   icon, label, title, onClick, disabled, active,
@@ -674,45 +758,64 @@ function ToolbarBtn({
   )
 }
 
-function ChecklistItem({ label, value, onToggle }: { label: string; value: boolean; onToggle: () => void }) {
+function ToolbarBtnPopover({
+  icon, label, title, onClick, active, children, badge,
+}: {
+  icon: string
+  label: string
+  title: string
+  onClick?: () => void
+  active?: boolean
+  children: React.ReactNode
+  badge?: string
+}) {
+  return (
+    <div className="relative">
+      {active && (
+        <div
+          className="absolute bottom-full left-0 mb-2 z-20 bg-background border rounded-lg shadow-lg p-3 animate-in fade-in slide-in-from-bottom-2 duration-150"
+        >
+          {children}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        className={`relative flex flex-col items-center justify-center gap-0.5 min-w-[58px] px-2 py-1.5 rounded-md transition-colors ${
+          active ? 'bg-primary/15 text-primary' : 'hover:bg-muted'
+        }`}
+      >
+        <span className="text-lg leading-none">{icon}</span>
+        <span className="text-[10px] font-medium leading-none">{label}</span>
+        {badge && (
+          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center leading-none">
+            {badge.length > 4 ? badge.slice(0, 3) + '…' : badge}
+          </span>
+        )}
+      </button>
+    </div>
+  )
+}
+
+function ChecklistRow({ label, icon, value, onToggle }: { label: string; icon: string; value: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      className={`flex items-center gap-2 p-2 rounded-md border transition-colors text-left ${
+      className={`w-full flex items-center gap-3 p-2 rounded-md border transition-colors text-left ${
         value
-          ? 'bg-primary/10 border-primary/40 text-foreground'
-          : 'bg-background border-border text-muted-foreground hover:bg-muted/50'
+          ? 'bg-primary/10 border-primary/40'
+          : 'bg-background border-border hover:bg-muted/50'
       }`}
     >
-      <span className={`inline-block w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+      <span className={`inline-flex items-center justify-center w-5 h-5 rounded border text-[11px] ${
         value ? 'bg-primary border-primary text-primary-foreground' : 'border-input'
       }`}>
         {value ? '✓' : ''}
       </span>
-      <span className="text-xs">{label}</span>
+      <span className="text-base">{icon}</span>
+      <span className={`text-sm flex-1 ${value ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
     </button>
-  )
-}
-
-function UrlField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-muted-foreground">{label}</label>
-      <div className="flex gap-1">
-        <input
-          type="url"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://…"
-          className="flex-1 h-8 px-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-        {value && (
-          <a href={value} target="_blank" rel="noopener noreferrer" className="h-8 px-2 rounded-md border bg-background text-xs text-blue-600 hover:bg-muted flex items-center">
-            ↗
-          </a>
-        )}
-      </div>
-    </div>
   )
 }
