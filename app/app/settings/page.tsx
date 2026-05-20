@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LogoUrlInput } from './_components/logo-url-input'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,7 @@ export default async function SettingsPage() {
       <header>
         <h1 className="text-4xl font-bold mb-2">Settings</h1>
         <p className="text-muted-foreground">
-          Configuración del sistema. Edición de marcas se habilita en Plan 5 (multi-usuario).
+          Configuración del sistema y branding de cada marca.
         </p>
       </header>
 
@@ -41,6 +42,43 @@ export default async function SettingsPage() {
             <span className="text-muted-foreground">Provider: </span>
             <Badge variant="outline">{user.app_metadata.provider ?? 'email'}</Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* LOGOS de marca — Pedro pega aquí URLs de Drive */}
+      <Card>
+        <CardHeader>
+          <CardTitle>🎨 Logos de marca</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Pega aquí la URL del logo de cada marca. Soporta <strong>Drive</strong> (con permiso "Cualquier persona con el enlace"),
+            Imgur, Cloudinary o cualquier CDN público. Si dejás vacío, se usa el placeholder local generado.
+          </p>
+          <div className="mt-3 p-3 bg-muted/40 rounded-md text-xs">
+            <strong className="block mb-1">💡 Cómo obtener URL de Drive:</strong>
+            <ol className="list-decimal ml-4 space-y-0.5 text-muted-foreground">
+              <li>Subí el logo a tu carpeta de Drive</li>
+              <li>Click derecho → <em>Compartir</em> → cambiar a <em>"Cualquier persona con el enlace"</em></li>
+              <li>Copiá el link (formato: <code className="text-[10px]">https://drive.google.com/file/d/FILE_ID/view</code>)</li>
+              <li>Pegá acá — el sistema lo convierte automáticamente</li>
+            </ol>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!marcas || marcas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin marcas.</p>
+          ) : (
+            <div className="space-y-0">
+              {marcas.map((m) => (
+                <LogoUrlInput
+                  key={m.slug}
+                  slug={m.slug}
+                  marcaNombre={m.nombre}
+                  emojiMarca={m.emoji_marca}
+                  initialUrl={m.logo_url}
+                />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
