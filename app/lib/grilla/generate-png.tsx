@@ -7,7 +7,7 @@
 import type { GrillaPublicacion } from '@/lib/integrations/notion'
 
 export type GrillaData = {
-  marca: { slug: string; nombre: string; emoji: string; color: string }
+  marca: { slug: string; nombre: string; emoji: string; color: string; logo_url?: string | null }
   semanaInicio: string
   semanaFin: string
   publicaciones: GrillaPublicacion[]
@@ -40,6 +40,11 @@ export async function generateGrillaPNG(data: GrillaData): Promise<Buffer> {
     fin: data.semanaFin,
     pubs: JSON.stringify(pubs),
   })
+  // Logo URL custom (Drive, Imgur, etc.) si la marca tiene uno configurado.
+  // El endpoint normaliza URLs de Drive automáticamente.
+  if (data.marca.logo_url) {
+    params.set('logo', data.marca.logo_url)
+  }
 
   const url = `${baseUrl}/api/render-grilla?${params.toString()}`
   const secret = process.env.CRON_SECRET

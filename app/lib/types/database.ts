@@ -86,6 +86,7 @@ export interface MarcaRow {
   emoji_marca: string | null
   activa: boolean
   notion_proyecto_id: string | null
+  logo_url: string | null
   created_at: string
   updated_at: string
 }
@@ -104,6 +105,7 @@ export interface MarcaInsert {
   emoji_marca?: string | null
   activa?: boolean
   notion_proyecto_id?: string | null
+  logo_url?: string | null
   created_at?: string
   updated_at?: string
 }

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     errores: [] as string[],
   }
 
-  type MarcaRow = { slug: string; nombre: string; emoji_marca: string | null; color_primario_hex: string | null; notion_proyecto_id: string | null }
+  type MarcaRow = { slug: string; nombre: string; emoji_marca: string | null; color_primario_hex: string | null; notion_proyecto_id: string | null; logo_url: string | null }
   type GrillaRow = {
     id: string
     semana_inicio: string
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     .from('grillas_pendientes')
     .select(`
       id, semana_inicio, semana_fin, pedida_at,
-      marca:marcas(slug, nombre, emoji_marca, color_primario_hex, notion_proyecto_id)
+      marca:marcas(slug, nombre, emoji_marca, color_primario_hex, notion_proyecto_id, logo_url)
     `)
     .eq('estado', 'pendiente')
     .order('pedida_at', { ascending: true })
@@ -100,6 +100,7 @@ export async function GET(request: Request) {
           nombre: marca.nombre,
           emoji: marca.emoji_marca ?? '📊',
           color: marca.color_primario_hex ?? '#283B6F',
+          logo_url: marca.logo_url,
         },
         semanaInicio: g.semana_inicio,
         semanaFin: g.semana_fin,

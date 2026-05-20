@@ -32,7 +32,7 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
   // 1. Buscar marca (incluyendo notion_proyecto_id)
   const { data: marca, error: marcaError } = await supabase
     .from('marcas')
-    .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz, notion_proyecto_id')
+    .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz, notion_proyecto_id, logo_url')
     .eq('slug', marcaSlug)
     .eq('activa', true)
     .single()
@@ -128,6 +128,7 @@ export async function pedirGrilla(marcaSlug: string): Promise<PedirGrillaResult>
         nombre: marca.nombre,
         emoji: marca.emoji_marca ?? '📊',
         color: marca.color_primario_hex ?? '#283B6F',
+        logo_url: marca.logo_url,
       },
       semanaInicio: semana_inicio,
       semanaFin: semana_fin,

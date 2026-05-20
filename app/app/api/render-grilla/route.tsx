@@ -14,8 +14,14 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import chromium from '@sparticuz/chromium'
+import chromium from '@sparticuz/chromium-min'
 import puppeteer, { type Browser } from 'puppeteer-core'
+
+// URL del binary compilado con shared libs incluidas (libnss3, etc).
+// Cambiar al actualizar @sparticuz/chromium-min — match con el major version.
+// Ver: https://github.com/Sparticuz/chromium/releases
+const CHROMIUM_PACK_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v138.0.0/chromium-v138.0.0-pack.tar'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -60,6 +66,30 @@ const IMAGE_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" h
 const MESSAGE_ICON_SVG = `<svg viewBox="0 0 64 64"><path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/></svg>`
 // SVG icon de "empty" — círculo con guión
 const EMPTY_ICON_SVG = `<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="20"/><path d="M22 32h20"/></svg>`
+
+/**
+ * Normaliza URLs de Google Drive a su formato de descarga directa.
+ * Drive expone los archivos en varios formatos; solo el ?export=download&id=
+ * devuelve los bytes del archivo (no HTML del viewer).
+ *
+ * Convierte:
+ *   https://drive.google.com/file/d/FILE_ID/view → https://drive.google.com/uc?export=download&id=FILE_ID
+ *   https://drive.google.com/open?id=FILE_ID    → https://drive.google.com/uc?export=download&id=FILE_ID
+ *   URLs ya en formato correcto → sin cambios
+ *   URLs no-Drive → sin cambios
+ */
+function normalizeDriveUrl(rawUrl: string): string {
+  if (!rawUrl.includes('drive.google.com')) return rawUrl
+  // Pattern: /file/d/FILE_ID/...
+  const m1 = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`
+  // Pattern: ?id=FILE_ID or &id=FILE_ID
+  const m2 = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+  if (m2 && !rawUrl.includes('export=download')) {
+    return `https://drive.google.com/uc?export=download&id=${m2[1]}`
+  }
+  return rawUrl
+}
 
 function pickIcon(tipo: string[]): string {
   const t = tipo.join(' ').toLowerCase()
@@ -108,11 +138,19 @@ export async function GET(request: Request) {
     )
   }
 
-  // Construir URL absoluta del logo (Chromium necesita URLs accesibles)
+  // Construir URL del logo con jerarquía:
+  //   1. Query param explícito (?logo=...)
+  //   2. Fallback al placeholder local /marcas/{slug}/logo.{ext}
   const proto = url.protocol
   const host = url.host
-  const logoExt = LOGO_EXTENSIONS_BY_SLUG[slug] ?? 'png'
-  const logoUrl = `${proto}//${host}/marcas/${slug}/logo.${logoExt}`
+  const logoOverride = url.searchParams.get('logo')
+  let logoUrl: string
+  if (logoOverride) {
+    logoUrl = normalizeDriveUrl(logoOverride)
+  } else {
+    const logoExt = LOGO_EXTENSIONS_BY_SLUG[slug] ?? 'png'
+    logoUrl = `${proto}//${host}/marcas/${slug}/logo.${logoExt}`
+  }
 
   // Sustituir tokens
   const datePill = buildDatePill(semanaInicio, semanaFin)
@@ -126,18 +164,23 @@ export async function GET(request: Request) {
     .replaceAll('{{DATE_SUB}}', dateSub)
     .replaceAll('{{CARDS_HTML}}', cardsHtml)
 
-  // Setup recomendado @sparticuz/chromium
-  chromium.setHeadlessMode = true
+  // Setup @sparticuz/chromium-min v138 (Vercel)
+  // En v138 la API se simplificó: solo setGraphicsMode + executablePath + args.
+  // Desactivamos GPU porque solo hacemos screenshots (no WebGL).
   chromium.setGraphicsMode = false
 
   // Lanzar Chromium y renderizar
   let browser: Browser | null = null
   try {
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        '--hide-scrollbars',
+        '--disable-web-security',
+      ],
       defaultViewport: { width: 1080, height: 1620, deviceScaleFactor: 1 },
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
+      headless: 'shell',  // modo headless ligero (chromium-headless-shell)
     })
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'networkidle0' })

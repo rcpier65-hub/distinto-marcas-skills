@@ -159,10 +159,10 @@ export async function regenerarPng(grillaId: string, marcaSlug: string): Promise
   // Re-query Notion para obtener publicaciones actualizadas
   const { queryGrillaForBrand } = await import('@/lib/integrations/notion')
   let publicaciones: import('@/lib/integrations/notion').GrillaPublicacion[] = []
-  // marca puede no traer notion_proyecto_id desde el JOIN; lo re-fetcheamos
+  // marca puede no traer notion_proyecto_id ni logo_url desde el JOIN; los re-fetcheamos
   const { data: marcaFull } = await supabase
     .from('marcas')
-    .select('notion_proyecto_id')
+    .select('notion_proyecto_id, logo_url')
     .eq('slug', marca.slug)
     .single()
   if (marcaFull?.notion_proyecto_id && process.env.NOTION_TOKEN && process.env.NOTION_GRILLA_DB_ID) {
@@ -184,6 +184,7 @@ export async function regenerarPng(grillaId: string, marcaSlug: string): Promise
         nombre: marca.nombre,
         emoji: marca.emoji_marca ?? '📊',
         color: marca.color_primario_hex ?? '#283B6F',
+        logo_url: marcaFull?.logo_url ?? null,
       },
       semanaInicio: grilla.semana_inicio,
       semanaFin: grilla.semana_fin,
