@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="8" fill="#1B4332"/>
+  <text x="100" y="90" font-family="Playfair Display, serif" font-style="italic" font-size="38" font-weight="700" text-anchor="middle" fill="#F5EDD8">La</text>
+  <text x="100" y="135" font-family="Playfair Display, serif" font-style="italic" font-size="42" font-weight="700" text-anchor="middle" fill="#F5EDD8">Victoria</text>
+  <text x="100" y="170" font-family="Inter, sans-serif" font-size="10" font-weight="500" text-anchor="middle" fill="#8B6F47" letter-spacing="3">DISTRIB. PINO</text>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="20" fill="#DCC32C"/>
+  <text x="100" y="115" font-family="Impact, sans-serif" font-size="80" font-weight="900" text-anchor="middle" fill="#0C0C12" letter-spacing="-2">ML</text>
+  <text x="100" y="155" font-family="Inter, sans-serif" font-size="14" font-weight="700" text-anchor="middle" fill="#0C0C12" letter-spacing="3">LOZANO</text>
+</svg>

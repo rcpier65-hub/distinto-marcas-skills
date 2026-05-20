@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="20" fill="#1A1A1A"/>
+  <text x="100" y="115" font-family="Impact, sans-serif" font-size="80" font-weight="900" text-anchor="middle" fill="#F54922" letter-spacing="-2">DF</text>
+  <text x="100" y="155" font-family="Inter, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#FFFFFF" letter-spacing="3">DISTRIB. FITNESS</text>
+</svg>

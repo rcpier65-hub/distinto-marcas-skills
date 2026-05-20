@@ -26,8 +26,31 @@ const DIAS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MESES_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const MESES_UP = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
-// Rotación de colores de cards (para variedad visual)
-const CARD_COLOR_CLASSES = ['is-white', 'is-rose', 'is-blue', 'is-cream', 'is-pink']
+// Rotación de colores de cards por marca (cada plantilla tiene sus propias clases CSS)
+const CARD_CLASSES_BY_SLUG: Record<string, string[]> = {
+  manrique: ['is-white', 'is-rose', 'is-blue', 'is-cream', 'is-pink'],
+  lozano: ['is-white', 'is-yellow', 'is-cream'],
+  'distribuidora-fitness': ['is-dark', 'is-darker', 'is-orange'],
+  'little-joe': ['is-white', 'is-soft', 'is-sky'],
+  kintu: ['is-white', 'is-mint', 'is-deep'],
+  novalamps: ['is-dark', 'is-light', 'is-lime'],
+  'la-victoria': ['is-cream', 'is-wood', 'is-deep'],
+}
+
+function cardClassesFor(slug: string): string[] {
+  return CARD_CLASSES_BY_SLUG[slug] ?? CARD_CLASSES_BY_SLUG.manrique
+}
+
+// Logo file: probamos .svg primero, fallback a .png
+const LOGO_EXTENSIONS_BY_SLUG: Record<string, 'svg' | 'png'> = {
+  manrique: 'png',  // Manrique tiene PNG real
+  lozano: 'svg',
+  'distribuidora-fitness': 'svg',
+  'little-joe': 'svg',
+  kintu: 'svg',
+  novalamps: 'svg',
+  'la-victoria': 'svg',
+}
 
 // SVG icon de "video" — para publicaciones tipo REEL/Video
 const VIDEO_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="34" rx="3"/><path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/><path d="M22 52h20"/><path d="M32 46v6"/></svg>`
@@ -88,12 +111,13 @@ export async function GET(request: Request) {
   // Construir URL absoluta del logo (Chromium necesita URLs accesibles)
   const proto = url.protocol
   const host = url.host
-  const logoUrl = `${proto}//${host}/marcas/${slug}/logo.png`
+  const logoExt = LOGO_EXTENSIONS_BY_SLUG[slug] ?? 'png'
+  const logoUrl = `${proto}//${host}/marcas/${slug}/logo.${logoExt}`
 
   // Sustituir tokens
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)
-  const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones)
+  const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones, slug)
 
   const html = templateHtml
     .replaceAll('{{TITLE}}', `Grilla ${slug} ${semanaInicio} → ${semanaFin}`)
@@ -161,7 +185,8 @@ function buildDateSub(inicio: string, fin: string): string {
   return `${mes.charAt(0).toUpperCase() + mes.slice(1)} · Del ${diaIni} ${d1.getUTCDate()} al ${diaFin} ${d2.getUTCDate()}`
 }
 
-function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[]): string {
+function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[], slug: string): string {
+  const cardClasses = cardClassesFor(slug)
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
   const numDays = Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)) + 1
@@ -198,7 +223,7 @@ function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[
     </article>`)
     } else {
       for (const pub of pubs) {
-        const colorClass = CARD_COLOR_CLASSES[colorIdx % CARD_COLOR_CLASSES.length]
+        const colorClass = cardClasses[colorIdx % cardClasses.length]
         colorIdx++
         const icon = pickIcon([pub.tipo])
         cards.push(`

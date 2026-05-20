@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <circle cx="100" cy="100" r="95" fill="#1E3A8A"/>
+  <text x="100" y="90" font-family="Quicksand, sans-serif" font-size="34" font-weight="700" text-anchor="middle" fill="#FFFFFF">Little</text>
+  <text x="100" y="130" font-family="Quicksand, sans-serif" font-size="44" font-weight="700" text-anchor="middle" fill="#FFFFFF">Joe</text>
+  <circle cx="80" cy="148" r="3" fill="#FFFFFF"/>
+  <circle cx="120" cy="148" r="3" fill="#FFFFFF"/>
+  <path d="M 85 162 Q 100 175 115 162" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>
