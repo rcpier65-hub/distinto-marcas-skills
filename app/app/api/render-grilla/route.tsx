@@ -12,10 +12,9 @@
 // Timeout: 60s (Vercel Hobby Free permite hasta 60s en Node runtime).
 
 import { NextResponse } from 'next/server'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import chromium from '@sparticuz/chromium-min'
 import puppeteer, { type Browser } from 'puppeteer-core'
+import { buildGrillaHtml } from '@/lib/grilla/template-builder'
 
 // URL del binary compilado con shared libs incluidas (libnss3, etc).
 // Cambiar al actualizar @sparticuz/chromium-min — match con el major version.
@@ -33,22 +32,10 @@ const DIAS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MESES_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const MESES_UP = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
-// Rotación de colores de cards por marca (cada plantilla tiene sus propias clases CSS)
-const CARD_CLASSES_BY_SLUG: Record<string, string[]> = {
-  manrique: ['is-white', 'is-rose', 'is-blue', 'is-cream', 'is-pink'],
-  lozano: ['is-white', 'is-yellow', 'is-cream'],
-  'distribuidora-fitness': ['is-dark', 'is-darker', 'is-orange'],
-  'little-joe': ['is-white', 'is-soft', 'is-sky'],
-  kintu: ['is-white', 'is-mint', 'is-deep'],
-  novalamps: ['is-dark', 'is-light', 'is-lime'],
-  'la-victoria': ['is-cream', 'is-wood', 'is-deep'],
-}
+// Theme-builder usa SIEMPRE las mismas 2 clases de card. Alternamos para variedad.
+const CARD_CLASSES = ['is-white', 'is-alt']
 
-function cardClassesFor(slug: string): string[] {
-  return CARD_CLASSES_BY_SLUG[slug] ?? CARD_CLASSES_BY_SLUG.manrique
-}
-
-// Logo file: probamos .svg primero, fallback a .png
+// Logo file: usamos PNG si existe el archivo local, sino SVG placeholder.
 const LOGO_EXTENSIONS_BY_SLUG: Record<string, 'svg' | 'png'> = {
   manrique: 'png',  // Manrique tiene PNG real
   lozano: 'svg',
@@ -127,18 +114,6 @@ export async function GET(request: Request) {
     publicaciones = []
   }
 
-  // Cargar plantilla por slug
-  let templateHtml: string
-  try {
-    const templatePath = join(process.cwd(), 'lib', 'grilla', 'templates', `${slug}.html`)
-    templateHtml = await readFile(templatePath, 'utf8')
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: `Plantilla no encontrada para slug '${slug}'`, detail: (e as Error).message },
-      { status: 404 },
-    )
-  }
-
   // Construir URL del logo con jerarquía:
   //   1. Query param explícito (?logo=...)
   //   2. Fallback al placeholder local /marcas/{slug}/logo.{ext}
@@ -153,17 +128,17 @@ export async function GET(request: Request) {
     logoUrl = `${proto}//${host}/marcas/${slug}/logo.${logoExt}`
   }
 
-  // Sustituir tokens
+  // Generar HTML con la plantilla maestra parametrizada por theme
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)
-  const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones, slug)
-
-  const html = templateHtml
-    .replaceAll('{{TITLE}}', `Grilla ${slug} ${semanaInicio} → ${semanaFin}`)
-    .replaceAll('{{LOGO_URL}}', logoUrl)
-    .replaceAll('{{DATE_PILL}}', datePill)
-    .replaceAll('{{DATE_SUB}}', dateSub)
-    .replaceAll('{{CARDS_HTML}}', cardsHtml)
+  const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones)
+  const html = buildGrillaHtml({
+    slug,
+    logoUrl,
+    datePill,
+    dateSub,
+    cardsHtml,
+  })
 
   // Setup @sparticuz/chromium-min v138 (Vercel)
   // En v138 la API se simplificó: solo setGraphicsMode + executablePath + args.
@@ -229,8 +204,9 @@ function buildDateSub(inicio: string, fin: string): string {
   return `${mes.charAt(0).toUpperCase() + mes.slice(1)} · Del ${diaIni} ${d1.getUTCDate()} al ${diaFin} ${d2.getUTCDate()}`
 }
 
-function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[], slug: string): string {
-  const cardClasses = cardClassesFor(slug)
+function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[]): string {
+  // Alternamos entre 2 classes: is-white (cardBg) e is-alt (cardAltBg) del theme
+  const cardClasses = CARD_CLASSES
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
   const numDays = Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)) + 1
