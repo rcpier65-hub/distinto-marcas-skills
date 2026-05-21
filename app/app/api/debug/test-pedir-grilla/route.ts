@@ -143,12 +143,63 @@ export async function GET(request: Request) {
   const upload = await uploadGrillaPNG(pngBuffer, slug, semana_inicio)
   recordStep(steps, '4-upload-storage', t5, upload)
 
+  // 6. Persistir en BD (igual que pedirGrilla)
+  let bdWrote = false
+  let bdGrillaId: string | null = null
+  if ('ok' in upload && upload.ok) {
+    const t6 = Date.now()
+    // Upsert grilla
+    const { data: existingGrilla } = await service
+      .from('grillas_pendientes')
+      .select('id')
+      .eq('marca_id', marca.id)
+      .eq('semana_inicio', semana_inicio)
+      .maybeSingle()
+
+    if (existingGrilla) {
+      await service
+        .from('grillas_pendientes')
+        .update({
+          estado: 'esperando_aprobacion',
+          png_url: upload.url,
+          png_storage_path: upload.path,
+          publicaciones_count: publicaciones.length,
+          notion_grilla_ids: publicaciones.map((p) => p.notion_id),
+          procesada_at: new Date().toISOString(),
+          error: null,
+        })
+        .eq('id', existingGrilla.id)
+      bdGrillaId = existingGrilla.id
+    } else {
+      const { data: nueva } = await service
+        .from('grillas_pendientes')
+        .insert({
+          marca_id: marca.id,
+          semana_inicio,
+          semana_fin,
+          estado: 'esperando_aprobacion',
+          png_url: upload.url,
+          png_storage_path: upload.path,
+          publicaciones_count: publicaciones.length,
+          notion_grilla_ids: publicaciones.map((p) => p.notion_id),
+          procesada_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+      bdGrillaId = nueva?.id ?? null
+    }
+    bdWrote = true
+    recordStep(steps, '5-persist-bd', t6, { grilla_id: bdGrillaId })
+  }
+
   return NextResponse.json({
-    ok: 'ok' in upload && upload.ok,
+    ok: 'ok' in upload && upload.ok && bdWrote,
     steps,
     totalMs: Date.now() - t0,
     publicacionesEncontradas: publicaciones.length,
     pngBytes: pngBuffer.length,
     finalUrl: 'ok' in upload && upload.ok ? upload.url : null,
+    grilla_id: bdGrillaId,
+    verUrl: bdGrillaId ? `https://distinto-app.vercel.app/marca/${slug}` : null,
   })
 }
