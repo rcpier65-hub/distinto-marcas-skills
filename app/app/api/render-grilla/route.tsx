@@ -40,7 +40,7 @@ const LOGO_EXTENSIONS_BY_SLUG: Record<string, 'svg' | 'png'> = {
   manrique: 'png',  // Manrique tiene PNG real
   lozano: 'svg',
   'distribuidora-fitness': 'svg',
-  'little-joe': 'svg',
+  'little-joe': 'png',  // Typhouse rebrand (22 may 2026) — PNG recortado 771×253
   kintu: 'svg',
   novalamps: 'svg',
   'la-victoria': 'svg',
