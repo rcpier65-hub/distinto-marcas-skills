@@ -135,13 +135,16 @@ export async function generarGrillaParaSemana(
  *
  * Flujo:
  *  1. Resolver grupo (alias o nombre)
+ *     - modo='real' → grupo del cliente (marca.grupo_whatsapp_*)
+ *     - modo='test' → grupo de testing interno (env WHATSAPP_TEST_GROUP_NAME, default "New team")
  *  2. Regenerar PNG fresh con publicaciones actuales
  *  3. Upload Storage (URL signed accesible públicamente)
  *  4. Llamar Rubi whatsapp_send_image con la URL + caption
- *  5. Update grilla a estado='enviada' con timestamp
+ *  5. Si modo='real' → update grilla a estado='enviada' + log aprobación
+ *     Si modo='test' → NO persistir (no contaminar estado de grilla del cliente)
  */
 type EnviarResult =
-  | { ok: true; messageId?: string; grupo: string }
+  | { ok: true; messageId?: string; grupo: string; modo: 'real' | 'test' }
   | { ok: false; error: string }
 
 export async function enviarGrillaAlGrupo(
@@ -149,6 +152,7 @@ export async function enviarGrillaAlGrupo(
   semanaInicio: string,
   semanaFin: string,
   caption: string,
+  modo: 'real' | 'test' = 'real',
 ): Promise<EnviarResult> {
   const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,14 +167,25 @@ export async function enviarGrillaAlGrupo(
     .maybeSingle()
   if (!marca) return { ok: false, error: 'Marca no encontrada' }
 
-  const grupoAlias = marca.grupo_whatsapp_alias as string | null
-  const grupoNombre = marca.grupo_whatsapp_nombre as string | null
-  const grupo = grupoAlias ?? grupoNombre
-  const byAlias = !!grupoAlias
+  // Resolución del grupo destino según el modo
+  let grupo: string | null
+  let byAlias: boolean
+  if (modo === 'test') {
+    // Grupo interno de testing — override config marca.
+    grupo = process.env.WHATSAPP_TEST_GROUP_NAME ?? 'New team'
+    byAlias = false
+  } else {
+    const grupoAlias = marca.grupo_whatsapp_alias as string | null
+    const grupoNombre = marca.grupo_whatsapp_nombre as string | null
+    grupo = grupoAlias ?? grupoNombre
+    byAlias = !!grupoAlias
+  }
   if (!grupo) {
     return {
       ok: false,
-      error: `Marca '${marca.slug}' no tiene grupo_whatsapp configurado. Configurá en Settings.`,
+      error: modo === 'real'
+        ? `Marca '${marca.slug}' no tiene grupo_whatsapp configurado. Configurá en Settings.`
+        : `Grupo de testing no configurado (env WHATSAPP_TEST_GROUP_NAME)`,
     }
   }
 
@@ -215,48 +230,53 @@ export async function enviarGrillaAlGrupo(
   const upload = await uploadGrillaPNG(pngBuffer, slug, semanaInicio)
   if (!upload.ok) return { ok: false, error: `Upload: ${upload.error}` }
 
-  // 5. Envío vía Rubi MCP
+  // 5. Envío vía Rubi MCP (igual para test y real — mismo grupo de destino sólo cambia)
   const rubiResult = await sendWhatsAppImageToGroup(grupo, upload.url, caption, byAlias)
   if (!rubiResult.ok) {
     return { ok: false, error: `WhatsApp: ${rubiResult.error}` }
   }
 
-  // 6. Persistir como enviada
-  const { data: existing } = await service
-    .from('grillas_pendientes')
-    .select('id')
-    .eq('marca_id', marca.id)
-    .eq('semana_inicio', semanaInicio)
-    .maybeSingle()
+  // 6. Persistencia — SOLO en modo real.
+  // En modo test no marcamos la grilla del cliente como "enviada" — sería falso
+  // y confundiría el estado en dashboard. Tampoco loggeamos aprobación.
+  if (modo === 'real') {
+    const { data: existing } = await service
+      .from('grillas_pendientes')
+      .select('id')
+      .eq('marca_id', marca.id)
+      .eq('semana_inicio', semanaInicio)
+      .maybeSingle()
 
-  const enviadaAt = new Date().toISOString()
-  if (existing) {
-    await service.from('grillas_pendientes').update({
-      png_url: upload.url, png_storage_path: upload.path, caption,
-      estado: 'enviada', enviada_at: enviadaAt,
-      publicaciones_count: publicaciones.length,
-      notion_grilla_ids: publicaciones.map((p) => p.notion_id),
-    }).eq('id', existing.id)
-  } else {
-    await service.from('grillas_pendientes').insert({
-      marca_id: marca.id, semana_inicio: semanaInicio, semana_fin: semanaFin,
-      png_url: upload.url, png_storage_path: upload.path, caption,
-      estado: 'enviada', enviada_at: enviadaAt,
-      pedida_por: user.id,
-      publicaciones_count: publicaciones.length,
-      notion_grilla_ids: publicaciones.map((p) => p.notion_id),
+    const enviadaAt = new Date().toISOString()
+    if (existing) {
+      await service.from('grillas_pendientes').update({
+        png_url: upload.url, png_storage_path: upload.path, caption,
+        estado: 'enviada', enviada_at: enviadaAt,
+        publicaciones_count: publicaciones.length,
+        notion_grilla_ids: publicaciones.map((p) => p.notion_id),
+      }).eq('id', existing.id)
+    } else {
+      await service.from('grillas_pendientes').insert({
+        marca_id: marca.id, semana_inicio: semanaInicio, semana_fin: semanaFin,
+        png_url: upload.url, png_storage_path: upload.path, caption,
+        estado: 'enviada', enviada_at: enviadaAt,
+        pedida_por: user.id,
+        publicaciones_count: publicaciones.length,
+        notion_grilla_ids: publicaciones.map((p) => p.notion_id),
+      })
+    }
+
+    // Log en aprobaciones
+    await service.from('aprobaciones').insert({
+      grilla_id: existing?.id ?? null,
+      usuario_id: user.id, accion: 'aprobar', via: 'dashboard',
+      comentario: `Enviada a grupo "${grupo}" via Rubi`,
     })
+
+    revalidatePath(`/grilla/${slug}`)
+    revalidatePath(`/marca/${slug}`)
+    revalidatePath('/dashboard')
   }
 
-  // Log en aprobaciones
-  await service.from('aprobaciones').insert({
-    grilla_id: existing?.id ?? null,
-    usuario_id: user.id, accion: 'aprobar', via: 'dashboard',
-    comentario: `Enviada a grupo "${grupo}" via Rubi`,
-  })
-
-  revalidatePath(`/grilla/${slug}`)
-  revalidatePath(`/marca/${slug}`)
-  revalidatePath('/dashboard')
-  return { ok: true, grupo }
+  return { ok: true, grupo, modo }
 }

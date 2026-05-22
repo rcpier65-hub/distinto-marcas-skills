@@ -44,6 +44,7 @@ export function GrillaWorkspace({
   const [caption, setCaption] = useState(captionDefault)
   const [zoom, setZoom] = useState(0.45)
   const [isSending, startSending] = useTransition()
+  const [isTesting, startTesting] = useTransition()
   // Bust de cache para el iframe: token que cambia al apretar "Recargar
   // preview" o al primer mount. Algunos navegadores ignoran Cache-Control:
   // no-store dentro de iframes, así que un param ?_v= rompe el cache HTTP.
@@ -69,15 +70,29 @@ export function GrillaWorkspace({
   }, [marca.slug, semanaInicio, semanaFin, publicaciones, bust])
 
   function handleEnviar() {
-    if (!confirm(`¿Enviar grilla al grupo WhatsApp de ${marca.nombre}? El PNG se genera ahora con la plantilla profesional.`)) return
+    if (!confirm(`¿Enviar grilla al grupo WhatsApp de ${marca.nombre}?\n\nEl PNG se genera ahora con la plantilla profesional y se manda al cliente.`)) return
     startSending(async () => {
       toast.loading('Generando PNG + enviando al grupo (~10s)…', { id: 'send' })
-      const result = await enviarGrillaAlGrupo(marca.slug, semanaInicio, semanaFin, caption)
+      const result = await enviarGrillaAlGrupo(marca.slug, semanaInicio, semanaFin, caption, 'real')
       if (result.ok) {
         toast.success(`✅ Enviada al grupo "${result.grupo}"`, { id: 'send' })
         router.refresh()
       } else {
         toast.error(`Error: ${result.error}`, { id: 'send' })
+      }
+    })
+  }
+
+  function handleProbar() {
+    if (!confirm(`¿Enviar grilla a "New team" para PROBAR?\n\nMismo PNG y mismo caption que se mandaría al cliente — sólo cambia el grupo destino. No se marca como enviada en BD.`)) return
+    startTesting(async () => {
+      toast.loading('Probando — generando PNG + enviando a New team (~10s)…', { id: 'test' })
+      const result = await enviarGrillaAlGrupo(marca.slug, semanaInicio, semanaFin, caption, 'test')
+      if (result.ok) {
+        toast.success(`🧪 Prueba enviada a "${result.grupo}"`, { id: 'test' })
+        // En test no refrescamos la página — la grilla no cambió de estado.
+      } else {
+        toast.error(`Error en prueba: ${result.error}`, { id: 'test' })
       }
     })
   }
@@ -107,7 +122,21 @@ export function GrillaWorkspace({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleEnviar} disabled={isSending} size="lg">
+          <Button
+            onClick={handleProbar}
+            disabled={isSending || isTesting}
+            size="lg"
+            variant="secondary"
+            title="Envía el mismo PNG + caption a New team (grupo interno de prueba). No persiste cambios."
+          >
+            {isTesting ? '⏳ Probando…' : '🧪 Probar (New team)'}
+          </Button>
+          <Button
+            onClick={handleEnviar}
+            disabled={isSending || isTesting}
+            size="lg"
+            title={`Envía al grupo WhatsApp real del cliente de ${marca.nombre}`}
+          >
             {isSending ? '⏳ Enviando…' : '📤 Enviar al grupo WhatsApp'}
           </Button>
         </div>
