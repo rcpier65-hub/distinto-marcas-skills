@@ -158,16 +158,38 @@ export async function GET(request: Request) {
       ],
       defaultViewport: { width: 1080, height: 1620, deviceScaleFactor: 1 },
       executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
-      headless: 'shell',  // modo headless ligero (chromium-headless-shell)
+      // headless: true (Chromium completo). 'shell' es chromium-headless-shell
+      // que es más liviano pero NO renderiza correctamente algunos features
+      // (gradients !important, ::first-letter, mix-blend-mode, drop-shadow filters).
+      // Causa PNG con fondo negro/parcial en algunos themes. Ver Sparticuz/chromium#issues.
+      headless: true,
     })
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
-    // Esperar a que las Google Fonts terminen de cargar
+    // Bg color blanco explícito ANTES de setContent (evita flash de bg default
+    // chromium si el render tarda). Sólo afecta si el .poster tiene transparencia.
+    await page.setViewport({ width: 1080, height: 1620, deviceScaleFactor: 1 })
+    await page.emulateMediaType('screen')
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 })
+    // Esperar a que las Google Fonts + assets terminen de cargar
     await page.evaluate(() => document.fonts.ready)
-    // Screenshot del .poster (el contenedor principal)
-    const posterElement = await page.$('.poster')
-    if (!posterElement) throw new Error('.poster element not found in template')
-    const pngBuffer = await posterElement.screenshot({ type: 'png', omitBackground: false })
+    // Pequeño settle para que el browser pinte después del fonts ready event
+    await new Promise((r) => setTimeout(r, 500))
+    // Verificación defensiva del .poster
+    const posterDims = await page.evaluate(() => {
+      const p = document.querySelector('.poster') as HTMLElement | null
+      if (!p) return null
+      const r = p.getBoundingClientRect()
+      return { x: r.x, y: r.y, w: r.width, h: r.height }
+    })
+    if (!posterDims) throw new Error('.poster element not found in DOM')
+    // Screenshot por clip a coords fijos (más confiable que posterElement.screenshot
+    // que en algunos casos en Chromium serverless captura un área en blanco/negra
+    // si el elemento tiene position: relative + hijos absolutes).
+    const pngBuffer = await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: 1080, height: 1620 },
+      omitBackground: false,
+    })
 
     await browser.close()
     browser = null
@@ -177,6 +199,7 @@ export async function GET(request: Request) {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'no-store, max-age=0',
+        'X-Poster-Bbox': `${posterDims.w}x${posterDims.h}`,
       },
     })
   } catch (e) {
