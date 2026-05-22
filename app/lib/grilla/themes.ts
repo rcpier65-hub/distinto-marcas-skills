@@ -100,19 +100,18 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   'distribuidora-fitness': {
     style: 'gym-energy',
-    // Estilo de diseño v2 (22-may-2026, Pedro): dark grafito + Fiery Red Smoke +
-    // Saira Condensed italic black. Ver `09-estilo-diseno.md` en la skill.
-    // Cambio total vs v1: ahora es pieza dark cinematográfica (no blanco+naranja).
-    primary: '#FFFFFF',       // Blanco crudo (texto/elementos sobre dark)
+    // Estilo de diseño v3 (22-may-2026, Pedro feedback "más blanco"):
+    // Magazine editorial gym. Dark+smoke como "stage", cards BLANCAS como
+    // paneles de información (igual que precios en pieza Warrior).
+    // Logo DF y Distinto en NEGATIVO (blanco) via filter CSS. Sin wrapper
+    // blanco para el logo del header. Ver `09-estilo-diseno.md`.
+    primary: '#1A1818',       // Grafito dark (texto sobre cards blancas)
     accent: '#F54922',        // Naranja DF oficial Manual pág. 7
-    highlight: '#FF6B45',     // Naranja brillante (variaciones)
-    canvas: '#1A1818',        // Grafito dark base (smoke layer va encima)
-    text: '#FFFFFF',
-    cardBg: '#1F1F1D',        // Gris muy oscuro (cards "sólidas")
-    cardAltBg: '#262624',     // Gris alterno
-    // Saira Condensed: la opción Google Fonts con italic real + peso 900 +
-    // condensed. Reemplaza a Stretch Pro (pago) con fidelidad alta.
-    // Inter para subtítulos/body. Bebas Neue alternativa para acentos.
+    highlight: '#FF6B45',     // Naranja brillante
+    canvas: '#1A1818',        // Grafito dark base (smoke layer encima)
+    text: '#1A1818',          // Texto dark sobre paneles blancos
+    cardBg: '#FFFFFF',        // PANELES BLANCOS (lo que rompe con dark)
+    cardAltBg: '#FAFAFA',     // Alterno gris muy claro
     fontsUrl: 'https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap',
     fontSerif: "'Saira Condensed', 'Bebas Neue', Impact, sans-serif",
     fontSans: "'Inter', system-ui, sans-serif",
@@ -122,7 +121,10 @@ export const THEMES: Record<string, GrillaTheme> = {
     tagline: 'Tu progreso, nuestro suplemento',
     footerUrl: 'distribuidorafitness.pe',
     heroTitle: 'Esta semana',
-    logoBg: '#FFFFFF',         // Logo FD oficial = positivo sobre blanco (manual)
+    // logoBg transparent → logo flota sobre smoke, sin thumbnail blanco.
+    // El logo se renderiza en NEGATIVO (blanco) via CSS filter en el style.
+    logoBg: 'transparent',
+    logoPad: '0',
   },
   'little-joe': {
     style: 'playful-italian',

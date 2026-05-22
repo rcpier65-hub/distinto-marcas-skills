@@ -200,6 +200,30 @@ Cuando se diseñe **cualquier** pieza para DF (post IG, carrusel, story, banner 
 
 ## 📝 Histórico de cambios
 
-- **22 may 2026** — Pedro define este estilo a partir de pieza Warrior x DF.
-  Reemplaza diseño previo (que usaba fondo blanco + Anton + speed lines).
+- **22 may 2026 v1** — Pedro define el estilo a partir de pieza Warrior x DF.
+  Reemplaza diseño previo (fondo blanco + Anton + speed lines).
   Implementado primero en `gym-energy.ts` del sistema de grillas semanales.
+
+- **22 may 2026 v2** — Feedback Pedro: "hay que usar más blanco" + "los logos están mal".
+  Pivote del diseño: cards de día ahora son **BLANCAS** (paneles editoriales) en lugar
+  de dark semi-transparentes. El dark+smoke queda como "stage" cinematográfico.
+  Logo DF y logo Distinto se renderizan en **NEGATIVO (blanco)** via CSS
+  `filter: brightness(0) invert(1)` — el manual permite versión negativa.
+  Sin wrapper blanco en el logo del header (logoBg: transparent, logoPad: 0).
+  Agregados: divider con barra naranja sólida (no flecha), text-shadow más sutil,
+  acentos naranjas estructurales (líneas top/bottom).
+
+## 🎓 Lecciones aprendidas (para futuras piezas DF)
+
+1. **Dark canvas + cards blancas** > dark canvas + cards dark: la lectura editorial
+   exige un panel de "información" que rompa el "stage". Una grilla de 7 días con
+   todo dark fatiga la vista — el blanco descansa.
+2. **Filter `brightness(0) invert(1)`** es el truco para convertir cualquier SVG/PNG
+   a versión blanca sin tocar el asset original. Útil cuando solo hay versión
+   positiva (color) disponible y necesitás "modo negativo" sobre dark.
+3. **El smoke debe respirar**: opacity 0.7-0.85 + `mix-blend-mode: screen` da el
+   efecto de humo iluminado. Más opacidad = pieza ahogada. Menos = perder el mood.
+4. **Vignettes top/bottom** son críticos: el smoke por sí solo cubre toda la pieza
+   pero las esquinas necesitan oscurecerse para foco al contenido.
+5. **Cards blancas con border-left 7px naranja** son la "firma visual" repetible.
+   Espejo de los precios "S./200" en Warrior — bloque blanco + acento color marca.
