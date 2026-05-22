@@ -200,25 +200,31 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   'la-victoria': {
     style: 'wood-industrial',
-    // Brochure: Verde bosque oscuro PRIMARIO + crema madera + marrón
-    primary: '#1B4332',       // Verde bosque oscuro
-    accent: '#8B6F47',         // Marrón madera
-    highlight: '#C9A87A',      // Madera clara
-    canvas: '#F2E8D0',         // Crema madera natural
-    text: '#1B4332',
-    cardBg: '#FFFCEB',
-    cardAltBg: '#E8D4B0',
-    // Brochure: serif moderna semibold + sans tracking ancho
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap',
+    // Estilo v2 (22-may-2026, basado en pieza Día del Trabajador):
+    // Profesional industrial cinematográfico · canvas verde bosque MUY oscuro
+    // (NO blanco crema) + foto sutil overlay + tipografía serif moderna semibold
+    // ALL CAPS BLANCO + firma visual = pill verde con em-dashes "— TEXTO —".
+    primary: '#F5EDD8',        // Crema madera (texto sobre dark — color del logo en negativo)
+    accent: '#C9A87A',         // Madera clara dorada (acentos secundarios)
+    highlight: '#8B6F47',      // Marrón madera (acentos terciarios)
+    canvas: '#0A2A1F',         // Verde bosque MUY OSCURO (background protagonista)
+    text: '#F5EDD8',
+    cardBg: '#FFFCEB',         // Cards blanco crema (paneles editoriales)
+    cardAltBg: '#F2E8D0',      // Card alterno
+    // Brochure: serif moderna semibold + sans tracking ancho uppercase
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@300;400;500;600;700;800&display=swap',
     fontSerif: "'Playfair Display', Georgia, serif",
     fontSans: "'Inter', system-ui, sans-serif",
     fontDisplay: "'Playfair Display', Georgia, serif",
     brandSmall: 'DISTRIBUIDORA DE PINO',
     brandBig: 'LA VICTORIA',
-    tagline: 'Asegura tu abastecimiento',
-    footerUrl: 'lavictoria.com.pe',
-    heroTitle: 'La semana en obra',
-    logoBg: '#FFFCEB',
+    tagline: '',                  // Sin tagline (aprendizaje DF/Kintu)
+    footerUrl: 'WhatsApp · 973 991 208',  // CTA del brochure
+    heroTitle: 'Esta semana',
+    // Logo aspect 1.57:1 (stack vertical símbolo+wordmark). Sin wrapper.
+    // El logo es verde bosque sobre dark → necesita filter para volverse crema.
+    logoBg: 'transparent',
+    logoPad: '0',
   },
 }
 
