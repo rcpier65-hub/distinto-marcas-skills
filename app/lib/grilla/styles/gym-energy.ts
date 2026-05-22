@@ -56,14 +56,16 @@ export const gymEnergy: StyleBuilder = () => ({
     .vignette-bottom { bottom: 0; height: 220px;
       background: linear-gradient(0deg, rgba(0,0,0,0.65) 0%, transparent 100%); }
 
-    /* Acentos naranjas estructurales (firma de marca) */
+    /* Acentos naranjas estructurales (firma de marca). La línea bottom
+       va al BORDE absoluto del poster (z-index 1) para que quede DEBAJO
+       del footer entero — antes atravesaba el logo de Distinto. */
     .orange-accent-line {
       position: absolute; height: 4px; background: var(--accent);
       left: 70px; right: 70px; z-index: 2;
       box-shadow: 0 0 18px rgba(245,73,34,0.55);
     }
-    .orange-accent-line.top { top: 32px; }
-    .orange-accent-line.bottom { bottom: 32px; }
+    .orange-accent-line.top { top: 22px; }
+    .orange-accent-line.bottom { bottom: 18px; }
 
     /* ═══════════════ HEADER ═══════════════
        Sin wordmark de texto: el logo oficial DF ya dice "DISTRIBUIDORA FITNESS"
@@ -75,8 +77,10 @@ export const gymEnergy: StyleBuilder = () => ({
       margin-bottom: 20px !important;
       align-items: center !important;
     }
-    /* Logo DF: tight viewBox + tamaño grande + negativo via filter
-       Aspect real 1.63:1 → 320×196px lo deja proporcional sin whitespace */
+    /* Logo DF: tight viewBox + tamaño grande + negativo via filter.
+       object-position: left center → ancla el SVG al borde izquierdo del
+       contenedor para que NO aparezca centrado (corrige el aspect mismatch
+       de ~10px que el object-fit:contain default introducía). */
     .logo {
       filter: brightness(0) invert(1);
       filter: drop-shadow(0 4px 24px rgba(255,255,255,0.18)) brightness(0) invert(1);
@@ -84,6 +88,7 @@ export const gymEnergy: StyleBuilder = () => ({
       width: 340px !important;
       height: 208px !important;
       padding: 0 !important;
+      object-position: left center !important;
     }
     /* Ocultar brand-name texto: el logo ya dice "DISTRIBUIDORA FITNESS"
        y "MAYORISTA" debajo. No duplicar. */
