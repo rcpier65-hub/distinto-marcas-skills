@@ -1,65 +1,70 @@
-# 09 · ESTILO DE DISEÑO — Little Joe Perú
+# 09 · ESTILO DE DISEÑO — Typhouse (ex-Little Joe)
 
-> 🎨 **Referencia visual canónica para piezas de Little Joe**.
-> Definido el 22 may 2026 a partir del FONDO CIELO oficial Kit 2026 + post DM 2026 real.
-> 📌 Esta guía reemplaza cualquier inferencia previa (v1 era azul royal sólido).
+> 🎨 **Referencia visual canónica para piezas de Typhouse**.
+> Definido el 22 may 2026 — **rebrand v4 completo**: Little Joe → Typhouse (agencia de diseño / branding).
+> 📌 Esta guía REEMPLAZA todas las versiones anteriores (v1 royal blue, v2 cielo cartoon, v3 fucsia + Joe rojo). Son obsoletas.
 
 ---
 
-## 🖼️ Referencias visuales aprobadas
+## ⚠️ Contexto del rebrand
 
-1. **FONDO CIELO LITTLE JOE-100** (CANVAS OFICIAL del cliente)
-   Path: `01 - IDENTIDAD DE MARCA/KIT DE MARCA 2026/FONDO CIELO LITTLE JOE-100.jpg`
-   Lo que define: **fondo cielo cartoon italiano** (azul medio + nubes blancas estilo cartoon dulce). Es el canvas oficial — replicar como background.
+Pedro decidió el **22 may 2026** rebrandear "Little Joe" (importador peruano de muñecos italianos) a **"Typhouse"** — pivote a marca de **agencia de diseño / branding propio**. Implica:
 
-2. **Post Día de la Madre 2026 Little Joe** (CANÓNICA tipográfica)
-   Path: `05 - POSTS/MAYO 2026/DIA DE LA MADRE/1.png`
-   Lo que define: foto lifestyle de muñecos Joe (lila + rojo) abrazándose en jardín primaveral + chip rosa fucsia con texto blanco + **"Feliz / día de la / madre" en script cursive rosa + corazón rojo** + logo "Little Joe®" cursive negro.
+- ❌ FUERA: mascota Joe roja, cielo cartoon italiano, script cursive Caveat, fucsia/coral fútbol.
+- ✅ DENTRO: símbolo TP celeste minimalista + wordmark "typhouse" sans bold + concepto editorial limpio creativo.
+- El skill se mantiene en `marca-4-little-joe/` (slug de BD legacy) pero el contenido es Typhouse.
 
-3. **Historia destacada Mascota Joe** (Kit 2026)
-   Path: `01 - IDENTIDAD DE MARCA/KIT DE MARCA 2026/HISTORIAS DESTACADAS 2026/Mesa de trabajo 4-100.jpg`
-   Lo que define: **mascota Joe ROJA oficial peruana** (no azul como matriz italiana) sobre fondo cielo + wordmark "Little Joe®" cursive blanco en la barriga.
+---
 
-**Implementación referencia**: `app/lib/grilla/styles/playful-italian.ts`.
+## 🖼️ Referencia visual canónica
+
+1. **Logo Typhouse oficial** (única fuente de verdad)
+   Path: `13 - GESTION COMERCIAL/TYPHOUSE/LOGO/FORMATO PNG/Mesa de trabajo 1.png` (horizontal)
+   Lo que define: símbolo **TP en celeste** (`#1FB3E8` aprox) compuesto por dos formas redondeadas que sugieren splash/gota + **wordmark "typhouse"** en sans serif bold rounded negro/grafito + acento de gotas (concepto splash) a la derecha de la "y".
+   - Aspect-ratio nativo del bbox útil: ~3.68:1 (711×193 dentro del 1080×1080 original).
+   - Asset desplegado: `app/public/marcas/little-joe/logo.png` recortado a **771×253** (aspect 3.05:1) para maximizar área visible con `object-fit:contain`.
+
+2. **Variante vertical**
+   Path: `13 - GESTION COMERCIAL/TYPHOUSE/LOGO/FORMATO PNG/Mesa de trabajo 1 copia.png`
+   No se usa en grilla horizontal pero existe como recurso.
+
+**Implementación referencia**: `app/lib/grilla/styles/playful-italian.ts` (mismo nombre por compat, contenido completamente reescrito).
 
 ---
 
 ## 🎯 Filosofía del estilo
 
-**Cute Charming Italiano · Cielo Cartoon Dulce + Mascota Joe Roja**
+**Editorial Limpio Creativo · Agencia de Diseño/Branding**
 
-- **Mood**: pieza emocional cute italiana, "pon una sonrisa en el aire". Lover + Innocent + Caregiver.
-- **No es**: dark luxury, sci-fi, industrial, masculinizado, hardcore, ofertón comercial.
-- **Cliente arquetípico**: persona que regala a sus seres queridos. Mujeres jóvenes que aman detalles. Fans fútbol Perú que conectan con co-branding U/Alianza/Cristal.
-- **Es la única marca CLARA WARM CUTE** del set Distinto. DF/LV/Lozano/NovaLamps son dark luxury. Kintu es claro orgánico. Manrique es clinical. Little Joe es **cute warm italiano playful**.
+- **Mood**: pieza editorial luminosa, profesional creativa. Confianza + claridad + acento de color refrescante.
+- **No es**: dark luxury, cute italiano, ofertón comercial, sci-fi industrial, cartoon, cielo, mascota.
+- **Cliente arquetípico interno**: agencia/empresa que necesita branding, identidad visual, casos de éxito. Audiencia: dueños de marca, diseñadores, marketing managers.
+- **Diferenciador en el set Distinto**: única marca **clara editorial creativa**. Manrique=clinical warm, Kintu=organic light, La Victoria=wood industrial, Lozano=artisan craft, NovaLamps=dark luxury lima, Distri Fitness=gym energy ámbar, Typhouse=**editorial blanco crema + celeste splash**.
 
 ---
 
 ## ☁️ Sistema visual canónico
 
-### Background — CIELO CARTOON oficial
+### Background — Blanco crema warm
 
 | Capa | Tratamiento |
 |---|---|
-| **Asset oficial** | `app/public/marcas/little-joe/fondo-cielo.jpg` (300KB, copia del Kit 2026 oficial) |
-| **CSS** | `background-image: url('/marcas/little-joe/fondo-cielo.jpg'); background-size: cover; background-position: center;` |
-| **Fallback color** | `#9DCEEC` (azul cielo medio si no carga la foto) |
-| **Overlay sutil** | `linear-gradient(180deg, rgba(157,206,236,0.10) 0%, rgba(255,255,255,0.10) 100%)` — mejora legibilidad |
-| **Nubes decorativas** | SVG paths white opacity 0.78-0.96 en 3 posiciones (refuerzan el cielo) |
+| **Gradient** | `linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 60%, #F4F9FC 100%)` — blanco arriba, sutil celeste muy claro abajo |
+| **Splashes decorativos** | 3 SVG con círculos celeste (`#1FB3E8` opacity 0.4–0.7) emulando el concepto splash del logo TP — top-right, bottom-left, mid-right |
+| **Accent bars** | Barras 4px celeste con border-radius 999px en `top: 28px` y `bottom: 28px` (estructurales editoriales) |
 
 ### Paleta canónica
 
 | Color | Hex | Rol |
 |---|---|---|
-| **Navy Little Joe** | **`#1A3A6E`** | Texto principal sobre cielo claro |
-| Azul cielo | `#9DCEEC` | Fallback canvas |
-| **Rosa fucsia / coral** | **`#E63D6A`** | Acento PROTAGONISTA — firma visual (chips, DD, divider, hero) |
-| **Rojo Joe** | **`#E63946`** | Color de la mascota peruana — acentos secundarios |
-| Dorado estrella | `#EAB308` | Estrellas decorativas |
-| **Blanco** | `#FFFFFF` | Cards + nubes + text shadows |
-| Crema sutil | `#F4F9FE` | Cards alternas |
+| **Negro Typhouse** | `#0A0A0A` | Texto principal (wordmark, hero, títulos cards) |
+| **Celeste Typhouse** | **`#1FB3E8`** | ACENTO PROTAGONISTA — símbolo TP, pill fecha, DD cards, divider, splashes |
+| Celeste claro | `#5DC8EF` | Highlight / shadows del celeste |
+| **Blanco** | `#FFFFFF` | Card bg principal |
+| Crema sutil | `#FAFBFC` | Mid gradient |
+| Celeste muy claro | `#F4F9FC` | Card alt + bottom gradient |
 
-> ⚠️ **NO usar** azul royal Italia matriz como background (la marca PE evolucionó hacia rosa+rojo+cielo). El azul royal queda en la mascota italiana de comparación.
+> ⚠️ **NO usar** rosa fucsia, fondo cielo cartoon, mascota Joe, script cursive — todo eso era Little Joe v3 y quedó obsoleto.
 
 ---
 
@@ -67,182 +72,97 @@
 
 | Rol | Familia | Peso | Aplicación |
 |---|---|---|---|
-| **Hero / palabras destacadas** | **Caveat** cursive | 700 | "Esta semana" 156px rosa fucsia con shadow blanco |
-| **DD en card** | Caveat cursive | 700 | 72px rosa fucsia |
-| **Card titles** | **Fraunces** | 600 italic | "POV Unboxing ASMR" 26px italic navy |
-| **Date pill** | **Quicksand** rounded | 700 | "♥ 18 — 24 MAY · 2026" uppercase tracking blanco sobre fucsia |
-| **Sub hero / labels** | Quicksand | 600-700 | Tracking 2-2.5px uppercase |
-| **Card meta** | Quicksand | 600 | Plataformas uppercase rosa |
-| **URL footer** | Quicksand | 700 | `littlejoe.pe` lowercase rosa |
+| **Hero / DD / Card titles / Logo** | **Quicksand** rounded | 700 | Coherente con el wordmark "typhouse" del logo |
+| **Sub hero / meta / pill / footer URL** | Quicksand | 600 | Tracking 2-3.5px uppercase para labels |
 
 ```
-https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Quicksand:wght@400;500;600;700&display=swap
+https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Quicksand:wght@400;500;600;700&display=swap
 ```
 
-> 💡 **Caveat** es el OSS más cercano al estilo "Feliz / madre" script del post DM. Sacramento / Lemon Tuesday son alternativas viables. Quicksand es rounded friendly (no Inter). Fraunces tiene curvas italic emotivas (no Playfair recta).
+(Caveat + Fraunces se mantienen en el fontsUrl por compat del theme; no se usan visualmente.)
 
 ---
 
-## 🎨 Componentes / patrones visuales
+## 🧱 Componentes — specs
 
-### 💗 FIRMA VISUAL — Chip rosa fucsia con corazón
+### Header
 
-Espejo del chip "A las mamás que llenan cada camino de amor." del post DM:
+- **Logo**: `width: 340px; height: 105px; object-fit: contain; object-position: left center; filter: drop-shadow(0 3px 10px rgba(31,179,232,0.18))`. Aspect-ratio del PNG (3.05:1) ≈ contenedor (3.24:1) → llena el ancho útil al ~94%.
+- **Brand name** (`brandSmall` / `brandBig` del theme): **oculto** (`display: none`) — el logo PNG ya contiene todo.
+- **Date pill**: chip rounded `border-radius: 999px`, background celeste sólido, color blanco, Quicksand 700 16px tracking 1.8px uppercase, padding `14px 28px`, box-shadow celeste suave. Alineado a la derecha (`margin-left: auto`).
 
-```css
-.pill-firma {
-  background: #E63D6A;
-  color: #FFFFFF;
-  font-family: 'Quicksand', sans-serif;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 12px 26px;
-  border-radius: 999px;
-  box-shadow: 0 8px 22px rgba(230,61,106,0.4);
-}
-.pill-firma::before { content: '♥ '; }
-```
+### Hero
 
-### Hero text cursive (espejo "Feliz / madre")
+- **H1**: Quicksand 700 130px, letter-spacing -3px, line-height 0.95, color negro.
+  - **Primera letra en celeste** (`::first-letter { color: var(--accent); }`) → firma visual (ej: "**E**sta semana" donde la E es celeste).
+- **Sub**: Quicksand 600 13px tracking 3.5px uppercase color negro opacity 0.55. Margin-top 14px.
+- **Divider**: línea celeste 3px ancho 80px border-radius 999px + dot celeste 10px box-shadow celeste glow.
 
-```css
-.hero h1 {
-  font-family: 'Caveat', cursive;
-  font-weight: 700;
-  font-size: 156px;
-  letter-spacing: -1px;
-  line-height: 0.9;
-  color: #E63D6A;
-  text-shadow: 3px 3px 0 rgba(255,255,255,0.8);
-}
-```
+### Cards (publicaciones reales)
 
-### Cards blancas redondeadas
+- `background: #FFFFFF` (alterna con `#F4F9FC` para `.is-alt`).
+- `border-radius: 14px` (medio, ni cuadrado severo ni pill).
+- `border: 1px solid rgba(31,179,232,0.18)` (delicado).
+- `border-left: 5px solid #1FB3E8` (acento estructural — firma).
+- `box-shadow: 0 6px 22px rgba(10,10,10,0.06)` (sombra editorial sutil).
+- `padding: 16px 26px`, `gap: 22px`.
 
-```css
-.card {
-  background: #FFFFFF;
-  border-radius: 22px;
-  border: 2px solid rgba(230,61,106,0.18);
-  box-shadow: 0 8px 26px rgba(26,58,110,0.12);
-}
-.card .date .day {
-  font-family: 'Caveat', cursive;
-  font-weight: 700;
-  font-size: 72px;
-  color: #E63D6A;
-}
-.card .body .title {
-  font-family: 'Fraunces', Georgia, serif;
-  font-style: italic;
-  font-weight: 600;
-  font-size: 26px;
-  color: #1A3A6E;
-}
-```
+**Date interno**:
+- `.day`: Quicksand 700 54px celeste, letter-spacing -2px.
+- `.month`: Quicksand 600 11px tracking 2.5px uppercase negro opacity 0.5.
+- Texto alineado a la izquierda (no chip cuadrado — fluye con el card).
 
-### Decoraciones (corazones + estrellas + nubes)
+**Body**:
+- `.title`: Quicksand 700 27px negro line-height 1.15.
+- `.meta`: Quicksand 600 11px tracking 2.5px uppercase celeste.
 
-3 corazones rosa fucsia dispersos + 2 estrellas doradas + 3 nubes blancas adicionales sobre el fondo cielo. Cada uno con `filter: drop-shadow` para presencia sutil.
+**Icon**: 42×42 celeste opacity 0.65.
 
-### Logos
+### Cards vacías ("Sin publicación programada")
 
-#### Logo Little Joe (header)
-
-- **Asset**: `app/public/marcas/little-joe/logo.png` (LOGO BLANCO PNG del Kit 2025)
-- **Filter**: el PNG es blanco. Sobre cielo claro necesita invertir a navy oscuro:
-  ```css
-  filter: drop-shadow(0 3px 10px rgba(255,255,255,0.5)) brightness(0) invert(0.16);
-  ```
-  `brightness(0)` colapsa a negro, `invert(0.16)` deja un navy oscuro visible.
-- **Dimensiones**: `width: 160px; height: 60px`.
-- **Sin wrapper**: `logoBg: transparent; logoPad: 0`.
-
-#### Logo Distinto Agencia (footer)
-
-- **Color ORIGINAL** (morado + amarillo + negro). Sobre cielo claro NO necesita filter.
-- **Drop-shadow** sutil para presencia:
-  ```css
-  filter: drop-shadow(0 3px 12px rgba(26,58,110,0.15));
-  ```
-- **Dimensiones**: `height: 64px; max-width: 380px`.
-
-### Date pill
-
-Chip rosa fucsia con corazón + tracking + rounded — la firma cute aplicada al header.
+- `background: rgba(255,255,255,0.55)`, `border: 1.5px dashed rgba(31,179,232,0.35)`.
+- `.day` celeste opacity 0.5, `.title` negro opacity 0.5 italic 500 weight.
 
 ### Footer
 
-- **NO tagline** frase comercial
-- **URL `littlejoe.pe`** Quicksand rosa lowercase tracking
-- **Logo Distinto color original**
+- Logo Distinto agency centrado, `height: 64px max-width: 380px` con drop-shadow sutil.
+- URL `typhouse.pe`: Quicksand 700 12px tracking 2.5px lowercase color celeste.
+- Tagline oculta.
 
 ---
 
-## 🚫 Reglas duras (lo que NO va)
+## 🚫 Reglas duras (NO hacer)
 
-- ❌ Azul royal italiano sólido como background (v1 — la marca PE usa cielo cartoon)
-- ❌ Playfair Display serif elegante (eso es Lozano/LV/NL — Little Joe usa Caveat/Fraunces curvy)
-- ❌ Inter sans plano (no transmite el cute italiano)
-- ❌ Dark/oscuro (Little Joe es CLARO WARM)
-- ❌ Verde / lima / amarillo neón (paleta cerrada en rosa+rojo+cielo+blanco)
-- ❌ Tono masculinizado / hardcore (NO es esa audiencia)
-- ❌ Memes ofensivos / sexualizados
-- ❌ Tagline frase comercial en footer (mantener minimalista cute)
-- ❌ Border-radius < 14px en cards (rompe el feel rounded charming)
-- ❌ Tecnicismos químicos en piezas
+1. ❌ **NO** usar fondo cielo cartoon (era Little Joe v3, obsoleto).
+2. ❌ **NO** mostrar el `brandBig` / `brandSmall` como texto — el logo PNG es la única identidad visible.
+3. ❌ **NO** usar script cursive Caveat para hero (era v3 fucsia).
+4. ❌ **NO** usar rosa fucsia / coral / rojo Joe — la paleta es **negro + celeste + blanco crema**.
+5. ❌ **NO** subir un PNG cuadrado con whitespace masivo — el aspect del archivo debe coincidir (±15%) con el del contenedor CSS, o `object-fit:contain` desperdicia área.
+6. ❌ **NO** usar mascota Joe ni corazones ni decoraciones cute italianas.
+7. ❌ **NO** poner el logo pegado al borde sin padding — `object-position: left center` ya lo ancla; el padding del header da el aire.
 
 ---
 
-## 🔁 Cómo replicar este estilo en otras piezas
+## ✅ Cómo replicar este estilo
 
-1. **Background**: `fondo-cielo.jpg` oficial Kit 2026 (cielo cartoon)
-2. **Nubes blancas** SVG adicionales para refuerzo
-3. **Corazones rosa fucsia + estrellas doradas** dispersos como decoraciones cute
-4. **Tipografía hero**: Caveat cursive — espejo del "Feliz / madre" del post DM
-5. **Tipografía body**: Fraunces italic curvy navy
-6. **Tipografía labels**: Quicksand rounded friendly
-7. **Chips rosa fucsia con ♥** como firma visual aplicada en CTAs
-8. **Cards radius 22px** con border-left fucsia + DD Caveat cursive rosa
-9. **Logo Little Joe** con filter invert(0.16) → navy oscuro sobre cielo
-10. **Logo Distinto color original** sobre cielo claro (no negativo)
+1. Theme `little-joe` en `app/lib/grilla/themes.ts` → `style: 'playful-italian'`, primary `#0A0A0A`, accent `#1FB3E8`, canvas `#FAFBFC`, fontDisplay/Sans Quicksand, brandBig `typhouse`, brandSmall `AGENCIA DE DISEÑO`, footerUrl `typhouse.pe`, heroTitle `Esta semana`.
+2. PNG del logo en `app/public/marcas/little-joe/logo.png` debe ser **recortado al bbox útil** (no el cuadrado original 1080×1080). Aspect ~3:1.
+3. Style builder en `app/lib/grilla/styles/playful-italian.ts` — usar el código actual como referencia.
 
 ---
 
-## 📝 Histórico de iteraciones
+## 📜 Histórico de iteraciones
 
-| Versión | Cambio | Aprendizaje |
-|---|---|---|
-| v1 (sesión previa) | Azul royal Italia + Fraunces curvy + nubes + estrellas + corazón en pill | Off-brand. La marca PE evolucionó a cielo cartoon + mascota roja, no azul royal sólido. |
-| v2 (correcciones intermedias) | Cielo cálido warm gradient + Caveat opcional + acento dorado | Aún no usaba el FONDO CIELO oficial del cliente. |
-| **v3 (22 may 2026)** | **Fondo cielo cartoon oficial Kit 2026 + Caveat cursive ROSA + chip rosa fucsia con corazón + cards radius 22px + decoraciones (corazones+estrellas+nubes) + logo navy con invert(0.16)** | El FONDO CIELO oficial del cliente es CANÓNICO. La mascota roja Joe + rosa fucsia + script cursive son la identidad real de Little Joe Perú. |
+- **v1 (5 may 2026)**: royal blue Italia matriz sólido — descartada por inconsistente con manual PE.
+- **v2 (19 may 2026)**: fondo cielo cartoon + mascota Joe + Caveat fucsia — implementada y entregada en grilla 12-18 may.
+- **v3 (21 may 2026)**: refuerzo del cute italiano + cards cute + ajustes de logo — entregada en grilla 19-25 may.
+- **v4 REBRAND (22 may 2026)**: pivote completo a **Typhouse** agencia de diseño. Editorial limpio creativo. Logo TP celeste + wordmark sans bold. Es la versión actual y oficial.
 
-## 🎓 Lecciones aprendidas (para futuras piezas Little Joe)
+---
 
-1. **El fondo cielo cartoon es OFICIAL del cliente** (Kit 2026). Es el canvas canónico — replicarlo es obligatorio para identidad inmediata. Sin él, la pieza pierde el alma italiana cute.
+## 🎓 Lecciones aprendidas
 
-2. **Rosa fucsia `#E63D6A` es la firma visual** (no rojo, no azul). Es lo que vi en el post DM como acento dominante en chip + script cursive "Feliz". Rojo `#E63946` queda como color de la mascota Joe.
-
-3. **Caveat cursive** es la fuente clave para hero + DD. Espejo del "Feliz / madre" del post DM. Sacramento / Lemon Tuesday son alternativas válidas pero Caveat es la más rounded friendly.
-
-4. **Cards radius 22px** (alto). Refuerza el feel "marshmallow" rounded cute. Si usás radius bajo (< 14px) la pieza se ve corporativa/dura, rompe el alma Little Joe.
-
-5. **Filter `brightness(0) invert(0.16)`** para el logo blanco PNG: `brightness(0)` colapsa a negro, `invert(0.16)` da navy oscuro (no blanco puro). Visible sobre cielo claro. Si fuera invert(1) se volvería blanco e invisible.
-
-6. **Logo Distinto en color original sobre cielo claro** (no negativo). El morado + amarillo del logo Distinto contrasta bien sobre el cielo azul claro — no necesita filter.
-
-7. **3 corazones rosa + 2 estrellas doradas + 3 nubes blancas** = densidad correcta de decoraciones. Más es ruido, menos pierde el mood. Espolvorear con sentido emotivo (no aleatorio).
-
-8. **Esta es la única marca con script cursive** del set Distinto. DF usa Saira italic. LV/NL/Lozano usan Playfair. Kintu Montserrat. Manrique Poppins. Little Joe es el ÚNICO con Caveat — diferencia clara del cluster.
-
-9. **NO tagline frase comercial**. El logo + URL alcanzan. Aprendizaje aplicado a las 7 marcas.
-
-10. **Filosofía "pon una sonrisa en el aire"** se traduce visualmente como: cielo cartoon + corazones + script cursive emocional + mascota roja saludando. Cada elemento aporta a la sonrisa.
-
-11. **Cluster Distinto completo** (post 22-may-2026):
-    - **Dark Luxury Cluster**: DF (smoke naranja Anton italic), LV (verde bosque Playfair ALL CAPS + em-dashes), Lozano (negro azulado Playfair italic + amarillo dorado), NovaLamps (grafito Playfair ALL CAPS + verde lima underlines)
-    - **Clean Warm Cluster**: Kintu (blanco Montserrat estricto + tarjeta verde profundo), Manrique (clinical Poppins + raspberry)
-    - **Cute Warm Cluster**: Little Joe (cielo cartoon Caveat cursive + rosa fucsia)
-
-    7 marcas, 7 identidades distintas pero coherentes. Sistema visual completo.
+1. **Asset bitmap sin SVG → aspect debe matchear el contenedor**: PNG 1080×1080 cuadrado con logo útil 3.68:1 hacía que `object-fit:contain` lo dejara minúsculo (~30% del ancho disponible). Cropping con Python PIL al bbox real (Pillow `Image.getbbox()` sobre alpha channel) resuelve sin necesidad de SVG.
+2. **`getBBox()` runtime > regex sobre `d=`**: para SVGs Illustrator, la única forma confiable de obtener el bbox útil es renderizarlos y leer DOM. Las curvas Bezier tienen control points fuera del visible que rompen regex.
+3. **Verificar visualmente en browser antes de declarar listo**: Pedro lo pidió explícitamente. Las specs CSS pueden estar correctas pero el resultado renderizado puede diferir (CDN cache, deploy reciente, fonts loading). Chrome MCP `javascript_tool` con `getBoundingClientRect()` + `naturalWidth` da evidencia objetiva del estado real desplegado.
+4. **Rebrands completos justifican refactor full**: cuando la dirección cambia (cute italiano → editorial agencia), no se conservan elementos del estilo previo. Forzar coherencia con la versión anterior empeora el resultado.
