@@ -118,7 +118,7 @@ export const THEMES: Record<string, GrillaTheme> = {
     fontDisplay: "'Saira Condensed', 'Bebas Neue', Impact, sans-serif",
     brandSmall: 'MAYORISTA Y MENOR · DELIVERY LIMA',
     brandBig: 'DISTRIBUIDORA FITNESS',
-    tagline: 'Tu progreso, nuestro suplemento',
+    tagline: '',                       // Pedro 22-may: sin tagline en footer
     footerUrl: 'distribuidorafitness.pe',
     heroTitle: 'Esta semana',
     // logoBg transparent → logo flota sobre smoke, sin thumbnail blanco.

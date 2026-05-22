@@ -261,15 +261,9 @@ export const gymEnergy: StyleBuilder = () => ({
       position: relative; z-index: 3;
       padding-top: 22px !important;
     }
+    /* Tagline oculto en DF — Pedro: el logo + URL alcanzan, sin frase extra */
     .footer .tagline {
-      font-family: 'Saira Condensed', Impact, sans-serif !important;
-      font-style: italic !important;
-      font-weight: 800 !important;
-      text-transform: uppercase;
-      letter-spacing: 4px !important;
-      color: #FFFFFF !important;
-      font-size: 19px !important;
-      margin-bottom: 14px !important;
+      display: none !important;
     }
     /* Logo Distinto en NEGATIVO sobre dark — filter convierte morado+amarillo
        a blanco puro, manteniendo formas. Drop-shadow sutil para presencia.
