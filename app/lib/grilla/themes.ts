@@ -185,27 +185,32 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   novalamps: {
     style: 'led-technical',
-    // Manual oficial pág. 7-8: Verde lima debe PREDOMINAR + Grafito + Blanco.
-    // Mood Sage+Creator+Ruler aspiracional premium, NO sci-fi cyberpunk.
-    primary: '#262726',       // Grafito oficial Manual pág. 7 (texto)
-    accent: '#D2DD00',        // Verde lima Novalamps Manual pág. 7 (PRINCIPAL)
-    highlight: '#E4F000',     // Lima brillante (acento)
-    canvas: '#FAFAF5',        // Off-white para que lima predomine (no dark)
-    text: '#262726',
-    cardBg: '#FFFFFF',
-    cardAltBg: '#F2F4D6',     // Lima muy suave
-    // Manual oficial pág. 9: Arial Regular/Bold → OSS Inter (NO Orbitron sci-fi)
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap',
-    fontSerif: "'Inter', system-ui, sans-serif",
+    // Estilo v2 (22-may-2026, basado en post DM 2026 NovaLamps real):
+    // Editorial dark luxury · serif moderna + verde lima acento + sub eléctrika.
+    // El equipo del cliente ya evolucionó del manual base (Arial sans plano)
+    // hacia un editorial premium con serif Bodoni-like + verde lima underlines.
+    primary: '#FFFFFF',        // Texto blanco sobre dark
+    accent: '#D2DD00',         // Verde lima Novalamps oficial (PROTAGONISTA)
+    highlight: '#E4F000',      // Lima más brillante (variación)
+    canvas: '#1A1A1A',         // Grafito muy oscuro (mix #262726 + algo más oscuro)
+    text: '#FFFFFF',
+    cardBg: '#FFFFFF',         // Cards blancas (legibilidad 7 días)
+    cardAltBg: '#FAFAFA',
+    // Post DM real usa SERIF MODERNA Bodoni-like, NO Arial. OSS: Playfair Display.
+    // Inter para body/labels (mantiene neutralidad técnica como pide manual).
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,500;1,600&family=Inter:wght@300;400;500;600;700;800&family=Caveat:wght@500;600&display=swap',
+    fontSerif: "'Playfair Display', Georgia, serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'Inter', system-ui, sans-serif",
-    brandSmall: 'ILUMINACIÓN LED · 15 AÑOS',
-    brandBig: 'Novalamps',     // Manual: escritura correcta, NO mayúsculas
-    tagline: 'Convierte cada espacio en diseño',
+    fontDisplay: "'Playfair Display', Georgia, serif",
+    brandSmall: 'eléctrika',     // Sub-marca línea MAX
+    brandBig: 'Novalamps',
+    tagline: '',                  // Sin tagline (aprendizaje)
     footerUrl: 'novalamps.com.pe',
     heroTitle: 'Esta semana',
-    // Logo oficial es lima+grafito sobre dark — el wrapper grafito lo realza
-    logoBg: '#262726',
+    // Logo aspect 4.32:1 (banner plano). Sin wrapper sobre canvas dark.
+    // Filter para llevar negro+lima a blanco+lima visible.
+    logoBg: 'transparent',
+    logoPad: '0',
   },
   'la-victoria': {
     style: 'wood-industrial',
