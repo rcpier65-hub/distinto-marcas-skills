@@ -1,229 +1,296 @@
 # 09 · ESTILO DE DISEÑO — Distribuidora Fitness Marketing
 
 > 🎨 **Referencia visual canónica para piezas de DF**.
-> Definido el 22 may 2026 por Pedro a partir de pieza catálogo "Warrior Raw + Crunch".
+> Definido por Pedro a partir de pieza catálogo "Warrior Raw + Crunch" (22 may 2026).
+> Aprobado en v8 el 22 may 2026 después de 8 iteraciones verificadas en browser real.
 > 📌 Esta es la guía visual real que reemplaza cualquier inferencia previa.
 
 ---
 
 ## 🖼️ Referencia visual aprobada
 
-> Imagen de referencia: catálogo Warrior x Distribuidora Fitness mostrando promos de
-> Warrior Raw + Crunch (avena/crocante + cookies/cookies dough).
-> Archivada en `assets/referencias-visuales/` (cuando se guarde manualmente).
+**Imagen original**: catálogo Warrior x Distribuidora Fitness mostrando promos de
+Warrior Raw + Crunch.
+Archivada en `assets/referencias-visuales/`.
 
 **Por qué es la referencia canónica**: Pedro la eligió como el estilo visual que define a DF.
 Cualquier pieza que se haga para DF debe respetar este sistema visual.
+
+**Implementación de referencia**: la grilla semanal v8 en
+`app/lib/grilla/styles/gym-energy.ts` del repo `distinto-marcas-skills` aplica este
+estilo correctamente. Si una pieza necesita ejemplo concreto de código → leer ese archivo.
 
 ---
 
 ## 🎯 Filosofía del estilo
 
-**Cinematográfico · Dark · Energético · Premium-gym**
+**Cinematográfico · Dark · Editorial · Premium-gym**
 
-- **Mood**: cartel premium de suplementación gym hardcore
-- **No es**: light, friendly, wellness, corporate-clean
-- **Cliente arquetípico al que apunta**: Diego (gym brother) — la persona #1.
+- **Mood**: cartel premium de suplementación gym hardcore con jerarquía editorial.
+- **No es**: light, friendly, wellness, corporate-clean, sci-fi, cyberpunk.
+- **Cliente arquetípico al que apunta**: Diego (gym brother) — persona #1.
   El estilo se inclina hacia él. Andrea (fit girl) lee la pieza porque también va a gym,
   pero el lenguaje visual NO se diseña pensando en "friendly femenino".
-- **Es lo opuesto** del estilo wellness/spa (Kintu) o cute italiano (Little Joe).
+- **Lo opuesto** del estilo wellness/spa (Kintu) o cute italiano (Little Joe).
 
 ---
 
 ## 🌑 Sistema visual canónico
 
-### Background — DARK con HUMO
+### Background — DARK con HUMO + VIGNETTES
 
-| Elemento | Tratamiento |
+| Capa | Tratamiento |
 |---|---|
-| **Color base** | Negro grafito profundo (NO #000 puro — el manual dice `#333333` pero para fondo full pieza puede usarse `#1A1818` a `#0D0D0D`). |
-| **Capa "Fiery Red Smoke"** | El asset oficial `assets/elementos-graficos/Fiery Red Smoke.png` se aplica como background full pieza al 70-100% opacidad. Es el alma visual de DF — NO inventar otro humo. |
-| **Gradiente** | El smoke emerge desde el medio/abajo hacia los bordes. Esquinas superiores quedan más oscuras (negro puro). Centro tiene la energía naranja del humo. |
-| **Vignette** | Ligero darken en las esquinas para foco al producto/título. |
+| **Color base poster** | `#0D0D0D` (negro muy oscuro, NO negro puro #000) |
+| **Capa "Fiery Red Smoke"** | Asset oficial `assets/elementos-graficos/Fiery Red Smoke.png` aplicado FULL pieza. **CSS**: `background-size: cover`, `background-position: center 40%`, `opacity: 0.78`, `mix-blend-mode: screen` (suma luminancia, hace que el humo naranja "ilumine" sobre el grafito). |
+| **Capa darker** | Gradiente vertical `linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.55) 100%)` que oscurece el arriba y abajo. |
+| **Vignettes** | Top: `linear-gradient(180deg, rgba(0,0,0,0.75) 0%, transparent 100%)` altura 280px. Bottom: igual invertido altura 220px. Enfocan el contenido central. |
+| **Acentos estructurales** | Líneas naranjas top y bottom del poster (4px alto, `box-shadow: 0 0 18px rgba(245,73,34,0.55)`). Top en `top: 22px`, bottom en `bottom: 10px` (importante: NO atravesar el logo del footer). |
 
-### Paleta aplicada (refinada vs manual base)
+### Paleta aplicada
 
 | Color | Hex | Rol |
 |---|---|---|
-| Negro vignette | `#0D0D0D` | Bordes superiores, vignette |
-| Grafito base | `#1A1818` | Background sin smoke |
-| **Naranja DF** | **`#F54922`** | Chips/etiquetas (PRECIOS, PROMO N, COMBINACIONES), CTAs, símbolo FD |
-| Naranja humo | `#F54922` con 30-60% alpha | Capa de smoke encima del grafito |
-| Blanco crudo | `#FFFFFF` | Texto principal, headlines display, productos |
-| Crema sutil | `#F5F1E8` | Bullets ("• Cookies & Cream"), descripciones secundarias |
-| Texto sobre naranja | `#0D0D0D` o `#FFFFFF` | Según contraste — los precios "1 x S./10" van en blanco sobre fondo, los chips de promo "PROMO 1" van blanco sobre naranja |
+| Negro vignette | `#0D0D0D` | Base del poster, bordes oscuros |
+| **Naranja DF** | **`#F54922`** | Chips, CTAs, día (DD) en cards, plataformas, líneas estructurales, acentos |
+| Naranja brillante | `#FF6B45` | Variación (border alterno de cards) |
+| **Card blanco** | `#FFFFFF` | Fondo de cards de día (paneles editoriales que rompen con el dark) |
+| Card alterno | `#FAFAFA` | Cards alternas |
+| **Texto dark sobre card** | `#1A1818` | Títulos en cards blancas |
+| Texto blanco | `#FFFFFF` | Sobre el dark del poster (hero, brand-name si hubiera, footer tagline si hubiera) |
+
+> ⚠️ Regla dura: **NUNCA usar `#000000` puro**. El manual dice `#333333` para texto cuerpo. En contextos de fondo full pieza, `#0D0D0D` o `#1A1818` están permitidos.
 
 ---
 
-## ✏️ Sistema tipográfico
+## ✏️ Sistema tipográfico FINAL
 
-### Display / Headlines — CONDENSED + ITALIC + BOLD
+### Display / Headlines / Brand
 
-Lo que la imagen muestra:
-- **WARRIOR RAW**, **WARRIOR CRUNCH**, **COMBINACIONES**, **PROMO 1/2/3/4**:
-  - Condensed (estrechas)
-  - **Italic** (inclinadas hacia adelante — sensación de velocidad)
-  - Peso bold / black
-  - Todo MAYÚSCULAS
-- Fuente oficial: **Stretch Pro** italic bold extended (no Google Font — pago).
-- **OSS válidos (en orden de cercanía visual)**:
-  1. **Bowlby One** + `transform: skew(-8deg)` → la más cercana al feel italic-condensed-pesado
-  2. **Saira Condensed** weight 900 + italic
-  3. **Anton** + `font-style: italic` (no tiene italic real, pero CSS lo simula con skew)
-  4. **Oswald** weight 700 + `transform: skew(-8deg)` → más industrial, menos gym hardcore
-- **Para producción Web/PNG**: usar **Saira Condensed 900 italic** (tiene italic real en Google Fonts, condensed, peso black). Es la opción más limpia. Alternativa: **Bebas Neue + skew CSS**.
+- **Fuente OSS canónica**: **`Saira Condensed`** weight `900` italic
+  (reemplaza Stretch Pro pago con fidelidad alta — condensed + italic + bold)
+- **Fallback chain**: `'Saira Condensed', 'Bebas Neue', Impact, sans-serif`
+- **Aplicaciones**: hero `158px`, brand name `58px` (si se usa), date pill `24px`, day (DD) en cards `72px`, card title `28px`.
+- **Estilo**: siempre `italic` + `font-weight: 900` + `text-transform: uppercase` (excepto card titles que pueden ser size variable).
 
-### Subtítulos / labels — Sans bold uppercase
+### Subtítulos / labels / cuerpo
 
-- "SABORES:", "PRECIOS", "ATENCIÓN PERSONALIZADA":
-  - Sans bold, uppercase
-  - Tracking moderado (1-2px)
-  - Sobre chip naranja o texto crudo
-- **OSS**: Inter Bold / Montserrat Bold uppercase
+- **Fuente OSS**: **`Inter`** weights 300-800.
+- **Aplicaciones**: subtítulo hero, meta de cards (plataformas), URL footer, "DÍA SIN CONTENIDO" en empty cards.
+- **Características**: `letter-spacing: 2-5px`, `text-transform: uppercase` en labels, `font-weight: 500-700` según jerarquía.
 
-### Cuerpo — Sans regular/italic light
+### Google Fonts URL completa
 
-- Bullets de sabores ("• Cookies & Cream"): italic light/regular sans
-- Descripciones ("TEXTURA DE AVENA"): light italic, muy pequeño
-- **OSS**: Inter regular/italic, peso 400-500
-
-### Precios — Sans bold extra grande
-
-- "S./10", "S./200": sans bold, peso 800-900, tamaño dominante
-- En chips naranjas con el "S./" más chico que el número
+```
+https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap
+```
 
 ---
 
-## 🎨 Elementos compositivos
+## 🎨 Componentes / patrones visuales
 
-### Chips/etiquetas
+### Date pill / chips con corte angular (FIRMA VISUAL DF)
 
-Las "etiquetas" (PROMO 1, COMBINACIONES, PRECIOS) son **fundamentales** al estilo DF:
-- Fondo naranja sólido `#F54922`
-- Texto blanco bold uppercase, condensed o italic
-- Esquinas con **corte angular asimétrico** (parallelogram efecto), o bordes redondeados sutiles 4-6px
-- Sombra: drop-shadow naranja 30% alpha 8-12px (glow sutil)
-- Tamaño: padding generoso (10-16px vertical, 20-32px horizontal)
-- **Ejemplo CSS aproximado**:
-  ```css
+Es el elemento de identidad más importante. Espejo del precio "S./200" en Warrior:
+
+```css
+background: #FFFFFF;
+color: #F54922;
+font-family: 'Saira Condensed', Impact, sans-serif;
+font-style: italic;
+font-weight: 900;
+font-size: 24px;
+letter-spacing: 1.5px;
+text-transform: uppercase;
+padding: 16px 36px;
+border-radius: 0;
+clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);  /* corte angular asimétrico */
+box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+```
+
+**Variantes**:
+- Chip blanco + texto naranja → date pill, etiquetas de precio
+- Chip naranja + texto blanco → CTAs, "PROMO N", labels destacados
+
+### Cards blancas editoriales (paneles de información)
+
+Rompen el dark cinematográfico para legibilidad. Espejo de los chips de precio en Warrior:
+
+```css
+background: #FFFFFF;
+border-radius: 4px;
+border-left: 7px solid #F54922;
+box-shadow: 0 6px 28px rgba(0,0,0,0.55);
+padding: 18px 30px;
+```
+
+- Día (DD): Saira italic 900 72px naranja
+- Mes (LUN/MAR/etc): Inter 800 13px dark con opacity 0.55
+- Título: Saira italic 800 28px dark `#1A1818` uppercase
+- Plataformas: Inter 700 11px naranja uppercase
+- Cards alternas: `background: #FAFAFA` + `border-left-color: #FF6B45`
+
+### Logos
+
+#### Logo de la MARCA (Distribuidora Fitness)
+
+- **Asset**: `app/public/marcas/distribuidora-fitness/logo.svg`
+- **viewBox crítico**: `"138 457 803 166"` (tight crop al bbox real del logo — sin Bezier whitespace).
+- **Aspect real**: 4.86:1 (banner horizontal). NO es cuadrado.
+- **Modo**: NEGATIVO via CSS `filter: brightness(0) invert(1)` (manual permite versión negativa).
+- **Dimensiones recomendadas en grilla**: `width: 400px; height: 83px`.
+- **Posición**: pegado al borde izquierdo del header (`object-position: left center !important`).
+- **Drop-shadow**: `drop-shadow(0 4px 24px rgba(255,255,255,0.18))` para halo blanco sutil.
+
+#### Logo de Distinto Agencia (footer)
+
+- **Asset**: `app/public/agencia/distinto-horizontal.svg`
+- **viewBox crítico**: `"129 462 821 169"` (excluye el texto "VERSION HORIZONTAL" del artwork de Illustrator).
+- **Aspect**: 4.86:1.
+- **Modo**: NEGATIVO via mismo filter.
+- **Dimensiones en grilla**: `height: 88px; max-width: 480px`.
+
+### Hero text "ESTA SEMANA"
+
+```css
+font-family: 'Saira Condensed', 'Bebas Neue', Impact, sans-serif;
+font-style: italic;
+font-weight: 900;
+font-size: 156px;
+letter-spacing: -2px;
+line-height: 0.88;
+text-transform: uppercase;
+color: #FFFFFF;
+text-shadow:
+  4px 4px 0 rgba(245,73,34,0.85),
+  8px 8px 40px rgba(245,73,34,0.4);
+```
+
+El doble text-shadow (offset sólido naranja + blur grande) da el efecto cinematográfico de la imagen Warrior.
+
+### Divider editorial (no flecha, no curva)
+
+```css
+.line {
   background: #F54922;
-  color: #fff;
-  padding: 10px 24px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); /* corte angular */
-  box-shadow: 0 6px 20px rgba(245,73,34,0.35);
-  ```
+  height: 4px;
+  width: 80px;
+  box-shadow: 0 0 14px rgba(245,73,34,0.6);
+}
+.dot {
+  width: 8px; height: 8px;
+  background: #F54922;
+  border-radius: 0;
+  transform: rotate(45deg);
+  box-shadow: 0 0 10px rgba(245,73,34,0.7);
+}
+```
 
-### Drop shadows / glows
+### Footer minimalista
 
-- **Productos**: sombras dramáticas negras (rgba(0,0,0,0.5)) para flotar sobre el smoke
-- **Chips**: glow naranja sutil
-- **Textos blancos sobre dark**: NO usar shadow — usar peso fuerte directamente
-
-### Espacio negativo
-
-- El layout **respira** — no llenar todo. La pieza de Warrior tiene mucho aire entre secciones.
-- Permite que el smoke se vea entre elementos.
-
-### Logo FD + Logo partner
-
-- Logo FD oficial arriba a la izquierda (versión MENOS ELEMENTOS o MÍNIMA según pieza)
-- Si hay marca partner (Warrior), va al lado del FD separado por aire mínimo
-
-### Footer institucional
-
-La pieza Warrior muestra 4 íconos al final con valores:
-1. 🛡️ **CONFIANZA Y SEGURIDAD**
-2. 🕐 **ENTREGA RÁPIDA A TODO EL PERÚ**
-3. 👤 **ATENCIÓN PERSONALIZADA**
-4. 💲 **PRECIOS JUSTOS**
-
-Estos pueden usarse como diferenciadores recurrentes en piezas institucionales.
-**Estilo**: línea fina, no rellenos, naranja o blanco sobre dark.
+- **NO incluir** tagline frase ("Tu progreso, nuestro suplemento") — Pedro eliminó. El logo Distinto + URL alcanzan.
+- **Solo**: logo Distinto + URL `distribuidorafitness.pe` + línea naranja al borde inferior.
 
 ---
 
-## 📐 Aplicación a la grilla semanal de contenido
+## 🚫 Reglas duras (lo que NO va)
 
-La pieza Warrior es un **catálogo de producto**. La **grilla semanal** es un calendario,
-distinto en función pero debe sentirse de la MISMA familia visual.
-
-### Cómo traducir el estilo a la grilla
-
-| Elemento de grilla | Aplicación del estilo DF |
-|---|---|
-| **Background** | Dark grafito (`#1A1818`) + capa "Fiery Red Smoke" full overlay con 75% opacidad. Vignette en esquinas. |
-| **Header (logo + brand name + date pill)** | Logo FD oficial sobre fondo "transparent" (smoke visible detrás). Brand name "DISTRIBUIDORA FITNESS" en Saira Condensed italic black + small "MAYORISTA Y MENOR \| DELIVERY LIMA" en blanco sutil. Date pill = **chip naranja con corte angular**. |
-| **Hero** | "ESTA SEMANA" o "AGENDA DE LA SEMANA" en Saira Condensed italic black SUPER GRANDE (140px+), blanco, con drop shadow rojo sutil. Subtítulo en blanco regular italic. |
-| **Cards de días** | Fondo gris muy oscuro (`#1F1F1D`) con borde-izquierdo naranja, texto blanco. Date.day en Saira Italic black grande NARANJA, date.month blanco condensed bold. Title blanco bold, meta naranja uppercase. **NO usar borde redondeado sutil — más bien angular cuadrado con border-left 5px naranja**. |
-| **Divider** | Flecha naranja apuntando derecha (motion) — coherente con "velocidad". |
-| **Footer** | Tagline marca en blanco italic. Logo Distinto Agencia en blanco/grayscale (sobre dark). URL en gris sutil. |
-
-### Lo que NO va
-
-- ❌ Fondo blanco/crema (rompe el mood dark)
-- ❌ Anton (mi diseño previo — muy "recta", no italic)
-- ❌ Skew exagerado >-10deg (queda payaso)
-- ❌ Speed lines/bandas naranjas (yo las metí antes — están de más, el smoke ya da movimiento)
-- ❌ Border-radius redondeado >12px en cards (rompe el feel industrial)
-- ❌ Texto naranja sobre fondo blanco (al revés del manual)
+- ❌ Fondo blanco/crema como base (rompe el mood dark cinematográfico)
+- ❌ Negro puro `#000000` (manual prohíbe)
+- ❌ Wordmark texto "DISTRIBUIDORA FITNESS" duplicando lo que el logo ya dice
+- ❌ Anton recta (sin italic) o cualquier fuente display sin italic
+- ❌ Skew CSS exagerado (> -8deg) en pills/cards — queda payaso
+- ❌ Speed lines / bandas naranjas (ya el smoke da movimiento)
+- ❌ Border-radius redondeado > 12px en cards (rompe feel industrial)
+- ❌ Texto blanco fino sobre dark en bloques largos (fatiga vista — usar cards blancas)
+- ❌ Frase comercial extra en footer (mantener minimalista)
+- ❌ Logo cuadrado/thumbnail blanco wrapper (logos van flotando en negativo)
+- ❌ Líneas decorativas atravesando logos (siempre dejar gap > 30px)
 
 ---
 
 ## 🔁 Cómo replicar este estilo en otras piezas
 
-Cuando se diseñe **cualquier** pieza para DF (post IG, carrusel, story, banner web):
+Cuando se diseñe **cualquier** pieza para DF (post IG, carrusel, story, banner web, grilla):
 
-1. **Empezar siempre** con dark grafito + Fiery Red Smoke overlay
-2. **Tipografía display** = Saira Condensed Italic Black (o Bebas Neue con skew CSS)
-3. **Chips naranjas con corte angular** para CTAs/labels/precios
-4. **Naranja `#F54922` puro** — no derivar tonos, no rosa ni rojo
-5. **Texto blanco crudo** dominante. Crema sutil para subtítulos.
-6. **Drop shadows negras** para productos/imágenes (no naranjas)
-7. **Glow naranja sutil** solo en chips
-8. **Logo FD** siempre presente
+1. **Background**: dark grafito `#0D0D0D` + Fiery Red Smoke overlay con `mix-blend-mode: screen` + vignettes
+2. **Tipografía display**: `Saira Condensed` weight 900 italic uppercase
+3. **Tipografía body**: `Inter` con tracking generoso uppercase
+4. **Chips**: clip-path angular asimétrico (espejo de "S./200" en Warrior)
+5. **Naranja `#F54922`** puro — no derivar tonos, no rosa, no rojo
+6. **Texto blanco crudo** o texto dark sobre paneles blancos según jerarquía
+7. **Logos en negativo** via `filter: brightness(0) invert(1)` con drop-shadow blanco
+8. **Líneas estructurales naranjas** top y bottom con `box-shadow: glow`
+9. **Cards/paneles blancos** para info que rompe con el dark (igual que precios en Warrior)
+10. **Sin tagline frase comercial** en footer
+
+---
+
+## 📐 Tamaño y proporción de pieza
+
+- **Grilla semanal**: 1080×1620px (formato vertical 2:3, optimizado para feed IG)
+- **Post cuadrado**: 1080×1080px
+- **Story**: 1080×1920px
+- **Header / banner web**: aspect variable, mantener cohesión
 
 ---
 
 ## 📎 Referencias internas
 
-- 🎨 Brand book extract: `assets/brand-book-extract.md`
+- 🎨 Brand book oficial extract: `assets/brand-book-extract.md`
 - 🎨 Colores y fuentes: `assets/colores-fuentes.txt`
-- 🖼️ Fiery Red Smoke: `assets/elementos-graficos/Fiery Red Smoke.png` (asset oficial)
+- 🖼️ Fiery Red Smoke (asset oficial): `assets/elementos-graficos/Fiery Red Smoke.png`
+- 🖼️ Backgrounds adicionales: `assets/elementos-graficos/`
 - 🎙️ Voz: `01-marca.md`
 - 👥 Audiencia: `02-audiencia.md`
 - 🚦 Rubric ON/OFF: `07-rubric.md`
+- 🧱 Implementación referencia (grilla v8): `app/lib/grilla/styles/gym-energy.ts` en `distinto-marcas-skills`
 
 ---
 
-## 📝 Histórico de cambios
+## 📝 Histórico de iteraciones (verificadas en browser real con Chrome MCP)
 
-- **22 may 2026 v1** — Pedro define el estilo a partir de pieza Warrior x DF.
-  Reemplaza diseño previo (fondo blanco + Anton + speed lines).
-  Implementado primero en `gym-energy.ts` del sistema de grillas semanales.
+| Versión | Cambio | Aprendizaje |
+|---|---|---|
+| v1 | Blanco + Anton + speed lines | Off-brand. La marca es dark cinematográfica, no clean+naranja. |
+| v2 | Pivote: dark + Fiery Red Smoke + Saira italic + cards dark | Cards dark + texto blanco fino fatigan la vista en 7 días. |
+| v3 | Cards blancas (paneles editoriales) + logos en negativo via `filter: brightness(0) invert(1)` | El blanco rompe el dark sin perder mood (espejo de precios en Warrior). |
+| v4 | Logo DF más grande + sin wordmark texto + Distinto grande | El logo oficial ya dice "DISTRIBUIDORA FITNESS" — duplicar es ruido visual. |
+| v5 | `object-position: left` + línea bottom 18px | El `object-fit: contain` default centraba el logo dentro del wrapper. |
+| v6 | viewBox del logo DF apretado al **aspect REAL 4.84:1** (vía `getBBox()` runtime) | Calcular bbox con regex sobre `path d=` incluye **puntos de control de Bezier** que están fuera del visible — aspect calculado de 1.6 era erróneo. **Siempre usar `getBBox()` en runtime para verificar SVGs de Illustrator**. |
+| v7 | viewBox del logo Distinto excluyendo texto "VERSION HORIZONTAL" del artwork | SVGs exportados de mesas de trabajo de Illustrator pueden traer labels/headers que hay que recortar del viewBox. |
+| **v8** | **Sin tagline "Tu progreso nuestro suplemento"** en footer | Pedro: "el logo + URL alcanzan". Footer minimalista. |
 
-- **22 may 2026 v2** — Feedback Pedro: "hay que usar más blanco" + "los logos están mal".
-  Pivote del diseño: cards de día ahora son **BLANCAS** (paneles editoriales) en lugar
-  de dark semi-transparentes. El dark+smoke queda como "stage" cinematográfico.
-  Logo DF y logo Distinto se renderizan en **NEGATIVO (blanco)** via CSS
-  `filter: brightness(0) invert(1)` — el manual permite versión negativa.
-  Sin wrapper blanco en el logo del header (logoBg: transparent, logoPad: 0).
-  Agregados: divider con barra naranja sólida (no flecha), text-shadow más sutil,
-  acentos naranjas estructurales (líneas top/bottom).
-
-## 🎓 Lecciones aprendidas (para futuras piezas DF)
+## 🎓 Lecciones aprendidas (críticas para futuras piezas DF)
 
 1. **Dark canvas + cards blancas** > dark canvas + cards dark: la lectura editorial
-   exige un panel de "información" que rompa el "stage". Una grilla de 7 días con
-   todo dark fatiga la vista — el blanco descansa.
-2. **Filter `brightness(0) invert(1)`** es el truco para convertir cualquier SVG/PNG
-   a versión blanca sin tocar el asset original. Útil cuando solo hay versión
-   positiva (color) disponible y necesitás "modo negativo" sobre dark.
-3. **El smoke debe respirar**: opacity 0.7-0.85 + `mix-blend-mode: screen` da el
-   efecto de humo iluminado. Más opacidad = pieza ahogada. Menos = perder el mood.
-4. **Vignettes top/bottom** son críticos: el smoke por sí solo cubre toda la pieza
-   pero las esquinas necesitan oscurecerse para foco al contenido.
-5. **Cards blancas con border-left 7px naranja** son la "firma visual" repetible.
-   Espejo de los precios "S./200" en Warrior — bloque blanco + acento color marca.
+   exige paneles blancos de información que rompen el "stage" cinematográfico.
+   Una grilla de 7 días con todo dark fatiga la vista.
+
+2. **Filter `brightness(0) invert(1)`** convierte cualquier SVG/PNG a versión blanca
+   sin tocar el asset original. Útil para "modo negativo" sobre dark.
+
+3. **El smoke debe respirar**: opacity 0.7-0.85 + `mix-blend-mode: screen`.
+   Más opacidad = pieza ahogada. Menos = perder el mood.
+
+4. **Vignettes top/bottom críticas**: el smoke cubre toda la pieza pero las
+   esquinas necesitan oscurecerse para foco al contenido.
+
+5. **Cards blancas con border-left 7px naranja** son la "firma visual"
+   repetible — espejo de los precios "S./200" en Warrior.
+
+6. **getBBox() en runtime > cálculo analítico**: cuando un SVG viene de Illustrator,
+   los path Bezier tienen control points fuera del visible. Para apretar viewBox al
+   contenido real, usar la API DOM `element.getBBox()` en el browser.
+
+7. **Logos en Illustrator suelen traer "VERSION HORIZONTAL" u otros labels** del
+   artwork — inspeccionar children groups del SVG y recortar viewBox al group del logo.
+
+8. **NO duplicar lo que el logo dice**: si el logo oficial incluye el wordmark
+   "DISTRIBUIDORA FITNESS", no poner texto adicional en el header.
+
+9. **Líneas estructurales y logos**: siempre dejar gap > 30px verticalmente
+   entre líneas decorativas y logos para evitar atravesamientos.
+
+10. **Verificar con browser real**: no asumir que el CSS se ve como diseñado.
+    Usar Chrome MCP + `getBBox()` + `getBoundingClientRect()` antes de marcar listo.
