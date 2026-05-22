@@ -66,56 +66,47 @@ export const gymEnergy: StyleBuilder = () => ({
     .orange-accent-line.bottom { bottom: 32px; }
 
     /* ═══════════════ HEADER ═══════════════
-       Logo DF en NEGATIVO (blanco via filter) sin wrapper. Flota sobre smoke. */
+       Sin wordmark de texto: el logo oficial DF ya dice "DISTRIBUIDORA FITNESS"
+       + "MAYORISTA" pequeño. Repetir = ruido visual. Logo grande izquierda +
+       date pill derecha, mucho aire entre medio = cartel cinematográfico. */
     .header {
       position: relative; z-index: 3;
       gap: 24px !important;
-      margin-bottom: 16px !important;
+      margin-bottom: 20px !important;
+      align-items: center !important;
     }
-    /* El logo se rinde en blanco para integrarse con el dark canvas */
+    /* Logo DF: tight viewBox + tamaño grande + negativo via filter
+       Aspect real 1.63:1 → 320×196px lo deja proporcional sin whitespace */
     .logo {
       filter: brightness(0) invert(1);
-      filter: drop-shadow(0 4px 20px rgba(255,255,255,0.12)) brightness(0) invert(1);
+      filter: drop-shadow(0 4px 24px rgba(255,255,255,0.18)) brightness(0) invert(1);
       margin: 0 !important;
-      width: 140px !important;
-      height: 140px !important;
+      width: 340px !important;
+      height: 208px !important;
+      padding: 0 !important;
     }
-    .brand-name .big {
-      font-family: 'Saira Condensed', 'Bebas Neue', Impact, sans-serif !important;
-      font-style: italic !important;
-      font-weight: 900 !important;
-      font-size: 58px !important;
-      letter-spacing: 0.5px !important;
-      text-transform: uppercase;
-      color: #FFFFFF !important;
-      line-height: 0.92 !important;
-    }
-    .brand-name .small {
-      font-family: 'Inter', sans-serif !important;
-      font-weight: 700 !important;
-      letter-spacing: 3.5px !important;
-      text-transform: uppercase;
-      color: var(--accent) !important;
-      opacity: 1 !important;
-      font-size: 13px !important;
-      margin-bottom: 10px !important;
-    }
+    /* Ocultar brand-name texto: el logo ya dice "DISTRIBUIDORA FITNESS"
+       y "MAYORISTA" debajo. No duplicar. */
+    .brand-name { display: none !important; }
 
     /* Date pill — chip blanco con corte angular + texto naranja
-       (rompe el dark, espejo del precio "S./200" en Warrior) */
+       (rompe el dark, espejo del precio "S./200" en Warrior).
+       margin-left: auto lo empuja al extremo derecho ahora que .brand-name
+       está display:none y el flex perdió el spacer. */
     .date-pill {
+      margin-left: auto !important;
       background: #FFFFFF !important;
       color: var(--accent) !important;
       font-family: 'Saira Condensed', Impact, sans-serif !important;
       font-style: italic !important;
       font-weight: 900 !important;
-      font-size: 21px !important;
+      font-size: 24px !important;
       letter-spacing: 1.5px !important;
       text-transform: uppercase;
-      padding: 14px 32px !important;
+      padding: 16px 36px !important;
       border-radius: 0 !important;
       clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55);
     }
 
     /* ═══════════════ HERO ═══════════════ */
@@ -276,12 +267,14 @@ export const gymEnergy: StyleBuilder = () => ({
       margin-bottom: 14px !important;
     }
     /* Logo Distinto en NEGATIVO sobre dark — filter convierte morado+amarillo
-       a blanco puro, manteniendo formas. Drop-shadow sutil para presencia. */
-    .footer .agency-mark { margin: 6px 0 8px !important; }
+       a blanco puro, manteniendo formas. Drop-shadow sutil para presencia.
+       Más grande (88px) por pedido de Pedro — presencia institucional. */
+    .footer .agency-mark { margin: 10px 0 10px !important; }
     .footer .agency-logo {
       filter: brightness(0) invert(1);
-      filter: drop-shadow(0 2px 10px rgba(255,255,255,0.15)) brightness(0) invert(1);
-      height: 52px !important;
+      filter: drop-shadow(0 3px 14px rgba(255,255,255,0.2)) brightness(0) invert(1);
+      height: 88px !important;
+      max-width: 480px !important;
       opacity: 0.95;
     }
     .footer .url {
