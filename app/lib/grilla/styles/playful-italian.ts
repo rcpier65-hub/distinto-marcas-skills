@@ -1,104 +1,86 @@
 // app/lib/grilla/styles/playful-italian.ts
-// Little Joe Perú — ESTILO v3 (22 may 2026).
-// Referencias: post "Día de la Madre 2026" + FONDO CIELO LITTLE JOE-100 oficial
-// + Historia destacada mascota Joe rojo en cielo cartoon.
+// TYPHOUSE — REBRAND v4 (22 may 2026, Pedro: Little Joe → Typhouse).
+// Logo Typhouse: símbolo TP celeste + gotas splash + wordmark "typhouse" sans bold.
 //
-// Mood: CUTE CHARMING ITALIANO · cielo cartoon dulce + mascota Joe roja
-//   Background: cielo cartoon oficial (fondo-cielo.jpg)
-//   Script cursive Caveat para palabras destacadas rosa fucsia
-//   Fraunces serif curvy para texto principal navy
-//   Quicksand rounded para labels
-//   Acentos: rosa fucsia (firma), rojo Joe (mascota), azul navy (texto)
-//   Decoraciones: corazones, estrellitas, nubes adicionales
+// Mood: EDITORIAL LIMPIO CREATIVO · Agencia de diseño / branding
+//   Canvas blanco crema warm sutil (no cielo cartoon — era Little Joe)
+//   Acento celeste Typhouse #1FB3E8 (color del símbolo)
+//   Tipografía Quicksand bold rounded (coherente con wordmark typhouse)
+//   Decoraciones: gotas/salpicaduras celeste (concepto splash del logo)
+//   NO mascota Joe, NO corazones, NO cielo, NO script cursive
 //
-// CAMBIO TOTAL vs v2: v2 era azul royal sólido + Fraunces. Ahora fondo cielo
-// cartoon oficial + script cursive rosa + paleta warm cute.
+// CAMBIO TOTAL vs v3 Little Joe: rebrand completo a marca de agencia/branding.
 
 import type { StyleBuilder } from './types'
 
 export const playfulItalian: StyleBuilder = () => ({
   decorations: `
-    <div class="sky-overlay"></div>
-    <svg class="cloud cloud-1" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
-      <path d="M30 70 Q15 70 15 55 Q15 40 35 40 Q40 25 60 25 Q80 25 88 38 Q105 32 115 45 Q135 40 140 55 Q150 50 160 60 Q170 70 160 80 L40 80 Q25 80 30 70 Z" fill="white" opacity="0.96"/>
+    <svg class="splash splash-1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="30" r="5" fill="#1FB3E8" opacity="0.7"/>
+      <circle cx="50" cy="15" r="3" fill="#1FB3E8" opacity="0.5"/>
+      <circle cx="75" cy="40" r="4" fill="#1FB3E8" opacity="0.6"/>
+      <circle cx="40" cy="60" r="3" fill="#1FB3E8" opacity="0.4"/>
+      <circle cx="80" cy="75" r="5" fill="#1FB3E8" opacity="0.55"/>
     </svg>
-    <svg class="cloud cloud-2" viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-      <path d="M25 55 Q12 55 12 42 Q12 30 28 30 Q35 18 50 18 Q66 18 72 30 Q88 25 95 40 Q108 38 110 50 Q118 45 125 55 Q132 65 122 70 L35 70 Q22 70 25 55 Z" fill="white" opacity="0.86"/>
+    <svg class="splash splash-2" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="20" r="4" fill="#1FB3E8" opacity="0.55"/>
+      <circle cx="60" cy="40" r="6" fill="#1FB3E8" opacity="0.7"/>
+      <circle cx="25" cy="65" r="3" fill="#1FB3E8" opacity="0.45"/>
+      <circle cx="80" cy="70" r="4" fill="#1FB3E8" opacity="0.6"/>
     </svg>
-    <svg class="cloud cloud-3" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
-      <path d="M22 50 Q10 50 10 38 Q10 26 24 26 Q30 16 44 16 Q58 16 64 26 Q78 22 84 35 Q96 32 98 44 Q108 40 112 50 Q118 60 108 65 L30 65 Q18 65 22 50 Z" fill="white" opacity="0.78"/>
+    <svg class="splash splash-3" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="40" cy="30" r="3" fill="#1FB3E8" opacity="0.5"/>
+      <circle cx="70" cy="50" r="5" fill="#1FB3E8" opacity="0.6"/>
+      <circle cx="20" cy="70" r="4" fill="#1FB3E8" opacity="0.55"/>
     </svg>
-    <svg class="heart heart-1" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z" fill="#E63D6A"/></svg>
-    <svg class="heart heart-2" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z" fill="#E63D6A"/></svg>
-    <svg class="heart heart-3" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z" fill="#E63946"/></svg>
-    <svg class="star star-1" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
-    <svg class="star star-2" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
+    <div class="accent-bar top"></div>
+    <div class="accent-bar bottom"></div>
   `,
   extraCss: `
     /* ═══════════════ BACKGROUND ═══════════════
-       Fondo cielo cartoon OFICIAL del cliente (Kit 2026). */
+       Blanco crema warm — editorial limpio agencia */
     .poster {
-      background: #9DCEEC !important;
-      background-image: url('/marcas/little-joe/fondo-cielo.jpg') !important;
-      background-size: cover !important;
-      background-position: center !important;
+      background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 60%, #F4F9FC 100%) !important;
       position: relative;
     }
-    /* Overlay sutil para mejorar legibilidad sobre el cielo */
-    .sky-overlay {
-      position: absolute; inset: 0; z-index: 0;
-      background: linear-gradient(180deg, rgba(157,206,236,0.10) 0%, rgba(255,255,255,0.10) 100%);
-      pointer-events: none;
-    }
 
-    /* Nubes decorativas adicionales (encima del fondo) */
-    .cloud {
+    /* Splashes celeste — concepto del logo TP con gotas */
+    .splash {
       position: absolute; pointer-events: none; z-index: 1;
-      filter: drop-shadow(0 8px 16px rgba(26,58,110,0.08));
     }
-    .cloud-1 { top: 320px; right: 50px; width: 180px; opacity: 0.92; }
-    .cloud-2 { top: 780px; left: 30px; width: 150px; opacity: 0.82; }
-    .cloud-3 { bottom: 280px; right: 90px; width: 130px; opacity: 0.75; }
+    .splash-1 { top: 200px; right: 60px; width: 120px; }
+    .splash-2 { bottom: 240px; left: 50px; width: 110px; }
+    .splash-3 { top: 880px; right: 200px; width: 80px; opacity: 0.75; }
 
-    /* Corazones rosa fucsia + estrellas doradas dispersas */
-    .heart, .star {
-      position: absolute; pointer-events: none; z-index: 2;
+    /* Barras estructurales celeste */
+    .accent-bar {
+      position: absolute; height: 4px; background: var(--accent);
+      left: 70px; right: 70px; z-index: 2;
+      border-radius: 999px;
     }
-    .heart {
-      filter: drop-shadow(0 0 8px rgba(230,61,106,0.5));
-    }
-    /* Confinados a esquinas/bordes — NUNCA cerca de las cards centrales */
-    .heart-1 { top: 230px; right: 100px; width: 28px; }
-    .heart-2 { bottom: 90px; left: 100px; width: 22px; opacity: 0.92; }
-    .heart-3 { bottom: 130px; right: 120px; width: 18px; opacity: 0.85; }
-    .star {
-      filter: drop-shadow(0 0 6px rgba(234,179,8,0.6));
-    }
-    .star-1 { top: 285px; left: 110px; width: 18px; opacity: 0.85; }
-    .star-2 { top: 360px; right: 260px; width: 16px; opacity: 0.78; }
+    .accent-bar.top { top: 28px; }
+    .accent-bar.bottom { bottom: 28px; }
 
     /* ═══════════════ HEADER ═══════════════
-       Logo Little Joe® centrado arriba (espejo del post DM).
-       Logo es BLANCO PNG → filter para volverlo navy/dark visible sobre cielo. */
+       Logo Typhouse grande pegado izquierda. PNG horizontal con whitespace
+       interno → object-position left + width grande para visibilidad. */
     .header {
       position: relative; z-index: 3;
       gap: 24px !important;
-      margin-bottom: 18px !important;
+      margin-bottom: 22px !important;
       align-items: center !important;
     }
     .logo {
       margin: 0 !important;
-      width: 280px !important;
+      width: 340px !important;
       height: 105px !important;
       padding: 0 !important;
       object-position: left center !important;
-      /* PNG blanco → invertir para volverlo navy oscuro (espejo "Little Joe®" del post DM) */
-      filter: brightness(0) invert(0.16);
-      filter: drop-shadow(0 4px 16px rgba(255,255,255,0.7)) brightness(0) invert(0.16);
+      filter: drop-shadow(0 3px 10px rgba(31,179,232,0.18));
     }
     .brand-name { display: none !important; }
 
-    /* Date pill — chip rosa fucsia con corazón (firma cute Little Joe) */
+    /* Date pill — chip celeste rounded (signature visual) */
     .date-pill {
       margin-left: auto !important;
       background: var(--accent) !important;
@@ -106,79 +88,71 @@ export const playfulItalian: StyleBuilder = () => ({
       font-family: 'Quicksand', sans-serif !important;
       font-weight: 700 !important;
       font-size: 16px !important;
-      letter-spacing: 1.5px !important;
+      letter-spacing: 1.8px !important;
       text-transform: uppercase;
-      padding: 12px 26px !important;
+      padding: 14px 28px !important;
       border-radius: 999px !important;
-      box-shadow: 0 8px 22px rgba(230,61,106,0.4);
+      box-shadow: 0 8px 22px rgba(31,179,232,0.35);
       border: none !important;
     }
-    .date-pill::before { content: '♥ '; color: #FFFFFF; }
 
     /* ═══════════════ HERO ═══════════════
-       Script cursive Caveat para hero romántico (espejo "Feliz / madre" del post DM)
-       En grilla usamos "Esta semana" con Caveat 156px navy + acento fucsia */
+       Quicksand 700 + acento celeste (coherente con typhouse wordmark) */
     .hero {
       position: relative; z-index: 3;
-      margin: 30px 0 28px !important;
+      margin: 32px 0 28px !important;
       text-align: center !important;
     }
     .hero h1 {
-      font-family: 'Caveat', cursive !important;
+      font-family: 'Quicksand', sans-serif !important;
       font-style: normal !important;
       font-weight: 700 !important;
-      font-size: 168px !important;
-      letter-spacing: -1px !important;
-      line-height: 0.9 !important;
-      color: var(--accent) !important;
-      /* Multi-stroke blanco para destacar sobre el cielo (firma del post DM) */
-      text-shadow:
-        4px 4px 0 #FFFFFF,
-        -4px -4px 0 #FFFFFF,
-        4px -4px 0 #FFFFFF,
-        -4px 4px 0 #FFFFFF,
-        0 0 30px rgba(255,255,255,0.9),
-        0 8px 24px rgba(26,58,110,0.2);
+      font-size: 130px !important;
+      letter-spacing: -3px !important;
+      line-height: 0.95 !important;
+      color: var(--primary) !important;
+    }
+    .hero h1::first-letter {
+      color: var(--accent);
     }
     .hero .sub {
       font-family: 'Quicksand', sans-serif !important;
       font-style: normal !important;
       font-weight: 600 !important;
-      letter-spacing: 2px !important;
+      letter-spacing: 3.5px !important;
       text-transform: uppercase;
-      font-size: 14px !important;
+      font-size: 13px !important;
       color: var(--primary) !important;
-      opacity: 0.85 !important;
-      margin-top: 8px !important;
+      opacity: 0.55 !important;
+      margin-top: 14px !important;
     }
-    .divider { margin-top: 14px !important; }
+    .divider { margin-top: 18px !important; }
     .divider .line {
       background: var(--accent) !important;
-      height: 2px !important;
-      width: 60px !important;
+      height: 3px !important;
+      width: 80px !important;
       border-radius: 999px !important;
-      opacity: 0.65;
     }
     .divider .dot {
-      width: 14px !important; height: 14px !important;
+      width: 10px !important; height: 10px !important;
       background: var(--accent) !important;
-      border-radius: 0 !important;
-      transform: rotate(45deg);
-      clip-path: path('M7 13s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z');
-      box-shadow: 0 0 10px rgba(230,61,106,0.5);
+      border-radius: 50% !important;
+      transform: none !important;
+      box-shadow: 0 0 8px rgba(31,179,232,0.5);
     }
 
-    /* ═══════════════ CARDS BLANCAS ═══════════════
-       Redondeadas + DD en script cursive fucsia + title sans rounded navy */
+    /* ═══════════════ CARDS ═══════════════
+       Blancas radius medio con border-left celeste + DD celeste grande */
     .cards {
       position: relative; z-index: 3;
       gap: 11px !important;
     }
     .card {
       background: var(--card-bg) !important;
-      border-radius: 22px !important;
-      border: 2px solid rgba(230,61,106,0.18) !important;
-      box-shadow: 0 8px 26px rgba(26,58,110,0.12);
+      border-radius: 14px !important;
+      border: 1px solid rgba(31,179,232,0.18) !important;
+      border-left: 5px solid var(--accent) !important;
+      box-shadow: 0 6px 22px rgba(10,10,10,0.06);
       padding: 16px 26px !important;
       display: flex !important;
       align-items: center !important;
@@ -189,23 +163,23 @@ export const playfulItalian: StyleBuilder = () => ({
     }
     .card .date {
       min-width: 84px !important;
-      text-align: center !important;
+      text-align: left !important;
       flex-shrink: 0;
     }
     .card .date .day {
-      font-family: 'Caveat', cursive !important;
+      font-family: 'Quicksand', sans-serif !important;
       font-weight: 700 !important;
-      font-size: 72px !important;
-      letter-spacing: -1px !important;
+      font-size: 54px !important;
+      letter-spacing: -2px !important;
       color: var(--accent) !important;
-      line-height: 0.85 !important;
+      line-height: 0.95 !important;
     }
     .card .date .month {
       font-family: 'Quicksand', sans-serif !important;
-      font-weight: 700 !important;
+      font-weight: 600 !important;
       letter-spacing: 2.5px !important;
       color: var(--primary) !important;
-      opacity: 0.55;
+      opacity: 0.5;
       text-transform: uppercase;
       font-size: 11px !important;
       margin-top: 2px !important;
@@ -223,11 +197,11 @@ export const playfulItalian: StyleBuilder = () => ({
     .card .body .meta {
       font-family: 'Quicksand', sans-serif !important;
       font-weight: 600 !important;
-      letter-spacing: 2px !important;
+      letter-spacing: 2.5px !important;
       text-transform: uppercase;
       font-size: 11px !important;
       color: var(--accent) !important;
-      opacity: 0.85 !important;
+      opacity: 0.95 !important;
       margin-top: 4px !important;
     }
     .card .icon {
@@ -237,11 +211,11 @@ export const playfulItalian: StyleBuilder = () => ({
       height: 42px !important;
     }
 
-    /* Empty cards — translúcidas con dashed fucsia sutil */
+    /* Empty cards — translúcidas con dashed celeste sutil */
     .card.empty {
       background: rgba(255,255,255,0.55) !important;
-      border: 1.5px dashed rgba(230,61,106,0.35) !important;
-      box-shadow: 0 4px 12px rgba(26,58,110,0.05);
+      border: 1.5px dashed rgba(31,179,232,0.35) !important;
+      box-shadow: 0 3px 10px rgba(10,10,10,0.04);
     }
     .card.empty .date .day {
       color: var(--accent) !important;
@@ -269,13 +243,12 @@ export const playfulItalian: StyleBuilder = () => ({
     /* ═══════════════ FOOTER ═══════════════ */
     .footer {
       position: relative; z-index: 3;
-      padding-top: 24px !important;
+      padding-top: 28px !important;
     }
     .footer .tagline { display: none !important; }
-    .footer .agency-mark { margin: 10px 0 10px !important; }
-    /* Logo Distinto color original sobre cielo claro */
+    .footer .agency-mark { margin: 10px 0 12px !important; }
     .footer .agency-logo {
-      filter: drop-shadow(0 3px 12px rgba(26,58,110,0.15));
+      filter: drop-shadow(0 3px 12px rgba(10,10,10,0.10));
       height: 64px !important;
       max-width: 380px !important;
     }

@@ -137,29 +137,30 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   'little-joe': {
     style: 'playful-italian',
-    // Estilo v3 (22-may-2026, basado en FONDO CIELO oficial + post DM real):
-    // Cute charming italiano · cielo cartoon background + mascota Joe roja
-    // + script cursive friendly + acento rosa fucsia/coral.
-    primary: '#1A3A6E',        // Azul navy Little Joe Italia (texto sobre claro)
-    accent: '#E63D6A',         // Rosa fucsia/coral del post DM (firma visual)
-    highlight: '#E63946',      // Rojo Joe (color de la mascota peruana)
-    canvas: '#9DCEEC',         // Azul cielo italiano (de fallback si no carga foto)
-    text: '#1A3A6E',
+    // REBRAND v4 (22-may-2026): Little Joe → TYPHOUSE.
+    // Logo TP celeste + gotas/splash + wordmark "typhouse" sans bold rounded.
+    // Sistema visual: blanco limpio editorial + celeste TP + negro.
+    // Quitado fondo cielo cartoon (era para Little Joe — Typhouse es editorial).
+    primary: '#0A0A0A',          // Negro suave para texto
+    accent: '#1FB3E8',           // Celeste Typhouse (color del símbolo TP+splash)
+    highlight: '#5DC8EF',        // Celeste más claro
+    canvas: '#FAFBFC',           // Blanco crema muy sutil
+    text: '#0A0A0A',
     cardBg: '#FFFFFF',
-    cardAltBg: '#F4F9FE',      // Blanco con tinte cielo muy sutil
-    // Tipografía: Caveat script cursive (hero palabras destacadas)
-    // + Fraunces serif curvy (body emocional) + Quicksand rounded (labels)
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Quicksand:wght@400;500;600;700&display=swap',
+    cardAltBg: '#F4F9FC',        // Blanco con tinte celeste muy sutil
+    // Quicksand bold rounded (coherente con wordmark "typhouse") +
+    // Caveat cursive opcional para palabras destacadas + Fraunces para body
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Quicksand:wght@400;500;600;700&display=swap',
     fontSerif: "'Fraunces', Georgia, serif",
     fontSans: "'Quicksand', system-ui, sans-serif",
-    fontDisplay: "'Caveat', cursive",
-    brandSmall: 'AROMATIZANTES · ITALIA',
-    brandBig: 'Little Joe',     // Capitalización oficial
-    tagline: '',                 // Sin tagline frase
-    footerUrl: 'littlejoe.pe',
+    fontDisplay: "'Quicksand', system-ui, sans-serif",
+    brandSmall: 'AGENCIA DE DISEÑO',  // Placeholder hasta que Pedro confirme
+    brandBig: 'typhouse',
+    tagline: '',
+    footerUrl: 'typhouse.pe',          // Placeholder hasta confirmar
     heroTitle: 'Esta semana',
-    // Logo blanco PNG sobre cielo cartoon — necesita filter invert para volverse
-    // navy oscuro (espejo del "Little Joe®" negro del post DM)
+    // Logo Typhouse PNG full-color (celeste + negro) sobre canvas blanco
+    // → NO necesita filter, ya viene listo
     logoBg: 'transparent',
     logoPad: '0',
   },
