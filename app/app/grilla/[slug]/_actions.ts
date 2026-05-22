@@ -7,7 +7,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
-import { sendWhatsAppImageToGroup } from '@/lib/integrations/rubi'
+import { sendWhatsAppImageToGroup, sendWhatsAppImageToChatId } from '@/lib/integrations/rubi'
 import type { GrillaPublicacion } from '@/lib/integrations/notion'
 
 type Result = { ok: true; pngUrl: string } | { ok: false; error: string }
@@ -168,24 +168,24 @@ export async function enviarGrillaAlGrupo(
   if (!marca) return { ok: false, error: 'Marca no encontrada' }
 
   // Resolución del grupo destino según el modo
-  let grupo: string | null
-  let byAlias: boolean
+  // - test: chatId hardcoded de "New team" (más confiable que group_name).
+  // - real: alias o group_name de marca (resolución vía wrapper Rubi).
+  let grupo: string | null = null  // descriptor humano para logs/UI
+  let testChatId: string | null = null
+  let byAlias = false
   if (modo === 'test') {
-    // Grupo interno de testing — override config marca.
-    grupo = process.env.WHATSAPP_TEST_GROUP_NAME ?? 'New team'
-    byAlias = false
+    testChatId = process.env.WHATSAPP_TEST_GROUP_CHATID ?? '120363427129444398@g.us'
+    grupo = 'New team (test)'
   } else {
     const grupoAlias = marca.grupo_whatsapp_alias as string | null
     const grupoNombre = marca.grupo_whatsapp_nombre as string | null
     grupo = grupoAlias ?? grupoNombre
     byAlias = !!grupoAlias
-  }
-  if (!grupo) {
-    return {
-      ok: false,
-      error: modo === 'real'
-        ? `Marca '${marca.slug}' no tiene grupo_whatsapp configurado. Configurá en Settings.`
-        : `Grupo de testing no configurado (env WHATSAPP_TEST_GROUP_NAME)`,
+    if (!grupo) {
+      return {
+        ok: false,
+        error: `Marca '${marca.slug}' no tiene grupo_whatsapp configurado. Configurá en Settings.`,
+      }
     }
   }
 
@@ -230,8 +230,25 @@ export async function enviarGrillaAlGrupo(
   const upload = await uploadGrillaPNG(pngBuffer, slug, semanaInicio)
   if (!upload.ok) return { ok: false, error: `Upload: ${upload.error}` }
 
-  // 5. Envío vía Rubi MCP (igual para test y real — mismo grupo de destino sólo cambia)
-  const rubiResult = await sendWhatsAppImageToGroup(grupo, upload.url, caption, byAlias)
+  // 5. Envío vía Rubi MCP
+  // - test: usa chatId directo + caption con mention al WhatsApp de Pedro (51983852191).
+  // - real: usa alias/group_name + caption tal como viene del UI.
+  // Por qué split: la tool oficial whatsapp_send_image acepta `chatId`; el
+  // wrapper Rubi acepta también `alias`/`group_name` pero falla con grupos sin
+  // alias o con espacios ambiguos. chatId es bullet-proof.
+  let rubiResult
+  if (modo === 'test' && testChatId) {
+    const testNumber = process.env.WHATSAPP_TEST_MENTION_NUMBER ?? '51983852191'
+    const captionTest = [
+      `🧪 *PRUEBA — Grilla ${marca.nombre}*`,
+      `@${testNumber} esto es cómo le llegaría al cliente. NO se ha enviado al grupo real.`,
+      ``,
+      caption,
+    ].join('\n')
+    rubiResult = await sendWhatsAppImageToChatId(testChatId, upload.url, captionTest)
+  } else {
+    rubiResult = await sendWhatsAppImageToGroup(grupo!, upload.url, caption, byAlias)
+  }
   if (!rubiResult.ok) {
     return { ok: false, error: `WhatsApp: ${rubiResult.error}` }
   }

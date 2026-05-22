@@ -150,6 +150,10 @@ export async function sendWhatsAppToGroup(
 /**
  * Envía una IMAGEN a un grupo WhatsApp por alias o nombre, con caption opcional.
  * imageUrl debe ser una URL pública accesible (Supabase Storage signed URL funciona).
+ *
+ * NOTA: Rubi acepta alias/group_name como conveniencia (wrapper que resuelve a chatId).
+ * Para máxima confiabilidad (especialmente con grupos sin alias o nombres con espacios
+ * problemáticos), preferir sendWhatsAppImageToChatId.
  */
 export async function sendWhatsAppImageToGroup(
   groupName: string,
@@ -163,4 +167,34 @@ export async function sendWhatsAppImageToGroup(
     media: { url: imageUrl },
     caption,
   })
+}
+
+/**
+ * Envía una IMAGEN a un chat WhatsApp por chatId directo (`123…@g.us`).
+ *
+ * Versión bullet-proof: no depende de aliases ni de resolución por nombre.
+ * Si el caption contiene `@<numero>`, WhatsApp lo renderiza automáticamente
+ * como mention clickeable cuando el número pertenece al grupo destino.
+ */
+export async function sendWhatsAppImageToChatId(
+  chatId: string,
+  imageUrl: string,
+  caption: string,
+): Promise<RubiToolCallResult> {
+  return callRubiTool('whatsapp_send_image', {
+    chatId,
+    media: { url: imageUrl },
+    caption,
+  })
+}
+
+/**
+ * Envía mensaje de texto a un grupo mencionando uno o varios números.
+ * Usar para fallback cuando la mención en caption de imagen no se renderiza
+ * como clickeable.
+ */
+export async function sendWhatsAppWithMentions(
+  args: { chatId?: string; alias?: string; group_name?: string; text: string; mentions: string[] }
+): Promise<RubiToolCallResult> {
+  return callRubiTool('whatsapp_send_with_mentions', args)
 }
