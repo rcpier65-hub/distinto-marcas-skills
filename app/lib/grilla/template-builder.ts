@@ -1,12 +1,15 @@
 // app/lib/grilla/template-builder.ts
-// Generador de HTML de la grilla semanal. Una sola plantilla "maestra" basada
-// en Manrique, parametrizada por theme. Todas las marcas usan el MISMO layout
-// pero con sus colores/fuentes/identidad.
+// Generador de HTML de la grilla semanal.
+// Filosofía: una BASE común (estructura HTML + CSS reset/grid) + DELTAS por
+// marca (decoraciones, extra CSS, hero override). El dispatcher lee
+// theme.style y llama al style module correspondiente.
 //
-// Filosofía: consistency over customization. Si después una marca pide layout
-// drásticamente diferente, se hace una plantilla custom. Por ahora, una sola.
+// Esto permite que cada marca tenga su propio "mood" sin duplicar el HTML
+// completo. Manrique es clinical-warm, Lozano es artisan-craft, etc.
+// (Ver styles/ para cada implementación.)
 
 import { getTheme, type GrillaTheme } from './themes'
+import { getStyleBuilder } from './styles'
 
 export type TemplateInput = {
   slug: string
@@ -18,6 +21,9 @@ export type TemplateInput = {
 
 export function buildGrillaHtml(input: TemplateInput): string {
   const t = getTheme(input.slug)
+  const blocks = getStyleBuilder(t.style)(t)
+  const heroTitle = blocks.heroTitleOverride ?? t.heroTitle ?? '¿Qué se viene?'
+
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -27,13 +33,13 @@ export function buildGrillaHtml(input: TemplateInput): string {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${t.fontsUrl}" rel="stylesheet">
 <style>
-  ${buildCss(t)}
+  ${buildBaseCss(t)}
+  ${blocks.extraCss}
 </style>
 </head>
 <body>
 <div class="poster">
-  <div class="blob tr"></div>
-  <div class="blob bl"></div>
+  ${blocks.decorations}
 
   <header class="header">
     <img class="logo" src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(t.brandBig)}" />
@@ -45,7 +51,7 @@ export function buildGrillaHtml(input: TemplateInput): string {
   </header>
 
   <section class="hero">
-    <h1>¿Qué se viene?</h1>
+    <h1>${escapeHtml(heroTitle)}</h1>
     <div class="sub">${escapeHtml(input.dateSub)}</div>
     <div class="divider">
       <span class="line"></span><span class="dot"></span><span class="line"></span>
@@ -64,6 +70,7 @@ export function buildGrillaHtml(input: TemplateInput): string {
       <span class="agency-dot"></span>
     </div>
     <div class="url">${escapeHtml(t.footerUrl)}</div>
+    ${blocks.footerExtra ?? ''}
   </footer>
 </div>
 </body>
@@ -71,11 +78,11 @@ export function buildGrillaHtml(input: TemplateInput): string {
 }
 
 /**
- * CSS común parametrizado por theme.
- * Se basa en la plantilla de Manrique que ya funciona bien — solo cambian
- * los valores de color/fuente que vienen del theme.
+ * CSS BASE común a todas las marcas. Define el grid, layout, dimensiones
+ * fijas 1080x1620, y un mood neutro. Cada style module sobreescribe lo
+ * que necesita vía `extraCss` (que se concatena DESPUÉS de este base).
  */
-function buildCss(t: GrillaTheme): string {
+function buildBaseCss(t: GrillaTheme): string {
   return `
   :root {
     --primary:    ${t.primary};
@@ -96,12 +103,6 @@ function buildCss(t: GrillaTheme): string {
   .poster { width: 1080px; height: 1620px; background: var(--canvas); position: relative;
     overflow: hidden; padding: 55px 70px 45px; display: flex; flex-direction: column;
     box-shadow: 0 30px 80px rgba(0,0,0,.35); }
-  .blob { position: absolute; background: var(--accent); opacity: .18;
-    filter: blur(2px); border-radius: 50%; pointer-events: none; }
-  .blob.tr { width: 380px; height: 220px; top: -110px; right: -130px;
-    transform: rotate(-25deg); border-radius: 60% 40% 50% 50% / 60% 50% 50% 40%; }
-  .blob.bl { width: 420px; height: 260px; bottom: -120px; left: -150px;
-    transform: rotate(15deg); border-radius: 50% 50% 60% 40% / 50% 60% 40% 50%; }
 
   .header { display: flex; align-items: center; gap: 20px; margin-bottom: 8px;
     position: relative; z-index: 2; }
@@ -112,18 +113,18 @@ function buildCss(t: GrillaTheme): string {
   .brand-name .small { font-size: 18px; font-weight: 500; letter-spacing: 4px;
     color: var(--primary); line-height: 1; margin-bottom: 6px; opacity: .85;
     text-transform: uppercase; }
-  .brand-name .big { font-size: 48px; font-weight: 800; letter-spacing: 1px;
-    color: var(--primary); line-height: 1; }
+  .brand-name .big { font-family: var(--serif); font-size: 48px; font-weight: 800;
+    letter-spacing: 1px; color: var(--primary); line-height: 1; }
   .date-pill { background: var(--primary); color: var(--white); font-weight: 600;
     font-size: 18px; letter-spacing: .8px; padding: 12px 22px; border-radius: 999px;
     white-space: nowrap; align-self: center; }
 
   .hero { text-align: center; margin: 24px 0 26px; position: relative; z-index: 2; }
-  .hero h1 { font-family: var(--serif); font-style: italic; font-weight: 500;
+  .hero h1 { font-family: var(--serif); font-weight: 500;
     font-size: 96px; color: var(--primary); line-height: .95; letter-spacing: -1px;
     white-space: nowrap; }
-  .hero .sub { font-size: 20px; font-weight: 400; color: var(--primary);
-    margin-top: 10px; letter-spacing: .3px; opacity: .85; }
+  .hero .sub { font-family: var(--sans); font-size: 20px; font-weight: 400;
+    color: var(--primary); margin-top: 10px; letter-spacing: .3px; opacity: .85; }
   .divider { display: flex; align-items: center; justify-content: center;
     gap: 10px; margin-top: 14px; }
   .divider .line { width: 180px; height: 2px; background: var(--highlight);
@@ -137,17 +138,18 @@ function buildCss(t: GrillaTheme): string {
     padding: 18px 28px; display: flex; align-items: center; gap: 22px;
     min-height: 96px; position: relative; }
   .card .date { flex-shrink: 0; text-align: left; min-width: 90px; }
-  .card .date .day { font-size: 58px; font-weight: 800; color: var(--primary);
-    line-height: .9; letter-spacing: -1px; }
-  .card .date .month { font-size: 16px; font-weight: 700; color: var(--acc-color, var(--primary));
-    letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+  .card .date .day { font-family: var(--serif); font-size: 58px; font-weight: 800;
+    color: var(--primary); line-height: .9; letter-spacing: -1px; }
+  .card .date .month { font-family: var(--sans); font-size: 16px; font-weight: 700;
+    color: var(--acc-color, var(--primary)); letter-spacing: 2px; text-transform: uppercase;
+    margin-top: 2px; }
   .card .bar { width: 3px; height: 64px; background: var(--acc-color, var(--primary));
     border-radius: 2px; opacity: .8; flex-shrink: 0; }
   .card .body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .card .body .title { font-size: 28px; font-weight: 700; color: var(--primary);
-    line-height: 1.1; letter-spacing: -.3px; }
-  .card .body .meta { font-size: 15px; font-weight: 500; color: var(--primary);
-    letter-spacing: .2px; opacity: .75; }
+  .card .body .title { font-family: var(--sans); font-size: 28px; font-weight: 700;
+    color: var(--primary); line-height: 1.1; letter-spacing: -.3px; }
+  .card .body .meta { font-family: var(--sans); font-size: 15px; font-weight: 500;
+    color: var(--primary); letter-spacing: .2px; opacity: .75; }
   .card .icon { flex-shrink: 0; width: 64px; height: 64px; color: var(--primary); }
   .card .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none;
     stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
