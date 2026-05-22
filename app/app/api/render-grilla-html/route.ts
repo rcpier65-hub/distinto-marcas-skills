@@ -40,12 +40,15 @@ export async function GET(request: Request) {
     pubs = JSON.parse(url.searchParams.get('pubs') ?? '[]')
   } catch {}
 
-  // Logo URL — usa override si vino, sino el placeholder local
+  // Logo URL — usa override si vino, sino el archivo local oficial.
+  // Por default usamos SVG (vector, escala perfecto al render Chromium 1080×1620).
+  // Little Joe es excepción: solo hay PNG blanco oficial (sin SVG vector aún).
   const proto = url.protocol
   const host = url.host
+  const ext = slug === 'little-joe' ? 'png' : 'svg'
   const logoUrl = logoOverride
     ? normalizeDriveUrl(logoOverride)
-    : `${proto}//${host}/marcas/${slug}/logo.${slug === 'manrique' ? 'png' : 'svg'}`
+    : `${proto}//${host}/marcas/${slug}/logo.${ext}`
 
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)

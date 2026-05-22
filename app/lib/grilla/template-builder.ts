@@ -83,6 +83,8 @@ export function buildGrillaHtml(input: TemplateInput): string {
  * que necesita vía `extraCss` (que se concatena DESPUÉS de este base).
  */
 function buildBaseCss(t: GrillaTheme): string {
+  const logoBg = t.logoBg ?? '#FFFFFF'
+  const logoPad = t.logoPad ?? '14px'
   return `
   :root {
     --primary:    ${t.primary};
@@ -95,6 +97,8 @@ function buildBaseCss(t: GrillaTheme): string {
     --card-alt:   ${t.cardAltBg};
     --serif:      ${t.fontSerif};
     --sans:       ${t.fontSans};
+    --logo-bg:    ${logoBg};
+    --logo-pad:   ${logoPad};
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: #2c2c2c; font-family: var(--sans); color: var(--text);
@@ -107,8 +111,8 @@ function buildBaseCss(t: GrillaTheme): string {
   .header { display: flex; align-items: center; gap: 20px; margin-bottom: 8px;
     position: relative; z-index: 2; }
   .logo { width: 160px; height: 160px; flex-shrink: 0; object-fit: contain;
-    margin: -20px -10px -20px -20px; background: var(--white); border-radius: 12px;
-    padding: 14px; }
+    margin: -20px -10px -20px -20px; background: var(--logo-bg); border-radius: 12px;
+    padding: var(--logo-pad); }
   .brand-name { flex: 1; }
   .brand-name .small { font-size: 18px; font-weight: 500; letter-spacing: 4px;
     color: var(--primary); line-height: 1; margin-bottom: 6px; opacity: .85;

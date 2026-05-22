@@ -1,153 +1,161 @@
 // app/lib/grilla/styles/artisan-craft.ts
-// Muebles Lozano — Mood: blueprint técnico, oficio, madera fina.
-// Características: Bebas Neue display masivo, grid de medidas tipo papel
-// técnico, paleta negro + dorado.
+// Muebles Lozano. Manual oficial págs. 4-11 (LOGOS PERÚ, dic 2019).
+// Paleta: Amarillo dorado #DCC32C + Negro azulado #0C0C12.
+// Tipografía: Opificio Neue (sin bold real, énfasis por borde) + Myriad Pro.
+// OSS: Oswald (display sin bold) + Inter (sans cuerpo).
+// Mood: Caregiver+Creator — cálido oficio peruano, NO industrial brutalist.
+// NO Bebas Neue masivo, NO grid blueprint duro. Sí líneas finas que evocan medida.
 
 import type { StyleBuilder } from './types'
 
 export const artisanCraft: StyleBuilder = () => ({
   decorations: `
-    <div class="blueprint-grid"></div>
-    <div class="ruler ruler-top"></div>
-    <div class="ruler ruler-left"></div>
-    <div class="corner-mark tl"></div>
-    <div class="corner-mark tr"></div>
-    <div class="corner-mark bl"></div>
-    <div class="corner-mark br"></div>
+    <div class="warm-glow"></div>
+    <div class="rule-line rule-top"></div>
+    <div class="rule-line rule-bottom"></div>
+    <div class="amber-block tl"></div>
+    <div class="amber-block br"></div>
   `,
   extraCss: `
-    /* Canvas: papel técnico crema con grid sutil */
-    .blueprint-grid {
+    /* Glow cálido amarillo en background (oficio, no blueprint frío) */
+    .warm-glow {
       position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(220,195,44,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(220,195,44,0.06) 1px, transparent 1px);
-      background-size: 40px 40px;
+      background: radial-gradient(ellipse 700px 500px at 50% 0%, rgba(220,195,44,0.10), transparent 70%);
       pointer-events: none; z-index: 0;
     }
 
-    /* Reglas de medición en bordes */
-    .ruler {
-      position: absolute; background: var(--accent); opacity: .4;
+    /* Líneas finas amarillas (sutiles, marcan medida sin gritar industrial) */
+    .rule-line {
+      position: absolute; height: 1px; background: var(--accent); opacity: .25;
       z-index: 1;
     }
-    .ruler-top { top: 30px; left: 70px; right: 70px; height: 1px; }
-    .ruler-left { top: 30px; bottom: 80px; left: 30px; width: 1px; }
+    .rule-top { top: 240px; left: 70px; right: 70px; }
+    .rule-bottom { bottom: 120px; left: 70px; right: 70px; }
 
-    /* Marcas de esquina tipo blueprint */
-    .corner-mark {
-      position: absolute; width: 28px; height: 28px;
-      border: 2px solid var(--accent); opacity: .6; z-index: 1;
+    /* Bloques esquinas estilo sello carpintería (no marcas técnicas frías) */
+    .amber-block {
+      position: absolute; width: 8px; height: 60px;
+      background: var(--accent); z-index: 1;
     }
-    .corner-mark.tl { top: 22px; left: 22px; border-right: none; border-bottom: none; }
-    .corner-mark.tr { top: 22px; right: 22px; border-left: none; border-bottom: none; }
-    .corner-mark.bl { bottom: 22px; left: 22px; border-right: none; border-top: none; }
-    .corner-mark.br { bottom: 22px; right: 22px; border-left: none; border-top: none; }
+    .amber-block.tl { top: 200px; left: 30px; }
+    .amber-block.br { bottom: 180px; right: 30px; }
 
-    /* Hero: Bebas Neue MASIVO, no italic */
+    /* Hero: Oswald medium (no bold extremo — la marca cálida no admite Bebas masivo) */
     .hero h1 {
-      font-family: 'Bebas Neue', Impact, sans-serif !important;
+      font-family: 'Oswald', 'Impact', sans-serif !important;
       font-style: normal !important;
-      font-weight: 400 !important;
-      font-size: 132px !important;
-      letter-spacing: 4px !important;
-      line-height: 0.9 !important;
+      font-weight: 500 !important;
+      font-size: 110px !important;
+      letter-spacing: 2px !important;
+      line-height: 0.95 !important;
       text-transform: uppercase;
       color: var(--primary);
     }
     .hero .sub {
-      font-family: var(--sans);
-      font-weight: 500;
-      letter-spacing: 3px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 500 !important;
+      letter-spacing: 2.5px !important;
       text-transform: uppercase;
       font-size: 14px !important;
+      color: var(--primary) !important;
+      opacity: .7;
     }
-    .hero .sub::before { content: '— '; }
-    .hero .sub::after  { content: ' —'; }
+    .hero .sub::before { content: '— '; color: var(--accent); }
+    .hero .sub::after  { content: ' —'; color: var(--accent); }
 
-    /* Pill negra con tipografía industrial */
+    /* Pill negro con borde amarillo (oficio premium) */
     .date-pill {
-      font-family: 'Bebas Neue', Impact, sans-serif !important;
-      font-weight: 400 !important;
-      font-size: 22px !important;
-      letter-spacing: 3px !important;
-      background: var(--primary);
-      border-radius: 0 !important;
-      padding: 14px 26px !important;
-      border-left: 4px solid var(--accent);
+      background: var(--primary) !important;
+      color: var(--accent) !important;
+      font-family: 'Oswald', Impact, sans-serif !important;
+      font-weight: 500 !important;
+      font-size: 18px !important;
+      letter-spacing: 2.5px !important;
+      border-radius: 4px !important;
+      padding: 12px 24px !important;
+      border: 1px solid var(--accent);
     }
 
-    /* Brand name con peso tipo cartel de carpintería */
+    /* Brand name Oswald medium + tracking respirado */
     .brand-name .big {
-      font-family: 'Bebas Neue', Impact, sans-serif !important;
-      font-weight: 400 !important;
-      font-size: 56px !important;
-      letter-spacing: 4px !important;
+      font-family: 'Oswald', Impact, sans-serif !important;
+      font-weight: 500 !important;
+      font-size: 50px !important;
+      letter-spacing: 2px !important;
+      text-transform: uppercase;
     }
     .brand-name .small {
-      letter-spacing: 6px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 600 !important;
+      letter-spacing: 5px !important;
       color: var(--accent) !important;
       opacity: 1 !important;
-      font-weight: 700 !important;
     }
 
-    /* Cards estilo ficha técnica: sin radius, borde inferior dorado, números display */
+    /* Cards con borde amarillo abajo (sello) + radius pequeño cálido */
     .card {
-      border-radius: 0 !important;
+      border-radius: 6px !important;
       border-bottom: 3px solid var(--accent);
-      padding: 18px 28px !important;
+      box-shadow: 0 2px 8px rgba(12,12,18,0.05);
     }
     .card .date .day {
-      font-family: 'Bebas Neue', Impact, sans-serif !important;
-      font-size: 72px !important;
-      font-weight: 400 !important;
-      letter-spacing: 2px !important;
+      font-family: 'Oswald', Impact, sans-serif !important;
+      font-weight: 500 !important;
+      font-size: 66px !important;
+      letter-spacing: 1px !important;
     }
     .card .date .month {
-      font-family: 'Bebas Neue', Impact, sans-serif !important;
+      font-family: 'Oswald', Impact, sans-serif !important;
       font-weight: 400 !important;
-      letter-spacing: 4px !important;
-      color: var(--accent) !important;
+      letter-spacing: 3px !important;
+      color: var(--primary) !important;
+      opacity: .55;
     }
     .card .bar {
       background: var(--accent) !important;
-      width: 4px !important;
+      width: 3px !important;
     }
     .card .body .title {
-      font-weight: 600 !important;
-      letter-spacing: 0 !important;
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 700 !important;
+      letter-spacing: -.2px !important;
     }
     .card .body .meta {
-      font-family: 'Bebas Neue', Impact, sans-serif !important;
-      letter-spacing: 3px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 500 !important;
+      letter-spacing: 1.5px !important;
       text-transform: uppercase;
-      font-size: 14px !important;
+      font-size: 13px !important;
       opacity: 1 !important;
       color: var(--accent) !important;
     }
 
-    /* Divider con marcas de regla */
+    /* Divider con clavo dorado (oficio carpintería) */
     .divider .line {
       background: var(--primary) !important;
+      opacity: .25;
       height: 1px !important;
-      opacity: .35;
     }
     .divider .dot {
       background: var(--accent) !important;
+      width: 10px !important; height: 10px !important;
       border-radius: 0 !important;
-      width: 14px !important; height: 14px !important;
       transform: rotate(45deg);
+      box-shadow: 0 0 0 3px rgba(220,195,44,0.18);
     }
 
-    /* Footer industrial */
-    .footer .agency {
-      font-family: 'Bebas Neue', Impact, sans-serif;
-      letter-spacing: 8px !important;
-    }
+    /* Footer */
     .footer .tagline {
-      font-style: italic;
+      font-family: 'Inter', sans-serif !important;
+      font-style: italic !important;
+      font-weight: 500 !important;
       color: var(--primary) !important;
       opacity: .75;
+    }
+    .footer .agency {
+      font-family: 'Oswald', Impact, sans-serif !important;
+      font-weight: 400 !important;
+      letter-spacing: 6px !important;
     }
   `,
 })

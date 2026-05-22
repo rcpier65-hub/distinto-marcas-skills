@@ -47,138 +47,167 @@ export type GrillaTheme = {
   footerUrl: string
   /** Override opcional del hero title (default "¿Qué se viene?") */
   heroTitle?: string
+  /** Color de fondo del wrapper del logo (importante para logos blancos
+   *  como Little Joe, o cuando el manual de marca lo exige). Default: white. */
+  logoBg?: string
+  /** Padding interno del wrapper del logo. Default 14px. Algunos logos con
+   *  poca respiración propia se ven mejor sin padding. */
+  logoPad?: string
 }
 
 export const THEMES: Record<string, GrillaTheme> = {
   manrique: {
     style: 'clinical-warm',
-    primary: '#283B6F',       // Navy oficial
-    accent: '#D9536C',        // Raspberry
-    highlight: '#9AC2E8',     // Sky
-    canvas: '#FBF6F2',        // Crema cálido
+    primary: '#283B6F',       // Navy oficial Manual pág. 4
+    accent: '#D9536C',        // Raspberry Pink Manual pág. 4
+    highlight: '#9AC2E8',     // Light Sky Blue Manual pág. 4
+    canvas: '#FBF6F2',        // Crema cálido (no listado en manual, complemento)
     text: '#283B6F',
     cardBg: '#FFFFFF',
-    cardAltBg: '#F4C9D2',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Poppins:wght@300;400;500;600;700;800&display=swap',
-    fontSerif: "'Playfair Display', Georgia, serif",
+    cardAltBg: '#F4C9D2',     // Rosa derivado del raspberry
+    // Manual oficial pág. 5: "Poppins Family Font" para todo. NO Playfair.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap',
+    fontSerif: "'Poppins', system-ui, -apple-system, sans-serif",
     fontSans: "'Poppins', system-ui, -apple-system, sans-serif",
     brandSmall: 'CENTRO PSICOLÓGICO',
     brandBig: 'MANRIQUE',
     tagline: 'Acompañamos a tu familia con rigor clínico y calidez',
     footerUrl: 'www.agenciadistinto.com',
     heroTitle: '¿Qué se viene?',
+    logoBg: '#FFFFFF',
   },
   lozano: {
     style: 'artisan-craft',
-    primary: '#0C0C12',
-    accent: '#DCC32C',
-    highlight: '#F4E180',
-    canvas: '#FAF6EC',
+    primary: '#0C0C12',       // Negro azulado oficial Manual pág. 6
+    accent: '#DCC32C',        // Amarillo dorado oficial Manual pág. 6
+    highlight: '#F4E180',     // Amarillo suave (derivado)
+    canvas: '#FAF6EC',        // Crema cálido (complemento warm para oficio)
     text: '#0C0C12',
     cardBg: '#FFFFFF',
     cardAltBg: '#F8E790',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap',
-    fontSerif: "'Playfair Display', Georgia, serif",
+    // Manual oficial pág. 8: Opificio Neue (no tiene bold) + Myriad Pro.
+    // OSS equivalente: Oswald (display sin bold real) + Inter (sans cuerpo).
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500&family=Inter:wght@300;400;500;600;700&display=swap',
+    fontSerif: "'Oswald', Impact, sans-serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'Bebas Neue', Impact, sans-serif",
+    fontDisplay: "'Oswald', Impact, sans-serif",
     brandSmall: 'MUEBLES A MEDIDA · LIMA',
     brandBig: 'MUEBLES LOZANO',
     tagline: 'Convierte tu espacio en un lugar único',
     footerUrl: 'www.agenciadistinto.com',
-    heroTitle: 'TU SEMANA',
+    heroTitle: 'Tu semana',
+    logoBg: '#FAF6EC',
   },
   'distribuidora-fitness': {
     style: 'gym-energy',
-    primary: '#1A1A1F',
-    accent: '#F54922',
+    // Manual oficial pág. 7: negro NO puro (#333333) + naranja DF.
+    primary: '#333333',       // Negro suave Manual (NO #000000)
+    accent: '#F54922',        // Naranja DF oficial Manual
     highlight: '#FF6B45',
-    canvas: '#F2F2EC',
-    text: '#1A1A1F',
+    canvas: '#FFFFFF',        // Manual: blanco predomina, naranja como acento
+    text: '#333333',
     cardBg: '#FFFFFF',
-    cardAltBg: '#FFDFD0',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap',
+    cardAltBg: '#FFEDE5',     // Naranja muy suave
+    // Manual oficial pág. 6: Stretch Pro bold-extended + Infinite Light/Thin.
+    // OSS: Anton (display extended bold) + Inter Light/Regular para body.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700;800&display=swap',
     fontSerif: "'Anton', Impact, sans-serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'Barlow Condensed', Impact, sans-serif",
-    brandSmall: 'SUPLEMENTACIÓN PREMIUM · PERÚ',
+    fontDisplay: "'Anton', Impact, sans-serif",
+    brandSmall: 'SUPLEMENTACIÓN PREMIUM',
     brandBig: 'DISTRIBUIDORA FITNESS',
     tagline: 'Tu progreso, nuestro suplemento',
     footerUrl: 'distribuidorafitness.pe',
-    heroTitle: 'ESTA SEMANA',
+    heroTitle: 'Esta semana',
+    logoBg: '#FFFFFF',
   },
   'little-joe': {
     style: 'playful-italian',
-    primary: '#1E3A8A',
-    accent: '#E63946',
+    primary: '#1E3A8A',       // Azul Little Joe (marca matriz italiana)
+    accent: '#EAB308',        // Dorado estrella (warm acento)
     highlight: '#BFD4F5',
-    canvas: '#F4FAFE',
+    canvas: '#EAF4FF',        // Cielo italiano cálido
     text: '#1E3A8A',
     cardBg: '#FFFFFF',
     cardAltBg: '#DCE8FA',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,700;1,500&family=Quicksand:wght@400;500;600;700&display=swap',
+    // Tono cute+aspiracional: Quicksand rounded + Fraunces curvy
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,700;1,500;1,700&family=Quicksand:wght@400;500;600;700&display=swap',
     fontSerif: "'Fraunces', Georgia, serif",
     fontSans: "'Quicksand', system-ui, sans-serif",
-    brandSmall: 'AROMATIZANTES PREMIUM · ITALIA',
+    brandSmall: 'AROMATIZANTES · ITALIA',
     brandBig: 'LITTLE JOE',
     tagline: 'Pon una sonrisa en el aire',
     footerUrl: 'littlejoe.com.pe',
     heroTitle: 'La semana viene así',
+    // CRÍTICO: logo es BLANCO solo, sin fondo azul es invisible
+    logoBg: '#1E3A8A',
+    logoPad: '10px',
   },
   kintu: {
     style: 'wellness-organic',
-    primary: '#1A3E42',
-    accent: '#45B787',
-    highlight: '#BBE0CD',
-    canvas: '#F4F8F2',
+    primary: '#1A3E42',       // Verde profundo Manual pág. 6
+    accent: '#45B787',        // Verde Kintu Manual pág. 6
+    highlight: '#BBE0CD',     // Verde menta Manual pág. 6
+    canvas: '#F4F8F2',        // Off-white verdoso
     text: '#1A3E42',
     cardBg: '#FFFFFF',
     cardAltBg: '#DDEDE3',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Nunito+Sans:wght@300;400;500;600;700&display=swap',
-    fontSerif: "'Cormorant Garamond', Georgia, serif",
-    fontSans: "'Nunito Sans', system-ui, sans-serif",
-    brandSmall: 'ESSENTIAL OILS · PERÚ',
-    brandBig: 'KINTU',
+    // Manual oficial pág. 7: Montserrat estricto (NO Cormorant — eso era invención mía)
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap',
+    fontSerif: "'Montserrat', system-ui, sans-serif",
+    fontSans: "'Montserrat', system-ui, sans-serif",
+    brandSmall: 'ESSENTIAL OILS',
+    brandBig: 'kintu',          // Manual: wordmark lowercase
     tagline: 'Cuidarte de forma simple y consciente',
-    footerUrl: 'kintu.com.pe',
-    heroTitle: 'Florece esta semana',
+    footerUrl: 'kintuoils.com',
+    heroTitle: 'Tu semana en calma',
+    logoBg: '#FFFFFF',
   },
   novalamps: {
     style: 'led-technical',
-    primary: '#E4F000',       // Lima brillante (texto sobre fondo oscuro)
-    accent: '#D2DD00',
-    highlight: '#9AAA00',
-    canvas: '#0F0F0E',        // Grafito casi negro
-    text: '#F2F2F2',
-    cardBg: '#1C1C1A',
-    cardAltBg: '#262624',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700;800&display=swap',
-    fontSerif: "'Orbitron', 'JetBrains Mono', monospace",
+    // Manual oficial pág. 7-8: Verde lima debe PREDOMINAR + Grafito + Blanco.
+    // Mood Sage+Creator+Ruler aspiracional premium, NO sci-fi cyberpunk.
+    primary: '#262726',       // Grafito oficial Manual pág. 7 (texto)
+    accent: '#D2DD00',        // Verde lima Novalamps Manual pág. 7 (PRINCIPAL)
+    highlight: '#E4F000',     // Lima brillante (acento)
+    canvas: '#FAFAF5',        // Off-white para que lima predomine (no dark)
+    text: '#262726',
+    cardBg: '#FFFFFF',
+    cardAltBg: '#F2F4D6',     // Lima muy suave
+    // Manual oficial pág. 9: Arial Regular/Bold → OSS Inter (NO Orbitron sci-fi)
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap',
+    fontSerif: "'Inter', system-ui, sans-serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'JetBrains Mono', monospace",
-    brandSmall: 'ILUMINACIÓN LED · 15+ AÑOS',
-    brandBig: 'NOVALAMPS',
+    fontDisplay: "'Inter', system-ui, sans-serif",
+    brandSmall: 'ILUMINACIÓN LED · 15 AÑOS',
+    brandBig: 'Novalamps',     // Manual: escritura correcta, NO mayúsculas
     tagline: 'Convierte cada espacio en diseño',
     footerUrl: 'novalamps.com.pe',
-    heroTitle: 'AGENDA / SEMANA',
+    heroTitle: 'Esta semana',
+    // Logo oficial es lima+grafito sobre dark — el wrapper grafito lo realza
+    logoBg: '#262726',
   },
   'la-victoria': {
     style: 'wood-industrial',
-    primary: '#1B4332',
-    accent: '#8B6F47',
-    highlight: '#C9A87A',
-    canvas: '#F2E8D0',        // Crema madera natural más cálido
+    // Brochure: Verde bosque oscuro PRIMARIO + crema madera + marrón
+    primary: '#1B4332',       // Verde bosque oscuro
+    accent: '#8B6F47',         // Marrón madera
+    highlight: '#C9A87A',      // Madera clara
+    canvas: '#F2E8D0',         // Crema madera natural
     text: '#1B4332',
     cardBg: '#FFFCEB',
     cardAltBg: '#E8D4B0',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500;1,600&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap',
+    // Brochure: serif moderna semibold + sans tracking ancho
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap',
     fontSerif: "'Playfair Display', Georgia, serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'Libre Caslon Text', Georgia, serif",
+    fontDisplay: "'Playfair Display', Georgia, serif",
     brandSmall: 'DISTRIBUIDORA DE PINO',
     brandBig: 'LA VICTORIA',
-    tagline: '15 años abasteciendo la industria peruana',
+    tagline: 'Asegura tu abastecimiento',
     footerUrl: 'lavictoria.com.pe',
     heroTitle: 'La semana en obra',
+    logoBg: '#FFFCEB',
   },
 }
 
