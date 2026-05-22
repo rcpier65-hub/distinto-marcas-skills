@@ -44,6 +44,10 @@ export function GrillaWorkspace({
   const [caption, setCaption] = useState(captionDefault)
   const [zoom, setZoom] = useState(0.45)
   const [isSending, startSending] = useTransition()
+  // Bust de cache para el iframe: token que cambia al apretar "Recargar
+  // preview" o al primer mount. Algunos navegadores ignoran Cache-Control:
+  // no-store dentro de iframes, así que un param ?_v= rompe el cache HTTP.
+  const [bust, setBust] = useState(() => Date.now())
 
   // URL del iframe — el endpoint /api/render-grilla-html devuelve el HTML
   // de la grilla con las publicaciones reales. Se actualiza si cambia algo.
@@ -59,9 +63,10 @@ export function GrillaWorkspace({
       inicio: semanaInicio,
       fin: semanaFin,
       pubs: JSON.stringify(pubs),
+      _v: String(bust),
     })
     return `/api/render-grilla-html?${params.toString()}`
-  }, [marca.slug, semanaInicio, semanaFin, publicaciones])
+  }, [marca.slug, semanaInicio, semanaFin, publicaciones, bust])
 
   function handleEnviar() {
     if (!confirm(`¿Enviar grilla al grupo WhatsApp de ${marca.nombre}? El PNG se genera ahora con la plantilla profesional.`)) return
@@ -113,7 +118,7 @@ export function GrillaWorkspace({
         {/* PREVIEW iframe — HTML en vivo, NO PNG */}
         <Card>
           <CardContent className="p-4 flex flex-col items-center bg-muted/30">
-            <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground flex-wrap">
               <span>Zoom:</span>
               {[0.3, 0.4, 0.45, 0.5, 0.6, 0.75, 1].map((z) => (
                 <button
@@ -125,6 +130,14 @@ export function GrillaWorkspace({
                   {Math.round(z * 100)}%
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setBust(Date.now())}
+                className="ml-auto px-2 py-0.5 rounded text-xs border hover:bg-muted"
+                title="Forzar recarga del iframe (rompe el cache del navegador)"
+              >
+                ↻ Recargar
+              </button>
             </div>
             <div
               style={{
