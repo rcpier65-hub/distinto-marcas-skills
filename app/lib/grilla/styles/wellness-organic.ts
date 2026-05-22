@@ -61,8 +61,8 @@ export const wellnessOrganic: StyleBuilder = () => ({
       position: absolute; pointer-events: none; z-index: 0;
       filter: blur(1px);
     }
-    .organic-blob.blob-tr { top: -120px; right: -150px; width: 620px; height: 620px; }
-    .organic-blob.blob-bl { bottom: -150px; left: -180px; width: 580px; height: 580px; }
+    .organic-blob.blob-tr { top: -150px; right: -200px; width: 540px; height: 540px; }
+    .organic-blob.blob-bl { bottom: -200px; left: -240px; width: 480px; height: 480px; opacity: 0.6; }
 
     /* Hojas decorativas (más sutiles que la v1) */
     .leaf {
