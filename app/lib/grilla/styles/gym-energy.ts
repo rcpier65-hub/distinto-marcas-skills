@@ -65,7 +65,7 @@ export const gymEnergy: StyleBuilder = () => ({
       box-shadow: 0 0 18px rgba(245,73,34,0.55);
     }
     .orange-accent-line.top { top: 22px; }
-    .orange-accent-line.bottom { bottom: 18px; }
+    .orange-accent-line.bottom { bottom: 10px; }
 
     /* ═══════════════ HEADER ═══════════════
        Sin wordmark de texto: el logo oficial DF ya dice "DISTRIBUIDORA FITNESS"
@@ -77,16 +77,16 @@ export const gymEnergy: StyleBuilder = () => ({
       margin-bottom: 20px !important;
       align-items: center !important;
     }
-    /* Logo DF: tight viewBox + tamaño grande + negativo via filter.
-       object-position: left center → ancla el SVG al borde izquierdo del
-       contenedor para que NO aparezca centrado (corrige el aspect mismatch
-       de ~10px que el object-fit:contain default introducía). */
+    /* Logo DF: aspect REAL es 4.84:1 (banner horizontal — verificado con
+       getBBox()). Antes había puesto 340×208 asumiendo aspect 1.6, lo que
+       dejaba mucho whitespace y hacía verse el logo flotando centrado.
+       Ahora 400×83 respeta el aspect real → logo ocupa todo el contenedor. */
     .logo {
       filter: brightness(0) invert(1);
       filter: drop-shadow(0 4px 24px rgba(255,255,255,0.18)) brightness(0) invert(1);
       margin: 0 !important;
-      width: 340px !important;
-      height: 208px !important;
+      width: 400px !important;
+      height: 83px !important;
       padding: 0 !important;
       object-position: left center !important;
     }
