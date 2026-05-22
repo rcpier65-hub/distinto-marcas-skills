@@ -150,23 +150,29 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   kintu: {
     style: 'wellness-organic',
-    primary: '#1A3E42',       // Verde profundo Manual pág. 6
-    accent: '#45B787',        // Verde Kintu Manual pág. 6
-    highlight: '#BBE0CD',     // Verde menta Manual pág. 6
-    canvas: '#F4F8F2',        // Off-white verdoso
+    // Estilo v2 (22-may-2026, Pedro: combinar elementos de carruseles reales):
+    // Editorial wellness consciente con firma visual "tarjeta verde profundo +
+    // texto blanco extrabold uppercase" (espejo del 'CANSADAS' en carrusel ¿Por qué
+    // nace Kintu?). Verde profundo es el protagonista, NO verde Kintu medio.
+    primary: '#1A3E42',       // Verde profundo Manual pág. 6 (texto + firma)
+    accent: '#45B787',        // Verde Kintu Manual pág. 6 (acentos secundarios)
+    highlight: '#BBE0CD',     // Verde menta Manual pág. 6 (formas orgánicas suaves)
+    canvas: '#F8FBF5',        // Off-white casi blanco con tinte verdoso muy sutil
     text: '#1A3E42',
     cardBg: '#FFFFFF',
-    cardAltBg: '#DDEDE3',
-    // Manual oficial pág. 7: Montserrat estricto (NO Cormorant — eso era invención mía)
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap',
+    cardAltBg: '#F2F8EE',     // Alterno muy claro
+    // Manual oficial pág. 7: Montserrat estricto en TODAS las jerarquías.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap',
     fontSerif: "'Montserrat', system-ui, sans-serif",
     fontSans: "'Montserrat', system-ui, sans-serif",
     brandSmall: 'ESSENTIAL OILS',
-    brandBig: 'kintu',          // Manual: wordmark lowercase
-    tagline: 'Cuidarte de forma simple y consciente',
+    brandBig: 'kintu',
+    tagline: '',                  // Sin tagline frase (aprendizaje DF)
     footerUrl: 'kintuoils.com',
     heroTitle: 'Tu semana en calma',
-    logoBg: '#FFFFFF',
+    // Logo positivo (verde sobre blanco) — sin wrapper, ya está sobre canvas blanco
+    logoBg: 'transparent',
+    logoPad: '0',
   },
   novalamps: {
     style: 'led-technical',
