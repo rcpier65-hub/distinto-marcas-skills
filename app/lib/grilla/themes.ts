@@ -78,25 +78,34 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   lozano: {
     style: 'artisan-craft',
-    primary: '#0C0C12',       // Negro azulado oficial Manual pág. 6
-    accent: '#DCC32C',        // Amarillo dorado oficial Manual pág. 6
-    highlight: '#F4E180',     // Amarillo suave (derivado)
-    canvas: '#FAF6EC',        // Crema cálido (complemento warm para oficio)
-    text: '#0C0C12',
-    cardBg: '#FFFFFF',
-    cardAltBg: '#F8E790',
-    // Manual oficial pág. 8: Opificio Neue (no tiene bold) + Myriad Pro.
-    // OSS equivalente: Oswald (display sin bold real) + Inter (sans cuerpo).
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500&family=Inter:wght@300;400;500;600;700&display=swap',
-    fontSerif: "'Oswald', Impact, sans-serif",
+    // Estilo v2 (22-may-2026, basado en post Día de la Madre 2026):
+    // Editorial elegante dark luxury — magazine de interiorismo premium.
+    // Canvas negro `#0C0C12` + amarillo dorado `#DCC32C` acento + serif
+    // italic delgada blanco gigante + sans tracking ancho uppercase labels.
+    primary: '#FFFFFF',        // Texto blanco sobre dark
+    accent: '#DCC32C',         // Amarillo dorado oficial Manual
+    highlight: '#F4E180',      // Amarillo suave
+    canvas: '#0C0C12',         // Negro oficial Manual (protagonista)
+    text: '#FFFFFF',
+    cardBg: '#FFFFFF',         // Cards blancas para legibilidad de 7 días
+    cardAltBg: '#FAFAFA',
+    // Manual pág. 8: Opificio Neue (no bold) + Myriad Pro.
+    // Post DM real usa SERIF ITALIC ELEGANTE para hero ("un lugar / único.").
+    // OSS: Playfair Display (serif italic delgada) + Inter (sans tracking).
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Inter:wght@300;400;500;600;700;800&display=swap',
+    fontSerif: "'Playfair Display', Georgia, serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'Oswald', Impact, sans-serif",
-    brandSmall: 'MUEBLES A MEDIDA · LIMA',
+    fontDisplay: "'Playfair Display', Georgia, serif",
+    brandSmall: 'MUEBLES A MEDIDA · LIMA, PERÚ',
     brandBig: 'MUEBLES LOZANO',
-    tagline: 'Convierte tu espacio en un lugar único',
-    footerUrl: 'www.agenciadistinto.com',
-    heroTitle: 'Tu semana',
-    logoBg: '#FAF6EC',
+    tagline: '',                  // Sin tagline frase (aprendizaje DF/Kintu/LV)
+    footerUrl: '@muebleslozanosac',
+    heroTitle: 'Esta semana',
+    // Logo aspect 1.09:1 (cuadrado isotipo+wordmark). Filter para volverlo
+    // contrastante sobre dark — el logo original es negro+amarillo,
+    // necesita invertir el negro a blanco manteniendo el amarillo.
+    logoBg: 'transparent',
+    logoPad: '0',
   },
   'distribuidora-fitness': {
     style: 'gym-energy',
