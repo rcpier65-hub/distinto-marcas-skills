@@ -48,13 +48,36 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // 1. Marca (incluye envio_real_habilitado para safety lock en UI)
-  const { data: marca, error: marcaErr } = await service
-    .from('marcas')
-    .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz, envio_real_habilitado, grupo_whatsapp_chatid, grupo_whatsapp_nombre')
-    .eq('slug', slug)
-    .eq('activa', true)
-    .maybeSingle()
+  // 1. Marca — SELECT tolerante a Migration 015 no aplicada.
+  // Si las columnas nuevas (envio_real_habilitado, grupo_whatsapp_chatid)
+  // no existen, el primer intento falla; reintentamos con SELECT mínimo y
+  // los campos nuevos quedan undefined → defaults seguros (safety lock OFF).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let marca: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let marcaErr: any = null
+  {
+    const r1 = await service
+      .from('marcas')
+      .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz, envio_real_habilitado, grupo_whatsapp_chatid, grupo_whatsapp_nombre')
+      .eq('slug', slug)
+      .eq('activa', true)
+      .maybeSingle()
+    if (r1.error && (r1.error.message ?? '').includes('does not exist')) {
+      // Fallback: migration no aplicada — usar columnas legacy
+      const r2 = await service
+        .from('marcas')
+        .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz, grupo_whatsapp_nombre')
+        .eq('slug', slug)
+        .eq('activa', true)
+        .maybeSingle()
+      marca = r2.data
+      marcaErr = r2.error
+    } else {
+      marca = r1.data
+      marcaErr = r1.error
+    }
+  }
 
   if (marcaErr || !marca) notFound()
 

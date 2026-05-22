@@ -158,17 +158,38 @@ export async function enviarGrillaAlGrupo(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // 1. Marca + grupo (incluye campos Migration 015 para safety lock + chatId + mention)
-  const { data: marca } = await service
-    .from('marcas')
-    .select(
-      'id, slug, nombre, emoji_marca, color_primario_hex, logo_url, ' +
-      'grupo_whatsapp_nombre, grupo_whatsapp_alias, grupo_whatsapp_chatid, ' +
-      'mention_number, envio_real_habilitado'
-    )
-    .eq('slug', slug)
-    .eq('activa', true)
-    .maybeSingle()
+  // 1. Marca + grupo — SELECT tolerante a Migration 015 no aplicada.
+  // Si las columnas nuevas no existen, fallback al SELECT legacy. Los campos
+  // nuevos quedan undefined → defaults: envio_real_habilitado=false (lock ON),
+  // chatId=null (cae a alias/nombre), mention_number=null (sin @ prefix).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let marca: any = null
+  {
+    const r1 = await service
+      .from('marcas')
+      .select(
+        'id, slug, nombre, emoji_marca, color_primario_hex, logo_url, ' +
+        'grupo_whatsapp_nombre, grupo_whatsapp_alias, grupo_whatsapp_chatid, ' +
+        'mention_number, envio_real_habilitado'
+      )
+      .eq('slug', slug)
+      .eq('activa', true)
+      .maybeSingle()
+    if (r1.error && (r1.error.message ?? '').includes('does not exist')) {
+      const r2 = await service
+        .from('marcas')
+        .select(
+          'id, slug, nombre, emoji_marca, color_primario_hex, logo_url, ' +
+          'grupo_whatsapp_nombre, grupo_whatsapp_alias'
+        )
+        .eq('slug', slug)
+        .eq('activa', true)
+        .maybeSingle()
+      marca = r2.data
+    } else {
+      marca = r1.data
+    }
+  }
   if (!marca) return { ok: false, error: 'Marca no encontrada' }
 
   // SAFETY LOCK — en modo real, exigir envio_real_habilitado=true
