@@ -1,7 +1,7 @@
 // app/app/grilla/[slug]/page.tsx
-// Vista "Pedir grilla" para una marca específica.
-// Carga las publicaciones de la semana actual desde NUESTRA BD (no Notion)
-// y renderiza la plantilla de la marca + el caption editable + botón download PNG.
+// Vista "Grilla semanal" para una marca específica.
+// Carga publicaciones de la semana + la grilla PNG ya generada (si existe) en BD.
+// El workspace muestra el PNG real (no un mock) + caption editable.
 
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -9,7 +9,6 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { GrillaWorkspace } from './_components/grilla-workspace'
 import { buildCaptionDefault } from '@/lib/grilla/build-caption'
-import type { GrillaPublicacionLite } from '@/components/plantillas-grilla'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +32,14 @@ function calcularSemanaActual(): { inicio: string; fin: string } {
   }
 }
 
+type PubLite = {
+  id: string
+  titulo: string
+  fecha: string
+  plataformas: string[]
+  tipo_contenido: string[]
+}
+
 export default async function GrillaPage({ params, searchParams }: PageProps) {
   await requireUser()
   const { slug } = await params
@@ -41,7 +48,7 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // 1. Cargar marca
+  // 1. Marca
   const { data: marca, error: marcaErr } = await service
     .from('marcas')
     .select('id, slug, nombre, emoji_marca, color_primario_hex, decisor_nombre, decisor_tratamiento, tono_voz')
@@ -51,12 +58,12 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
 
   if (marcaErr || !marca) notFound()
 
-  // 2. Calcular rango semana
+  // 2. Semana
   const { inicio, fin } = sp.inicio && sp.fin
     ? { inicio: sp.inicio, fin: sp.fin }
     : calcularSemanaActual()
 
-  // 3. Cargar publicaciones de la semana para esta marca
+  // 3. Publicaciones de la semana (de NUESTRA BD)
   const { data: pubsRaw } = await service
     .from('publicaciones')
     .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido')
@@ -69,10 +76,10 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
     id: string
     nombre: string
     fecha_publicacion: string | null
-    plataformas: string[]
-    tipo_contenido: string[]
+    plataformas: string[] | null
+    tipo_contenido: string[] | null
   }
-  const pubs: GrillaPublicacionLite[] = (pubsRaw ?? [])
+  const pubs: PubLite[] = (pubsRaw ?? [])
     .filter((p: PubRow) => p.fecha_publicacion)
     .map((p: PubRow) => ({
       id: p.id,
@@ -82,7 +89,18 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
       tipo_contenido: p.tipo_contenido ?? [],
     }))
 
-  // 4. Generar caption por defecto (editable después en el client)
+  // 4. Grilla PNG ya generada (si existe) — esta es la VERDAD
+  const { data: grilla } = await service
+    .from('grillas_pendientes')
+    .select('id, png_url, estado, updated_at')
+    .eq('marca_id', marca.id)
+    .eq('semana_inicio', inicio)
+    .in('estado', ['esperando_aprobacion', 'aprobada', 'enviada'])
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // 5. Caption por defecto (editable después en el client)
   const captionDefault = buildCaptionDefault({
     marca: {
       nombre: marca.nombre,
@@ -127,6 +145,8 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
         semanaFin={fin}
         publicaciones={pubs}
         captionDefault={captionDefault}
+        pngUrl={grilla?.png_url ?? null}
+        estado={grilla?.estado ?? null}
       />
     </main>
   )
