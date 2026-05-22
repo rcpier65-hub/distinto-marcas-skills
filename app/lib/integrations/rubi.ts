@@ -146,3 +146,21 @@ export async function sendWhatsAppToGroup(
   const args = byAlias ? { alias: groupName, text } : { group_name: groupName, text }
   return callRubiTool('whatsapp_send_message', args)
 }
+
+/**
+ * Envía una IMAGEN a un grupo WhatsApp por alias o nombre, con caption opcional.
+ * imageUrl debe ser una URL pública accesible (Supabase Storage signed URL funciona).
+ */
+export async function sendWhatsAppImageToGroup(
+  groupName: string,
+  imageUrl: string,
+  caption: string,
+  byAlias = false
+): Promise<RubiToolCallResult> {
+  const base = byAlias ? { alias: groupName } : { group_name: groupName }
+  return callRubiTool('whatsapp_send_image', {
+    ...base,
+    media: { url: imageUrl },
+    caption,
+  })
+}

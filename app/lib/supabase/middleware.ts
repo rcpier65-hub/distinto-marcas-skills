@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||
     request.nextUrl.pathname.startsWith('/api/render-grilla') ||
+    request.nextUrl.pathname.startsWith('/api/render-grilla-html') ||
     request.nextUrl.pathname.startsWith('/api/debug') ||
     request.nextUrl.pathname === '/'
 

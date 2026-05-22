@@ -1,15 +1,16 @@
 // app/app/grilla/[slug]/_components/grilla-workspace.tsx
-// Muestra el PNG REAL generado por Chromium (no un mock React).
-// Si no existe png_url todavía, ofrece botón "Generar grilla" que dispara el render.
+// Preview HTML en vivo (iframe del endpoint render-grilla-html).
+// El PNG se genera SOLO al hacer click "Enviar al grupo" — just-in-time.
+// Pattern: single source of truth (mismo HTML para preview y PNG final).
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { generarGrillaParaSemana } from '../_actions'
+import { enviarGrillaAlGrupo } from '../_actions'
 
 type Marca = {
   slug: string
@@ -32,29 +33,46 @@ type Props = {
   semanaFin: string
   publicaciones: PubLite[]
   captionDefault: string
-  pngUrl: string | null
+  pngUrl: string | null  // legacy — ya no se usa para preview
   estado: string | null
 }
 
 export function GrillaWorkspace({
-  marca, semanaInicio, semanaFin, publicaciones, captionDefault, pngUrl, estado,
+  marca, semanaInicio, semanaFin, publicaciones, captionDefault, estado,
 }: Props) {
   const router = useRouter()
   const [caption, setCaption] = useState(captionDefault)
-  const [currentPngUrl, setCurrentPngUrl] = useState<string | null>(pngUrl)
-  const [isGenerating, startGenerating] = useTransition()
+  const [zoom, setZoom] = useState(0.45)
+  const [isSending, startSending] = useTransition()
 
-  function handleGenerar() {
-    startGenerating(async () => {
-      toast.loading('Generando grilla (Chromium + plantilla profesional, ~7s)…', { id: 'gen' })
-      const result = await generarGrillaParaSemana(marca.slug, semanaInicio, semanaFin)
+  // URL del iframe — el endpoint /api/render-grilla-html devuelve el HTML
+  // de la grilla con las publicaciones reales. Se actualiza si cambia algo.
+  const previewUrl = useMemo(() => {
+    const pubs = publicaciones.map((p) => ({
+      fecha: p.fecha,
+      titulo: p.titulo,
+      plataformas: p.plataformas.join(' · '),
+      tipo: p.tipo_contenido.join(' · '),
+    }))
+    const params = new URLSearchParams({
+      slug: marca.slug,
+      inicio: semanaInicio,
+      fin: semanaFin,
+      pubs: JSON.stringify(pubs),
+    })
+    return `/api/render-grilla-html?${params.toString()}`
+  }, [marca.slug, semanaInicio, semanaFin, publicaciones])
+
+  function handleEnviar() {
+    if (!confirm(`¿Enviar grilla al grupo WhatsApp de ${marca.nombre}? El PNG se genera ahora con la plantilla profesional.`)) return
+    startSending(async () => {
+      toast.loading('Generando PNG + enviando al grupo (~10s)…', { id: 'send' })
+      const result = await enviarGrillaAlGrupo(marca.slug, semanaInicio, semanaFin, caption)
       if (result.ok) {
-        // Cache-bust: agregamos timestamp para forzar reload del PNG
-        setCurrentPngUrl(`${result.pngUrl}&v=${Date.now()}`)
-        toast.success('Grilla generada ✓', { id: 'gen' })
+        toast.success(`✅ Enviada al grupo "${result.grupo}"`, { id: 'send' })
         router.refresh()
       } else {
-        toast.error(`Error: ${result.error}`, { id: 'gen' })
+        toast.error(`Error: ${result.error}`, { id: 'send' })
       }
     })
   }
@@ -66,17 +84,6 @@ export function GrillaWorkspace({
     } catch {
       toast.error('No se pudo copiar (permisos)')
     }
-  }
-
-  function handleDownloadPNG() {
-    if (!currentPngUrl) return
-    const a = document.createElement('a')
-    a.href = currentPngUrl
-    a.download = `grilla-${marca.slug}-${semanaInicio}.png`
-    a.target = '_blank'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
   }
 
   return (
@@ -95,51 +102,56 @@ export function GrillaWorkspace({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {currentPngUrl && (
-            <Button onClick={handleDownloadPNG} variant="outline">
-              📥 Descargar PNG
-            </Button>
-          )}
-          <Button onClick={handleGenerar} disabled={isGenerating} size="lg">
-            {isGenerating ? '⏳ Generando…' : currentPngUrl ? '🔄 Regenerar' : '✨ Generar grilla'}
+          <Button onClick={handleEnviar} disabled={isSending} size="lg">
+            {isSending ? '⏳ Enviando…' : '📤 Enviar al grupo WhatsApp'}
           </Button>
         </div>
       </div>
 
-      {/* SPLIT: preview PNG real + caption */}
+      {/* SPLIT: preview HTML iframe + caption */}
       <div className="grid lg:grid-cols-[1fr_420px] gap-4">
-        {/* PREVIEW del PNG real */}
+        {/* PREVIEW iframe — HTML en vivo, NO PNG */}
         <Card>
           <CardContent className="p-4 flex flex-col items-center bg-muted/30">
-            {currentPngUrl ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={currentPngUrl}
-                  alt="Grilla generada"
-                  className="max-w-full h-auto rounded-lg border bg-white shadow-md"
-                  style={{ maxHeight: '85vh' }}
-                />
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  PNG 1080×1620 — renderizado con Chromium + plantilla profesional
-                </p>
-              </>
-            ) : (
-              <div className="aspect-[2/3] w-full max-w-[400px] flex flex-col items-center justify-center text-center p-8 bg-background border border-dashed border-border rounded-lg">
-                <div className="text-5xl mb-3 opacity-50">🖼️</div>
-                <p className="text-sm text-muted-foreground mb-1">
-                  Aún no se generó la grilla para esta semana.
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Click en <strong>Generar grilla</strong> arriba para crear el PNG con la plantilla profesional de la marca.
-                </p>
-                {publicaciones.length === 0 && (
-                  <p className="text-xs text-orange-600 mt-2">
-                    ⚠ No hay publicaciones en /publicaciones para esta semana. La grilla va a salir con días vacíos.
-                  </p>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+              <span>Zoom:</span>
+              {[0.3, 0.4, 0.45, 0.5, 0.6, 0.75, 1].map((z) => (
+                <button
+                  key={z}
+                  type="button"
+                  onClick={() => setZoom(z)}
+                  className={`px-2 py-0.5 rounded text-xs ${zoom === z ? 'bg-primary text-primary-foreground' : 'border hover:bg-muted'}`}
+                >
+                  {Math.round(z * 100)}%
+                </button>
+              ))}
+            </div>
+            <div
+              style={{
+                width: 1080 * zoom,
+                height: 1620 * zoom,
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: 8,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                overflow: 'hidden',
+                background: 'white',
+              }}
+            >
+              <iframe
+                src={previewUrl}
+                title="Preview grilla"
+                style={{
+                  width: 1080,
+                  height: 1620,
+                  border: 'none',
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left',
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Preview HTML en vivo · El PNG 1080×1620 se genera al apretar Enviar
+            </p>
           </CardContent>
         </Card>
 
@@ -162,16 +174,15 @@ export function GrillaWorkspace({
                 className="w-full p-3 rounded-md border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary resize-vertical"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {caption.length} caracteres · Editá antes de enviar
+                {caption.length} caracteres · Se manda este texto + PNG al grupo cuando apriete Enviar
               </p>
             </CardContent>
           </Card>
 
-          {/* Lista publicaciones de la semana */}
           <Card>
             <CardContent className="p-4">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                📅 Publicaciones de la semana
+                📅 Publicaciones de la semana ({publicaciones.length})
               </h3>
               {publicaciones.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">
