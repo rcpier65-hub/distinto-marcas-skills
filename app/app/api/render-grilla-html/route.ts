@@ -50,10 +50,13 @@ export async function GET(request: Request) {
     ? normalizeDriveUrl(logoOverride)
     : `${proto}//${host}/marcas/${slug}/logo.${ext}`
 
+  // Logo Distinto Agencia (footer) — URL absoluta para que Chromium PNG la cargue
+  const agencyLogoUrl = `${proto}//${host}/agencia/distinto-horizontal.svg`
+
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)
   const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, pubs)
-  const html = buildGrillaHtml({ slug, logoUrl, datePill, dateSub, cardsHtml })
+  const html = buildGrillaHtml({ slug, logoUrl, agencyLogoUrl, datePill, dateSub, cardsHtml })
 
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },

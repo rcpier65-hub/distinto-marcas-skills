@@ -129,12 +129,14 @@ export async function GET(request: Request) {
   }
 
   // Generar HTML con la plantilla maestra parametrizada por theme
+  const agencyLogoUrl = `${proto}//${host}/agencia/distinto-horizontal.svg`
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)
   const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones)
   const html = buildGrillaHtml({
     slug,
     logoUrl,
+    agencyLogoUrl,
     datePill,
     dateSub,
     cardsHtml,

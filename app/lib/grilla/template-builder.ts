@@ -14,6 +14,7 @@ import { getStyleBuilder } from './styles'
 export type TemplateInput = {
   slug: string
   logoUrl: string
+  agencyLogoUrl?: string // URL del logo SVG de Distinto Agencia (default: /agencia/distinto-horizontal.svg)
   datePill: string       // "18 — 24 MAY · 2026"
   dateSub: string        // "Mayo · Del lunes 18 al domingo 24"
   cardsHtml: string      // HTML pre-generado de las cards
@@ -64,10 +65,8 @@ export function buildGrillaHtml(input: TemplateInput): string {
 
   <footer class="footer">
     <div class="tagline">${escapeHtml(t.tagline)}</div>
-    <div class="agency">
-      <span class="agency-dot"></span>
-      DISTINTO · AGENCIA
-      <span class="agency-dot"></span>
+    <div class="agency-mark">
+      <img class="agency-logo" src="${escapeHtml(input.agencyLogoUrl ?? '/agencia/distinto-horizontal.svg')}" alt="Distinto · Agencia de Marketing" />
     </div>
     <div class="url">${escapeHtml(t.footerUrl)}</div>
     ${blocks.footerExtra ?? ''}
@@ -173,14 +172,13 @@ function buildBaseCss(t: GrillaTheme): string {
   .footer { margin-top: auto; padding-top: 14px; text-align: center;
     position: relative; z-index: 2; }
   .footer .tagline { font-family: var(--serif); font-style: italic; font-size: 18px;
-    color: var(--accent); margin-bottom: 8px; }
-  .footer .agency { display: inline-flex; align-items: center; gap: 12px;
-    font-size: 18px; font-weight: 700; color: var(--primary);
-    letter-spacing: 4px; text-transform: uppercase; }
-  .footer .agency-dot { width: 7px; height: 7px; background: var(--accent);
-    border-radius: 50%; }
+    color: var(--accent); margin-bottom: 10px; }
+  .footer .agency-mark { display: flex; justify-content: center; align-items: center;
+    margin: 8px 0 6px; }
+  .footer .agency-logo { height: 56px; width: auto; max-width: 320px;
+    object-fit: contain; }
   .footer .url { font-size: 12px; font-weight: 400; color: var(--primary);
-    margin-top: 6px; letter-spacing: 2px; opacity: .65; }
+    margin-top: 4px; letter-spacing: 2px; opacity: .65; }
   `
 }
 
