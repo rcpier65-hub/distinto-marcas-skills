@@ -67,14 +67,15 @@ export const playfulItalian: StyleBuilder = () => ({
     .heart {
       filter: drop-shadow(0 0 8px rgba(230,61,106,0.5));
     }
-    .heart-1 { top: 240px; left: 80px; width: 26px; }
-    .heart-2 { top: 540px; right: 130px; width: 20px; opacity: 0.85; }
-    .heart-3 { bottom: 350px; left: 110px; width: 22px; opacity: 0.9; }
+    /* Confinados a esquinas/bordes — NUNCA cerca de las cards centrales */
+    .heart-1 { top: 230px; right: 100px; width: 28px; }
+    .heart-2 { bottom: 90px; left: 100px; width: 22px; opacity: 0.92; }
+    .heart-3 { bottom: 130px; right: 120px; width: 18px; opacity: 0.85; }
     .star {
       filter: drop-shadow(0 0 6px rgba(234,179,8,0.6));
     }
-    .star-1 { top: 380px; left: 280px; width: 18px; opacity: 0.85; }
-    .star-2 { bottom: 480px; right: 200px; width: 16px; opacity: 0.78; }
+    .star-1 { top: 285px; left: 110px; width: 18px; opacity: 0.85; }
+    .star-2 { top: 360px; right: 260px; width: 16px; opacity: 0.78; }
 
     /* ═══════════════ HEADER ═══════════════
        Logo Little Joe® centrado arriba (espejo del post DM).
@@ -87,13 +88,13 @@ export const playfulItalian: StyleBuilder = () => ({
     }
     .logo {
       margin: 0 !important;
-      width: 160px !important;
-      height: 60px !important;
+      width: 280px !important;
+      height: 105px !important;
       padding: 0 !important;
       object-position: left center !important;
       /* PNG blanco → invertir para volverlo navy oscuro (espejo "Little Joe®" del post DM) */
       filter: brightness(0) invert(0.16);
-      filter: drop-shadow(0 3px 10px rgba(255,255,255,0.5)) brightness(0) invert(0.16);
+      filter: drop-shadow(0 4px 16px rgba(255,255,255,0.7)) brightness(0) invert(0.16);
     }
     .brand-name { display: none !important; }
 
@@ -126,11 +127,18 @@ export const playfulItalian: StyleBuilder = () => ({
       font-family: 'Caveat', cursive !important;
       font-style: normal !important;
       font-weight: 700 !important;
-      font-size: 156px !important;
+      font-size: 168px !important;
       letter-spacing: -1px !important;
       line-height: 0.9 !important;
       color: var(--accent) !important;
-      text-shadow: 3px 3px 0 rgba(255,255,255,0.8);
+      /* Multi-stroke blanco para destacar sobre el cielo (firma del post DM) */
+      text-shadow:
+        4px 4px 0 #FFFFFF,
+        -4px -4px 0 #FFFFFF,
+        4px -4px 0 #FFFFFF,
+        -4px 4px 0 #FFFFFF,
+        0 0 30px rgba(255,255,255,0.9),
+        0 8px 24px rgba(26,58,110,0.2);
     }
     .hero .sub {
       font-family: 'Quicksand', sans-serif !important;
@@ -204,11 +212,11 @@ export const playfulItalian: StyleBuilder = () => ({
     }
     .card .bar { display: none !important; }
     .card .body .title {
-      font-family: 'Fraunces', Georgia, serif !important;
-      font-style: italic !important;
-      font-weight: 600 !important;
-      font-size: 26px !important;
-      letter-spacing: -0.3px !important;
+      font-family: 'Quicksand', sans-serif !important;
+      font-style: normal !important;
+      font-weight: 700 !important;
+      font-size: 27px !important;
+      letter-spacing: -0.2px !important;
       color: var(--primary) !important;
       line-height: 1.15 !important;
     }
