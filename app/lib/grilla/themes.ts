@@ -100,26 +100,29 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   'distribuidora-fitness': {
     style: 'gym-energy',
-    // Manual oficial pág. 7: negro NO puro (#333333) + naranja DF.
-    primary: '#333333',       // Negro suave Manual (NO #000000)
-    accent: '#F54922',        // Naranja DF oficial Manual
-    highlight: '#FF6B45',
-    canvas: '#FFFFFF',        // Manual: blanco predomina, naranja como acento
-    text: '#333333',
-    cardBg: '#FFFFFF',
-    cardAltBg: '#FFEDE5',     // Naranja muy suave
-    // Manual oficial pág. 6: Stretch Pro bold-extended + Infinite Light/Thin.
-    // OSS: Anton (display extended bold) + Inter Light/Regular para body.
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700;800&display=swap',
-    fontSerif: "'Anton', Impact, sans-serif",
+    // Estilo de diseño v2 (22-may-2026, Pedro): dark grafito + Fiery Red Smoke +
+    // Saira Condensed italic black. Ver `09-estilo-diseno.md` en la skill.
+    // Cambio total vs v1: ahora es pieza dark cinematográfica (no blanco+naranja).
+    primary: '#FFFFFF',       // Blanco crudo (texto/elementos sobre dark)
+    accent: '#F54922',        // Naranja DF oficial Manual pág. 7
+    highlight: '#FF6B45',     // Naranja brillante (variaciones)
+    canvas: '#1A1818',        // Grafito dark base (smoke layer va encima)
+    text: '#FFFFFF',
+    cardBg: '#1F1F1D',        // Gris muy oscuro (cards "sólidas")
+    cardAltBg: '#262624',     // Gris alterno
+    // Saira Condensed: la opción Google Fonts con italic real + peso 900 +
+    // condensed. Reemplaza a Stretch Pro (pago) con fidelidad alta.
+    // Inter para subtítulos/body. Bebas Neue alternativa para acentos.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap',
+    fontSerif: "'Saira Condensed', 'Bebas Neue', Impact, sans-serif",
     fontSans: "'Inter', system-ui, sans-serif",
-    fontDisplay: "'Anton', Impact, sans-serif",
-    brandSmall: 'SUPLEMENTACIÓN PREMIUM',
+    fontDisplay: "'Saira Condensed', 'Bebas Neue', Impact, sans-serif",
+    brandSmall: 'MAYORISTA Y MENOR · DELIVERY LIMA',
     brandBig: 'DISTRIBUIDORA FITNESS',
     tagline: 'Tu progreso, nuestro suplemento',
     footerUrl: 'distribuidorafitness.pe',
     heroTitle: 'Esta semana',
-    logoBg: '#FFFFFF',
+    logoBg: '#FFFFFF',         // Logo FD oficial = positivo sobre blanco (manual)
   },
   'little-joe': {
     style: 'playful-italian',

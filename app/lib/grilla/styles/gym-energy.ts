@@ -1,154 +1,224 @@
 // app/lib/grilla/styles/gym-energy.ts
-// Distribuidora Fitness. Manual oficial págs. 6-11 (IDEOTAS!, ago 2024).
-// Paleta: Naranja DF #F54922 + Negro suave #333333 (NO #000) + Blanco.
-// Tipografía: Stretch Pro bold-extended + Infinite Light/Thin.
-// OSS: Anton (display) + Inter (cuerpo).
-// Mood: Hero+Jester — energético pero NO gritón, divertido pero NO payaso.
-// NO skew exagerado, NO speed lines agresivas, NO glow excesivo.
-// Sí: naranja dominante, tipografía bold extended, contraste alto pero limpio.
+// Distribuidora Fitness — ESTILO v2 (22 may 2026, definido por Pedro).
+// Referencia visual: catálogo Warrior x DF (raw + crunch).
+// Documentado en plugins/.../marca-3-distribuidora-fitness/09-estilo-diseno.md
+//
+// Mood: cinematográfico · dark grafito · humo naranja-rojizo · gym hardcore premium.
+// Sistema: Background dark + "Fiery Red Smoke" overlay + chips naranjas angulares +
+// Saira Condensed italic black para display.
+//
+// CAMBIO TOTAL vs v1: antes era blanco+Anton+speed lines. Ahora es DARK + SMOKE +
+// SAIRA ITALIC + chips con corte angular. No mezclar las dos visiones.
 
 import type { StyleBuilder } from './types'
 
 export const gymEnergy: StyleBuilder = () => ({
   decorations: `
-    <div class="orange-band orange-top"></div>
-    <div class="orange-band orange-bottom"></div>
-    <div class="bold-bar bar-1"></div>
-    <div class="bold-bar bar-2"></div>
-    <div class="bold-bar bar-3"></div>
+    <div class="smoke-layer"></div>
+    <div class="vignette-tl"></div>
+    <div class="vignette-tr"></div>
+    <div class="vignette-bl"></div>
+    <div class="vignette-br"></div>
   `,
   extraCss: `
-    /* Bandas naranjas horizontales (energía sin chaos) */
-    .orange-band {
-      position: absolute; height: 6px; background: var(--accent);
-      left: 0; right: 0; z-index: 1;
+    /* Background full dark con humo naranja-rojizo oficial */
+    .poster {
+      background: #0D0D0D !important;
+      position: relative;
     }
-    .orange-band.orange-top { top: 220px; }
-    .orange-band.orange-bottom { bottom: 110px; }
+    .smoke-layer {
+      position: absolute; inset: 0; z-index: 0;
+      background-image: url('/marcas/distribuidora-fitness/fiery-red-smoke.png');
+      background-size: cover;
+      background-position: center 35%;
+      background-repeat: no-repeat;
+      opacity: 0.85;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+    /* Vignette en esquinas para foco al contenido */
+    .vignette-tl, .vignette-tr, .vignette-bl, .vignette-br {
+      position: absolute; width: 360px; height: 360px;
+      pointer-events: none; z-index: 1;
+    }
+    .vignette-tl { top: 0; left: 0;
+      background: radial-gradient(ellipse at top left, rgba(0,0,0,0.65), transparent 70%); }
+    .vignette-tr { top: 0; right: 0;
+      background: radial-gradient(ellipse at top right, rgba(0,0,0,0.55), transparent 70%); }
+    .vignette-bl { bottom: 0; left: 0;
+      background: radial-gradient(ellipse at bottom left, rgba(0,0,0,0.5), transparent 70%); }
+    .vignette-br { bottom: 0; right: 0;
+      background: radial-gradient(ellipse at bottom right, rgba(0,0,0,0.6), transparent 70%); }
 
-    /* Barras gruesas decorativas (gym, pesa, fuerza) */
-    .bold-bar {
-      position: absolute; background: var(--accent); z-index: 1;
-    }
-    .bold-bar.bar-1 { top: 250px; right: 40px; width: 4px; height: 80px; opacity: .8; }
-    .bold-bar.bar-2 { top: 270px; right: 56px; width: 4px; height: 50px; opacity: .5; }
-    .bold-bar.bar-3 { bottom: 140px; left: 40px; width: 4px; height: 70px; opacity: .8; }
-
-    /* Hero: Anton tamaño grande, sin skew (manual no lo permite) */
-    .hero h1 {
-      font-family: 'Anton', Impact, sans-serif !important;
-      font-style: normal !important;
-      font-weight: 400 !important;
-      font-size: 132px !important;
-      letter-spacing: -1px !important;
-      line-height: 0.88 !important;
-      text-transform: uppercase;
-      color: var(--primary);
-    }
-    .hero h1::first-letter { color: var(--accent); }
-    .hero .sub {
-      font-family: 'Inter', sans-serif !important;
-      font-weight: 300 !important;
-      letter-spacing: 5px !important;
-      text-transform: uppercase;
-      font-size: 13px !important;
-      color: var(--accent) !important;
-    }
-
-    /* Pill naranja sólido (no gradiente, no skew) */
-    .date-pill {
-      background: var(--accent) !important;
-      color: #FFFFFF !important;
-      font-family: 'Anton', Impact, sans-serif !important;
-      font-weight: 400 !important;
-      font-size: 22px !important;
-      letter-spacing: 2px !important;
-      text-transform: uppercase;
-      padding: 12px 26px !important;
-      border-radius: 4px !important;
-    }
-
-    /* Brand name Anton bold + small en gray suave */
+    /* HEADER ─────────────────────────────────────── */
+    .header { position: relative; z-index: 3; }
     .brand-name .big {
-      font-family: 'Anton', Impact, sans-serif !important;
-      font-weight: 400 !important;
+      font-family: 'Saira Condensed', 'Bebas Neue', Impact, sans-serif !important;
+      font-style: italic !important;
+      font-weight: 900 !important;
       font-size: 56px !important;
-      letter-spacing: 0 !important;
+      letter-spacing: 1px !important;
       text-transform: uppercase;
+      color: #FFFFFF !important;
+      line-height: 0.9 !important;
     }
     .brand-name .small {
       font-family: 'Inter', sans-serif !important;
-      font-weight: 300 !important;
-      letter-spacing: 5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 3px !important;
+      text-transform: uppercase;
       color: var(--accent) !important;
       opacity: 1 !important;
+      font-size: 14px !important;
+      margin-top: 8px !important;
     }
 
-    /* Cards limpias con borde izquierdo naranja sólido */
+    /* Date pill — chip naranja con corte angular (firma visual DF) */
+    .date-pill {
+      background: var(--accent) !important;
+      color: #FFFFFF !important;
+      font-family: 'Saira Condensed', Impact, sans-serif !important;
+      font-style: italic !important;
+      font-weight: 900 !important;
+      font-size: 22px !important;
+      letter-spacing: 1.5px !important;
+      text-transform: uppercase;
+      padding: 14px 30px !important;
+      border-radius: 0 !important;
+      clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+      box-shadow: 0 8px 24px rgba(245,73,34,0.45);
+    }
+
+    /* HERO ─────────────────────────────────────── */
+    .hero { position: relative; z-index: 3; }
+    .hero h1 {
+      font-family: 'Saira Condensed', 'Bebas Neue', Impact, sans-serif !important;
+      font-style: italic !important;
+      font-weight: 900 !important;
+      font-size: 158px !important;
+      letter-spacing: -2px !important;
+      line-height: 0.88 !important;
+      text-transform: uppercase;
+      color: #FFFFFF !important;
+      text-shadow: 6px 6px 0 rgba(245,73,34,0.55), 8px 8px 30px rgba(245,73,34,0.3);
+    }
+    .hero .sub {
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 500 !important;
+      letter-spacing: 5px !important;
+      text-transform: uppercase;
+      font-size: 14px !important;
+      color: var(--accent) !important;
+      opacity: 1 !important;
+      margin-top: 16px !important;
+    }
+    .hero .sub::before { content: '— '; }
+    .hero .sub::after  { content: ' —'; }
+
+    /* CARDS ─────────────────────────────────────── */
+    .cards { position: relative; z-index: 3; }
     .card {
-      border-radius: 4px !important;
+      background: rgba(31,31,29,0.92) !important;
+      border-radius: 2px !important;
       border-left: 6px solid var(--accent) !important;
-      box-shadow: 0 2px 10px rgba(51,51,51,0.06);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.55), 0 0 0 1px rgba(245,73,34,0.18);
+      padding: 18px 28px !important;
+      backdrop-filter: blur(4px);
+    }
+    .card.is-alt {
+      background: rgba(38,38,36,0.92) !important;
+      border-left-color: #FF6B45 !important;
     }
     .card .date .day {
-      font-family: 'Anton', Impact, sans-serif !important;
-      font-weight: 400 !important;
-      font-size: 70px !important;
-      letter-spacing: -1px !important;
+      font-family: 'Saira Condensed', Impact, sans-serif !important;
+      font-style: italic !important;
+      font-weight: 900 !important;
+      font-size: 76px !important;
+      letter-spacing: -2px !important;
       color: var(--accent) !important;
+      line-height: 0.9 !important;
     }
     .card .date .month {
       font-family: 'Inter', sans-serif !important;
       font-weight: 700 !important;
       letter-spacing: 3px !important;
-      color: var(--primary) !important;
-      opacity: .7;
+      color: #FFFFFF !important;
+      opacity: 0.85;
+      text-transform: uppercase;
+      font-size: 14px !important;
     }
     .card .bar { display: none !important; }
     .card .body .title {
-      font-family: 'Inter', sans-serif !important;
+      font-family: 'Saira Condensed', Impact, sans-serif !important;
+      font-style: italic !important;
       font-weight: 800 !important;
+      font-size: 30px !important;
+      letter-spacing: 0 !important;
       text-transform: uppercase;
-      font-size: 24px !important;
-      letter-spacing: -.3px !important;
+      color: #FFFFFF !important;
+      line-height: 1.05 !important;
     }
     .card .body .meta {
       font-family: 'Inter', sans-serif !important;
-      font-weight: 500 !important;
+      font-weight: 600 !important;
       letter-spacing: 2px !important;
       text-transform: uppercase;
-      font-size: 13px !important;
+      font-size: 12px !important;
       color: var(--accent) !important;
       opacity: 1 !important;
     }
+    .card .icon { color: var(--accent) !important; opacity: 0.7; }
 
-    /* Divider con flecha sólida derecha */
+    /* Cards vacías (sin publicación) */
+    .card.empty {
+      background: rgba(13,13,13,0.55) !important;
+      border: 1px dashed rgba(245,73,34,0.35) !important;
+      border-left: 1px dashed rgba(245,73,34,0.35) !important;
+    }
+    .card.empty .body .title,
+    .card.empty .body .meta { color: #FFFFFF !important; opacity: 0.35; }
+    .card.empty .date .day,
+    .card.empty .date .month { opacity: 0.35; }
+
+    /* DIVIDER — flecha naranja motion */
     .divider .line {
-      background: var(--accent) !important;
+      background: linear-gradient(90deg, transparent, var(--accent)) !important;
       height: 3px !important;
+      box-shadow: 0 0 12px rgba(245,73,34,0.5);
     }
     .divider .dot {
       background: transparent !important;
       width: 0 !important; height: 0 !important;
       border-radius: 0 !important;
       border-style: solid !important;
-      border-width: 8px 0 8px 14px !important;
+      border-width: 10px 0 10px 16px !important;
       border-color: transparent transparent transparent var(--accent) !important;
+      filter: drop-shadow(0 0 8px rgba(245,73,34,0.6));
     }
 
-    /* Footer firme */
+    /* FOOTER ─────────────────────────────────────── */
     .footer .tagline {
-      font-family: 'Inter', sans-serif !important;
-      font-style: normal !important;
-      font-weight: 700 !important;
+      font-family: 'Saira Condensed', Impact, sans-serif !important;
+      font-style: italic !important;
+      font-weight: 800 !important;
       text-transform: uppercase;
-      letter-spacing: 3px !important;
+      letter-spacing: 4px !important;
       color: var(--accent) !important;
-      font-size: 14px !important;
+      font-size: 18px !important;
+      margin-bottom: 12px !important;
     }
-    .footer .agency {
-      font-family: 'Anton', Impact, sans-serif !important;
-      letter-spacing: 6px !important;
+    /* Footer URL en blanco/gris sutil sobre dark */
+    .footer .url {
+      color: #FFFFFF !important;
+      opacity: 0.5 !important;
+      letter-spacing: 3px !important;
+      text-transform: uppercase;
+    }
+    /* Logo Distinto sobre dark — invertir colores con CSS filter para
+       que el morado/amarillo se mantenga visible sin perder identidad */
+    .footer .agency-logo {
+      filter: brightness(1) drop-shadow(0 0 12px rgba(255,255,255,0.15));
+      height: 50px !important;
     }
   `,
 })
