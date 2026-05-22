@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LogoUrlInput } from './_components/logo-url-input'
+import { WhatsappConfigInput } from './_components/whatsapp-config-input'
+import { listWhatsAppGroups } from '@/lib/integrations/rubi'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,10 +13,15 @@ export default async function SettingsPage() {
   const user = await requireUser()
   const supabase = await createClient()
 
-  const { data: marcas } = await supabase
-    .from('marcas')
-    .select('*')
-    .order('slug')
+  // Cargamos marcas y grupos WhatsApp en paralelo (Promise.all) para
+  // que el live fetch de Rubi (~1-2s) no bloquee secuencialmente al SELECT.
+  const [marcasResult, gruposResult] = await Promise.all([
+    supabase.from('marcas').select('*').order('slug'),
+    listWhatsAppGroups(),
+  ])
+  const marcas = marcasResult.data
+  const gruposDisponibles = gruposResult.ok ? gruposResult.groups : []
+  const gruposError = gruposResult.ok ? null : gruposResult.error
 
   return (
     <main className="container mx-auto p-8 max-w-4xl space-y-6">
@@ -75,6 +82,58 @@ export default async function SettingsPage() {
                   marcaNombre={m.nombre}
                   emojiMarca={m.emoji_marca}
                   initialUrl={m.logo_url}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* WhatsApp config — Migration 015 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>📱 Configuración WhatsApp por marca</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Definí el grupo destino, el número a mencionar (@) y los datos del decisor para cada marca.
+            <br />
+            Mientras <strong>Envío real OFF</strong> esté activo, sólo el botón 🧪 <em>Probar</em> funcionará — el botón
+            real al cliente queda deshabilitado. Cuando hayas validado todo, activá el toggle por marca.
+          </p>
+          {gruposError && (
+            <div className="mt-3 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-xs">
+              <strong className="text-destructive block mb-1">⚠ No se pudo cargar la lista de grupos de Rubi:</strong>
+              <code className="text-[10px]">{gruposError}</code>
+              <p className="text-muted-foreground mt-1">
+                Podés pegar el chatId manualmente si lo conocés, o reintentá refrescando la página.
+              </p>
+            </div>
+          )}
+          {!gruposError && gruposDisponibles.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-2">
+              ✓ {gruposDisponibles.length} grupos disponibles via Rubi: {gruposDisponibles.map((g) => g.nombre).join(', ')}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!marcas || marcas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin marcas.</p>
+          ) : (
+            <div className="space-y-0">
+              {marcas.map((m) => (
+                <WhatsappConfigInput
+                  key={m.slug}
+                  slug={m.slug}
+                  marcaNombre={m.nombre}
+                  emojiMarca={m.emoji_marca}
+                  gruposDisponibles={gruposDisponibles}
+                  initial={{
+                    grupo_whatsapp_chatid: m.grupo_whatsapp_chatid ?? null,
+                    grupo_whatsapp_nombre: m.grupo_whatsapp_nombre ?? null,
+                    mention_number: m.mention_number ?? null,
+                    decisor_tratamiento: m.decisor_tratamiento ?? null,
+                    decisor_nombre: m.decisor_nombre ?? null,
+                    envio_real_habilitado: Boolean(m.envio_real_habilitado),
+                  }}
                 />
               ))}
             </div>

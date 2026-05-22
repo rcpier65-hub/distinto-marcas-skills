@@ -158,29 +158,43 @@ export async function enviarGrillaAlGrupo(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // 1. Marca + grupo
+  // 1. Marca + grupo (incluye campos Migration 015 para safety lock + chatId + mention)
   const { data: marca } = await service
     .from('marcas')
-    .select('id, slug, nombre, emoji_marca, color_primario_hex, logo_url, grupo_whatsapp_nombre, grupo_whatsapp_alias')
+    .select(
+      'id, slug, nombre, emoji_marca, color_primario_hex, logo_url, ' +
+      'grupo_whatsapp_nombre, grupo_whatsapp_alias, grupo_whatsapp_chatid, ' +
+      'mention_number, envio_real_habilitado'
+    )
     .eq('slug', slug)
     .eq('activa', true)
     .maybeSingle()
   if (!marca) return { ok: false, error: 'Marca no encontrada' }
 
+  // SAFETY LOCK — en modo real, exigir envio_real_habilitado=true
+  if (modo === 'real' && !marca.envio_real_habilitado) {
+    return {
+      ok: false,
+      error: `Envío real DESHABILITADO para '${marca.nombre}'. Activá el toggle en Settings o usá el botón 🧪 Probar.`,
+    }
+  }
+
   // Resolución del grupo destino según el modo
-  // - test: chatId hardcoded de "New team" (más confiable que group_name).
-  // - real: alias o group_name de marca (resolución vía wrapper Rubi).
+  // - test: chatId hardcoded de "New team" (independiente de config de marca).
+  // - real: prioridad chatId > alias > nombre (chatId es bullet-proof).
   let grupo: string | null = null  // descriptor humano para logs/UI
+  let realChatId: string | null = null  // chatId directo si está configurado
   let testChatId: string | null = null
   let byAlias = false
   if (modo === 'test') {
     testChatId = process.env.WHATSAPP_TEST_GROUP_CHATID ?? '120363427129444398@g.us'
     grupo = 'New team (test)'
   } else {
+    realChatId = marca.grupo_whatsapp_chatid as string | null
     const grupoAlias = marca.grupo_whatsapp_alias as string | null
     const grupoNombre = marca.grupo_whatsapp_nombre as string | null
-    grupo = grupoAlias ?? grupoNombre
-    byAlias = !!grupoAlias
+    grupo = realChatId ?? grupoAlias ?? grupoNombre
+    byAlias = !realChatId && !!grupoAlias
     if (!grupo) {
       return {
         ok: false,
@@ -231,11 +245,11 @@ export async function enviarGrillaAlGrupo(
   if (!upload.ok) return { ok: false, error: `Upload: ${upload.error}` }
 
   // 5. Envío vía Rubi MCP
-  // - test: usa chatId directo + caption con mention al WhatsApp de Pedro (51983852191).
-  // - real: usa alias/group_name + caption tal como viene del UI.
-  // Por qué split: la tool oficial whatsapp_send_image acepta `chatId`; el
-  // wrapper Rubi acepta también `alias`/`group_name` pero falla con grupos sin
-  // alias o con espacios ambiguos. chatId es bullet-proof.
+  // - test: usa chatId hardcoded "New team" + caption con mention a Pedro.
+  // - real: usa chatId de marca (preferred) o alias/group_name como fallback.
+  //   Si marca.mention_number está set, antepone @<num> al caption para que
+  //   el cliente reciba un mensaje "tagueado" al decisor (formato verificado
+  //   con Manrique: el @<num> en caption se renderiza como mention clickeable).
   let rubiResult
   if (modo === 'test' && testChatId) {
     const testNumber = process.env.WHATSAPP_TEST_MENTION_NUMBER ?? '51983852191'
@@ -247,7 +261,16 @@ export async function enviarGrillaAlGrupo(
     ].join('\n')
     rubiResult = await sendWhatsAppImageToChatId(testChatId, upload.url, captionTest)
   } else {
-    rubiResult = await sendWhatsAppImageToGroup(grupo!, upload.url, caption, byAlias)
+    const mentionNum = marca.mention_number as string | null
+    const captionReal = mentionNum ? `@${mentionNum} ${caption}` : caption
+    if (realChatId) {
+      // Path bullet-proof — chatId directo
+      rubiResult = await sendWhatsAppImageToChatId(realChatId, upload.url, captionReal)
+    } else {
+      // Fallback legacy — alias o group_name (sigue funcionando para marcas
+      // viejas sin chatId configurado, ej. Manrique antes de Migration 015)
+      rubiResult = await sendWhatsAppImageToGroup(grupo!, upload.url, captionReal, byAlias)
+    }
   }
   if (!rubiResult.ok) {
     return { ok: false, error: `WhatsApp: ${rubiResult.error}` }

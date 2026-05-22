@@ -17,6 +17,8 @@ type Marca = {
   nombre: string
   emoji_marca: string | null
   color_primario_hex: string | null
+  envio_real_habilitado: boolean
+  grupo_nombre: string | null  // nombre humano del grupo destino real (para tooltip/UI)
 }
 
 type PubLite = {
@@ -133,13 +135,22 @@ export function GrillaWorkspace({
           </Button>
           <Button
             onClick={handleEnviar}
-            disabled={isSending || isTesting}
+            disabled={isSending || isTesting || !marca.envio_real_habilitado}
             size="lg"
-            title={`Envía al grupo WhatsApp real del cliente de ${marca.nombre}`}
+            title={
+              !marca.envio_real_habilitado
+                ? `🔒 Envío real DESHABILITADO. Activá el toggle "Envío real ON" en Settings para ${marca.nombre}.`
+                : `Envía al grupo WhatsApp real del cliente${marca.grupo_nombre ? `: ${marca.grupo_nombre}` : ''}`
+            }
           >
-            {isSending ? '⏳ Enviando…' : '📤 Enviar al grupo WhatsApp'}
+            {isSending ? '⏳ Enviando…' : marca.envio_real_habilitado ? '📤 Enviar al grupo WhatsApp' : '🔒 Envío real OFF'}
           </Button>
         </div>
+        {!marca.envio_real_habilitado && (
+          <p className="w-full text-[11px] text-muted-foreground mt-1">
+            🔒 Envío real está deshabilitado para esta marca. <a href="/settings" className="underline">Configurá en Settings</a> antes de habilitarlo.
+          </p>
+        )}
       </div>
 
       {/* SPLIT: preview HTML iframe + caption */}

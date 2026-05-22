@@ -81,6 +81,9 @@ export interface MarcaRow {
   decisor_whatsapp: string | null
   grupo_whatsapp_nombre: string | null
   grupo_whatsapp_alias: string | null
+  grupo_whatsapp_chatid: string | null   // Migration 015 — formato 12036...@g.us
+  mention_number: string | null           // Migration 015 — número sin '@' formato internacional
+  envio_real_habilitado: boolean          // Migration 015 — safety lock (default false)
   tono_voz: Json | null
   color_primario_hex: string | null
   emoji_marca: string | null
@@ -100,6 +103,9 @@ export interface MarcaInsert {
   decisor_whatsapp?: string | null
   grupo_whatsapp_nombre?: string | null
   grupo_whatsapp_alias?: string | null
+  grupo_whatsapp_chatid?: string | null
+  mention_number?: string | null
+  envio_real_habilitado?: boolean
   tono_voz?: Json | null
   color_primario_hex?: string | null
   emoji_marca?: string | null

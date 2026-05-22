@@ -198,3 +198,54 @@ export async function sendWhatsAppWithMentions(
 ): Promise<RubiToolCallResult> {
   return callRubiTool('whatsapp_send_with_mentions', args)
 }
+
+/**
+ * Lista los grupos WhatsApp disponibles donde Rubi está agregado.
+ * Devuelve nombre, chatId, alias (si existe) y miembros.
+ *
+ * El MCP responde con texto plano formateado (lista markdown-like),
+ * así que parseamos defensivamente. Si cambia el formato del servidor,
+ * el caller debe manejar el caso.
+ */
+export type WhatsAppGroup = {
+  nombre: string         // ej. "Marketing Manrique ABA"
+  chatId: string         // ej. "120363339856209687@g.us"
+  alias: string | null   // ej. "little-joe" o null si no tiene
+  miembros: number | null
+}
+
+export async function listWhatsAppGroups(): Promise<
+  { ok: true; groups: WhatsAppGroup[] } | { ok: false; error: string }
+> {
+  const result = await callRubiTool('whatsapp_list_groups', {})
+  if (!result.ok) return { ok: false, error: result.error }
+
+  // El MCP responde con MCP content blocks. Extraemos el text content.
+  // Estructura: result.data.content[0].text
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = result.data as any
+  const text: string =
+    (Array.isArray(data?.content) && data.content[0]?.text) ||
+    (typeof data === 'string' ? data : '') ||
+    ''
+  if (!text) return { ok: false, error: 'Rubi devolvió respuesta vacía' }
+
+  // Parseamos lineas tipo:
+  //   "- New team [alias: little-joe] — 7 miembros — chatId: 120363427129444398@g.us"
+  //   "- Marketing Manrique ABA  [sin alias] — 7 miembros — chatId: 120363339856209687@g.us"
+  const groups: WhatsAppGroup[] = []
+  const lineRegex =
+    /^\s*-\s+(.+?)\s+\[(?:alias:\s*([^\]]+?)|sin alias)\]\s+—\s+(\d+)\s+miembros\s+—\s+chatId:\s+([\w.@-]+)/
+  for (const line of text.split('\n')) {
+    const m = line.match(lineRegex)
+    if (m) {
+      groups.push({
+        nombre: m[1].trim(),
+        alias: m[2]?.trim() ?? null,
+        miembros: parseInt(m[3], 10) || null,
+        chatId: m[4].trim(),
+      })
+    }
+  }
+  return { ok: true, groups }
+}
