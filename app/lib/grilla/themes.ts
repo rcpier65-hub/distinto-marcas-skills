@@ -137,25 +137,31 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
   'little-joe': {
     style: 'playful-italian',
-    primary: '#1E3A8A',       // Azul Little Joe (marca matriz italiana)
-    accent: '#EAB308',        // Dorado estrella (warm acento)
-    highlight: '#BFD4F5',
-    canvas: '#EAF4FF',        // Cielo italiano cálido
-    text: '#1E3A8A',
+    // Estilo v3 (22-may-2026, basado en FONDO CIELO oficial + post DM real):
+    // Cute charming italiano · cielo cartoon background + mascota Joe roja
+    // + script cursive friendly + acento rosa fucsia/coral.
+    primary: '#1A3A6E',        // Azul navy Little Joe Italia (texto sobre claro)
+    accent: '#E63D6A',         // Rosa fucsia/coral del post DM (firma visual)
+    highlight: '#E63946',      // Rojo Joe (color de la mascota peruana)
+    canvas: '#9DCEEC',         // Azul cielo italiano (de fallback si no carga foto)
+    text: '#1A3A6E',
     cardBg: '#FFFFFF',
-    cardAltBg: '#DCE8FA',
-    // Tono cute+aspiracional: Quicksand rounded + Fraunces curvy
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,700;1,500;1,700&family=Quicksand:wght@400;500;600;700&display=swap',
+    cardAltBg: '#F4F9FE',      // Blanco con tinte cielo muy sutil
+    // Tipografía: Caveat script cursive (hero palabras destacadas)
+    // + Fraunces serif curvy (body emocional) + Quicksand rounded (labels)
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Quicksand:wght@400;500;600;700&display=swap',
     fontSerif: "'Fraunces', Georgia, serif",
     fontSans: "'Quicksand', system-ui, sans-serif",
+    fontDisplay: "'Caveat', cursive",
     brandSmall: 'AROMATIZANTES · ITALIA',
-    brandBig: 'LITTLE JOE',
-    tagline: 'Pon una sonrisa en el aire',
-    footerUrl: 'littlejoe.com.pe',
-    heroTitle: 'La semana viene así',
-    // CRÍTICO: logo es BLANCO solo, sin fondo azul es invisible
-    logoBg: '#1E3A8A',
-    logoPad: '10px',
+    brandBig: 'Little Joe',     // Capitalización oficial
+    tagline: '',                 // Sin tagline frase
+    footerUrl: 'littlejoe.pe',
+    heroTitle: 'Esta semana',
+    // Logo blanco PNG sobre cielo cartoon — necesita filter invert para volverse
+    // navy oscuro (espejo del "Little Joe®" negro del post DM)
+    logoBg: 'transparent',
+    logoPad: '0',
   },
   kintu: {
     style: 'wellness-organic',

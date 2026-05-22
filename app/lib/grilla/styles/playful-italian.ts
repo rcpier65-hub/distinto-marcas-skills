@@ -1,162 +1,285 @@
 // app/lib/grilla/styles/playful-italian.ts
-// Little Joe. Marca italiana — mood Lover+Innocent+Caregiver.
-// Tono: cute, aspiracional emocional, NO masculinizado, NO ofertón.
-// Paleta: Azul royal italiano + dorado estrella + cielo cálido.
-// Tipografía: Quicksand rounded + Fraunces curvy (mood charming).
-// NO "♥" en pill (ofertón), NO promesas comerciales.
-// Sí: nubes flotando, estrellas doradas que evocan la fragancia, "Joe" como hilo.
+// Little Joe Perú — ESTILO v3 (22 may 2026).
+// Referencias: post "Día de la Madre 2026" + FONDO CIELO LITTLE JOE-100 oficial
+// + Historia destacada mascota Joe rojo en cielo cartoon.
+//
+// Mood: CUTE CHARMING ITALIANO · cielo cartoon dulce + mascota Joe roja
+//   Background: cielo cartoon oficial (fondo-cielo.jpg)
+//   Script cursive Caveat para palabras destacadas rosa fucsia
+//   Fraunces serif curvy para texto principal navy
+//   Quicksand rounded para labels
+//   Acentos: rosa fucsia (firma), rojo Joe (mascota), azul navy (texto)
+//   Decoraciones: corazones, estrellitas, nubes adicionales
+//
+// CAMBIO TOTAL vs v2: v2 era azul royal sólido + Fraunces. Ahora fondo cielo
+// cartoon oficial + script cursive rosa + paleta warm cute.
 
 import type { StyleBuilder } from './types'
 
 export const playfulItalian: StyleBuilder = () => ({
   decorations: `
+    <div class="sky-overlay"></div>
     <svg class="cloud cloud-1" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
-      <path d="M30 70 Q15 70 15 55 Q15 40 35 40 Q40 25 60 25 Q80 25 88 38 Q105 32 115 45 Q135 40 140 55 Q150 50 160 60 Q170 70 160 80 L40 80 Q25 80 30 70 Z" fill="white" opacity="0.92"/>
+      <path d="M30 70 Q15 70 15 55 Q15 40 35 40 Q40 25 60 25 Q80 25 88 38 Q105 32 115 45 Q135 40 140 55 Q150 50 160 60 Q170 70 160 80 L40 80 Q25 80 30 70 Z" fill="white" opacity="0.96"/>
     </svg>
     <svg class="cloud cloud-2" viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-      <path d="M25 55 Q12 55 12 42 Q12 30 28 30 Q35 18 50 18 Q66 18 72 30 Q88 25 95 40 Q108 38 110 50 Q118 45 125 55 Q132 65 122 70 L35 70 Q22 70 25 55 Z" fill="white" opacity="0.78"/>
+      <path d="M25 55 Q12 55 12 42 Q12 30 28 30 Q35 18 50 18 Q66 18 72 30 Q88 25 95 40 Q108 38 110 50 Q118 45 125 55 Q132 65 122 70 L35 70 Q22 70 25 55 Z" fill="white" opacity="0.86"/>
     </svg>
     <svg class="cloud cloud-3" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
-      <path d="M22 50 Q10 50 10 38 Q10 26 24 26 Q30 16 44 16 Q58 16 64 26 Q78 22 84 35 Q96 32 98 44 Q108 40 112 50 Q118 60 108 65 L30 65 Q18 65 22 50 Z" fill="white" opacity="0.7"/>
+      <path d="M22 50 Q10 50 10 38 Q10 26 24 26 Q30 16 44 16 Q58 16 64 26 Q78 22 84 35 Q96 32 98 44 Q108 40 112 50 Q118 60 108 65 L30 65 Q18 65 22 50 Z" fill="white" opacity="0.78"/>
     </svg>
+    <svg class="heart heart-1" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z" fill="#E63D6A"/></svg>
+    <svg class="heart heart-2" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z" fill="#E63D6A"/></svg>
+    <svg class="heart heart-3" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z" fill="#E63946"/></svg>
     <svg class="star star-1" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
     <svg class="star star-2" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
-    <svg class="star star-3" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
-    <svg class="star star-4" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
-    <svg class="star star-5" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4h7.6l-6.1 4.5 2.3 7.1L12 16.5 5.8 21l2.3-7.1L2 9.4h7.6z" fill="#EAB308"/></svg>
   `,
   extraCss: `
-    /* Cielo italiano warm: gradiente sutil azul-blanco-warm */
+    /* ═══════════════ BACKGROUND ═══════════════
+       Fondo cielo cartoon OFICIAL del cliente (Kit 2026). */
     .poster {
-      background: linear-gradient(180deg, #DCE8FA 0%, var(--canvas) 50%, #FAFCFF 100%) !important;
+      background: #9DCEEC !important;
+      background-image: url('/marcas/little-joe/fondo-cielo.jpg') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      position: relative;
+    }
+    /* Overlay sutil para mejorar legibilidad sobre el cielo */
+    .sky-overlay {
+      position: absolute; inset: 0; z-index: 0;
+      background: linear-gradient(180deg, rgba(157,206,236,0.10) 0%, rgba(255,255,255,0.10) 100%);
+      pointer-events: none;
     }
 
-    /* Nubes flotantes (Joe vive en el aire — "pon una sonrisa en el aire") */
+    /* Nubes decorativas adicionales (encima del fondo) */
     .cloud {
       position: absolute; pointer-events: none; z-index: 1;
-      filter: drop-shadow(0 6px 16px rgba(30,58,138,0.10));
+      filter: drop-shadow(0 8px 16px rgba(26,58,110,0.08));
     }
-    .cloud-1 { top: 50px; right: 40px; width: 200px; }
-    .cloud-2 { top: 180px; left: 30px; width: 160px; }
-    .cloud-3 { top: 380px; right: 220px; width: 130px; opacity: .65; }
+    .cloud-1 { top: 320px; right: 50px; width: 180px; opacity: 0.92; }
+    .cloud-2 { top: 780px; left: 30px; width: 150px; opacity: 0.82; }
+    .cloud-3 { bottom: 280px; right: 90px; width: 130px; opacity: 0.75; }
 
-    /* Estrellas doradas (la fragancia que brilla) */
+    /* Corazones rosa fucsia + estrellas doradas dispersas */
+    .heart, .star {
+      position: absolute; pointer-events: none; z-index: 2;
+    }
+    .heart {
+      filter: drop-shadow(0 0 8px rgba(230,61,106,0.5));
+    }
+    .heart-1 { top: 240px; left: 80px; width: 26px; }
+    .heart-2 { top: 540px; right: 130px; width: 20px; opacity: 0.85; }
+    .heart-3 { bottom: 350px; left: 110px; width: 22px; opacity: 0.9; }
     .star {
-      position: absolute; pointer-events: none; z-index: 1;
-      filter: drop-shadow(0 0 6px rgba(234,179,8,0.55));
+      filter: drop-shadow(0 0 6px rgba(234,179,8,0.6));
     }
-    .star-1 { top: 260px; right: 90px; width: 30px; }
-    .star-2 { top: 410px; left: 130px; width: 20px; opacity: .82; }
-    .star-3 { top: 130px; left: 280px; width: 14px; opacity: .68; }
-    .star-4 { bottom: 220px; right: 130px; width: 26px; opacity: .92; }
-    .star-5 { bottom: 320px; left: 60px; width: 18px; opacity: .75; }
+    .star-1 { top: 380px; left: 280px; width: 18px; opacity: 0.85; }
+    .star-2 { bottom: 480px; right: 200px; width: 16px; opacity: 0.78; }
 
-    /* Hero: Fraunces serif curvy + Joe en optimismo */
-    .hero h1 {
-      font-family: 'Fraunces', Georgia, serif !important;
-      font-style: italic !important;
-      font-weight: 700 !important;
-      font-size: 96px !important;
-      letter-spacing: -1.5px !important;
-      line-height: 1 !important;
-      color: var(--primary);
+    /* ═══════════════ HEADER ═══════════════
+       Logo Little Joe® centrado arriba (espejo del post DM).
+       Logo es BLANCO PNG → filter para volverlo navy/dark visible sobre cielo. */
+    .header {
+      position: relative; z-index: 3;
+      gap: 24px !important;
+      margin-bottom: 18px !important;
+      align-items: center !important;
     }
-    .hero .sub {
-      font-family: 'Quicksand', sans-serif !important;
-      font-weight: 600 !important;
-      letter-spacing: 1.5px !important;
-      font-size: 18px !important;
-      color: var(--primary);
-      opacity: .85;
+    .logo {
+      margin: 0 !important;
+      width: 160px !important;
+      height: 60px !important;
+      padding: 0 !important;
+      object-position: left center !important;
+      /* PNG blanco → invertir para volverlo navy oscuro (espejo "Little Joe®" del post DM) */
+      filter: brightness(0) invert(0.16);
+      filter: drop-shadow(0 3px 10px rgba(255,255,255,0.5)) brightness(0) invert(0.16);
     }
+    .brand-name { display: none !important; }
 
-    /* Brand name LITTLE JOE con Joe en italic Fraunces (mascota viva) */
-    .brand-name .big {
-      font-family: 'Fraunces', Georgia, serif !important;
-      font-weight: 700 !important;
-      font-style: italic !important;
-      font-size: 52px !important;
-      letter-spacing: -1px !important;
-    }
-    .brand-name .small {
-      font-family: 'Quicksand', sans-serif !important;
-      font-weight: 700 !important;
-      letter-spacing: 4px !important;
-      color: var(--primary) !important;
-      opacity: .75 !important;
-    }
-
-    /* Pill rounded con tipo Quicksand — SIN corazón (no ofertón) */
+    /* Date pill — chip rosa fucsia con corazón (firma cute Little Joe) */
     .date-pill {
-      background: var(--primary) !important;
+      margin-left: auto !important;
+      background: var(--accent) !important;
       color: #FFFFFF !important;
       font-family: 'Quicksand', sans-serif !important;
       font-weight: 700 !important;
-      letter-spacing: 1.5px !important;
       font-size: 16px !important;
+      letter-spacing: 1.5px !important;
+      text-transform: uppercase;
+      padding: 12px 26px !important;
       border-radius: 999px !important;
-      padding: 13px 26px !important;
-      box-shadow: 0 6px 18px rgba(30,58,138,0.22);
+      box-shadow: 0 8px 22px rgba(230,61,106,0.4);
+      border: none !important;
+    }
+    .date-pill::before { content: '♥ '; color: #FFFFFF; }
+
+    /* ═══════════════ HERO ═══════════════
+       Script cursive Caveat para hero romántico (espejo "Feliz / madre" del post DM)
+       En grilla usamos "Esta semana" con Caveat 156px navy + acento fucsia */
+    .hero {
+      position: relative; z-index: 3;
+      margin: 30px 0 28px !important;
+      text-align: center !important;
+    }
+    .hero h1 {
+      font-family: 'Caveat', cursive !important;
+      font-style: normal !important;
+      font-weight: 700 !important;
+      font-size: 156px !important;
+      letter-spacing: -1px !important;
+      line-height: 0.9 !important;
+      color: var(--accent) !important;
+      text-shadow: 3px 3px 0 rgba(255,255,255,0.8);
+    }
+    .hero .sub {
+      font-family: 'Quicksand', sans-serif !important;
+      font-style: normal !important;
+      font-weight: 600 !important;
+      letter-spacing: 2px !important;
+      text-transform: uppercase;
+      font-size: 14px !important;
+      color: var(--primary) !important;
+      opacity: 0.85 !important;
+      margin-top: 8px !important;
+    }
+    .divider { margin-top: 14px !important; }
+    .divider .line {
+      background: var(--accent) !important;
+      height: 2px !important;
+      width: 60px !important;
+      border-radius: 999px !important;
+      opacity: 0.65;
+    }
+    .divider .dot {
+      width: 14px !important; height: 14px !important;
+      background: var(--accent) !important;
+      border-radius: 0 !important;
+      transform: rotate(45deg);
+      clip-path: path('M7 13s-7-5.5-7-11a4 4 0 0 1 7-3 4 4 0 0 1 7 3c0 5.5-7 11-7 11z');
+      box-shadow: 0 0 10px rgba(230,61,106,0.5);
     }
 
-    /* Cards super redondeadas con shadow azul suave + borde blanco interior */
+    /* ═══════════════ CARDS BLANCAS ═══════════════
+       Redondeadas + DD en script cursive fucsia + title sans rounded navy */
+    .cards {
+      position: relative; z-index: 3;
+      gap: 11px !important;
+    }
     .card {
-      border-radius: 28px !important;
-      box-shadow: 0 8px 24px rgba(30,58,138,0.10), inset 0 0 0 1px rgba(255,255,255,0.7);
+      background: var(--card-bg) !important;
+      border-radius: 22px !important;
+      border: 2px solid rgba(230,61,106,0.18) !important;
+      box-shadow: 0 8px 26px rgba(26,58,110,0.12);
+      padding: 16px 26px !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 22px !important;
+    }
+    .card.is-alt {
+      background: var(--card-alt) !important;
+    }
+    .card .date {
+      min-width: 84px !important;
+      text-align: center !important;
+      flex-shrink: 0;
     }
     .card .date .day {
-      font-family: 'Fraunces', Georgia, serif !important;
-      font-style: italic !important;
+      font-family: 'Caveat', cursive !important;
       font-weight: 700 !important;
+      font-size: 72px !important;
+      letter-spacing: -1px !important;
+      color: var(--accent) !important;
+      line-height: 0.85 !important;
     }
     .card .date .month {
       font-family: 'Quicksand', sans-serif !important;
       font-weight: 700 !important;
       letter-spacing: 2.5px !important;
       color: var(--primary) !important;
-      opacity: .65;
+      opacity: 0.55;
+      text-transform: uppercase;
+      font-size: 11px !important;
+      margin-top: 2px !important;
     }
-    .card .bar {
-      background: var(--accent) !important;
-      border-radius: 99px !important;
-      width: 4px !important;
-    }
+    .card .bar { display: none !important; }
     .card .body .title {
-      font-family: 'Quicksand', sans-serif !important;
-      font-weight: 700 !important;
+      font-family: 'Fraunces', Georgia, serif !important;
+      font-style: italic !important;
+      font-weight: 600 !important;
+      font-size: 26px !important;
+      letter-spacing: -0.3px !important;
+      color: var(--primary) !important;
+      line-height: 1.15 !important;
     }
     .card .body .meta {
       font-family: 'Quicksand', sans-serif !important;
-      font-weight: 500 !important;
-      opacity: .75 !important;
+      font-weight: 600 !important;
+      letter-spacing: 2px !important;
+      text-transform: uppercase;
+      font-size: 11px !important;
+      color: var(--accent) !important;
+      opacity: 0.85 !important;
+      margin-top: 4px !important;
+    }
+    .card .icon {
+      color: var(--accent) !important;
+      opacity: 0.65;
+      width: 42px !important;
+      height: 42px !important;
     }
 
-    /* Divider con estrella dorada central (oficial) */
-    .divider .line {
-      background: var(--primary) !important;
-      opacity: .15;
-      height: 1.5px !important;
+    /* Empty cards — translúcidas con dashed fucsia sutil */
+    .card.empty {
+      background: rgba(255,255,255,0.55) !important;
+      border: 1.5px dashed rgba(230,61,106,0.35) !important;
+      box-shadow: 0 4px 12px rgba(26,58,110,0.05);
     }
-    .divider .dot {
-      width: 22px !important; height: 22px !important;
-      background: var(--accent) !important;
-      box-shadow: 0 0 14px rgba(234,179,8,0.55);
-      border-radius: 0 !important;
-      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    .card.empty .date .day {
+      color: var(--accent) !important;
+      opacity: 0.5;
     }
-
-    /* Footer charming */
-    .footer .tagline {
-      font-family: 'Fraunces', Georgia, serif !important;
-      font-style: italic !important;
-      font-weight: 700 !important;
+    .card.empty .date .month {
       color: var(--primary) !important;
-      font-size: 22px !important;
+      opacity: 0.45;
     }
-    .footer .agency {
+    .card.empty .body .title {
+      color: var(--primary) !important;
+      opacity: 0.5;
+      font-style: italic !important;
+      font-weight: 500 !important;
+    }
+    .card.empty .body .meta {
+      color: var(--primary) !important;
+      opacity: 0.35;
+    }
+    .card.empty .icon {
+      color: var(--primary) !important;
+      opacity: 0.22;
+    }
+
+    /* ═══════════════ FOOTER ═══════════════ */
+    .footer {
+      position: relative; z-index: 3;
+      padding-top: 24px !important;
+    }
+    .footer .tagline { display: none !important; }
+    .footer .agency-mark { margin: 10px 0 10px !important; }
+    /* Logo Distinto color original sobre cielo claro */
+    .footer .agency-logo {
+      filter: drop-shadow(0 3px 12px rgba(26,58,110,0.15));
+      height: 64px !important;
+      max-width: 380px !important;
+    }
+    .footer .url {
       font-family: 'Quicksand', sans-serif !important;
+      color: var(--accent) !important;
+      opacity: 1 !important;
+      letter-spacing: 2.5px !important;
+      text-transform: lowercase;
+      font-size: 12px !important;
       font-weight: 700 !important;
-      letter-spacing: 5px !important;
+      margin-top: 6px !important;
     }
   `,
 })
