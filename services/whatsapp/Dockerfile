@@ -4,6 +4,11 @@
 
 FROM node:22-alpine
 
+# git: alguna dep de @whiskeysockets/baileys usa git+ URL en su árbol
+# (postinstall de libsignal o similar). Sin esto, npm install falla con ENOENT.
+# Otras tools opcionales: bash y wget (para HEALTHCHECK abajo).
+RUN apk add --no-cache git python3 make g++ wget
+
 WORKDIR /app
 
 # Layer caching: deps primero

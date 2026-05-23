@@ -1,0 +1,50 @@
+# services/whatsapp/fly.toml
+# Config Fly.io para el bot WhatsApp interno de Distinto.
+#
+# Deploy desde este directorio: fly deploy --app distinto-whatsapp
+# (asume que la app ya está creada con: fly apps create distinto-whatsapp)
+
+app = "distinto-whatsapp"
+primary_region = "gru"   # São Paulo, lo más cercano a Lima Perú (~60ms)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  AUTH_DIR = "/data/auth"
+  PORT = "8000"
+  LOG_LEVEL = "info"
+
+# Volume persistente para la sesión Baileys. Sin esto, cada deploy = QR nuevo.
+[mounts]
+  source = "auth_data"
+  destination = "/data"
+
+# HTTP service expuesto en :8000
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false   # MUY IMPORTANTE: NO dormir, sesión WhatsApp se cae si stop
+  auto_start_machines = true
+  min_machines_running = 1     # siempre 1 instancia activa
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 100
+    hard_limit = 200
+
+# Healthcheck — Fly usa /healthz para saber si la app está sana
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/healthz"
+
+# Recursos: shared CPU, 256MB RAM (el más chico — Baileys idle usa ~100MB)
+# Free tier alcanza con esto.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"
