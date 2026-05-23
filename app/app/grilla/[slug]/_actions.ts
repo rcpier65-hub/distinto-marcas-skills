@@ -7,7 +7,12 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
-import { sendWhatsAppImageToGroup, sendWhatsAppImageToChatId } from '@/lib/integrations/rubi'
+import {
+  sendWhatsAppImage,
+  sendWhatsAppImageToNamedGroup,
+  preflightWhatsApp,
+  whatsappRoute,
+} from '@/lib/integrations/whatsapp-router'
 import type { GrillaPublicacion } from '@/lib/integrations/notion'
 
 type Result = { ok: true; pngUrl: string } | { ok: false; error: string }
@@ -224,6 +229,17 @@ export async function enviarGrillaAlGrupo(
     }
   }
 
+  // PRE-FLIGHT CHECK — verificar que el bot WhatsApp esté connected ANTES de
+  // gastar Chromium (~5s) + Storage upload. Si el bot está caído, abortar
+  // temprano con error útil en lugar de generar PNG y fallar en el último paso.
+  const preflight = await preflightWhatsApp()
+  if (!preflight.ok) {
+    return {
+      ok: false,
+      error: `WhatsApp bot offline (route=${preflight.route}): ${preflight.error}. Reiniciá el bot o cambiá WHATSAPP_USE_INTERNAL.`,
+    }
+  }
+
   // 2. Publicaciones actualizadas
   const { data: pubsRaw } = await service
     .from('publicaciones')
@@ -265,12 +281,11 @@ export async function enviarGrillaAlGrupo(
   const upload = await uploadGrillaPNG(pngBuffer, slug, semanaInicio)
   if (!upload.ok) return { ok: false, error: `Upload: ${upload.error}` }
 
-  // 5. Envío vía Rubi MCP
-  // - test: usa chatId hardcoded "New team" + caption con mention a Pedro.
-  // - real: usa chatId de marca (preferred) o alias/group_name como fallback.
+  // 5. Envío vía router WhatsApp (interno Koyeb o Rubi externo según flag)
+  // - test: chatId hardcoded "New team" + caption con mention a Pedro.
+  // - real: chatId de marca (preferred) o alias/group_name como fallback.
   //   Si marca.mention_number está set, antepone @<num> al caption para que
-  //   el cliente reciba un mensaje "tagueado" al decisor (formato verificado
-  //   con Manrique: el @<num> en caption se renderiza como mention clickeable).
+  //   el cliente reciba un mensaje "tagueado" al decisor.
   let rubiResult
   if (modo === 'test' && testChatId) {
     const testNumber = process.env.WHATSAPP_TEST_MENTION_NUMBER ?? '51983852191'
@@ -280,21 +295,31 @@ export async function enviarGrillaAlGrupo(
       ``,
       caption,
     ].join('\n')
-    rubiResult = await sendWhatsAppImageToChatId(testChatId, upload.url, captionTest)
+    rubiResult = await sendWhatsAppImage({
+      chatId: testChatId,
+      imageUrl: upload.url,
+      caption: captionTest,
+      mentions: [testNumber],
+    })
   } else {
     const mentionNum = marca.mention_number as string | null
     const captionReal = mentionNum ? `@${mentionNum} ${caption}` : caption
     if (realChatId) {
       // Path bullet-proof — chatId directo
-      rubiResult = await sendWhatsAppImageToChatId(realChatId, upload.url, captionReal)
+      rubiResult = await sendWhatsAppImage({
+        chatId: realChatId,
+        imageUrl: upload.url,
+        caption: captionReal,
+        mentions: mentionNum ? [mentionNum] : undefined,
+      })
     } else {
       // Fallback legacy — alias o group_name (sigue funcionando para marcas
       // viejas sin chatId configurado, ej. Manrique antes de Migration 015)
-      rubiResult = await sendWhatsAppImageToGroup(grupo!, upload.url, captionReal, byAlias)
+      rubiResult = await sendWhatsAppImageToNamedGroup(grupo!, upload.url, captionReal, byAlias)
     }
   }
   if (!rubiResult.ok) {
-    return { ok: false, error: `WhatsApp: ${rubiResult.error}` }
+    return { ok: false, error: `WhatsApp [${whatsappRoute}]: ${rubiResult.error}` }
   }
 
   // 6. Persistencia — SOLO en modo real.

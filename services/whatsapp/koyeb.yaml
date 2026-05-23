@@ -1,0 +1,63 @@
+# services/whatsapp/koyeb.yaml
+#
+# Config declarativa para Koyeb. Pedro la puede usar con `koyeb app deploy`
+# si instaló el CLI, o como referencia para configurar manualmente desde la UI.
+#
+# La UI de Koyeb tiene un "Deploy from GitHub" que toma el Dockerfile
+# automáticamente — para ese path este archivo NO es necesario, pero queda
+# como documentación del setup canónico.
+
+name: whatsapp-distinto
+type: web
+
+git:
+  repository: github.com/rcpier65-hub/distinto-marcas-skills
+  branch: main
+  buildpack:
+    type: dockerfile
+    dockerfile: services/whatsapp/Dockerfile
+    context: services/whatsapp
+
+regions:
+  - was  # Washington DC, us-east-1 (más cercano a Lima Perú)
+
+instance_types:
+  - free  # 0.1 vCPU, 512MB RAM (suficiente para Baileys idle)
+
+scaling:
+  min: 1
+  max: 1   # sin auto-scale — sesión Baileys es single-instance
+
+ports:
+  - port: 8000
+    protocol: http
+    path: /
+
+routes:
+  - path: /
+    port: 8000
+
+healthcheck:
+  http:
+    path: /healthz
+    port: 8000
+    interval: 30s
+    timeout: 5s
+
+volumes:
+  - name: auth-data
+    path: /data
+    size: 1G  # más que suficiente — auth state pesa ~50KB
+
+env:
+  - key: NODE_ENV
+    value: production
+  - key: AUTH_DIR
+    value: /data/auth
+  - key: PORT
+    value: "8000"
+  - key: LOG_LEVEL
+    value: info
+  # Secretos (NO commitear valores reales; configurarlos en UI Koyeb)
+  - key: WHATSAPP_SHARED_SECRET
+    secret: whatsapp-shared-secret  # ← crear este secret en Koyeb UI

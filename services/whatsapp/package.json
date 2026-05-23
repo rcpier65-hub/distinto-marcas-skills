@@ -1,0 +1,29 @@
+{
+  "name": "@distinto/whatsapp-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot WhatsApp propio para Distinto Agencia. Reemplazo del MCP externo Rubi. Corre Baileys con sesión persistente, expone HTTP API protegida con shared secret. Deploy a Koyeb (free tier).",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
