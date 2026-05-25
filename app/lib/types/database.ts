@@ -119,6 +119,38 @@ export interface MarcaInsert {
 export type MarcaUpdate = Partial<MarcaRow>
 
 // --------------------------------------------------------
+// GRABACIONES — Migration 016
+// --------------------------------------------------------
+
+export type GrabacionEstado = 'planeada' | 'cumplida' | 'cancelada'
+
+export interface GrabacionRow {
+  id: string
+  marca_id: string
+  fecha_planeada: string  // ISO date YYYY-MM-DD
+  fecha_real: string | null
+  estado: GrabacionEstado
+  videos_grabados: number | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GrabacionInsert {
+  id?: string
+  marca_id: string
+  fecha_planeada: string
+  fecha_real?: string | null
+  estado?: GrabacionEstado
+  videos_grabados?: number | null
+  notas?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type GrabacionUpdate = Partial<GrabacionRow>
+
+// --------------------------------------------------------
 
 export interface PublicacionRow {
   id: string

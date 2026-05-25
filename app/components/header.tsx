@@ -39,6 +39,12 @@ export async function Header() {
             Publicaciones
           </Link>
           <Link
+            href="/grabaciones"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            🎬 Grabaciones
+          </Link>
+          <Link
             href="/editor"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
