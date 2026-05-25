@@ -256,6 +256,21 @@ export interface ComentarioTemplateRow {
 }
 
 // --------------------------------------------------------
+// INTEGRACIONES — Migration 020 (singleton row)
+// --------------------------------------------------------
+
+export interface IntegracionesRow {
+  id: 1
+  metricool_user_id: string | null
+  metricool_user_token: string | null
+  google_calendar_refresh_token: string | null
+  google_calendar_id: string | null
+  notion_token: string | null
+  updated_at: string
+  updated_by_user_id: string | null
+}
+
+// --------------------------------------------------------
 
 export interface PublicacionRow {
   id: string

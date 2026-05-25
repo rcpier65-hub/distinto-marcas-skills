@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LogoUrlInput } from './_components/logo-url-input'
 import { WhatsappConfigInput } from './_components/whatsapp-config-input'
+import { MetricoolConfig } from './_components/metricool-config'
 import { listWhatsAppGroups } from '@/lib/integrations/rubi'
+import { getIntegracionesConfig } from './_actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +15,19 @@ export default async function SettingsPage() {
   const user = await requireUser()
   const supabase = await createClient()
 
-  // Cargamos marcas y grupos WhatsApp en paralelo (Promise.all) para
-  // que el live fetch de Rubi (~1-2s) no bloquee secuencialmente al SELECT.
-  const [marcasResult, gruposResult] = await Promise.all([
+  // Cargamos marcas + grupos WhatsApp + config integraciones en paralelo
+  // para minimizar latencia secuencial.
+  const [marcasResult, gruposResult, integracionesResult] = await Promise.all([
     supabase.from('marcas').select('*').order('slug'),
     listWhatsAppGroups(),
+    getIntegracionesConfig(),
   ])
   const marcas = marcasResult.data
   const gruposDisponibles = gruposResult.ok ? gruposResult.groups : []
   const gruposError = gruposResult.ok ? null : gruposResult.error
+  const integraciones = integracionesResult.ok
+    ? integracionesResult.config
+    : { metricool_user_id: '', metricool_has_token: false, metricool_user_id_set: false, updated_at: null }
 
   return (
     <main className="container mx-auto p-8 max-w-4xl space-y-6">
@@ -86,6 +92,21 @@ export default async function SettingsPage() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Integraciones externas — Metricool API (Migration 020) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>🔌 Integraciones — Metricool API</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Credenciales para que la app de Distinto pueda leer comentarios y responder via Metricool.
+            <br />
+            Se usan en la pestaña <strong>💬 Comentarios</strong> para sincronizar inbox de IG/FB/TikTok.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <MetricoolConfig initial={integraciones} />
         </CardContent>
       </Card>
 

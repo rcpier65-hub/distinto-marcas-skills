@@ -11,10 +11,62 @@
 // excedés, devuelve 429. Para la app, fetcheamos máximo 7 marcas x 3 redes
 // (21 calls) cada mañana — muy por debajo de cualquier límite razonable.
 
+import { createServiceClient } from '@/lib/supabase/service'
+
 const METRICOOL_BASE = 'https://app.metricool.com'
 
-const USER_ID = process.env.METRICOOL_USER_ID ?? ''
-const TOKEN = process.env.METRICOOL_USER_TOKEN ?? ''
+// Env vars sirven como FALLBACK si la BD no está configurada todavía.
+// La BD (tabla integraciones) tiene prioridad — Pedro la edita desde Settings UI.
+const ENV_USER_ID = process.env.METRICOOL_USER_ID ?? ''
+const ENV_TOKEN = process.env.METRICOOL_USER_TOKEN ?? ''
+
+// Cache simple por request lifecycle (en serverless cada request es nuevo
+// proceso, así que el cache muere en segundos). Evita N+1 fetches a BD.
+let _cachedCreds: { userId: string; token: string; ts: number } | null = null
+const CACHE_TTL_MS = 30_000  // 30s — balance entre fresh y query economy
+
+async function getCredentials(): Promise<{ userId: string; token: string } | null> {
+  // Cache hit?
+  if (_cachedCreds && Date.now() - _cachedCreds.ts < CACHE_TTL_MS) {
+    return _cachedCreds
+  }
+
+  // Intentar BD primero
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const service = createServiceClient() as any
+    const { data } = await service
+      .from('integraciones')
+      .select('metricool_user_id, metricool_user_token')
+      .eq('id', 1)
+      .maybeSingle()
+    if (data?.metricool_user_id && data?.metricool_user_token) {
+      _cachedCreds = {
+        userId: data.metricool_user_id,
+        token: data.metricool_user_token,
+        ts: Date.now(),
+      }
+      return _cachedCreds
+    }
+  } catch {
+    // Tabla no existe (pre-migration 020) → cae al fallback env
+  }
+
+  // Fallback env vars
+  if (ENV_USER_ID && ENV_TOKEN) {
+    _cachedCreds = { userId: ENV_USER_ID, token: ENV_TOKEN, ts: Date.now() }
+    return _cachedCreds
+  }
+
+  return null
+}
+
+/**
+ * Invalidar cache forzosamente (llamar después de update desde UI).
+ */
+export function invalidateMetricoolCredsCache() {
+  _cachedCreds = null
+}
 
 export type MetricoolResult<T> =
   | { ok: true; data: T }
@@ -43,16 +95,20 @@ async function callMetricool<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<MetricoolResult<T>> {
-  if (!USER_ID || !TOKEN) {
-    return { ok: false, error: 'METRICOOL_USER_ID o METRICOOL_USER_TOKEN no configurados en env' }
+  const creds = await getCredentials()
+  if (!creds) {
+    return {
+      ok: false,
+      error: 'Metricool no configurado. Andá a /settings → Card "Integraciones" para agregar userId + token.',
+    }
   }
   try {
-    const url = `${METRICOOL_BASE}${path}${path.includes('?') ? '&' : '?'}userId=${USER_ID}`
+    const url = `${METRICOOL_BASE}${path}${path.includes('?') ? '&' : '?'}userId=${creds.userId}`
     const res = await fetch(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
-        'X-Mc-Auth': TOKEN,
+        'X-Mc-Auth': creds.token,
         ...(init.headers ?? {}),
       },
       cache: 'no-store',
@@ -65,6 +121,23 @@ async function callMetricool<T>(
     return { ok: true, data: payload as T }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'unknown fetch error' }
+  }
+}
+
+/**
+ * Test connection — útil para botón "Probar conexión" en Settings.
+ * Hace un GET a un endpoint simple (brands list) y devuelve si funcionó.
+ */
+export async function testMetricoolConnection(): Promise<MetricoolResult<{ brandsCount: number; sampleBrand: string }>> {
+  const r = await callMetricool<{ data: Array<{ label?: string; name?: string }> }>(`/api/v2/brands`)
+  if (!r.ok) return r
+  const brands = r.data?.data ?? []
+  return {
+    ok: true,
+    data: {
+      brandsCount: brands.length,
+      sampleBrand: brands[0]?.label ?? brands[0]?.name ?? '(sin label)',
+    },
   }
 }
 

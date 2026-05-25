@@ -9,6 +9,10 @@ import {
   sendWhatsAppWithMentions,
   type WhatsAppGroup,
 } from '@/lib/integrations/rubi'
+import {
+  testMetricoolConnection,
+  invalidateMetricoolCredsCache,
+} from '@/lib/integrations/metricool'
 
 /**
  * Actualiza el logo_url de una marca.
@@ -181,4 +185,100 @@ export async function probarMencionMarca(
 
   if (!result.ok) return { ok: false, error: result.error }
   return { ok: true, grupo: marca.nombre as string }
+}
+
+// ============================================================
+// Integraciones — tabla singleton (Migration 020)
+// ============================================================
+
+/**
+ * Lee config de integraciones. Tokens se devuelven MASKED al cliente
+ * (••••••••) — el server los usa internamente pero nunca los expone
+ * al browser. Si tiene valor, devolvemos `has_value: true` para que la UI
+ * sepa si mostrar "configurado" o "sin configurar".
+ */
+export async function getIntegracionesConfig(): Promise<{
+  ok: true
+  config: {
+    metricool_user_id: string  // safe to show — es un número público
+    metricool_has_token: boolean  // never expose el token
+    metricool_user_id_set: boolean
+    updated_at: string | null
+  }
+} | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data, error } = await service
+    .from('integraciones')
+    .select('metricool_user_id, metricool_user_token, updated_at')
+    .eq('id', 1)
+    .maybeSingle()
+  if (error) {
+    if ((error.message ?? '').includes('does not exist')) {
+      return {
+        ok: true,
+        config: {
+          metricool_user_id: '',
+          metricool_has_token: false,
+          metricool_user_id_set: false,
+          updated_at: null,
+        },
+      }
+    }
+    return { ok: false, error: error.message }
+  }
+  return {
+    ok: true,
+    config: {
+      metricool_user_id: data?.metricool_user_id ?? '',
+      metricool_has_token: !!data?.metricool_user_token,
+      metricool_user_id_set: !!data?.metricool_user_id,
+      updated_at: data?.updated_at ?? null,
+    },
+  }
+}
+
+/**
+ * Actualiza metricool_user_id + metricool_user_token (ambos opcional).
+ * Si token viene vacío y ya había uno, NO se borra (preserva el existente
+ * — la UI manda token sólo si Pedro lo está cambiando).
+ */
+export async function updateMetricoolConfig(args: {
+  metricool_user_id?: string
+  metricool_user_token?: string  // si undefined, no cambiar; si '', borrar
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: any = { updated_by_user_id: user.id }
+  if (args.metricool_user_id !== undefined) {
+    payload.metricool_user_id = args.metricool_user_id.trim() || null
+  }
+  if (args.metricool_user_token !== undefined) {
+    payload.metricool_user_token = args.metricool_user_token.trim() || null
+  }
+
+  const { error } = await service.from('integraciones').update(payload).eq('id', 1)
+  if (error) return { ok: false, error: error.message }
+
+  // Invalidar cache en el cliente metricool — próximo callMetricool() lee BD fresh
+  invalidateMetricoolCredsCache()
+  revalidatePath('/settings')
+  return { ok: true }
+}
+
+/**
+ * Probar conexión Metricool. Hace un GET /api/v2/brands real para validar
+ * que las credenciales funcionan. Útil para botón "Probar conexión" en UI.
+ */
+export async function probarMetricool(): Promise<
+  { ok: true; brandsCount: number; sampleBrand: string } | { ok: false; error: string }
+> {
+  await requireUser()
+  const r = await testMetricoolConnection()
+  if (!r.ok) return r
+  return { ok: true, brandsCount: r.data.brandsCount, sampleBrand: r.data.sampleBrand }
 }
