@@ -90,6 +90,8 @@ export interface MarcaRow {
   cadencia: Cadencia                       // Migration 017 — semanal|mensual|quincenal
   cadencia_cantidad: number                // Migration 017 — cantidad por unidad
   color_calendario: string                 // Migration 017 — hex para chips en UI calendar
+  reporte_comentarios_grupo: ReporteGrupo  // Migration 019 — cliente|interno|ninguno
+  metricool_blog_id: number | null         // Migration 020 — id de la marca en Metricool
   tono_voz: Json | null
   color_primario_hex: string | null
   emoji_marca: string | null
@@ -192,6 +194,65 @@ export interface HabitoCompletadoRow {
   fecha: string         // YYYY-MM-DD
   completado_at: string // timestamptz
   nota: string | null
+}
+
+// --------------------------------------------------------
+// COMENTARIOS INBOX — Migration 019
+// --------------------------------------------------------
+
+export type ComentarioCategoria =
+  | 'pregunta_info'
+  | 'testimonial'
+  | 'empatia'
+  | 'derivar'
+  | 'reaccion'
+  | 'otro'
+
+export type ComentarioStatus =
+  | 'pending'      // recién fetcheado, sin procesar
+  | 'approved'     // Pedro aprobó la respuesta
+  | 'responded'    // ya se envió a Metricool
+  | 'skipped'      // Pedro decidió no responder
+  | 'failed'       // Metricool rechazó el envío
+
+export type ComentarioNetwork = 'instagram' | 'facebook' | 'tiktok'
+
+export type ReporteGrupo = 'cliente' | 'interno' | 'ninguno'
+
+export interface ComentarioInboxRow {
+  id: string
+  marca_id: string
+  network: ComentarioNetwork
+  metricool_comment_id: string
+  metricool_thread_id: string | null
+  metricool_post_id: string | null
+  author_username: string
+  author_name: string | null
+  comment_text: string
+  comment_created_at: string
+  post_link: string | null
+  post_text_preview: string | null
+  post_media_url: string | null
+  categoria_sugerida: ComentarioCategoria | null
+  respuesta_sugerida: string | null
+  respuesta_final: string | null
+  status: ComentarioStatus
+  metricool_response_id: string | null
+  failed_reason: string | null
+  responded_at: string | null
+  responded_by_user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ComentarioTemplateRow {
+  id: string
+  marca_id: string | null  // NULL = global default
+  categoria: ComentarioCategoria
+  template_text: string
+  activo: boolean
+  created_at: string
+  updated_at: string
 }
 
 // --------------------------------------------------------

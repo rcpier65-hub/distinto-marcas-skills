@@ -51,6 +51,12 @@ export async function Header() {
             🔥 Hábitos
           </Link>
           <Link
+            href="/comentarios"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            💬 Comentarios
+          </Link>
+          <Link
             href="/editor"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
