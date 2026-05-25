@@ -158,6 +158,43 @@ export interface GrabacionInsert {
 export type GrabacionUpdate = Partial<GrabacionRow>
 
 // --------------------------------------------------------
+// HÁBITOS DIARIOS — Migration 018
+// --------------------------------------------------------
+// dias_activos: array ISO weekday (1=lun..7=dom). Default lun-vie [1,2,3,4,5]
+
+export interface HabitoRow {
+  id: string
+  nombre: string
+  icono: string         // emoji o caracter unicode
+  color: string         // hex #RRGGBB
+  dias_activos: number[]  // smallint[]: 1-7 ISO weekday
+  orden: number
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface HabitoInsert {
+  id?: string
+  nombre: string
+  icono?: string
+  color?: string
+  dias_activos?: number[]
+  orden?: number
+  activo?: boolean
+}
+
+export type HabitoUpdate = Partial<HabitoRow>
+
+export interface HabitoCompletadoRow {
+  id: string
+  habito_id: string
+  fecha: string         // YYYY-MM-DD
+  completado_at: string // timestamptz
+  nota: string | null
+}
+
+// --------------------------------------------------------
 
 export interface PublicacionRow {
   id: string

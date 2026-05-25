@@ -45,6 +45,12 @@ export async function Header() {
             🎬 Grabaciones
           </Link>
           <Link
+            href="/habitos"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            🔥 Hábitos
+          </Link>
+          <Link
             href="/editor"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
