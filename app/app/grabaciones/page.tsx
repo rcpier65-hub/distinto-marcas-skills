@@ -2,6 +2,7 @@
 // Control mensual de sesiones de grabación por marca.
 // Server component que orquesta: marcas, KPIs y lista de grabaciones del mes.
 
+import Link from 'next/link'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { listGrabaciones, getGrabacionesKPIs } from './_actions'
@@ -61,6 +62,22 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
         </div>
         <MesSelector />
       </header>
+
+      {/* TABS */}
+      <nav className="flex items-center gap-1 border-b border-border">
+        <Link
+          href="/grabaciones"
+          className="px-3 py-2 text-sm font-medium border-b-2 border-primary text-foreground"
+        >
+          📋 Lista
+        </Link>
+        <Link
+          href="/grabaciones/calendario"
+          className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
+        >
+          📅 Calendario
+        </Link>
+      </nav>
 
       {error && (
         <Card>

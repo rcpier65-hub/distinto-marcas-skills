@@ -72,6 +72,8 @@ export const ESTADO_PUBLICACION_LABEL: Record<EstadoPublicacion, string> = {
 // TABLAS — Row, Insert y Update types
 // ============================================================
 
+export type Cadencia = 'semanal' | 'mensual' | 'quincenal'
+
 export interface MarcaRow {
   id: string
   slug: string
@@ -84,6 +86,10 @@ export interface MarcaRow {
   grupo_whatsapp_chatid: string | null   // Migration 015 — formato 12036...@g.us
   mention_number: string | null           // Migration 015 — número sin '@' formato internacional
   envio_real_habilitado: boolean          // Migration 015 — safety lock (default false)
+  grabaciones_objetivo_mensual: number    // Migration 016 — derivable de cadencia, pero útil cached
+  cadencia: Cadencia                       // Migration 017 — semanal|mensual|quincenal
+  cadencia_cantidad: number                // Migration 017 — cantidad por unidad
+  color_calendario: string                 // Migration 017 — hex para chips en UI calendar
   tono_voz: Json | null
   color_primario_hex: string | null
   emoji_marca: string | null
@@ -132,6 +138,7 @@ export interface GrabacionRow {
   estado: GrabacionEstado
   videos_grabados: number | null
   notas: string | null
+  google_event_id: string | null   // Migration 017 — mapping a evento GCal cuando sync activo
   created_at: string
   updated_at: string
 }
