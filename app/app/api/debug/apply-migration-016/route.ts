@@ -24,6 +24,12 @@ export async function GET(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
+  // WHOAMI — qué proyecto Supabase está conectado (importante para
+  // confirmar que la migration se aplica al proyecto correcto).
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '(no set)'
+  const projectRefMatch = supabaseUrl.match(/\/\/([a-z0-9]+)\.supabase\.co/)
+  const projectRef = projectRefMatch?.[1] ?? '(unknown)'
+
   // Test 1: tabla grabaciones existe?
   const tablaCheck = await service
     .from('grabaciones')
@@ -43,6 +49,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       status: 'already_applied',
+      whoami: { project_ref: projectRef, supabase_url: supabaseUrl },
       message: 'Migration 016 ya está aplicada (tabla grabaciones + columna marcas.grabaciones_objetivo_mensual existen).',
       sample_marca: colCheck.data?.[0] ?? null,
       sample_grabacion: tablaCheck.data?.[0] ?? null,
@@ -74,6 +81,7 @@ CREATE POLICY "auth users full access grabaciones" ON grabaciones FOR ALL TO aut
     {
       ok: false,
       status: 'needs_manual_apply',
+      whoami: { project_ref: projectRef, supabase_url: supabaseUrl },
       message: 'Migration 016 NO está aplicada. Pegá este SQL en Supabase Studio → SQL Editor:',
       sql,
       checks: {
