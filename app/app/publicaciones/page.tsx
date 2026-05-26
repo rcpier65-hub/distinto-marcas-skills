@@ -54,7 +54,6 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       id: string
       nombre: string
       fecha_publicacion: string | null
-      hora_publicacion: string | null
       estado: string | null
       plataformas: string[] | null
       tipo_contenido: string[] | null
@@ -62,10 +61,14 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       editor_id: string | null
       marca: { slug: string } | { slug: string }[] | null
     }
+    /* Schema actual de Supabase: NO incluye hora_publicacion como columna
+       separada — la hora viene como parte de fecha_publicacion si es timestamp,
+       o se asume default. Pido solo columnas que existen para evitar que
+       la query falle y caiga al mock (genera 404 al hacer click en pubs). */
     const { data, error } = await service
       .from('publicaciones')
       .select(`
-        id, nombre, fecha_publicacion, hora_publicacion, estado,
+        id, nombre, fecha_publicacion, estado,
         plataformas, tipo_contenido, copy, editor_id,
         marca:marcas(slug)
       `)
@@ -76,11 +79,20 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
       const redes = (r.plataformas ?? []).map(normalizeRed).filter(Boolean) as Red[]
       const tipo = normalizeTipo((r.tipo_contenido ?? [])[0])
+      /* Extraer hora del timestamp si fecha_publicacion incluye tiempo.
+         Sino default '12:00'. */
+      let fecha = new Date().toISOString().slice(0, 10)
+      let hora = '12:00'
+      if (r.fecha_publicacion) {
+        const parts = r.fecha_publicacion.split('T')
+        fecha = parts[0]
+        if (parts[1]) hora = parts[1].slice(0, 5)
+      }
       return {
         id: r.id,
         marcaSlug: marca?.slug ?? 'unknown',
-        fecha: r.fecha_publicacion ?? new Date().toISOString().slice(0, 10),
-        hora: (r.hora_publicacion ?? '12:00').slice(0, 5),
+        fecha,
+        hora,
         caption: r.copy ?? r.nombre ?? '(sin título)',
         thumbnail: null,
         redes,
