@@ -946,9 +946,25 @@ def main_sync():
         host = os.environ.get("MCP_HOST", "0.0.0.0")
         port = int(os.environ.get("MCP_PORT", "8000"))
         print(f"🌐 Starting MCP server in SSE mode on {host}:{port}", file=sys.stderr)
-        # FastMCP exposes settings for host/port; usa el sub-API correcto:
         mcp.settings.host = host
         mcp.settings.port = port
+
+        # CRITICAL para deploy remoto: FastMCP tiene DNS rebinding protection
+        # con allowed_hosts=['127.0.0.1:*', 'localhost:*'] por default. Esto
+        # rechaza con HTTP 421 cualquier request con Host header distinto
+        # (ej. distinto-metricool-pro.fly.dev). Como vivimos detrás de Fly proxy
+        # con TLS terminado, no hay riesgo real de DNS rebinding clásico.
+        try:
+            from mcp.server.transport_security import TransportSecuritySettings
+            mcp.settings.transport_security = TransportSecuritySettings(
+                enable_dns_rebinding_protection=False,
+                allowed_hosts=["*"],
+                allowed_origins=["*"],
+            )
+            print("   transport_security: rebinding_protection=OFF (allow all hosts)", file=sys.stderr)
+        except ImportError:
+            print("   ⚠ TransportSecuritySettings no disponible — skip", file=sys.stderr)
+
         mcp.run(transport="sse")
     else:
         # stdio (default) — uso local Claude Desktop/Code
