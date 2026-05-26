@@ -1,0 +1,20 @@
+[project]
+name = "metricool-pro-mcp"
+version = "1.0.0"
+description = "MCP server enriquecido para Metricool — publicar (todas las redes), inbox/mensajes, comentarios, reviews. Distinto Agencia."
+requires-python = ">=3.10"
+authors = [{name = "Distinto Agencia"}]
+dependencies = [
+    "mcp>=1.0.0",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+metricool-pro-mcp = "server:main_sync"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["server"]

@@ -1,0 +1,42 @@
+# metricool-pro-mcp/fly.toml
+# Config Fly.io para el MCP Metricool remoto de Distinto Agencia.
+#
+# Deploy: fly deploy --remote-only
+#
+# IMPORTANTE: SSE no acepta requests HTTP planos (responde 400 "Request validation
+# failed" si no traen header Accept: text/event-stream). Por eso usamos
+# [http_service] SIN healthcheck HTTP — el container start-up es la única
+# verificación. Si el proceso Python crashea, Fly reinicia automáticamente
+# via restart_policy implícito.
+
+app = "distinto-metricool-pro"
+primary_region = "gru"   # São Paulo, lo más cercano a Lima (~60ms latencia)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  MCP_TRANSPORT = "sse"
+  MCP_HOST = "0.0.0.0"
+  MCP_PORT = "8000"
+  PYTHONUNBUFFERED = "1"
+
+# Secrets (set via `fly secrets set METRICOOL_USER_TOKEN=... METRICOOL_USER_ID=...`)
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"      # No dormir — MCPs deben responder rápido
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 50
+    hard_limit = 100
+
+# Recursos: shared CPU, 256MB RAM (Python + httpx = ~50MB idle, ~150MB con SSE active)
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"
