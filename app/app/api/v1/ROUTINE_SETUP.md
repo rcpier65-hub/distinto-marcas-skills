@@ -36,9 +36,9 @@ Abrí https://claude.ai/code/environments y click **New environment**.
 |------------------------|------------------------------------------------------------------------|
 | **Name**               | `distinto-api`                                                         |
 | **Network access**     | `Custom`                                                               |
-| **Allowed domains**    | `distinto-app.vercel.app` (uno por línea si agregás más)               |
+| **Allowed domains**    | `distinto-app.vercel.app` + `app.metricool.com` (uno por línea)        |
 | **Include default**    | ✅ Sí (mantén los package registries + GitHub para que la routine funcione) |
-| **Environment variables** | Agregar **`DISTINTO_API_TOKEN`** con el valor copiado en paso 1     |
+| **Environment variables** | Agregar tres: <br>• `DISTINTO_API_TOKEN` = `CRON_SECRET` de Vercel <br>• `METRICOOL_USER_TOKEN` = tu token Metricool <br>• `METRICOOL_USER_ID` = tu user_id Metricool |
 
 Click **Save**.
 
@@ -56,7 +56,7 @@ Abrí https://claude.ai/code/routines y click **New routine**.
 
 | Campo            | Valor                                                                                                              |
 |------------------|--------------------------------------------------------------------------------------------------------------------|
-| **Name**         | `Distinto · Sugerencias Comentarios`                                                                               |
+| **Name**         | `Distinto · Comentarios (gen + post)`                                                                              |
 | **Model**        | `claude-sonnet-4-5` (Sonnet es suficiente; Opus es overkill y 5× más caro)                                         |
 | **Instructions** | Copy-paste el contenido completo de `ROUTINE_PROMPT.md` (el archivo de al lado)                                    |
 | **Repository**   | `rcpier65-hub/distinto-marcas-skills` (opcional pero útil — el repo trae el README de la API para que Claude consulte) |
@@ -67,6 +67,19 @@ Abrí https://claude.ai/code/routines y click **New routine**.
 Click **Add trigger** → **Schedule** → **Daily** → seleccionar **08:30**
 (hora local Lima). Esto deja 30 min de buffer después del cron diario
 de la app a las 08:00.
+
+La Routine corre dos fases en cada ejecución:
+1. Genera sugerencias para los `pending` del día.
+2. Postea a Metricool lo que Pedro aprobó desde la corrida anterior.
+
+Si querés más cadencia podés agregar un segundo schedule a las 19:00
+(7 PM Lima) — la Routine es idempotente: si no hay nada que generar
+ni postear, termina sin efectos secundarios.
+
+**Opcional**: en lugar (o además) del schedule, podés dispararla a
+mano desde la app de Claude Desktop con **Run now**, o vía API/webhook
+si tu cuenta tiene esa beta habilitada. La app `distinto-app` NO
+dispara la Routine — solo expone los endpoints que la Routine consume.
 
 ### Connectors
 
@@ -109,7 +122,7 @@ Si hay errores, los más probables y sus fixes:
 
 ---
 
-## Paso 5 — Wirear el cron de la app (si no está)
+## Paso 5 — Verificar el cron de la app (si no está)
 
 El flujo completo es:
 
@@ -117,13 +130,20 @@ El flujo completo es:
 8:00am Lima → Vercel Cron app /api/cron/morning-fetch
               → fetch Metricool + upsert en BD + WhatsApp notify
 
-8:30am Lima → Anthropic Routine "Distinto · Sugerencias"
+8:30am Lima → Routine Claude Desktop "Distinto · Comentarios"
+              FASE 1 (generación):
               → GET /api/v1/comentarios/pendientes?sin_sugerencia=true
               → genera respuestas con Claude
               → POST /api/v1/comentarios/sugerencia (batch)
               → POST /api/v1/whatsapp/notify (resumen interno)
+              FASE 2 (posteo de aprobados de ayer):
+              → GET /api/v1/comentarios/aprobados
+              → POST a Metricool (X-Mc-Auth)
+              → POST /api/v1/comentarios/{id}/marcar-enviado (o /marcar-error)
+              → POST /api/v1/whatsapp/notify (resumen interno)
 
 9:00am+ → Pedro abre /comentarios → revisa + aprueba en UI
+          (los que apruebe hoy se postean en la próxima corrida de mañana)
 ```
 
 El cron de la app **ya está configurado en `vercel.json`** del proyecto.

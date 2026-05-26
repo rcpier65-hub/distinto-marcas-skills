@@ -10,10 +10,6 @@
     {
       "path": "/api/cron/morning-fetch",
       "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/process-approvals",
-      "schedule": "0 23 * * *"
     }
   ]
 }
