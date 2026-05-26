@@ -7,11 +7,18 @@ import type { User } from '@supabase/supabase-js'
  * Retorna null si no hay sesión válida.
  */
 export async function getUser(): Promise<User | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
+  // Defensive: si env vars Supabase no están configuradas (ej. mockup local sin
+  // .env.local poblado), devolvemos null sin crashear. Header.tsx ya maneja null
+  // retornando null (no renderiza nada).
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    return user
+  } catch {
+    return null
+  }
 }
 
 /**

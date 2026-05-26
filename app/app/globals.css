@@ -4,12 +4,206 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================
+   DESIGN SYSTEM — Linear / Raycast aesthetic, dark-first
+   Source of truth para toda la app. Antes vivía scoped en
+   /mockup/mockup.css; ahora es global.
+   ============================================================ */
+
+:root {
+  /* ---------- BACKGROUND ELEVATIONS ---------- */
+  --mk-bg-base: #08090a;
+  --mk-bg-elevated: #101113;
+  --mk-bg-overlay: #18191c;
+  --mk-bg-hover: rgba(255, 255, 255, 0.04);
+  --mk-bg-active: rgba(255, 255, 255, 0.06);
+  --mk-bg-selected: rgba(113, 112, 255, 0.08);
+
+  /* ---------- BORDERS ---------- */
+  --mk-border-subtle: rgba(255, 255, 255, 0.06);
+  --mk-border-default: rgba(255, 255, 255, 0.08);
+  --mk-border-strong: rgba(255, 255, 255, 0.14);
+  --mk-border-accent: rgba(113, 112, 255, 0.50);
+
+  /* ---------- TEXT (opacidades sobre blanco) ---------- */
+  --mk-text-primary: #f7f8f8;
+  --mk-text-secondary: rgba(247, 248, 248, 0.62);
+  --mk-text-tertiary: rgba(247, 248, 248, 0.40);
+  --mk-text-quaternary: rgba(247, 248, 248, 0.24);
+  --mk-text-disabled: rgba(247, 248, 248, 0.18);
+
+  /* ---------- ACCENT — violeta Linear signature ---------- */
+  --mk-accent: #7170ff;
+  --mk-accent-hover: #8a89ff;
+  --mk-accent-bg: rgba(113, 112, 255, 0.10);
+  --mk-accent-glow: rgba(113, 112, 255, 0.20);
+
+  /* ---------- SEMANTIC ---------- */
+  --mk-success: #4cb782;
+  --mk-success-bg: rgba(76, 183, 130, 0.10);
+  --mk-warning: #f2c94c;
+  --mk-warning-bg: rgba(242, 201, 76, 0.10);
+  --mk-danger: #eb5757;
+  --mk-danger-bg: rgba(235, 87, 87, 0.10);
+  --mk-info: #5e6ad2;
+  --mk-info-bg: rgba(94, 106, 210, 0.10);
+
+  /* ---------- PER-BRAND ---------- */
+  --mk-brand-manrique: #6fb8d8;
+  --mk-brand-lozano: #b8895e;
+  --mk-brand-kintu: #82a474;
+  --mk-brand-novalamps: #ffb547;
+  --mk-brand-lavictoria: #8b6f47;
+  --mk-brand-distrifitness: #ff5252;
+  --mk-brand-littlejoe: #ff8fab;
+  --mk-brand-warriorsupps: #c9882a;
+  --mk-brand-oralbeauty: #d896d4;
+
+  /* ---------- TYPOGRAPHY SCALE ---------- */
+  --mk-text-xs: 11px;
+  --mk-text-sm: 13px;
+  --mk-text-base: 14px;
+  --mk-text-lg: 16px;
+  --mk-text-xl: 22px;
+  --mk-text-2xl: 28px;
+
+  --mk-tracking-tight: -0.02em;
+  --mk-tracking-snug: -0.01em;
+  --mk-tracking-normal: -0.005em;
+  --mk-tracking-wide: 0.01em;
+  --mk-tracking-caps: 0.08em;
+
+  --mk-leading-tight: 1.1;
+  --mk-leading-snug: 1.3;
+  --mk-leading-normal: 1.45;
+
+  --mk-weight-regular: 400;
+  --mk-weight-medium: 500;
+  --mk-weight-semibold: 600;
+
+  /* ---------- SPACING ---------- */
+  --mk-space-1: 4px;
+  --mk-space-2: 8px;
+  --mk-space-3: 12px;
+  --mk-space-4: 16px;
+  --mk-space-5: 20px;
+  --mk-space-6: 24px;
+  --mk-space-8: 32px;
+  --mk-space-10: 40px;
+  --mk-space-12: 48px;
+  --mk-space-16: 64px;
+
+  /* ---------- RADIUS — sharp ---------- */
+  --mk-radius-sm: 4px;
+  --mk-radius-md: 6px;
+  --mk-radius-lg: 8px;
+  --mk-radius-xl: 12px;
+  --mk-radius-full: 9999px;
+
+  /* ---------- SHADOWS ---------- */
+  --mk-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.20);
+  --mk-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.32);
+  --mk-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.40);
+  --mk-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.50);
+  --mk-shadow-glow: 0 0 0 1px var(--mk-accent), 0 0 24px var(--mk-accent-glow);
+
+  /* ---------- MOTION ---------- */
+  --mk-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --mk-ease-out-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --mk-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mk-dur-instant: 100ms;
+  --mk-dur-fast: 150ms;
+  --mk-dur-base: 220ms;
+  --mk-dur-slow: 400ms;
+
+  /* ---------- DENSITY ---------- */
+  --mk-row-height: 36px;
+  --mk-row-height-compact: 28px;
+  --mk-button-height-sm: 24px;
+  --mk-button-height-md: 28px;
+  --mk-button-height-lg: 32px;
+  --mk-input-height: 30px;
+  --mk-sidebar-width: 240px;
+  --mk-sidebar-width-collapsed: 56px;
+  --mk-header-height: 44px;
+
+  /* ============================================================
+     SHADCN COMPATIBILITY LAYER
+     Mapeo los tokens shadcn → Linear para que componentes
+     existentes (button, card, etc.) hereden el nuevo aesthetic
+     sin tener que reescribirlos.
+     ============================================================ */
+  --background: var(--mk-bg-base);
+  --foreground: var(--mk-text-primary);
+  --card: var(--mk-bg-elevated);
+  --card-foreground: var(--mk-text-primary);
+  --popover: var(--mk-bg-overlay);
+  --popover-foreground: var(--mk-text-primary);
+  --primary: var(--mk-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--mk-bg-elevated);
+  --secondary-foreground: var(--mk-text-primary);
+  --muted: var(--mk-bg-elevated);
+  --muted-foreground: var(--mk-text-tertiary);
+  --accent: var(--mk-bg-hover);
+  --accent-foreground: var(--mk-text-primary);
+  --destructive: var(--mk-danger);
+  --border: var(--mk-border-subtle);
+  --input: var(--mk-border-default);
+  --ring: var(--mk-accent);
+  --chart-1: var(--mk-accent);
+  --chart-2: var(--mk-success);
+  --chart-3: var(--mk-warning);
+  --chart-4: var(--mk-danger);
+  --chart-5: var(--mk-info);
+  --radius: var(--mk-radius-md);
+  --sidebar: var(--mk-bg-elevated);
+  --sidebar-foreground: var(--mk-text-primary);
+  --sidebar-primary: var(--mk-accent);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--mk-bg-hover);
+  --sidebar-accent-foreground: var(--mk-text-primary);
+  --sidebar-border: var(--mk-border-subtle);
+  --sidebar-ring: var(--mk-accent);
+}
+
+/* Dark mode = same tokens (forzamos dark global). Mantenemos la
+   class .dark para compat con shadcn pero las vars son iguales. */
+.dark {
+  --background: var(--mk-bg-base);
+  --foreground: var(--mk-text-primary);
+  --card: var(--mk-bg-elevated);
+  --card-foreground: var(--mk-text-primary);
+  --popover: var(--mk-bg-overlay);
+  --popover-foreground: var(--mk-text-primary);
+  --primary: var(--mk-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--mk-bg-elevated);
+  --secondary-foreground: var(--mk-text-primary);
+  --muted: var(--mk-bg-elevated);
+  --muted-foreground: var(--mk-text-tertiary);
+  --accent: var(--mk-bg-hover);
+  --accent-foreground: var(--mk-text-primary);
+  --destructive: var(--mk-danger);
+  --border: var(--mk-border-subtle);
+  --input: var(--mk-border-default);
+  --ring: var(--mk-accent);
+  --sidebar: var(--mk-bg-elevated);
+  --sidebar-foreground: var(--mk-text-primary);
+  --sidebar-primary: var(--mk-accent);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--mk-bg-hover);
+  --sidebar-accent-foreground: var(--mk-text-primary);
+  --sidebar-border: var(--mk-border-subtle);
+  --sidebar-ring: var(--mk-accent);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-inter-tight);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-inter-tight);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,92 +233,152 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --radius-sm: var(--mk-radius-sm);
+  --radius-md: var(--mk-radius-md);
+  --radius-lg: var(--mk-radius-lg);
+  --radius-xl: var(--mk-radius-xl);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
+  html, body {
+    background: var(--mk-bg-base);
+    color: var(--mk-text-primary);
+    font-family: var(--font-inter-tight, system-ui, sans-serif);
+    font-size: var(--mk-text-sm);
+    line-height: var(--mk-leading-snug);
+    letter-spacing: var(--mk-tracking-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    font-variant-numeric: tabular-nums;
+    text-rendering: optimizeLegibility;
   }
-  html {
-    @apply font-sans;
-  }
+}
+
+/* ============================================================
+   GLOBAL UTILITIES — reusables en cualquier vista
+   ============================================================ */
+
+.mk-divider {
+  height: 1px;
+  background: var(--mk-border-subtle);
+  border: none;
+  margin: 0;
+}
+
+.mk-label {
+  font-size: var(--mk-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--mk-tracking-caps);
+  color: var(--mk-text-tertiary);
+  font-weight: var(--mk-weight-medium);
+}
+
+.mk-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-geist-mono, 'SF Mono', Menlo, monospace);
+  font-size: 10.5px;
+  font-weight: var(--mk-weight-medium);
+  color: var(--mk-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--mk-border-default);
+  border-radius: var(--mk-radius-sm);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.mk-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mk-focusable:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--mk-bg-base), 0 0 0 3px var(--mk-accent-glow);
+}
+
+/* Scrollbar — thin Linear-style global */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes mk-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes mk-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mk-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes mk-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--mk-accent-glow); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+.mk-anim-fade { animation: mk-fade-in var(--mk-dur-base) var(--mk-ease-out); }
+.mk-anim-slide-up { animation: mk-slide-up var(--mk-dur-base) var(--mk-ease-out); }
+.mk-anim-scale-in { animation: mk-scale-in var(--mk-dur-base) var(--mk-ease-out-spring); }
+.mk-anim-pulse { animation: mk-pulse-glow 2s var(--mk-ease-out) infinite; }
+
+.mk-stagger > * { animation: mk-slide-up var(--mk-dur-base) var(--mk-ease-out) backwards; }
+.mk-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.mk-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.mk-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.mk-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.mk-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.mk-stagger > *:nth-child(6) { animation-delay: 150ms; }
+.mk-stagger > *:nth-child(7) { animation-delay: 180ms; }
+.mk-stagger > *:nth-child(8) { animation-delay: 210ms; }
+.mk-stagger > *:nth-child(9) { animation-delay: 240ms; }
+.mk-stagger > *:nth-child(n+10) { animation-delay: 270ms; }
+
+/* ============================================================
+   MOCKUP COMPAT — mantener /mockup funcionando.
+   El mockup.css aplica .mockup-root y .mockup-fullscreen.
+   Las clases mockup-* siguen existiendo por compat.
+   ============================================================ */
+.mockup-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--mk-bg-base);
+  overflow: hidden;
+}
+.mockup-fullscreen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' /%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.012 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.6;
 }
