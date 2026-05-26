@@ -469,10 +469,10 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
         display: 'block',
         width: '100%',
         textAlign: 'left',
-        padding: variant === 'full' ? '6px 8px' : '3px 6px',
-        marginBottom: 2,
-        background: `${marca?.color}10`,
-        borderLeft: `2px solid ${marca?.color}`,
+        padding: variant === 'full' ? '6px 8px' : '5px 8px',
+        marginBottom: 3,
+        background: `${marca?.color}22`,
+        borderLeft: `3px solid ${marca?.color}`,
         borderTop: '1px solid transparent',
         borderRight: '1px solid transparent',
         borderBottom: '1px solid transparent',
@@ -483,14 +483,14 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
         transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = `${marca?.color}22`
-        e.currentTarget.style.borderColor = `${marca?.color}55`
+        e.currentTarget.style.background = `${marca?.color}3a`
+        e.currentTarget.style.borderColor = `${marca?.color}77`
         e.currentTarget.style.borderLeftColor = marca?.color ?? ''
-        e.currentTarget.style.boxShadow = `0 0 0 1px ${marca?.color}40, 0 2px 8px ${marca?.color}30`
+        e.currentTarget.style.boxShadow = `0 0 0 1px ${marca?.color}55, 0 4px 12px ${marca?.color}40`
         e.currentTarget.style.transform = 'translateY(-1px)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = `${marca?.color}10`
+        e.currentTarget.style.background = `${marca?.color}22`
         e.currentTarget.style.borderColor = 'transparent'
         e.currentTarget.style.borderLeftColor = marca?.color ?? ''
         e.currentTarget.style.boxShadow = 'none'
@@ -498,11 +498,12 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
       }}
     >
       {variant === 'compact' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5 }}>
-          <span style={{ color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums', fontWeight: 500, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, flexShrink: 0, minWidth: 32 }}>
             {pub.hora}
           </span>
-          <span style={{ color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+          <span style={{ width: 1, height: 11, background: `${marca?.color}55`, flexShrink: 0 }} />
+          <span style={{ fontSize: 11.5, color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1, lineHeight: 1.3 }}>
             {pub.caption}
           </span>
         </div>
@@ -593,26 +594,25 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
           const k = dayKey(c.date)
           const pubs = byDay.get(k) ?? []
           const isToday = k === todayKey
-          /* Si hay >4 pubs, las dejo más compactas (sin caption, solo hora+marca dot) */
-          const compactOnly = pubs.length > 4
-          const visiblePubs = compactOnly ? pubs : pubs.slice(0, 4)
-          const remaining = pubs.length - visiblePubs.length
 
           return (
             <div
               key={i}
               style={{
                 background: isToday ? 'var(--mk-bg-selected)' : 'var(--mk-bg-elevated)',
-                minHeight: 140,
+                minHeight: 200,
+                maxHeight: 280,
+                display: 'flex',
+                flexDirection: 'column',
                 padding: '10px 8px 8px',
-                opacity: c.thisMonth ? 1 : 0.4,
+                opacity: c.thisMonth ? 1 : 0.45,
                 position: 'relative',
                 transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
                 boxShadow: isToday ? `inset 0 0 0 1px var(--mk-accent-glow)` : undefined,
               }}
             >
               {/* Day number — más prominente */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
                 <span
                   style={{
                     fontSize: isToday ? 14 : 13,
@@ -637,13 +637,20 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
                 )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {visiblePubs.map((p) => <PubChip key={p.id} pub={p} variant="compact" />)}
-                {remaining > 0 && (
-                  <div style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', fontWeight: 500, padding: '2px 6px' }}>
-                    +{remaining} más
-                  </div>
-                )}
+              {/* TODAS las pubs visibles. Scroll interno si la celda se llena. */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 3,
+                  paddingRight: 2,
+                  /* Esconde scrollbar feo en celdas — visible solo cuando hover */
+                  scrollbarWidth: 'thin',
+                }}
+              >
+                {pubs.map((p) => <PubChip key={p.id} pub={p} variant="compact" />)}
               </div>
             </div>
           )
