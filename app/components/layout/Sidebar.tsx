@@ -107,6 +107,8 @@ export function Sidebar({ onOpenPalette }: Props) {
           <NavItem href="/cockpit"       icon={<HomeIcon />}     label="Cockpit"        active={isActive('/cockpit')}       shortcut="1" />
           <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={73} />
           <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
+          {/* Editor es sub-item de Publicaciones (workflow: lista pubs → editar una) */}
+          <NavItem href="/editor"        icon={<EditIcon />}     label="Editor"         active={isActive('/editor')}        indent />
           <NavItem href="/grabaciones"   icon={<VideoIcon />}    label="Grabaciones"    active={isActive('/grabaciones')}   shortcut="4" />
         </Section>
 
@@ -205,7 +207,7 @@ function Section({
 }
 
 function NavItem({
-  href, icon, label, active, badge, shortcut,
+  href, icon, label, active, badge, shortcut, indent,
 }: {
   href: string
   icon: React.ReactNode
@@ -213,6 +215,7 @@ function NavItem({
   active: boolean
   badge?: number
   shortcut?: string
+  indent?: boolean   /* sub-item: aumenta padding-left para mostrar jerarquía Linear-style */
 }) {
   return (
     <Link
@@ -220,10 +223,11 @@ function NavItem({
       className="mk-focusable"
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        width: '100%', height: 28, padding: '0 8px',
+        width: '100%', height: 28,
+        padding: indent ? '0 8px 0 24px' : '0 8px',
         background: active ? 'var(--mk-bg-selected)' : 'transparent',
         borderRadius: 'var(--mk-radius-md)',
-        color: active ? 'var(--mk-text-primary)' : 'var(--mk-text-secondary)',
+        color: active ? 'var(--mk-text-primary)' : (indent ? 'var(--mk-text-tertiary)' : 'var(--mk-text-secondary)'),
         fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
         fontWeight: active ? 'var(--mk-weight-medium)' : 'var(--mk-weight-regular)',
         textDecoration: 'none',
@@ -316,6 +320,7 @@ function HomeIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fil
 function InboxIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L4 3H10L12 7M2 7V11H12V7M2 7H5L6 9H8L9 7H12" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
 function CalendarIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="3" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M2 6H12M5 2V4M9 2V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function VideoIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="4" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M9 6L12 4.5V9.5L9 8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
+function EditIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 1.5L10.5 4L4.5 10H2V7.5L8 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M7 2.5L9.5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function CheckIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 7L6.2 8.7L9.5 5.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function NoteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2.5H9L11 4.5V11.5C11 11.78 10.78 12 10.5 12H3.5C3.22 12 3 11.78 3 11.5V3C3 2.72 3.22 2.5 3.5 2.5Z" stroke="currentColor" strokeWidth="1.2" /><path d="M9 2.5V4.5H11M5 7H9M5 9H8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
