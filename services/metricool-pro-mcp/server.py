@@ -381,17 +381,39 @@ def inbox_marcar_leido(
     network: str,
     conversation_id: str | None = None,
     comment_id: str | None = None,
+    review_id: str | None = None,
     is_read: bool = True,
 ) -> dict:
-    """Marca una conversación o comentario como leído (o no leído).
+    """Marca una conversación, comentario o review como leído (o no leído).
 
     Útil para limpiar el counter de pendientes después de procesar mensajes.
+
+    Args:
+      blog_id: ID de la marca.
+      network: red social ('instagram', 'facebook', 'twitter', 'tiktok', 'linkedin', 'google').
+      conversation_id: pasar SOLO esto para marcar un DM.
+      comment_id: pasar SOLO esto para marcar un comentario.
+      review_id: pasar SOLO esto para marcar un review (Google/Facebook).
+      is_read: True para marcar leído, False para devolver a no-leído.
     """
-    body: dict = {"provider": network, "read": is_read}
-    if conversation_id:
-        body["conversationId"] = conversation_id
+    # /v2/inbox/status v2 — esquema unificado:
+    # acepta un único par (conversationType, conversationId) más status READ/UNREAD.
+    # El campo "read" (boolean) del esquema viejo fue deprecado.
     if comment_id:
-        body["commentId"] = comment_id
+        convo_type, convo_id = "COMMENT", comment_id
+    elif review_id:
+        convo_type, convo_id = "REVIEW", review_id
+    elif conversation_id:
+        convo_type, convo_id = "MESSAGE", conversation_id
+    else:
+        return {"error": "Debes proveer uno de: conversation_id, comment_id o review_id."}
+
+    body = {
+        "provider": network,
+        "status": "READ" if is_read else "UNREAD",
+        "conversationType": convo_type,
+        "conversationId": convo_id,
+    }
     return _http_request("PUT", "/v2/inbox/status", blog_id, json_body=body)
 
 
