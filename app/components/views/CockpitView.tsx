@@ -339,30 +339,36 @@ function SectionHeader({ title, count, actionLabel }: { title: string; count: nu
   )
 }
 
-type Comentario = typeof COMENTARIOS_PENDIENTES[number]
+/* Categorías completas — declaradas explícitamente para soportar todas
+   las categorías posibles aunque el mock actual no las use todas. */
+type Categoria = 'consulta' | 'interes_compra' | 'agradecimiento' | 'queja' | 'tag_amigo' | 'spam' | 'otro'
+type Comentario = Omit<typeof COMENTARIOS_PENDIENTES[number], 'categoria'> & { categoria: Categoria }
 type Marca = typeof MARCAS_NAV[number]
+
+const CAT_COLORS: Record<Categoria, string> = {
+  consulta: 'var(--mk-info)',
+  interes_compra: 'var(--mk-success)',
+  agradecimiento: 'var(--mk-accent)',
+  queja: 'var(--mk-danger)',
+  tag_amigo: 'var(--mk-text-tertiary)',
+  spam: 'var(--mk-text-quaternary)',
+  otro: 'var(--mk-text-tertiary)',
+}
+const CAT_LABELS: Record<Categoria, string> = {
+  consulta: 'Consulta',
+  interes_compra: 'Interés compra',
+  agradecimiento: 'Gracias',
+  queja: 'Queja',
+  tag_amigo: 'Tag',
+  spam: 'Spam',
+  otro: 'Otro',
+}
 
 function CommentRow({ comment, marca }: { comment: Comentario; marca: Marca | undefined }) {
   if (!marca) return null
   const urgencyColor = comment.urgencia === 'high' ? 'var(--mk-danger)' : comment.urgencia === 'medium' ? 'var(--mk-warning)' : 'var(--mk-text-tertiary)'
-  const catColors: Record<Comentario['categoria'], string> = {
-    consulta: 'var(--mk-info)',
-    interes_compra: 'var(--mk-success)',
-    agradecimiento: 'var(--mk-accent)',
-    queja: 'var(--mk-danger)',
-    tag_amigo: 'var(--mk-text-tertiary)',
-    spam: 'var(--mk-text-quaternary)',
-    otro: 'var(--mk-text-tertiary)',
-  }
-  const catLabels: Record<Comentario['categoria'], string> = {
-    consulta: 'Consulta',
-    interes_compra: 'Interés compra',
-    agradecimiento: 'Gracias',
-    queja: 'Queja',
-    tag_amigo: 'Tag',
-    spam: 'Spam',
-    otro: 'Otro',
-  }
+  const catColors = CAT_COLORS
+  const catLabels = CAT_LABELS
   return (
     <div
       style={{
