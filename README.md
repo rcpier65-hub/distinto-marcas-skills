@@ -183,6 +183,11 @@ distinto-marcas-skills/
 
 ## 🎨 Roadmap de UI redesign (Claude Design)
 
+> 📄 **Brief completo de diseño**: [`docs/design-brief.md`](./docs/design-brief.md)
+> — filosofía, sistema de colores, tipografía, componentes base, prioridades.
+> Documento canónico para conversaciones con Claude Design u otras herramientas
+> de redesign.
+
 El sistema funciona pero **el diseño es funcional, no bonito todavía**. La próxima
 gran fase: rediseñar cada pantalla con Claude Design para que la experiencia visual
 esté a la altura de la calidad de las marcas que servimos.
