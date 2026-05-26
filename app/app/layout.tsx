@@ -1,12 +1,17 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Header } from '@/components/header'
+import { Inter_Tight, Geist_Mono } from 'next/font/google'
+import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+/* Inter Tight — la fuente signature de Linear. Sustituye Geist Sans.
+   Pesos 400/500/600 cubren todo (regular/medium/semibold).
+   Mantenemos Geist Mono para code blocks y .mk-kbd shortcuts. */
+const interTight = Inter_Tight({
+  variable: '--font-inter-tight',
   subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
 })
 
 const geistMono = Geist_Mono({
@@ -15,8 +20,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Distinto App',
-  description: 'Sistema de aprobación de grillas — Agencia Distinto',
+  title: 'Distinto',
+  description: 'Sistema operativo de Agencia Distinto',
 }
 
 export default function RootLayout({
@@ -27,11 +32,14 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      /* class "dark" fuerza dark mode en componentes shadcn que usen .dark.
+         Los tokens shadcn (--background, --foreground, etc.) ya están
+         mapeados a Linear en globals.css, así que dark global aplica
+         automáticamente a toda la app. */
+      className={`${interTight.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background">
-        <Header />
-        <div className="flex-1">{children}</div>
+      <body className="min-h-full">
+        <AppShell>{children}</AppShell>
         <Toaster />
       </body>
     </html>
