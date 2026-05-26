@@ -5,32 +5,39 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   DESIGN SYSTEM — Linear / Raycast aesthetic, dark-first
-   Source of truth para toda la app. Antes vivía scoped en
-   /mockup/mockup.css; ahora es global.
+   DESIGN SYSTEM — Light-first (Notion / Stripe / Vercel aesthetic).
+   Antes era dark Linear; ahora es light pro. Los tokens --mk-*
+   mantienen sus nombres pero apuntan a valores light. Eso preserva
+   compatibilidad con todos los componentes existentes.
    ============================================================ */
 
 :root {
-  /* ---------- BACKGROUND ELEVATIONS ---------- */
-  --mk-bg-base: #08090a;
-  --mk-bg-elevated: #101113;
-  --mk-bg-overlay: #18191c;
-  --mk-bg-hover: rgba(255, 255, 255, 0.04);
-  --mk-bg-active: rgba(255, 255, 255, 0.06);
-  --mk-bg-selected: rgba(113, 112, 255, 0.08);
+  /* ---------- BACKGROUND ELEVATIONS ----------
+     Light system inverso al dark anterior:
+     - base: la página (más claro)
+     - elevated: cards/sidebars (un toque más oscuro para profundidad)
+     - overlay: modals y popovers (vuelve a blanco con shadow fuerte) */
+  --mk-bg-base: #ffffff;
+  --mk-bg-elevated: #fafafa;
+  --mk-bg-overlay: #ffffff;
+  --mk-bg-hover: rgba(0, 0, 0, 0.035);
+  --mk-bg-active: rgba(0, 0, 0, 0.055);
+  --mk-bg-selected: rgba(113, 112, 255, 0.08);  /* accent bg-tint sirve igual */
 
-  /* ---------- BORDERS ---------- */
-  --mk-border-subtle: rgba(255, 255, 255, 0.06);
-  --mk-border-default: rgba(255, 255, 255, 0.08);
-  --mk-border-strong: rgba(255, 255, 255, 0.14);
-  --mk-border-accent: rgba(113, 112, 255, 0.50);
+  /* ---------- BORDERS — opacidades de negro ahora ---------- */
+  --mk-border-subtle: rgba(0, 0, 0, 0.06);
+  --mk-border-default: rgba(0, 0, 0, 0.10);
+  --mk-border-strong: rgba(0, 0, 0, 0.16);
+  --mk-border-accent: rgba(113, 112, 255, 0.45);
 
-  /* ---------- TEXT (opacidades sobre blanco) ---------- */
-  --mk-text-primary: #f7f8f8;
-  --mk-text-secondary: rgba(247, 248, 248, 0.62);
-  --mk-text-tertiary: rgba(247, 248, 248, 0.40);
-  --mk-text-quaternary: rgba(247, 248, 248, 0.24);
-  --mk-text-disabled: rgba(247, 248, 248, 0.18);
+  /* ---------- TEXT — opacidades de #0a0a0a sobre fondo claro ----------
+     NO usamos #000 puro porque produce contraste demasiado duro.
+     #0a0a0a (gris muy oscuro) es lo que usan Notion / Linear light. */
+  --mk-text-primary: #0a0a0a;
+  --mk-text-secondary: rgba(10, 10, 10, 0.65);
+  --mk-text-tertiary: rgba(10, 10, 10, 0.48);
+  --mk-text-quaternary: rgba(10, 10, 10, 0.30);
+  --mk-text-disabled: rgba(10, 10, 10, 0.20);
 
   /* ---------- ACCENT — violeta Linear signature ---------- */
   --mk-accent: #7170ff;
@@ -100,11 +107,14 @@
   --mk-radius-xl: 12px;
   --mk-radius-full: 9999px;
 
-  /* ---------- SHADOWS ---------- */
-  --mk-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.20);
-  --mk-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.32);
-  --mk-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.40);
-  --mk-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.50);
+  /* ---------- SHADOWS — sutiles en light (Notion-style) ----------
+     En dark las sombras eran fuertes (0.40 opacity) para crear
+     profundidad sobre fondo negro. En light hay que retroceder
+     mucho — alrededor de 0.05-0.10 opacity. Más alto se ve sucio. */
+  --mk-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --mk-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --mk-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --mk-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.06);
   --mk-shadow-glow: 0 0 0 1px var(--mk-accent), 0 0 24px var(--mk-accent-glow);
 
   /* ---------- MOTION ---------- */
@@ -307,7 +317,7 @@
   box-shadow: 0 0 0 1px var(--mk-bg-base), 0 0 0 3px var(--mk-accent-glow);
 }
 
-/* Scrollbar — thin Linear-style global */
+/* Scrollbar — thin, opacidades de NEGRO ahora que estamos en light */
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -316,11 +326,11 @@
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.10);
   border-radius: 4px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.20);
 }
 
 /* ============================================================

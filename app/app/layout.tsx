@@ -32,11 +32,12 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      /* class "dark" fuerza dark mode en componentes shadcn que usen .dark.
-         Los tokens shadcn (--background, --foreground, etc.) ya están
-         mapeados a Linear en globals.css, así que dark global aplica
-         automáticamente a toda la app. */
-      className={`${interTight.variable} ${geistMono.variable} dark h-full antialiased`}
+      /* La app ahora es light-first. Los tokens shadcn (--background,
+         --foreground, etc.) ya están mapeados a tokens light en
+         globals.css, así que el aesthetic aplica automáticamente sin
+         class="dark" en el root. Si en el futuro queremos toggle
+         dark/light, agregamos un ThemeProvider con class condicional. */
+      className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
         <AppShell>{children}</AppShell>
