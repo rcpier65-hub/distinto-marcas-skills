@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { LogoUrlInput } from './_components/logo-url-input'
 import { WhatsappConfigInput } from './_components/whatsapp-config-input'
 import { MetricoolConfig } from './_components/metricool-config'
+import { MarcaFactsCard } from './_components/marca-facts-card'
 import { listWhatsAppGroups } from '@/lib/integrations/rubi'
 import { getIntegracionesConfig } from './_actions'
 
@@ -155,6 +156,43 @@ export default async function SettingsPage() {
                     decisor_nombre: m.decisor_nombre ?? null,
                     envio_real_habilitado: Boolean(m.envio_real_habilitado),
                   }}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Datos canon por marca — Migration 022 — alimenta la Routine de comentarios */}
+      <Card>
+        <CardHeader>
+          <CardTitle>📚 Datos canon por marca (Routine de comentarios)</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            La Routine que responde comentarios consulta esta tabla antes de redactar para no inventar precios, URLs o naming desactualizado.
+            Si una marca está marcada <strong>⚠ sin datos</strong>, la Routine opera en modo conservador: deriva todo a DM sin afirmar nada.
+          </p>
+          <div className="mt-3 p-3 bg-muted/40 rounded-md text-xs">
+            <strong className="block mb-1">💡 Qué cargar:</strong>
+            <ul className="list-disc ml-4 space-y-0.5 text-muted-foreground">
+              <li><strong>Nombre comercial</strong>: el que usás HOY (ej Typhouse, no Little Joe)</li>
+              <li><strong>Web + WhatsApp</strong>: canales activos para derivar consultas</li>
+              <li><strong>Puntos de venta</strong>: tiendas físicas donde se vende (Sodimac, Totus...)</li>
+              <li><strong>Datos de producto</strong>: precios, calorías, dimensiones — todo dato numérico verificable</li>
+              <li><strong>Frases canon vs prohibidas</strong>: guardrails de voz (qué SÍ y qué NO escribir)</li>
+            </ul>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!marcas || marcas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin marcas.</p>
+          ) : (
+            <div className="space-y-2">
+              {marcas.map((m) => (
+                <MarcaFactsCard
+                  key={m.slug}
+                  slug={m.slug}
+                  marcaNombre={m.nombre}
+                  emojiMarca={m.emoji_marca}
                 />
               ))}
             </div>

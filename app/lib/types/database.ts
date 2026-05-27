@@ -505,6 +505,51 @@ export interface EnvioInsert {
 export type EnvioUpdate = Partial<EnvioRow>
 
 // ============================================================
+// MARCA_FACTS — Migration 022 — datos canon por marca
+// ============================================================
+// La Routine consulta esta tabla ANTES de redactar respuestas.
+// Razón: el modelo NO debe inventar URLs, precios, naming actual,
+// puntos de venta físicos. Esos viven acá y se cargan desde Settings.
+
+/** JSON libre con datos de producto verificables. Ej Warrior:
+ *  { "barra_warrior_crunch": { "kcal": 100, "precio_unit_soles": 13, "sabores": [...] } }
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ProductosDatos = Record<string, Record<string, any>>
+
+export interface MarcaFactsRow {
+  marca_id: string                         // PK + FK 1-1 a marcas.id
+  nombre_comercial: string | null          // "Typhouse" (no "Little Joe")
+  web_principal: string | null             // "typhouse.pe"
+  whatsapp_principal: string | null        // "+51 912 568 107"
+  puntos_venta: string[]                   // ["Sodimac", "Totus"]
+  proximamente: string[]                   // ["Rosatel"]
+  productos_datos: ProductosDatos          // shape libre por marca
+  frases_prohibidas: string[]              // ["littlejoe.pe", "te escribo al interno con info"]
+  frases_canon: string[]                   // ["Ingresa a typhouse.pe", "📲 912 568 107"]
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MarcaFactsInsert {
+  marca_id: string
+  nombre_comercial?: string | null
+  web_principal?: string | null
+  whatsapp_principal?: string | null
+  puntos_venta?: string[]
+  proximamente?: string[]
+  productos_datos?: ProductosDatos
+  frases_prohibidas?: string[]
+  frases_canon?: string[]
+  notas?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type MarcaFactsUpdate = Partial<Omit<MarcaFactsRow, 'marca_id' | 'created_at'>>
+
+// ============================================================
 // DATABASE — formato compat con @supabase/supabase-js typed client
 // ============================================================
 
@@ -515,6 +560,12 @@ export interface Database {
         Row: MarcaRow
         Insert: MarcaInsert
         Update: MarcaUpdate
+        Relationships: []
+      }
+      marca_facts: {
+        Row: MarcaFactsRow
+        Insert: MarcaFactsInsert
+        Update: MarcaFactsUpdate
         Relationships: []
       }
       grillas_pendientes: {

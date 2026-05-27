@@ -282,3 +282,139 @@ export async function probarMetricool(): Promise<
   if (!r.ok) return r
   return { ok: true, brandsCount: r.data.brandsCount, sampleBrand: r.data.sampleBrand }
 }
+
+// ============================================================
+// MARCA_FACTS — Migration 022 — datos canon por marca
+// ============================================================
+// Consumidos por la Routine antes de redactar respuestas. Decisión:
+// el operador (Pedro) los carga una sola vez por marca en /settings.
+// La Routine los lee vía GET /api/v1/marcas/{slug}/facts.
+
+export type MarcaFactsForm = {
+  nombre_comercial: string
+  web_principal: string
+  whatsapp_principal: string
+  puntos_venta: string[]         // chips editables
+  proximamente: string[]         // chips editables
+  productos_datos_json: string   // textarea con JSON crudo (validamos al guardar)
+  frases_prohibidas: string[]
+  frases_canon: string[]
+  notas: string
+}
+
+/**
+ * Lee facts actuales para hidratar el form. Si no hay row, devuelve defaults.
+ */
+export async function getMarcaFacts(
+  slug: string,
+): Promise<{ ok: true; data: MarcaFactsForm; hasFacts: boolean } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { data: marca, error: errM } = await service
+    .from('marcas')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (errM) return { ok: false, error: errM.message }
+  if (!marca) return { ok: false, error: `marca '${slug}' no existe` }
+
+  const { data: row } = await service
+    .from('marca_facts')
+    .select('*')
+    .eq('marca_id', marca.id)
+    .maybeSingle()
+
+  const hasFacts = row !== null
+  return {
+    ok: true,
+    hasFacts,
+    data: {
+      nombre_comercial: row?.nombre_comercial ?? '',
+      web_principal: row?.web_principal ?? '',
+      whatsapp_principal: row?.whatsapp_principal ?? '',
+      puntos_venta: row?.puntos_venta ?? [],
+      proximamente: row?.proximamente ?? [],
+      productos_datos_json: row?.productos_datos
+        ? JSON.stringify(row.productos_datos, null, 2)
+        : '{}',
+      frases_prohibidas: row?.frases_prohibidas ?? [],
+      frases_canon: row?.frases_canon ?? [],
+      notas: row?.notas ?? '',
+    },
+  }
+}
+
+/**
+ * Upsert de marca_facts. Valida que productos_datos_json sea JSON parseable
+ * antes de persistir — si está mal, devuelve error sin tocar la BD.
+ *
+ * Strings vacíos se convierten a NULL (no a "") para queries más limpias
+ * del lado de la Routine ("if (facts.web_principal) { ... }").
+ */
+export async function updateMarcaFacts(
+  slug: string,
+  form: MarcaFactsForm,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // Validar JSON de productos_datos antes de cualquier write
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let productosDatos: Record<string, any> = {}
+  try {
+    productosDatos = JSON.parse(form.productos_datos_json || '{}')
+    if (typeof productosDatos !== 'object' || Array.isArray(productosDatos)) {
+      return { ok: false, error: 'productos_datos debe ser un objeto JSON {}' }
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error: `JSON inválido en productos_datos: ${(err as Error).message}`,
+    }
+  }
+
+  // Resolver marca_id
+  const { data: marca, error: errM } = await service
+    .from('marcas')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (errM) return { ok: false, error: errM.message }
+  if (!marca) return { ok: false, error: `marca '${slug}' no existe` }
+
+  // Normalizar: trim strings, vacíos → null, arrays con strings vacíos out
+  const cleanString = (s: string): string | null => {
+    const t = s?.trim()
+    return t ? t : null
+  }
+  const cleanArr = (arr: string[]): string[] =>
+    (arr ?? []).map(s => s.trim()).filter(Boolean)
+
+  const payload = {
+    marca_id: marca.id,
+    nombre_comercial: cleanString(form.nombre_comercial),
+    web_principal: cleanString(form.web_principal),
+    whatsapp_principal: cleanString(form.whatsapp_principal),
+    puntos_venta: cleanArr(form.puntos_venta),
+    proximamente: cleanArr(form.proximamente),
+    productos_datos: productosDatos,
+    frases_prohibidas: cleanArr(form.frases_prohibidas),
+    frases_canon: cleanArr(form.frases_canon),
+    notas: cleanString(form.notas),
+  }
+
+  const { error } = await service
+    .from('marca_facts')
+    .upsert(payload, { onConflict: 'marca_id' })
+
+  if (error) {
+    console.error('[updateMarcaFacts] error:', error)
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/settings')
+  return { ok: true }
+}
