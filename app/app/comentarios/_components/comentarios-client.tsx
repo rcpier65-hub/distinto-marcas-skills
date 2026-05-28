@@ -18,6 +18,7 @@ import {
   skipComentario,
   responderBatch,
   dispatchRoutine,
+  previewInformeWhatsapp,
   type RoutineMode,
 } from '../_actions'
 import { ComentarioRow } from './comentario-row'
@@ -90,6 +91,31 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   // Dispatch Routine (Claude Desktop trigger)
   const [dispatching, setDispatching] = useState<RoutineMode | null>(null)
   const [, startDispatchTransition] = useTransition()
+
+  // Preview informe (modo prueba — manda al número personal de Pedro sin tocar Metricool)
+  const [previewing, setPreviewing] = useState(false)
+  const [, startPreviewTransition] = useTransition()
+
+  function handlePreviewInforme() {
+    if (seleccionados.size === 0) {
+      toast.error('Seleccioná al menos 1 comentario primero')
+      return
+    }
+    setPreviewing(true)
+    startPreviewTransition(async () => {
+      const toastId = toast.loading(`🧪 Mandando informe de prueba con ${seleccionados.size} comentarios…`)
+      const r = await previewInformeWhatsapp(Array.from(seleccionados))
+      if (r.ok) {
+        toast.success(
+          `✅ Informe enviado a tu WhatsApp personal (${r.marcas_procesadas} marca${r.marcas_procesadas > 1 ? 's' : ''}). NO se posteó nada a Metricool ni a clientes.`,
+          { id: toastId, duration: 10000 },
+        )
+      } else {
+        toast.error(`Error: ${r.error}`, { id: toastId, duration: 8000 })
+      }
+      setPreviewing(false)
+    })
+  }
 
   function handleDispatchRoutine(mode: RoutineMode) {
     setDispatching(mode)
@@ -378,6 +404,14 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
                 className="h-9 px-3 rounded-md border text-sm hover:bg-muted"
               >
                 Cancelar selección
+              </button>
+              <button
+                onClick={handlePreviewInforme}
+                disabled={previewing || isResponding}
+                title="Manda el informe que SE ENVIARÍA a tu número personal de WhatsApp. NO postea a Metricool. NO toca clientes."
+                className="h-9 px-3 rounded-md border border-amber-400 bg-amber-50 text-amber-900 text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
+              >
+                {previewing ? '⏳ Enviando…' : `🧪 Probar informe a mi número`}
               </button>
               <button
                 onClick={handleResponderClick}

@@ -412,17 +412,33 @@ export async function responderBatch(
 // ============================================================
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function enviarInformeWhatsapp(marca: any, exitosos: any[], fallos: any[]): Promise<boolean> {
-  // grupo destino según config: cliente (chatid de la marca) | interno (New team) | ninguno
-  const dest = marca.reporte_comentarios_grupo as string
-  if (dest === 'ninguno') return false
+async function enviarInformeWhatsapp(
+  marca: any,
+  exitosos: any[],
+  fallos: any[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  chatIdOverride?: string,
+  esPreview: boolean = false,
+): Promise<boolean> {
+  // chatIdOverride permite mandar el informe a OTRO destino (ej número
+  // personal de Pedro en modo prueba). Si está seteado, ignoramos la
+  // config de la marca.
   let chatId: string
-  if (dest === 'cliente') {
-    if (!marca.grupo_whatsapp_chatid) return false
-    chatId = marca.grupo_whatsapp_chatid
+  if (chatIdOverride) {
+    chatId = chatIdOverride
   } else {
-    chatId = process.env.WHATSAPP_TEST_GROUP_CHATID ?? '120363427129444398@g.us'  // New team default
+    // grupo destino según config: cliente (chatid de la marca) | interno (New team) | ninguno
+    const dest = marca.reporte_comentarios_grupo as string
+    if (dest === 'ninguno') return false
+    if (dest === 'cliente') {
+      if (!marca.grupo_whatsapp_chatid) return false
+      chatId = marca.grupo_whatsapp_chatid
+    } else {
+      chatId = process.env.WHATSAPP_TEST_GROUP_CHATID ?? '120363427129444398@g.us'  // New team default
+    }
   }
+  // Si es preview, agregamos marca visible al inicio del mensaje
+  const previewBadge = esPreview ? '🧪 *MODO PRUEBA — esto NO se mandó a clientes ni a Metricool*\n\n' : ''
 
   // Construir mensaje resumen
   const fecha = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -450,7 +466,7 @@ async function enviarInformeWhatsapp(marca: any, exitosos: any[], fallos: any[])
     }
   }
 
-  const text = lines.join('\n')
+  const text = previewBadge + lines.join('\n')
 
   // Enviamos como TEXTO (no imagen) — usamos sendWhatsAppImage con un workaround?
   // No — necesitamos sendWhatsAppText. Por ahora, lo mando como mensaje con
@@ -500,5 +516,90 @@ export async function getResumenInbox(marcaSlug: string): Promise<{
     approved: approvedR.count ?? 0,
     responded_today: respondedR.count ?? 0,
     failed: failedR.count ?? 0,
+  }
+}
+
+// ============================================================
+// PREVIEW INFORME — modo prueba que NO toca Metricool
+// ============================================================
+/**
+ * Simula que se respondieron los comentarios seleccionados y manda el
+ * informe a un destino de prueba (por default, número personal de Pedro).
+ *
+ * NO postea a Metricool. NO cambia status en BD. Solo construye el caption
+ * que SE ENVIARÍA si fuera real y lo manda como mensaje WhatsApp.
+ *
+ * Sirve para validar:
+ *   1. Que el bot WhatsApp Rubi está funcionando
+ *   2. Cómo va a quedar visualmente el informe
+ *   3. Que el grupo correcto está configurado (si pasás chatIdOverride)
+ *
+ * @param comentarioIds — los IDs seleccionados en la UI
+ * @param destinoOverride — chat WhatsApp donde mandar (default: número personal de Pedro)
+ */
+export async function previewInformeWhatsapp(
+  comentarioIds: string[],
+  destinoOverride?: string,
+): Promise<
+  | { ok: true; preview_text: string; sent_to: string; marcas_procesadas: number }
+  | { ok: false; error: string }
+> {
+  await requireUser()
+  if (comentarioIds.length === 0) return { ok: false, error: 'No hay comentarios seleccionados' }
+
+  // Default: número personal de Pedro (configurable por env var)
+  const destino = destinoOverride ?? process.env.WHATSAPP_PEDRO_PERSONAL ?? '51983852191@s.whatsapp.net'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // Pull los rows con join a marca
+  const { data: rows, error } = await service
+    .from('comentarios_inbox')
+    .select(`
+      id, marca_id, network, author_username, author_display_name,
+      comment_text, respuesta_sugerida, respuesta_editada, respuesta_final,
+      marcas:marca_id (
+        id, slug, nombre, reporte_comentarios_grupo,
+        grupo_whatsapp_chatid, grupo_whatsapp_nombre
+      )
+    `)
+    .in('id', comentarioIds)
+  if (error) return { ok: false, error: error.message }
+  if (!rows || rows.length === 0) return { ok: false, error: 'No se encontraron comentarios' }
+
+  // Agrupar por marca (un informe por marca)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const porMarca = new Map<string, { marca: any; exitosos: any[] }>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of rows as any[]) {
+    const textoFinal = r.respuesta_editada?.trim() || r.respuesta_final?.trim() || r.respuesta_sugerida?.trim() || ''
+    if (!textoFinal) continue  // skip los vacíos
+    const bucket = porMarca.get(r.marca_id) ?? { marca: r.marcas, exitosos: [] }
+    bucket.exitosos.push({ ...r, respuesta_final: textoFinal })
+    porMarca.set(r.marca_id, bucket)
+  }
+
+  // Generar informes por marca y mandarlos todos al destino de prueba
+  const partes: string[] = []
+  let enviadosOk = 0
+  for (const [, bucket] of porMarca) {
+    const enviado = await enviarInformeWhatsapp(
+      bucket.marca,
+      bucket.exitosos,
+      [],                  // sin fallos en preview
+      destino,             // override al número personal
+      true,                // marcar como preview
+    )
+    if (enviado) enviadosOk += 1
+    // Para mostrar al user el texto que se mandó
+    partes.push(`✅ ${bucket.marca.nombre}: ${bucket.exitosos.length} comentarios simulados`)
+  }
+
+  return {
+    ok: true,
+    preview_text: partes.join('\n'),
+    sent_to: destino,
+    marcas_procesadas: enviadosOk,
   }
 }
