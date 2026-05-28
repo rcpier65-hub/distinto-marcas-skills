@@ -174,8 +174,9 @@ export function ComentarioRow({
               type="button"
               onClick={() => onChangeTexto(row.respuesta_sugerida ?? '')}
               className="text-primary hover:underline"
+              title="Volver al texto original sugerido por IA (perdés tus ediciones)"
             >
-              ↶ usar sugerencia
+              ↶ revertir a sugerencia
             </button>
           )}
         </div>

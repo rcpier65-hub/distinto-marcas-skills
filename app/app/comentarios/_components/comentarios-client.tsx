@@ -9,7 +9,7 @@
 //   - Confirm dialog antes de batch
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -44,6 +44,8 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const sp = useSearchParams()
 
   // Estado local de ediciones por row (key = row.id)
+  // Inicializa con respuesta_sugerida pre-cargada — no hace falta apretar
+  // "usar sugerencia" para cada uno.
   const [ediciones, setEdiciones] = useState<Map<string, { texto: string; categoria: ComentarioCategoria }>>(() => {
     const m = new Map()
     for (const r of rowsIniciales) {
@@ -54,6 +56,31 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
     }
     return m
   })
+
+  // Re-sincronizar cuando llegan nuevos rowsIniciales del server (vos editaste
+  // en otro tab, la Routine generó sugerencias después de la primera carga,
+  // o hiciste router.refresh()). Sin esto, los textareas se quedaban vacíos
+  // aunque la BD tuviera sugerencia (bug original que Pedro detectó).
+  //
+  // IMPORTANTE: solo sobreescribimos rows que NO tienen edits locales aún
+  // (texto vacío). Si vos ya estabas escribiendo, no queremos perder ese trabajo.
+  useEffect(() => {
+    setEdiciones((prev) => {
+      const next = new Map(prev)
+      for (const r of rowsIniciales) {
+        const current = next.get(r.id)
+        const fromServer = r.respuesta_final ?? r.respuesta_sugerida ?? ''
+        // Si no había edits locales (o estaba vacío) y el server tiene contenido nuevo, sincronizamos.
+        if (!current || (!current.texto && fromServer)) {
+          next.set(r.id, {
+            texto: fromServer,
+            categoria: r.categoria_sugerida ?? 'otro',
+          })
+        }
+      }
+      return next
+    })
+  }, [rowsIniciales])
 
   // Selección
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
