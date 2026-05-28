@@ -17,6 +17,8 @@ import {
   actualizarComentarioBorrador,
   skipComentario,
   responderBatch,
+  dispatchRoutine,
+  type RoutineMode,
 } from '../_actions'
 import { ComentarioRow } from './comentario-row'
 import type { ComentarioInboxRow, ComentarioCategoria } from '@/lib/types/database'
@@ -57,6 +59,29 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
   const [enviarInforme, setEnviarInforme] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
+
+  // Dispatch Routine (Claude Desktop trigger)
+  const [dispatching, setDispatching] = useState<RoutineMode | null>(null)
+  const [, startDispatchTransition] = useTransition()
+
+  function handleDispatchRoutine(mode: RoutineMode) {
+    setDispatching(mode)
+    startDispatchTransition(async () => {
+      const labels: Record<RoutineMode, string> = {
+        generar: 'Generando borradores',
+        postear: 'Posteando aprobados a Metricool',
+        ambas: 'Generación + posteo',
+      }
+      const toastId = toast.loading(`🤖 ${labels[mode]}…`)
+      const r = await dispatchRoutine(mode)
+      if (r.ok) {
+        toast.success(r.message, { id: toastId, duration: 8000 })
+      } else {
+        toast.error(`Error: ${r.error}`, { id: toastId, duration: 8000 })
+      }
+      setDispatching(null)
+    })
+  }
 
   const [isFetching, startFetching] = useTransition()
   const [isResponding, startResponding] = useTransition()
@@ -197,6 +222,28 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
           >
             {isFetching ? '⏳ Cargando…' : '🔄 Cargar comentarios'}
           </button>
+
+          {/* Dispatch Routine — genera borradores con IA (Claude Desktop) */}
+          <button
+            onClick={() => handleDispatchRoutine('generar')}
+            disabled={dispatching !== null}
+            title="Dispara la Routine de Claude Desktop para generar respuestas sugeridas a los comentarios pendientes"
+            className="h-10 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {dispatching === 'generar' ? '⏳ Generando…' : '🤖 Generar borradores'}
+          </button>
+
+          {/* Postear aprobados — solo visible si hay aprobados pendientes de envío */}
+          {resumen.approved > 0 && (
+            <button
+              onClick={() => handleDispatchRoutine('postear')}
+              disabled={dispatching !== null}
+              title={`Dispara la Routine para postear los ${resumen.approved} aprobados a Metricool`}
+              className="h-10 px-3 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {dispatching === 'postear' ? '⏳ Posteando…' : `✅ Postear ${resumen.approved} aprobados`}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3 text-xs">

@@ -16,6 +16,81 @@ import type {
 const NETWORKS: ComentarioNetwork[] = ['instagram', 'facebook', 'tiktok']
 
 // ============================================================
+// DISPATCH ROUTINE — dispara la Claude Routine vía API
+// ============================================================
+// La Routine vive en Claude Desktop. Tu app le pega un POST a su
+// trigger API con un bearer token (env var encriptada en Vercel).
+// El campo "text" del body llega al contexto del prompt como
+// instrucción de qué fase ejecutar (generar / postear / ambas).
+
+export type RoutineMode = 'generar' | 'postear' | 'ambas'
+
+/**
+ * Dispara la Routine de Claude Desktop para procesar comentarios.
+ *
+ * Decisión: NO esperamos la respuesta de la Routine (puede tomar
+ * 30-90s). Mandamos el POST y devolvemos al usuario inmediatamente.
+ * El usuario sabe que la Routine terminó cuando le llega el WhatsApp
+ * de notificación interno (notify scope=interno desde el prompt v2).
+ */
+export async function dispatchRoutine(
+  mode: RoutineMode,
+): Promise<
+  | { ok: true; status: number; message: string }
+  | { ok: false; error: string }
+> {
+  await requireUser()
+
+  const url = process.env.ANTHROPIC_ROUTINE_URL
+  const bearer = process.env.ANTHROPIC_ROUTINE_BEARER
+
+  if (!url || !bearer) {
+    return {
+      ok: false,
+      error:
+        'ANTHROPIC_ROUTINE_URL o ANTHROPIC_ROUTINE_BEARER no están configurados en Vercel env vars.',
+    }
+  }
+
+  try {
+    // Le pasamos `text` con la fase que queremos. El prompt v2 lo lee
+    // del contexto para decidir si ejecuta FASE 1, FASE 2, o ambas.
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${bearer}`,
+        'Content-Type': 'application/json',
+        // Header experimental requerido para Claude Code routines API
+        // (descubierto en docs de Claude Routines)
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'agent-runs-2026-01-01',
+      },
+      body: JSON.stringify({ text: mode }),
+      // Timeout corto — solo queremos confirmar que el trigger se aceptó.
+      // La Routine corre asincrónica de todas formas.
+      signal: AbortSignal.timeout(15000),
+    })
+
+    const body = await res.text()
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Routine fire falló — HTTP ${res.status}: ${body.slice(0, 200)}`,
+      }
+    }
+
+    return {
+      ok: true,
+      status: res.status,
+      message: `Routine disparada en modo "${mode}". Te llegará WhatsApp al equipo interno cuando termine (~30-90s).`,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: `Error de red: ${msg}` }
+  }
+}
+
+// ============================================================
 // FETCH desde Metricool → upsert en BD
 // ============================================================
 
