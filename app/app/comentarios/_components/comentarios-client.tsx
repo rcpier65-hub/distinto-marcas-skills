@@ -75,9 +75,24 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
       const toastId = toast.loading(`🤖 ${labels[mode]}…`)
       const r = await dispatchRoutine(mode)
       if (r.ok) {
-        toast.success(r.message, { id: toastId, duration: 8000 })
+        // Si el dispatch devolvió session_url, agregamos action para abrirla
+        // en vivo (ver la Routine ejecutándose paso por paso).
+        toast.success(r.message, {
+          id: toastId,
+          duration: 12000,
+          action: r.sessionUrl
+            ? {
+                label: 'Ver en vivo',
+                onClick: () => window.open(r.sessionUrl!, '_blank'),
+              }
+            : undefined,
+        })
+        // Refrescar la página después de 60s para que aparezcan los borradores
+        if (mode === 'generar' || mode === 'ambas') {
+          setTimeout(() => router.refresh(), 60_000)
+        }
       } else {
-        toast.error(`Error: ${r.error}`, { id: toastId, duration: 8000 })
+        toast.error(`Error: ${r.error}`, { id: toastId, duration: 10000 })
       }
       setDispatching(null)
     })

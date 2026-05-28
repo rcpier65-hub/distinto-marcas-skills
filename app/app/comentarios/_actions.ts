@@ -36,7 +36,7 @@ export type RoutineMode = 'generar' | 'postear' | 'ambas'
 export async function dispatchRoutine(
   mode: RoutineMode,
 ): Promise<
-  | { ok: true; status: number; message: string }
+  | { ok: true; status: number; message: string; sessionUrl: string | null; sessionId: string | null }
   | { ok: false; error: string }
 > {
   await requireUser()
@@ -53,36 +53,47 @@ export async function dispatchRoutine(
   }
 
   try {
-    // Le pasamos `text` con la fase que queremos. El prompt v2 lo lee
-    // del contexto para decidir si ejecuta FASE 1, FASE 2, o ambas.
+    // Probado empíricamente: el endpoint /fire de Claude Routines acepta
+    // solo Authorization + Content-Type + anthropic-version. NO requiere
+    // anthropic-beta header (aunque está documentado en otros endpoints).
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${bearer}`,
         'Content-Type': 'application/json',
-        // Header experimental requerido para Claude Code routines API
-        // (descubierto en docs de Claude Routines)
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'agent-runs-2026-01-01',
       },
       body: JSON.stringify({ text: mode }),
-      // Timeout corto — solo queremos confirmar que el trigger se aceptó.
-      // La Routine corre asincrónica de todas formas.
       signal: AbortSignal.timeout(15000),
     })
 
-    const body = await res.text()
+    const text = await res.text()
     if (!res.ok) {
       return {
         ok: false,
-        error: `Routine fire falló — HTTP ${res.status}: ${body.slice(0, 200)}`,
+        error: `Routine fire falló — HTTP ${res.status}: ${text.slice(0, 200)}`,
       }
+    }
+
+    // El endpoint devuelve { claude_code_session_id, claude_code_session_url, type }
+    // El session_url es ORO: link en vivo a claude.ai/code/session_xxx donde
+    // se puede VER a la Routine ejecutándose paso a paso.
+    let sessionUrl: string | null = null
+    let sessionId: string | null = null
+    try {
+      const json = JSON.parse(text) as { claude_code_session_url?: string; claude_code_session_id?: string }
+      sessionUrl = json.claude_code_session_url ?? null
+      sessionId = json.claude_code_session_id ?? null
+    } catch {
+      // Si no es JSON parseable seguimos igual — el fire ya fue exitoso
     }
 
     return {
       ok: true,
       status: res.status,
-      message: `Routine disparada en modo "${mode}". Te llegará WhatsApp al equipo interno cuando termine (~30-90s).`,
+      message: `Routine disparada en modo "${mode}". Te llega WhatsApp interno cuando termine (~30-90s).`,
+      sessionUrl,
+      sessionId,
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
