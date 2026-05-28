@@ -346,14 +346,15 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         </div>
       </div>
 
-      {/* SPLIT — copy + preview.
-          items-stretch hace que ambas columnas tengan la misma altura.
-          La Card izquierda usa flex-col h-full + textarea flex-1 para
-          que el textarea CREZCA hasta llenar el alto del preview de la
-          derecha. Sin esto, copy vacío = card chica = hueco abajo. */}
-      <div className="grid lg:grid-cols-[1fr_400px] gap-4 items-stretch">
-        <Card className="h-full">
-          <CardContent className="p-0 h-full flex flex-col">
+      {/* SPLIT — columna izquierda (todo: copy + props + workflow +
+          guion + opción 2 + notas + guion técnico) + columna derecha (preview sticky).
+          items-start hace que cada columna tenga su altura natural y
+          el preview puede ser sticky mientras vos scrolleás en la izquierda. */}
+      <div className="grid lg:grid-cols-[1fr_400px] gap-4 items-start">
+        {/* Wrapper de la columna izquierda — apila todas las secciones */}
+        <div className="space-y-3 min-w-0">
+        <Card>
+          <CardContent className="p-0 flex flex-col">
             {/* Header de sección "1. COPY" — para que se entienda qué
                 edita Pedro acá. Estilo Notion: número grande + nombre
                 en mayúscula. */}
@@ -363,11 +364,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 1. Copy
               </span>
             </div>
-            {/* Copy textarea — toma todo el alto disponible.
-                minHeight: 0 es CRITICAL en flex children que tienen
-                contenido interno con scroll; sin esto el textarea ignora
-                flex-1 y solo crece según su contenido. */}
-            <div className="px-3 pt-3 flex-1 flex flex-col min-h-0">
+            {/* Copy textarea — altura modesta porque copy suele ser corto.
+                Crece hasta ~280px con su propio contenido, no se estira
+                al alto del preview (eso causaba hueco gigante). */}
+            <div className="px-3 pt-3 flex flex-col">
               <textarea
                 ref={copyTextareaRef}
                 value={form.copy}
@@ -377,8 +377,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 }}
                 placeholder="Escribí el copy de la publicación aquí…"
                 maxLength={COPY_MAX}
-                style={{ minHeight: '200px' }}
-                className="w-full flex-1 min-h-0 p-3 rounded-md border-0 bg-background text-sm focus:outline-none resize-none overflow-y-auto"
+                style={{ minHeight: '110px', maxHeight: '280px' }}
+                className="w-full p-3 rounded-md border-0 bg-background text-sm focus:outline-none resize-none overflow-y-auto"
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground px-2 py-2 border-t mt-2">
                 <div className="flex items-center gap-3">
@@ -587,9 +587,150 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           </CardContent>
         </Card>
 
-        {/* SIDEBAR DERECHO — Preview + Properties stack vertical.
-            Sticky para que mientras escribís copy largo, el preview
-            + properties queden visibles. */}
+        {/* PROPIEDADES — antes estaba en columna derecha, ahora apilada
+            debajo del copy en la columna izquierda según pedido de Pedro. */}
+        <Card>
+          <CardContent className="p-3 space-y-3">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Propiedades
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs">
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                  <span>🎯</span> Estado
+                </span>
+                <select
+                  value={form.estado}
+                  onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
+                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
+                >
+                  {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs">
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                  <span>👤</span> Editor
+                </span>
+                <select
+                  value={form.editor_id}
+                  onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
+                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
+                >
+                  <option value="">— Sin asignar —</option>
+                  {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs">
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                  <span>📅</span> Publicación
+                </span>
+                <input
+                  type="date"
+                  value={form.fecha_publicacion}
+                  onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))}
+                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
+                />
+              </label>
+              <label className="block text-xs">
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                  <span>✂️</span> Edición
+                </span>
+                <input
+                  type="date"
+                  value={form.fecha_edicion}
+                  onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
+                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
+                />
+              </label>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground text-[10px] block mb-1">Sub-estado tarea</span>
+              <div className="flex gap-1">
+                {ESTADOS_TAREA.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
+                    className={`flex-1 h-7 px-1 rounded text-[10px] border transition-colors ${
+                      form.estado_tarea === e
+                        ? 'bg-[#ba41f7] text-white border-[#ba41f7]'
+                        : 'bg-background hover:bg-muted border-border'
+                    }`}
+                  >{ESTADO_TAREA_LABEL[e]}</button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* PROGRESO WORKFLOW — checklist con 6 ítems */}
+        <Card>
+          <CardContent className="p-3 space-y-2">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              ✓ Progreso workflow
+            </h3>
+            <div className="space-y-1">
+              <ChecklistRowCompact label="Copy listo"    icon={<span className="text-sm leading-none">📝</span>} value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
+              <ChecklistRowCompact label="Música"        icon={<span className="text-sm leading-none">🎵</span>} value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
+              <ChecklistRowCompact label="Portada lista" icon={<span className="text-sm leading-none">🖼️</span>} value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
+              <ChecklistRowCompact label="Diseñado"      icon={<span className="text-sm leading-none">🎨</span>} value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
+              <ChecklistRowCompact label="Editado"       icon={<span className="text-sm leading-none">✂️</span>} value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
+              <ChecklistRowCompact label="Aprobado"      icon={<span className="text-sm leading-none">✅</span>} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3 CARDS EN FILA — Guión / Opción 2 (video alt) / Notas. */}
+        <div className="grid lg:grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span>🎬</span> Guión / Indicaciones
+              </label>
+              <textarea
+                value={form.guion}
+                onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
+                rows={5}
+                placeholder="Gancho, escenas, tomas, voz en off…"
+                className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span>🎞️</span> Versión 2 (video alt.)
+              </label>
+              <textarea
+                value={form.opcion_2}
+              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
+              rows={6}
+              placeholder="Versión B del copy o guión alternativo…"
+              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
+            />
+          </CardContent>
+        </Card>
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span>📝</span> Notas internas
+              </label>
+              <textarea
+                value={form.notas}
+                onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
+                rows={5}
+                placeholder="Notas privadas del equipo…"
+                className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
+              />
+            </CardContent>
+          </Card>
+        </div>
+        {/* Fin del grid 3 cards */}
+        </div>
+        {/* Fin columna izquierda */}
+
+        {/* COLUMNA DERECHA — Preview sticky. Solo el preview, lo demás
+            quedó apilado en la columna izquierda según pedido de Pedro. */}
         <div className="lg:sticky lg:top-4 lg:self-start space-y-3">
           <Card className="overflow-hidden">
             <CardContent className="p-0">
@@ -655,152 +796,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               ↗ Abrir carpeta de tomas en Drive
             </a>
           )}
-
-          {/* PROPERTIES — status, fechas, editor, checklist.
-              Movidas desde la "ZONA INFERIOR" para llenar el espacio
-              vertical debajo del preview y dar layout tipo Notion/Linear:
-              creación a la izquierda, properties a la derecha. */}
-          <Card>
-            <CardContent className="p-3 space-y-3">
-              <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-[#ba41f7]" /> Propiedades
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                    <Target className="w-3 h-3" /> Estado
-                  </span>
-                  <select
-                    value={form.estado}
-                    onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
-                    className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                  >
-                    {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
-                  </select>
-                </label>
-                <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                    <UserIcon className="w-3 h-3" /> Editor
-                  </span>
-                  <select
-                    value={form.editor_id}
-                    onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
-                    className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                  >
-                    <option value="">— Sin asignar —</option>
-                    {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
-                  </select>
-                </label>
-                <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                    <CalendarDays className="w-3 h-3" /> Publicación
-                  </span>
-                  <input
-                    type="date"
-                    value={form.fecha_publicacion}
-                    onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))}
-                    className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                  />
-                </label>
-                <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                    <Scissors className="w-3 h-3" /> Edición
-                  </span>
-                  <input
-                    type="date"
-                    value={form.fecha_edicion}
-                    onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
-                    className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                  />
-                </label>
-              </div>
-              <div className="text-xs">
-                <span className="text-muted-foreground text-[10px] block mb-1">Sub-estado tarea</span>
-                <div className="flex gap-1">
-                  {ESTADOS_TAREA.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
-                      className={`flex-1 h-7 px-1 rounded text-[10px] border transition-colors ${
-                        form.estado_tarea === e
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background hover:bg-muted border-border'
-                      }`}
-                    >{ESTADO_TAREA_LABEL[e]}</button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-3 space-y-2">
-              <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="w-3 h-3 text-[#ba41f7]" /> Progreso workflow
-              </h3>
-              <div className="space-y-1">
-                <ChecklistRowCompact label="Copy listo"    icon={<FileText className="w-3.5 h-3.5" />}  value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
-                <ChecklistRowCompact label="Música"        icon={<Music2 className="w-3.5 h-3.5" />}    value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
-                <ChecklistRowCompact label="Portada lista" icon={<ImageIcon className="w-3.5 h-3.5" />} value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
-                <ChecklistRowCompact label="Diseñado"      icon={<Palette className="w-3.5 h-3.5" />}   value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
-                <ChecklistRowCompact label="Editado"       icon={<Scissors className="w-3.5 h-3.5" />}  value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
-                <ChecklistRowCompact label="Aprobado"      icon={<CheckCircle2 className="w-3.5 h-3.5" />} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
-
-      {/* ZONA INFERIOR — Solo guión + opción 2 + notas (3 columnas).
-          Antes había duplicación de status/fechas/editor/checklist —
-          movido al sidebar derecho dentro del SPLIT (más Notion-style).
-          Acá quedan los textareas de contenido largo que merecen su
-          espacio horizontal completo. */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Film className="w-3 h-3 text-[#ba41f7]" /> Guión / Indicaciones
-            </label>
-            <textarea
-              value={form.guion}
-              onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
-              rows={6}
-              placeholder="Gancho, escenas, tomas, voz en off…"
-              className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Lightbulb className="w-3 h-3 text-[#f2cc2c]" /> Opción 2
-            </label>
-            <textarea
-              value={form.opcion_2}
-              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
-              rows={6}
-              placeholder="Versión B del copy o guión alternativo…"
-              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <StickyNote className="w-3 h-3 text-foreground" /> Notas internas
-            </label>
-            <textarea
-              value={form.notas}
-              onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
-              rows={6}
-              placeholder="Notas privadas del equipo…"
-              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-            />
-          </CardContent>
-        </Card>
-      </div>
+      {/* Fin SPLIT */}
 
       {/* META footer */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
