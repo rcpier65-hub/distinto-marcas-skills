@@ -498,20 +498,59 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
       }}
     >
       {variant === 'compact' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, flexShrink: 0, minWidth: 32 }}>
-            {pub.hora}
-          </span>
-          <span style={{ width: 1, height: 11, background: `${marca?.color}55`, flexShrink: 0 }} />
-          <span style={{ fontSize: 11.5, color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1, lineHeight: 1.3 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Línea 1: hora + nombre de la marca (badge con color) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 10.5, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, flexShrink: 0 }}>
+              {pub.hora}
+            </span>
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: marca?.color ?? 'var(--mk-text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+                padding: '1px 5px',
+                borderRadius: 3,
+                background: `${marca?.color ?? '#999'}18`,
+                border: `1px solid ${marca?.color ?? '#999'}40`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '70%',
+                flexShrink: 1,
+              }}
+            >
+              {marca?.nombreCorto ?? pub.marcaSlug}
+            </span>
+          </div>
+          {/* Línea 2: caption (texto del copy) */}
+          <span style={{ fontSize: 11, color: 'var(--mk-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.3 }}>
             {pub.caption}
           </span>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{pub.hora}</span>
-            <span style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.4 }}>{marca?.nombreCorto}</span>
+            {/* Badge marca con color de fondo + borde para identificación rápida */}
+            <span
+              style={{
+                fontSize: 9.5,
+                fontWeight: 700,
+                color: marca?.color ?? 'var(--mk-text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                padding: '2px 6px',
+                borderRadius: 3,
+                background: `${marca?.color ?? '#999'}18`,
+                border: `1px solid ${marca?.color ?? '#999'}40`,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {marca?.nombreCorto ?? pub.marcaSlug}
+            </span>
             <div style={{ flex: 1 }} />
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: estadoCfg.color }}>
               <span className="mk-dot" style={{ background: estadoCfg.color, width: 4, height: 4 }} />
@@ -565,8 +604,8 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
   const todayKey = dayKey(today)
 
   return (
-    <div style={{ padding: '20px 28px 60px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+    <div style={{ padding: '16px 24px 60px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <CalendarNav
           label={`${MONTH_NAMES[month]} ${year}`}
           onPrev={() => setCursor(new Date(year, month - 1, 1))}
@@ -600,53 +639,54 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
               key={i}
               style={{
                 background: isToday ? 'var(--mk-bg-selected)' : 'var(--mk-bg-elevated)',
-                minHeight: 200,
-                maxHeight: 280,
+                /* Calendario tradicional: celdas más compactas y proporcionadas.
+                   Antes 200-280px causaba que el mes se viera "estirado". */
+                minHeight: 130,
+                maxHeight: 220,
                 display: 'flex',
                 flexDirection: 'column',
-                padding: '10px 8px 8px',
-                opacity: c.thisMonth ? 1 : 0.45,
+                padding: '8px 6px 6px',
+                opacity: c.thisMonth ? 1 : 0.42,
                 position: 'relative',
                 transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
                 boxShadow: isToday ? `inset 0 0 0 1px var(--mk-accent-glow)` : undefined,
               }}
             >
-              {/* Day number — más prominente */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
+              {/* Day number — más prominente cuando es hoy */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexShrink: 0 }}>
                 <span
                   style={{
-                    fontSize: isToday ? 14 : 13,
+                    fontSize: isToday ? 13 : 12,
                     fontWeight: 600,
                     color: isToday ? '#fff' : 'var(--mk-text-primary)',
                     fontVariantNumeric: 'tabular-nums',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    minWidth: isToday ? 24 : undefined, height: isToday ? 24 : undefined,
-                    padding: isToday ? '0 6px' : '0',
+                    minWidth: isToday ? 22 : undefined, height: isToday ? 22 : undefined,
+                    padding: isToday ? '0 5px' : '0',
                     borderRadius: isToday ? 'var(--mk-radius-full)' : undefined,
                     background: isToday ? 'var(--mk-accent)' : undefined,
-                    boxShadow: isToday ? '0 0 12px var(--mk-accent-glow)' : undefined,
+                    boxShadow: isToday ? '0 0 10px var(--mk-accent-glow)' : undefined,
                     letterSpacing: '-0.01em',
                   }}
                 >
                   {c.date.getDate()}
                 </span>
                 {pubs.length > 0 && (
-                  <span style={{ fontSize: 9.5, color: 'var(--mk-text-tertiary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: 'rgba(255,255,255,0.05)', padding: '1px 5px', borderRadius: 3 }}>
+                  <span style={{ fontSize: 9, color: 'var(--mk-text-tertiary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: 'rgba(0,0,0,0.05)', padding: '1px 4px', borderRadius: 3 }}>
                     {pubs.length}
                   </span>
                 )}
               </div>
 
-              {/* TODAS las pubs visibles. Scroll interno si la celda se llena. */}
+              {/* Pubs visibles con scroll vertical si la celda se llena. */}
               <div
                 style={{
                   flex: 1,
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 3,
-                  paddingRight: 2,
-                  /* Esconde scrollbar feo en celdas — visible solo cuando hover */
+                  gap: 2,
+                  paddingRight: 1,
                   scrollbarWidth: 'thin',
                 }}
               >
