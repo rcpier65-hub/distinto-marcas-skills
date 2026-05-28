@@ -14,6 +14,7 @@ import {
   Target, ImageIcon, Music2, FolderOpen, Smile, Film,
   CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
+  Download, Video as VideoIcon,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -98,7 +99,7 @@ const EMOJI_PICKER = [
 ]
 
 // Tipos de popover (solo uno abierto a la vez)
-type PopoverKey = 'tipo' | 'objetivos' | 'portada' | 'musica' | 'tomas' | 'emoji' | null
+type PopoverKey = 'tipo' | 'objetivos' | 'portada' | 'musica' | 'tomas' | 'emoji' | 'videos' | null
 
 function extractDriveFolderId(url: string): string | null {
   if (!url) return null
@@ -177,6 +178,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     enlace_musica: initial.enlace_musica ?? '',
     portada_cruda_url: initial.portada_cruda_url ?? '',
     portada_editada_url: initial.portada_editada_url ?? '',
+    video_sin_musica_url: initial.video_sin_musica_url ?? '',  // Migration 025
+    video_con_musica_url: initial.video_con_musica_url ?? '',  // Migration 025
     editor_id: initial.editor_id ?? '',
     opcion_2: initial.opcion_2 ?? '',
     notas: initial.notas ?? '',
@@ -240,6 +243,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         enlace_musica: form.enlace_musica || null,
         portada_cruda_url: form.portada_cruda_url || null,
         portada_editada_url: form.portada_editada_url || null,
+        video_sin_musica_url: form.video_sin_musica_url || null,  // Migration 025
+        video_con_musica_url: form.video_con_musica_url || null,  // Migration 025
         editor_id: form.editor_id || null,
         opcion_2: form.opcion_2 || null,
         notas: form.notas || null,
@@ -355,14 +360,34 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         <div className="space-y-3 min-w-0">
         <Card>
           <CardContent className="p-0 flex flex-col">
-            {/* Header de sección "1. COPY" — para que se entienda qué
-                edita Pedro acá. Estilo Notion: número grande + nombre
-                en mayúscula. */}
-            <div className="px-4 pt-3 pb-2 border-b flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#ba41f7]" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                1. Copy
-              </span>
+            {/* Header de sección "1. COPY" + botón copiar al portapapeles.
+                Pedro publica manualmente y quiere copiar con 1 click el
+                texto del copy para pegarlo en Instagram/Facebook. */}
+            <div className="px-4 pt-3 pb-2 border-b flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#ba41f7]" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  1. Copy
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!form.copy) return
+                  try {
+                    await navigator.clipboard.writeText(form.copy)
+                    toast.success('Copy copiado al portapapeles 📋')
+                  } catch {
+                    toast.error('No se pudo copiar — copiá manualmente')
+                  }
+                }}
+                disabled={!form.copy}
+                title="Copiar copy al portapapeles"
+                className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <CopyIcon className="w-3 h-3" />
+                Copiar
+              </button>
             </div>
             {/* Copy textarea — altura modesta porque copy suele ser corto.
                 Crece hasta ~280px con su propio contenido, no se estira
@@ -502,6 +527,53 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                         ↗ Abrir música
                       </a>
                     )}
+                  </div>
+                </ToolbarBtnPopover>
+
+                {/* Videos editados — 2 versiones (sin música + con música).
+                    El editor pega ambos URLs Drive acá. Pedro descarga
+                    desde los botones grandes bajo el preview. */}
+                <ToolbarBtnPopover
+                  icon={<VideoIcon className="w-5 h-5" />}
+                  label="Videos"
+                  title="Versiones del video editado (con/sin música)"
+                  active={openPopover === 'videos'}
+                  onClick={() => setOpenPopover(openPopover === 'videos' ? null : 'videos')}
+                  badge={
+                    form.video_sin_musica_url && form.video_con_musica_url ? '2'
+                    : form.video_sin_musica_url || form.video_con_musica_url ? '1'
+                    : undefined
+                  }
+                >
+                  <div className="space-y-3 w-[320px]">
+                    <div className="font-semibold text-xs text-muted-foreground">Videos editados (Drive)</div>
+                    <label className="block text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <VideoIcon className="w-3 h-3" /> Sin música
+                      </span>
+                      <input
+                        type="url"
+                        value={form.video_sin_musica_url}
+                        onChange={(e) => setForm((s) => ({ ...s, video_sin_musica_url: e.target.value }))}
+                        placeholder="https://drive.google.com/file/d/…"
+                        className="w-full h-9 px-2 rounded border bg-background text-xs mt-1"
+                      />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Music2 className="w-3 h-3" /> Con música
+                      </span>
+                      <input
+                        type="url"
+                        value={form.video_con_musica_url}
+                        onChange={(e) => setForm((s) => ({ ...s, video_con_musica_url: e.target.value }))}
+                        placeholder="https://drive.google.com/file/d/…"
+                        className="w-full h-9 px-2 rounded border bg-background text-xs mt-1"
+                      />
+                    </label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Los botones de descarga aparecen debajo del preview cuando hay URL.
+                    </p>
                   </div>
                 </ToolbarBtnPopover>
 
@@ -795,6 +867,52 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-blue-600 hover:underline">
               ↗ Abrir carpeta de tomas en Drive
             </a>
+          )}
+
+          {/* BOTONES DE DESCARGA — 2 versiones del video editado.
+              Pedro entra desde celular y descarga el que necesita en
+              el momento. Botones grandes (h-12) para ser tappables fácil
+              con el dedo. Solo aparecen si hay URL cargado. */}
+          {(form.video_sin_musica_url || form.video_con_musica_url) && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">
+                Descargar video
+              </div>
+              {form.video_sin_musica_url && (
+                <a
+                  href={form.video_sin_musica_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 h-12 px-4 rounded-lg border border-input bg-background hover:bg-muted hover:border-[#ba41f7]/40 transition-colors active:scale-[0.98]"
+                >
+                  <div className="w-8 h-8 rounded-full bg-foreground/5 flex items-center justify-center shrink-0">
+                    <VideoIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium leading-tight">Sin música</div>
+                    <div className="text-[10px] text-muted-foreground">Tocá para abrir en Drive</div>
+                  </div>
+                  <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+                </a>
+              )}
+              {form.video_con_musica_url && (
+                <a
+                  href={form.video_con_musica_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 h-12 px-4 rounded-lg border border-input bg-background hover:bg-muted hover:border-[#ba41f7]/40 transition-colors active:scale-[0.98]"
+                >
+                  <div className="w-8 h-8 rounded-full bg-[#ba41f7]/10 flex items-center justify-center shrink-0">
+                    <Music2 className="w-4 h-4 text-[#ba41f7]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium leading-tight">Con música</div>
+                    <div className="text-[10px] text-muted-foreground">Tocá para abrir en Drive</div>
+                  </div>
+                  <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+                </a>
+              )}
+            </div>
           )}
         </div>
       </div>

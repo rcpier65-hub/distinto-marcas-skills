@@ -295,6 +295,8 @@ export interface PublicacionRow {
   enlace_musica: string | null
   portada_cruda_url: string | null
   portada_editada_url: string | null
+  video_sin_musica_url: string | null   // Migration 025 — editor pega URL Drive
+  video_con_musica_url: string | null   // Migration 025 — versión final
   copy_listo: boolean
   musica_lista: boolean
   portada_lista: boolean
@@ -331,6 +333,8 @@ export interface PublicacionInsert {
   enlace_musica?: string | null
   portada_cruda_url?: string | null
   portada_editada_url?: string | null
+  video_sin_musica_url?: string | null   // Migration 025
+  video_con_musica_url?: string | null   // Migration 025
   copy_listo?: boolean
   musica_lista?: boolean
   portada_lista?: boolean
