@@ -9,6 +9,12 @@
 import { useState, useTransition, useRef, useEffect, useLayoutEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import {
+  Globe, MessageCircle, Pin,
+  Target, ImageIcon, Music2, FolderOpen, Smile, Film,
+  CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
+  Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,15 +36,55 @@ const ESTADOS: EstadoPublicacion[] = [
 
 const ESTADOS_TAREA: EstadoTarea[] = ['sin_empezar', 'en_progreso', 'listo']
 
+/**
+ * Iconos de redes sociales — SVG inline porque lucide-react los deprecó
+ * por temas de marca/copyright. Usamos `fill="currentColor"` para que
+ * hereden el color del parent (paleta Distinto) y matchee con los demás
+ * iconos lucide.
+ */
+function InstagramIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+    </svg>
+  )
+}
+function FacebookIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+    </svg>
+  )
+}
+function YoutubeIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/>
+      <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/>
+    </svg>
+  )
+}
+function TikTokIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.66a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.09z"/>
+    </svg>
+  )
+}
+
+// Plataformas con iconos custom/lucide + color de marca social
+// (solo aparece en hover/active para mantener look limpio en idle)
 const PLATAFORMAS = [
-  { key: 'Instagram', icon: '📷', label: 'Instagram' },
-  { key: 'Facebook', icon: '👤', label: 'Facebook' },
-  { key: 'Tiktok', icon: '🎵', label: 'TikTok' },
-  { key: 'Youtube', icon: '▶️', label: 'YouTube' },
-  { key: 'Pinterest', icon: '📌', label: 'Pinterest' },
-  { key: 'WhatsApp', icon: '💬', label: 'WhatsApp' },
-  { key: 'Exterior', icon: '🌐', label: 'Exterior' },
-]
+  { key: 'Instagram', Icon: InstagramIcon, label: 'Instagram', brand: '#E1306C' },
+  { key: 'Facebook',  Icon: FacebookIcon,  label: 'Facebook',  brand: '#1877F2' },
+  { key: 'Tiktok',    Icon: TikTokIcon,    label: 'TikTok',    brand: '#000000' },
+  { key: 'Youtube',   Icon: YoutubeIcon,   label: 'YouTube',   brand: '#FF0000' },
+  { key: 'Pinterest', Icon: Pin,           label: 'Pinterest', brand: '#E60023' },
+  { key: 'WhatsApp',  Icon: MessageCircle, label: 'WhatsApp',  brand: '#25D366' },
+  { key: 'Exterior',  Icon: Globe,         label: 'Exterior',  brand: '#6B7280' },
+] as const
 
 const TIPO_OPTS = ['REEL', 'POST', 'CARRUSEL', 'STORY', 'REEL FRASE', 'VIDEO REEL TIKTOK', 'VIDEO']
 const OBJETIVO_OPTS = ['Normal', 'Anuncio', 'Conversión', 'Alcance', 'Engagement']
@@ -256,8 +302,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             className="w-full text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-muted focus:border-primary focus:outline-none transition-colors py-1 mb-3"
           />
 
-          {/* Tabs plataformas debajo del título (estilo Metricool) */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Tabs grandes de plataformas — estilo Notion/marca Distinto.
+              Pills más sólidos con icono lucide + label. Color de marca social
+              solo en hover/active para mantener look limpio en estado idle. */}
+          <div className="flex items-center gap-2 flex-wrap">
             {PLATAFORMAS.map((p) => {
               const isSelected = form.plataformas.includes(p.key)
               const isPreview = previewPlatform === p.key
@@ -271,13 +319,17 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   }}
                   onDoubleClick={() => setPreviewPlatform(p.key)}
                   title={`${p.label} — click: activar/desactivar · doble-click: previsualizar`}
-                  className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-all border ${
+                  className={`group flex items-center gap-2 h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                     isSelected
-                      ? 'bg-primary/10 border-primary text-foreground'
-                      : 'bg-background border-border text-muted-foreground opacity-60 hover:opacity-100'
-                  } ${isPreview && isSelected ? 'ring-2 ring-primary/40' : ''}`}
+                      ? 'bg-foreground/5 border-foreground/15 text-foreground shadow-sm'
+                      : 'bg-background border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  } ${isPreview && isSelected ? 'ring-2 ring-[#ba41f7]/30' : ''}`}
+                  style={isSelected ? { borderColor: `${p.brand}33` } : undefined}
                 >
-                  <span className="text-base leading-none">{p.icon}</span>
+                  <p.Icon
+                    className="w-4 h-4 transition-colors"
+                    style={{ color: isSelected ? p.brand : undefined }}
+                  />
                   <span>{p.label}</span>
                 </button>
               )
@@ -285,8 +337,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button onClick={handleDuplicate} disabled={isDuplicating} variant="outline" size="sm">📋 Duplicar</Button>
-          <Button onClick={handleDelete} disabled={isDeleting} variant="outline" size="sm" className="text-destructive hover:text-destructive">🗑️</Button>
+          <Button onClick={handleDuplicate} disabled={isDuplicating} variant="outline" size="sm" className="gap-1.5">
+            <CopyIcon className="w-3.5 h-3.5" /> Duplicar
+          </Button>
+          <Button onClick={handleDelete} disabled={isDeleting} variant="outline" size="sm" className="text-destructive hover:text-destructive">
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </div>
 
@@ -298,6 +354,15 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
       <div className="grid lg:grid-cols-[1fr_400px] gap-4 items-stretch">
         <Card className="h-full">
           <CardContent className="p-0 h-full flex flex-col">
+            {/* Header de sección "1. COPY" — para que se entienda qué
+                edita Pedro acá. Estilo Notion: número grande + nombre
+                en mayúscula. */}
+            <div className="px-4 pt-3 pb-2 border-b flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#ba41f7]" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                1. Copy
+              </span>
+            </div>
             {/* Copy textarea — toma todo el alto disponible.
                 minHeight: 0 es CRITICAL en flex children que tienen
                 contenido interno con scroll; sin esto el textarea ignora
@@ -329,7 +394,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               <div className="flex items-end justify-start gap-1 flex-wrap">
                 {/* Tipo de contenido */}
                 <ToolbarBtnPopover
-                  icon="🎬"
+                  icon={<Film className="w-5 h-5" />}
                   label="Tipo"
                   title="Tipo de contenido"
                   active={openPopover === 'tipo'}
@@ -355,7 +420,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Objetivos */}
                 <ToolbarBtnPopover
-                  icon="🎯"
+                  icon={<Target className="w-5 h-5" />}
                   label="Objetivo"
                   title="Objetivos de la publicación"
                   active={openPopover === 'objetivos'}
@@ -381,7 +446,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Portada (imagen) */}
                 <ToolbarBtnPopover
-                  icon="🖼️"
+                  icon={<ImageIcon className="w-5 h-5" />}
                   label="Portada"
                   title="Portada cruda y editada"
                   active={openPopover === 'portada'}
@@ -415,7 +480,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Música */}
                 <ToolbarBtnPopover
-                  icon="🎵"
+                  icon={<Music2 className="w-5 h-5" />}
                   label="Música"
                   title="Enlace de música"
                   active={openPopover === 'musica'}
@@ -442,7 +507,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Tomas */}
                 <ToolbarBtnPopover
-                  icon="📎"
+                  icon={<FolderOpen className="w-5 h-5" />}
                   label="Tomas"
                   title="Enlace de tomas (Drive)"
                   active={openPopover === 'tomas'}
@@ -472,7 +537,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Hashtag */}
                 <ToolbarBtn
-                  icon="#"
+                  icon={<span className="text-lg font-bold leading-none">#</span>}
                   label="Hashtag"
                   title="Agregar # en el copy"
                   onClick={() => insertAtCursor(' #')}
@@ -480,7 +545,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Enlace */}
                 <ToolbarBtn
-                  icon="🔗"
+                  icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
                   label="Enlace"
                   title="Pegar URL en el copy"
                   onClick={() => {
@@ -491,7 +556,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
                 {/* Emoji */}
                 <ToolbarBtnPopover
-                  icon="😊"
+                  icon={<Smile className="w-5 h-5" />}
                   label="Emoji"
                   title="Insertar emoji en el copy"
                   active={openPopover === 'emoji'}
@@ -597,12 +662,14 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               creación a la izquierda, properties a la derecha. */}
           <Card>
             <CardContent className="p-3 space-y-3">
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Propiedades
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-[#ba41f7]" /> Propiedades
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px]">🎯 Estado</span>
+                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                    <Target className="w-3 h-3" /> Estado
+                  </span>
                   <select
                     value={form.estado}
                     onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
@@ -612,7 +679,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   </select>
                 </label>
                 <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px]">👤 Editor</span>
+                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                    <UserIcon className="w-3 h-3" /> Editor
+                  </span>
                   <select
                     value={form.editor_id}
                     onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
@@ -623,7 +692,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   </select>
                 </label>
                 <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px]">📅 Publicación</span>
+                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                    <CalendarDays className="w-3 h-3" /> Publicación
+                  </span>
                   <input
                     type="date"
                     value={form.fecha_publicacion}
@@ -632,7 +703,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   />
                 </label>
                 <label className="block text-xs">
-                  <span className="text-muted-foreground text-[10px]">✂️ Edición</span>
+                  <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                    <Scissors className="w-3 h-3" /> Edición
+                  </span>
                   <input
                     type="date"
                     value={form.fecha_edicion}
@@ -663,16 +736,16 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
           <Card>
             <CardContent className="p-3 space-y-2">
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                ✓ Progreso workflow
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3 text-[#ba41f7]" /> Progreso workflow
               </h3>
               <div className="space-y-1">
-                <ChecklistRowCompact label="Copy listo" icon="📝" value={checklist.copy_listo} onToggle={() => toggleCheck('copy_listo')} />
-                <ChecklistRowCompact label="Música" icon="🎵" value={checklist.musica_lista} onToggle={() => toggleCheck('musica_lista')} />
-                <ChecklistRowCompact label="Portada lista" icon="🖼️" value={checklist.portada_lista} onToggle={() => toggleCheck('portada_lista')} />
-                <ChecklistRowCompact label="Diseñado" icon="🎨" value={checklist.disenado} onToggle={() => toggleCheck('disenado')} />
-                <ChecklistRowCompact label="Editado" icon="✂️" value={checklist.editado} onToggle={() => toggleCheck('editado')} />
-                <ChecklistRowCompact label="Aprobado" icon="✅" value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
+                <ChecklistRowCompact label="Copy listo"    icon={<FileText className="w-3.5 h-3.5" />}  value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
+                <ChecklistRowCompact label="Música"        icon={<Music2 className="w-3.5 h-3.5" />}    value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
+                <ChecklistRowCompact label="Portada lista" icon={<ImageIcon className="w-3.5 h-3.5" />} value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
+                <ChecklistRowCompact label="Diseñado"      icon={<Palette className="w-3.5 h-3.5" />}   value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
+                <ChecklistRowCompact label="Editado"       icon={<Scissors className="w-3.5 h-3.5" />}  value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
+                <ChecklistRowCompact label="Aprobado"      icon={<CheckCircle2 className="w-3.5 h-3.5" />} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
               </div>
             </CardContent>
           </Card>
@@ -687,43 +760,43 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
       <div className="grid lg:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4 space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block">
-              🎬 Guión / Indicaciones
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Film className="w-3 h-3 text-[#ba41f7]" /> Guión / Indicaciones
             </label>
             <textarea
               value={form.guion}
               onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
               rows={6}
               placeholder="Gancho, escenas, tomas, voz en off…"
-              className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
             />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block">
-              🧐 Opción 2
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Lightbulb className="w-3 h-3 text-[#f2cc2c]" /> Opción 2
             </label>
             <textarea
               value={form.opcion_2}
               onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
               rows={6}
               placeholder="Versión B del copy o guión alternativo…"
-              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
             />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block">
-              📝 Notas internas
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <StickyNote className="w-3 h-3 text-foreground" /> Notas internas
             </label>
             <textarea
               value={form.notas}
               onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
               rows={6}
               placeholder="Notas privadas del equipo…"
-              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
             />
           </CardContent>
         </Card>
@@ -761,7 +834,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 function ToolbarBtn({
   icon, label, title, onClick, disabled, active,
 }: {
-  icon: string
+  icon: React.ReactNode    // Lucide icon, ReactNode o (legacy) string
   label: string
   title: string
   onClick?: () => void
@@ -774,15 +847,15 @@ function ToolbarBtn({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex flex-col items-center justify-center gap-0.5 min-w-[58px] px-2 py-1.5 rounded-md transition-colors ${
+      className={`flex flex-col items-center justify-center gap-1 min-w-[64px] px-2.5 py-2 rounded-md transition-colors ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
           : active
-            ? 'bg-primary/15 text-primary'
-            : 'hover:bg-muted'
+            ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
-      <span className="text-lg leading-none">{icon}</span>
+      <span className="leading-none">{icon}</span>
       <span className="text-[10px] font-medium leading-none">{label}</span>
     </button>
   )
@@ -791,7 +864,7 @@ function ToolbarBtn({
 function ToolbarBtnPopover({
   icon, label, title, onClick, active, children, badge,
 }: {
-  icon: string
+  icon: React.ReactNode    // Acepta lucide icon, string emoji, o cualquier ReactNode
   label: string
   title: string
   onClick?: () => void
@@ -812,14 +885,16 @@ function ToolbarBtnPopover({
         type="button"
         onClick={onClick}
         title={title}
-        className={`relative flex flex-col items-center justify-center gap-0.5 min-w-[58px] px-2 py-1.5 rounded-md transition-colors ${
-          active ? 'bg-primary/15 text-primary' : 'hover:bg-muted'
+        className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] px-2.5 py-2 rounded-md transition-colors ${
+          active
+            ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         }`}
       >
-        <span className="text-lg leading-none">{icon}</span>
+        <span className="leading-none">{icon}</span>
         <span className="text-[10px] font-medium leading-none">{label}</span>
         {badge && (
-          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center leading-none">
+          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-[#ba41f7] text-white text-[9px] font-bold flex items-center justify-center leading-none">
             {badge.length > 4 ? badge.slice(0, 3) + '…' : badge}
           </span>
         )}
@@ -853,7 +928,7 @@ function ChecklistRow({ label, icon, value, onToggle }: { label: string; icon: s
 /* Versión compacta del ChecklistRow para el sidebar derecho del SPLIT.
    Sin borde card-like, más slim, óptimo cuando hay 6 items uno encima
    del otro en columna estrecha (~340px). */
-function ChecklistRowCompact({ label, icon, value, onToggle }: { label: string; icon: string; value: boolean; onToggle: () => void }) {
+function ChecklistRowCompact({ label, icon, value, onToggle }: { label: string; icon: React.ReactNode; value: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
@@ -863,11 +938,11 @@ function ChecklistRowCompact({ label, icon, value, onToggle }: { label: string; 
       }`}
     >
       <span className={`inline-flex items-center justify-center w-4 h-4 rounded border text-[10px] flex-shrink-0 ${
-        value ? 'bg-primary border-primary text-primary-foreground' : 'border-input'
+        value ? 'bg-[#ba41f7] border-[#ba41f7] text-white' : 'border-input'
       }`}>
         {value ? '✓' : ''}
       </span>
-      <span className="text-sm leading-none">{icon}</span>
+      <span className="leading-none shrink-0 text-muted-foreground">{icon}</span>
       <span className={`flex-1 leading-tight ${value ? 'line-through opacity-60' : ''}`}>{label}</span>
     </button>
   )

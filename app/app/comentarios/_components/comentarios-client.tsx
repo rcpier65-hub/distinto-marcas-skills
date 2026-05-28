@@ -270,9 +270,9 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
             onClick={() => handleDispatchRoutine('generar')}
             disabled={dispatching !== null}
             title="Dispara la Routine de Claude Desktop para generar respuestas sugeridas a los comentarios pendientes"
-            className="h-10 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-muted disabled:opacity-50"
+            className="h-10 px-3 rounded-md text-sm font-medium text-white bg-[#ba41f7] hover:bg-[#9f37db] disabled:opacity-50 transition-colors shadow-sm"
           >
-            {dispatching === 'generar' ? '⏳ Generando…' : '🤖 Generar borradores'}
+            {dispatching === 'generar' ? '⏳ Generando…' : '✨ Generar borradores'}
           </button>
 
           {/* Postear aprobados — solo visible si hay aprobados pendientes de envío */}
