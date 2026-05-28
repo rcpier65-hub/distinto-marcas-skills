@@ -107,43 +107,49 @@ export async function GET(request: Request) {
         continue
       }
       for (const c of r.data) {
-        if (c.hasReply) continue  /* ya respondimos antes */
-
-        const categoria = clasificarComentario(c.commentText)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: insData, error: insErr } = await service
+        // 1. Verificar si ya existe en BD (por unique key network + comment_id)
+        // Si existe, NO tocamos — preserva ediciones manuales (aprobaciones,
+        // textos editados por Pedro, status custom, etc.).
+        const { data: existing } = await service
           .from('comentarios_inbox')
-          .upsert(
-            {
-              marca_id: m.id,
-              network,
-              metricool_comment_id: c.id,
-              metricool_thread_id: c.threadId,
-              metricool_post_id: c.postId,
-              author_username: c.authorUsername,
-              author_display_name: c.authorDisplayName,  // Migration 024
-              author_avatar_url: c.authorAvatarUrl,      // Migration 024
-              comment_text: c.commentText,
-              comment_created_at: c.createdAt,
-              post_link: c.postLink,
-              post_text_preview: c.postText,
-              post_media_url: c.postMediaUrl,
-              categoria_sugerida: categoria,
-            },
-            { onConflict: 'network,metricool_comment_id', ignoreDuplicates: false },
-          )
-          .select('id, created_at')
+          .select('id')
+          .eq('network', network)
+          .eq('metricool_comment_id', c.id)
+          .maybeSingle()
+        if (existing) continue
+
+        // 2. Es nuevo → insert. Aceptamos también comentarios que YA tienen
+        // reply de la página en Metricool (c.hasReply=true) — Pedro quiere
+        // verlos para tener visibilidad completa. Status apropiado:
+        //   - "responded" si ya hay reply (no requiere acción)
+        //   - "pending"   si todavía no hay (requiere borrador)
+        const categoria = clasificarComentario(c.commentText)
+        const initialStatus = c.hasReply ? 'responded' : 'pending'
+
+        const { error: insErr } = await service
+          .from('comentarios_inbox')
+          .insert({
+            marca_id: m.id,
+            network,
+            metricool_comment_id: c.id,
+            metricool_thread_id: c.threadId,
+            metricool_post_id: c.postId,
+            author_username: c.authorUsername,
+            author_display_name: c.authorDisplayName,  // Migration 024
+            author_avatar_url: c.authorAvatarUrl,      // Migration 024
+            comment_text: c.commentText,
+            comment_created_at: c.createdAt,
+            post_link: c.postLink,
+            post_text_preview: c.postText,
+            post_media_url: c.postMediaUrl,
+            categoria_sugerida: categoria,
+            status: initialStatus,
+          })
         if (insErr) {
-          summary.errores.push(`upsert ${network}/${c.id}: ${insErr.message}`)
+          summary.errores.push(`insert ${network}/${c.id}: ${insErr.message}`)
           continue
         }
-        // Si created_at es de hace <60s, es insert nuevo (heurística simple)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const inserted = (insData ?? []).filter((row: any) => {
-          if (!row.created_at) return false
-          return Date.now() - new Date(row.created_at).getTime() < 60_000
-        })
-        summary.nuevos += inserted.length
+        summary.nuevos += 1
       }
     }
 
