@@ -78,5 +78,9 @@ export const CATEGORIA_LABEL: Record<ComentarioCategoria, { emoji: string; label
   empatia:        { emoji: '🤝', label: 'Empatía',        color: '#8B5CF6' },
   derivar:        { emoji: '📩', label: 'Derivar a DM',   color: '#F97316' },
   reaccion:       { emoji: '✨', label: 'Reacción',       color: '#EC4899' },
+  queja:          { emoji: '😟', label: 'Queja',          color: '#EF4444' },  // v2
+  humor:          { emoji: '😄', label: 'Humor',          color: '#F59E0B' },  // v2
+  sensible:       { emoji: '🩺', label: 'Sensible',       color: '#DC2626' },  // v2 — clínico/médico
+  spam:           { emoji: '🚫', label: 'Spam / Hate',    color: '#71717A' },  // v2 — skip
   otro:           { emoji: '💬', label: 'Otro',           color: '#6B7280' },
 }

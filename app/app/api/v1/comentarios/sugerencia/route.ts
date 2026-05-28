@@ -28,7 +28,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 const CATEGORIAS_VALIDAS: ComentarioCategoria[] = [
-  'pregunta_info', 'testimonial', 'empatia', 'derivar', 'reaccion', 'otro',
+  'pregunta_info', 'testimonial', 'empatia', 'derivar', 'reaccion',
+  'queja', 'humor', 'sensible', 'spam',  // (v2 — agregadas por Routine v2)
+  'otro',
 ]
 
 type ItemInput = {

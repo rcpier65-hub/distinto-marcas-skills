@@ -206,6 +206,10 @@ export type ComentarioCategoria =
   | 'empatia'
   | 'derivar'
   | 'reaccion'
+  | 'queja'        // (v2) cliente se queja → empatía + derivar a interno
+  | 'humor'        // (v2) cliente bromea → espejo de tono + dato útil si lo hay
+  | 'sensible'     // (v2) consulta médica/salud → derivar a profesional
+  | 'spam'         // (v2) hate/ruido → respuesta vacía, skip
   | 'otro'
 
 export type ComentarioStatus =
