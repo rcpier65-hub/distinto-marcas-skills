@@ -156,19 +156,25 @@ export async function listComentarios(args: {
   onlyUnread?: boolean
   limit?: number
 }): Promise<MetricoolResult<MetricoolComment[]>> {
+  // FIX 2026-05-27 — el endpoint correcto de Metricool es /post-comments
+  // (no /comments), y usa `provider` como param (no `network`).
+  // Confirmado vía services/metricool-pro-mcp/server.py que funciona OK.
   const params = new URLSearchParams({
     blogId: String(args.blogId),
-    network: args.network.toUpperCase(),
+    provider: args.network.toUpperCase(),
     limit: String(args.limit ?? 50),
   })
   if (args.onlyUnread) params.set('onlyUnread', 'true')
 
   const r = await callMetricool<{ data: MetricoolRawThread[] }>(
-    `/api/v2/inbox/comments?${params.toString()}`,
+    `/api/v2/inbox/post-comments?${params.toString()}`,
   )
   if (!r.ok) return r
 
-  const rows = (r.data?.data ?? []).map(mapRawToComment).filter(Boolean) as MetricoolComment[]
+  // Metricool puede devolver `data` como array directo o nested en `.data`
+  // dependiendo del endpoint. post-comments devuelve array directo.
+  const raw = Array.isArray(r.data) ? r.data : (r.data?.data ?? [])
+  const rows = raw.map(mapRawToComment).filter(Boolean) as MetricoolComment[]
   return { ok: true, data: rows }
 }
 
@@ -185,12 +191,16 @@ export async function responderComentario(args: {
   commentId: string
   text: string
 }): Promise<MetricoolResult<{ messageId: string | null }>> {
+  // FIX 2026-05-27 — Metricool API NO usa /comments/reply como sub-path.
+  // Usa POST a /v2/inbox/post-comments con body { provider, objectId, text }.
+  // Confirmado vía services/metricool-pro-mcp/server.py.
   const r = await callMetricool<{ id?: string; messageId?: string }>(
-    `/api/v2/inbox/comments/reply?blogId=${args.blogId}&network=${args.network.toUpperCase()}`,
+    `/api/v2/inbox/post-comments?blogId=${args.blogId}`,
     {
       method: 'POST',
       body: JSON.stringify({
-        commentId: args.commentId,
+        provider: args.network.toUpperCase(),
+        objectId: args.commentId,
         text: args.text,
       }),
     },
