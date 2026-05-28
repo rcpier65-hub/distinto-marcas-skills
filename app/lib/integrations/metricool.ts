@@ -85,7 +85,9 @@ export type MetricoolComment = {
   postLink: string | null     // root.element.link
   postText: string | null     // root.element.text (caption)
   postMediaUrl: string | null
-  authorUsername: string      // root.owner
+  authorUsername: string      // root.owner (en FB es user_id numérico)
+  authorDisplayName: string | null   // participants[].name del owner — humano-legible
+  authorAvatarUrl: string | null     // participants[].imageProfileUrl del owner
   commentText: string         // root.text
   createdAt: string           // root.creationDate
   hasReply: boolean           // si root.comments[] tiene reply nuestro
@@ -221,9 +223,18 @@ function mapRawToComment(thread: MetricoolRawThread): MetricoolComment | null {
     const root = thread?.root
     const element = root?.element
     const comments = root?.comments ?? []
+    const participants = Array.isArray(thread?.participants) ? thread.participants : []
     // Si ya respondimos (hay reply en comments[] con owner = self), skip o flag
     const selfId = thread?.self
     const hasReply = Array.isArray(comments) && comments.some((c: { owner?: string }) => c?.owner === selfId)
+
+    // Cruzar root.owner con participants[].id para sacar nombre humano + avatar.
+    // FB: owner es user_id numérico (ej "27376424491951608"), name viene aparte.
+    // IG: owner suele coincidir con name (handle), pero igual seguimos el patrón.
+    const ownerId = root?.owner
+    const ownerParticipant = participants.find((p: { id?: string }) => p?.id === ownerId)
+    const authorDisplayName: string | null = ownerParticipant?.name ?? null
+    const authorAvatarUrl: string | null = ownerParticipant?.imageProfileUrl ?? null
 
     return {
       id: thread.id,
@@ -234,7 +245,9 @@ function mapRawToComment(thread: MetricoolRawThread): MetricoolComment | null {
       postLink: element?.link ?? null,
       postText: element?.text ? String(element.text).slice(0, 300) : null,
       postMediaUrl: Array.isArray(element?.mediaUrls) ? element.mediaUrls[0] ?? null : null,
-      authorUsername: root?.owner ?? '?',
+      authorUsername: ownerId ?? '?',
+      authorDisplayName,
+      authorAvatarUrl,
       commentText: root?.text ?? '',
       createdAt: root?.creationDate ?? thread?.creationDate ?? new Date().toISOString(),
       hasReply,

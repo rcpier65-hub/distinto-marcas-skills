@@ -47,6 +47,8 @@ export async function GET(request: Request) {
       metricool_thread_id,
       metricool_post_id,
       author_username,
+      author_display_name,
+      author_avatar_url,
       comment_text,
       comment_created_at,
       post_link,
@@ -93,6 +95,8 @@ export async function GET(request: Request) {
       marca: marca ? { slug: marca.slug, nombre: marca.nombre, emoji: marca.emoji_marca } : null,
       network: r.network,
       author: r.author_username,
+      author_name: r.author_display_name,  // Migration 024 — humano-legible
+      author_avatar: r.author_avatar_url,
       text: r.comment_text,
       created_at: r.comment_created_at,
       post: {

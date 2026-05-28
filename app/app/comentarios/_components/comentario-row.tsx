@@ -83,7 +83,28 @@ export function ComentarioRow({
                 </span>
               )
             })()}
-            <span className="font-semibold">@{row.author_username}</span>
+            {/* Avatar de FB si existe — micro pero ayuda a humanizar */}
+            {row.author_avatar_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={row.author_avatar_url}
+                alt=""
+                className="w-5 h-5 rounded-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            )}
+            {/* Nombre humano si existe (FB), sino fallback al @username (IG) */}
+            {row.author_display_name ? (
+              <>
+                <span className="font-semibold">{row.author_display_name}</span>
+                {/* En FB el username es solo dígitos — lo escondemos. En IG sí mostrarlo */}
+                {row.author_username && !/^\d+$/.test(row.author_username) && (
+                  <span className="text-muted-foreground text-[10px]">@{row.author_username}</span>
+                )}
+              </>
+            ) : (
+              <span className="font-semibold">@{row.author_username}</span>
+            )}
             <span className="text-muted-foreground">· {fechaCorta}</span>
             {row.post_link && (
               <a

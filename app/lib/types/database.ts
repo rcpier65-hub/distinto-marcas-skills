@@ -231,7 +231,9 @@ export interface ComentarioInboxRow {
   metricool_thread_id: string | null
   metricool_post_id: string | null
   author_username: string
-  author_name: string | null
+  author_name: string | null               // legacy — mantenido por compat
+  author_display_name: string | null       // Migration 024 — humano-legible (FB)
+  author_avatar_url: string | null         // Migration 024 — foto perfil
   comment_text: string
   comment_created_at: string
   post_link: string | null

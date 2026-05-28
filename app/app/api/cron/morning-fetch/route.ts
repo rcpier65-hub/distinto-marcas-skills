@@ -121,6 +121,8 @@ export async function GET(request: Request) {
               metricool_thread_id: c.threadId,
               metricool_post_id: c.postId,
               author_username: c.authorUsername,
+              author_display_name: c.authorDisplayName,  // Migration 024
+              author_avatar_url: c.authorAvatarUrl,      // Migration 024
               comment_text: c.commentText,
               comment_created_at: c.createdAt,
               post_link: c.postLink,
