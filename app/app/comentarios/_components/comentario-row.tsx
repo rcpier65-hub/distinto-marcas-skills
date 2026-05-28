@@ -18,10 +18,24 @@ type Props = {
   onSkip: () => void
 }
 
-const NETWORK_EMOJI: Record<string, string> = {
-  instagram: '📷',
-  facebook: '👍',
-  tiktok: '🎵',
+/**
+ * Badge visual de plataforma. Rosa = IG, azul = FB, negro = TT.
+ * Mucho más claro que un emoji solo (un 👍 se confunde con "like").
+ * Tailwind clases inline para que cada caso sea estático y purgable.
+ */
+const NETWORK_BADGE: Record<string, { label: string; classes: string }> = {
+  instagram: {
+    label: 'IG',
+    classes: 'bg-pink-500/15 text-pink-700 border-pink-500/30',
+  },
+  facebook: {
+    label: 'FB',
+    classes: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  },
+  tiktok: {
+    label: 'TT',
+    classes: 'bg-zinc-900/10 text-zinc-900 border-zinc-900/30 dark:bg-white/10 dark:text-white dark:border-white/30',
+  },
 }
 
 export function ComentarioRow({
@@ -55,7 +69,20 @@ export function ComentarioRow({
       <td className="py-3 px-2 align-top max-w-md">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-xs flex-wrap">
-            <span className="text-base">{NETWORK_EMOJI[row.network] ?? '💬'}</span>
+            {(() => {
+              const badge = NETWORK_BADGE[row.network]
+              if (!badge) {
+                return <span className="text-base">💬</span>
+              }
+              return (
+                <span
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${badge.classes}`}
+                  title={row.network}
+                >
+                  {badge.label}
+                </span>
+              )
+            })()}
             <span className="font-semibold">@{row.author_username}</span>
             <span className="text-muted-foreground">· {fechaCorta}</span>
             {row.post_link && (
