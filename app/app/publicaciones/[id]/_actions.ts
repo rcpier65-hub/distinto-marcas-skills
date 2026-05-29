@@ -78,7 +78,25 @@ export async function updatePublicacion(
     }
   }
 
-  const { error } = await service.from('publicaciones').update(update).eq('id', id)
+  let { error } = await service.from('publicaciones').update(update).eq('id', id)
+
+  // DEFENSIVO contra migraciones pendientes: si el UPDATE falla porque una
+  // columna no existe (Postgres error 42703 = undefined_column), quitamos
+  // las columnas "opcionales" (features nuevas sin migración aplicada todavía)
+  // y reintentamos. Sin esto, una columna faltante bloqueaba TODO el guardado
+  // — incluido el editor (bug que Pedro detectó: cambiaba editor, no persistía,
+  // porque el form mandaba video_*_url sin que existieran esas columnas).
+  if (error && (error.code === '42703' || /column .* does not exist/i.test(error.message ?? ''))) {
+    const OPTIONAL_COLS = ['video_sin_musica_url', 'video_con_musica_url']
+    let removedAny = false
+    for (const col of OPTIONAL_COLS) {
+      if (col in update) { delete update[col]; removedAny = true }
+    }
+    if (removedAny) {
+      const retry = await service.from('publicaciones').update(update).eq('id', id)
+      error = retry.error
+    }
+  }
 
   if (error) {
     console.error('[updatePublicacion] error:', error)
