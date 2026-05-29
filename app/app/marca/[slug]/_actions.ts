@@ -63,13 +63,12 @@ export async function aprobarYEnviar(
     return { ok: false, error: `Rubi devolvió error: ${sendResult.error}` }
   }
 
-  // 4. Extraer messageId si está en el resultado de Rubi
+  // 4. Extraer messageId desde la respuesta WAHA.
+  //    WAHA POST /api/sendText devuelve { key: { id: "3EB0...", remoteJid, fromMe }, message, ... }
   let mensajeId: string | null = null
   try {
-    const data = sendResult.data as { content?: Array<{ text?: string }> }
-    const text = data?.content?.[0]?.text ?? ''
-    const match = text.match(/messageId=([A-Za-z0-9]+)/)
-    if (match) mensajeId = match[1]
+    const data = sendResult.data as { key?: { id?: string } } | null
+    mensajeId = data?.key?.id ?? null
   } catch {
     // ignorar parse error
   }
