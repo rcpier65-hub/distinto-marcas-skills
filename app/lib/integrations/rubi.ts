@@ -200,6 +200,17 @@ export async function sendWhatsAppWithMentions(
 }
 
 /**
+ * Envía mensaje de texto plano (sin menciones) a un chat por chatId.
+ * Usar cuando NO hay menciones — la tool whatsapp_send_with_mentions rechaza
+ * arrays vacíos. Esta acepta cualquiera de: chatId | alias | group_name.
+ */
+export async function sendWhatsAppMessage(
+  args: { chatId?: string; alias?: string; group_name?: string; text: string }
+): Promise<RubiToolCallResult> {
+  return callRubiTool('whatsapp_send_message', args)
+}
+
+/**
  * Lista los grupos WhatsApp disponibles donde Rubi está agregado.
  * Devuelve nombre, chatId, alias (si existe) y miembros.
  *

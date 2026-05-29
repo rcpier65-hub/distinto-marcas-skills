@@ -20,7 +20,7 @@
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { sendWhatsAppWithMentions } from '@/lib/integrations/rubi'
+import { sendWhatsAppWithMentions, sendWhatsAppMessage } from '@/lib/integrations/rubi'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -84,11 +84,13 @@ export async function POST(request: Request) {
   }
 
   // Enviar via Rubi (acepta chatId o nombre de grupo)
-  const result = await sendWhatsAppWithMentions({
-    ...(chatId ? { chatId } : { group_name: groupName! }),
-    text,
-    mentions: mentions ?? [],
-  })
+  // FIX 2026-05-29: la tool whatsapp_send_with_mentions REQUIERE al menos 1
+  // mention. Si no hay menciones, usar whatsapp_send_message (sin mentions).
+  const hasMentions = mentions && mentions.length > 0
+  const destinoArgs = chatId ? { chatId } : { group_name: groupName! }
+  const result = hasMentions
+    ? await sendWhatsAppWithMentions({ ...destinoArgs, text, mentions: mentions! })
+    : await sendWhatsAppMessage({ ...destinoArgs, text })
 
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 })
