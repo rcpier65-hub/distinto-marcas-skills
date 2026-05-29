@@ -25,7 +25,11 @@ import { sendWhatsAppWithMentions, sendWhatsAppMessage } from '@/lib/integration
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-const PEDRO_INTERNAL_GROUP = process.env.WHATSAPP_INTERNAL_GROUP_ALIAS ?? 'distinto-equipo'
+// Destino del scope "interno" (grupo Pedro / equipo).
+// Preferimos chatId (más confiable, no depende de nombres que cambian).
+// Si no está, caemos a nombre de grupo (WAHA hace lookup case-insensitive).
+const PEDRO_INTERNAL_CHATID = process.env.WHATSAPP_INTERNAL_GROUP_CHATID ?? null
+const PEDRO_INTERNAL_NAME = process.env.WHATSAPP_INTERNAL_GROUP_ALIAS ?? 'New team'
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
@@ -61,8 +65,12 @@ export async function POST(request: Request) {
   // Resolver destino
   if (!chatId) {
     if (scope === 'interno') {
-      // Grupo interno de Pedro — resolver por alias
-      groupName = PEDRO_INTERNAL_GROUP
+      // Grupo interno de Pedro — preferimos chatId, fallback a nombre
+      if (PEDRO_INTERNAL_CHATID) {
+        chatId = PEDRO_INTERNAL_CHATID
+      } else {
+        groupName = PEDRO_INTERNAL_NAME
+      }
     } else {
       // Grupo del cliente — necesita marca_slug
       if (!marcaSlug) return badRequest('marca_slug o chat_id requerido')
