@@ -29,6 +29,7 @@ export type PublicacionMock = {
   tipo: TipoContenido
   estado: EstadoPubMetricool
   editorId: string | null
+  editorNombre?: string | null   /* nombre real del editor desde BD (JOIN) */
 }
 
 /* Colores de estado Metricool-style (suaves para chip) */

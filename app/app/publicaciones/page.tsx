@@ -59,17 +59,21 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       tipo_contenido: string[] | null
       copy: string | null
       editor_id: string | null
+      editor: { nombre: string } | { nombre: string }[] | null
       marca: { slug: string } | { slug: string }[] | null
     }
     /* Schema actual de Supabase: NO incluye hora_publicacion como columna
        separada — la hora viene como parte de fecha_publicacion si es timestamp,
        o se asume default. Pido solo columnas que existen para evitar que
-       la query falle y caiga al mock (genera 404 al hacer click en pubs). */
+       la query falle y caiga al mock (genera 404 al hacer click en pubs).
+       JOIN con editores para traer el nombre real (las vistas mostraban
+       "sin asignar" porque buscaban el UUID en EDITORES_MOCK — bug fixeado). */
     const { data, error } = await service
       .from('publicaciones')
       .select(`
         id, nombre, fecha_publicacion, estado,
         plataformas, tipo_contenido, copy, editor_id,
+        editor:editores(nombre),
         marca:marcas(slug)
       `)
       .order('fecha_publicacion', { ascending: false, nullsFirst: false })
@@ -77,6 +81,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
     if (error || !data) return null
     return (data as RawRow[]).map((r) => {
       const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      const editor = Array.isArray(r.editor) ? r.editor[0] : r.editor
       const redes = (r.plataformas ?? []).map(normalizeRed).filter(Boolean) as Red[]
       const tipo = normalizeTipo((r.tipo_contenido ?? [])[0])
       /* Extraer hora del timestamp si fecha_publicacion incluye tiempo.
@@ -99,6 +104,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         tipo,
         estado: normalizeEstadoPub(r.estado),
         editorId: r.editor_id,
+        editorNombre: editor?.nombre ?? null,
       }
     })
   } catch {

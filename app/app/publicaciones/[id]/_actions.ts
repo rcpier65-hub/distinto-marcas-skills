@@ -61,6 +61,23 @@ export async function updatePublicacion(
     return { ok: false, error: 'Sin cambios para guardar' }
   }
 
+  // Sincronizar editor_nombre (columna desnormalizada) cuando cambia
+  // editor_id. Hay 2 columnas para el editor: editor_id (FK) + editor_nombre
+  // (texto). Mantenerlas en sync evita que reportes/WhatsApp que leen
+  // editor_nombre muestren datos viejos. Si editor_id viene null → limpiar.
+  if (input.editor_id !== undefined) {
+    if (input.editor_id) {
+      const { data: ed } = await service
+        .from('editores')
+        .select('nombre')
+        .eq('id', input.editor_id)
+        .maybeSingle()
+      update.editor_nombre = ed?.nombre ?? null
+    } else {
+      update.editor_nombre = null
+    }
+  }
+
   const { error } = await service.from('publicaciones').update(update).eq('id', id)
 
   if (error) {

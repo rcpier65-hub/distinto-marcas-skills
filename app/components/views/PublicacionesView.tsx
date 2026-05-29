@@ -18,10 +18,24 @@ import {
   type EstadoPubMetricool,
   type Red,
 } from '@/lib/mock-publicaciones'
-import { EDITORES_MOCK } from '@/lib/mock-editor'
 import { MARCAS_NAV } from '@/lib/mock-marcas'
 
 type ViewMode = 'listado' | 'mes' | 'semana'
+
+/* Editor desde la publicación real (BD).
+   Antes se buscaba pub.editorId en EDITORES_MOCK, pero los UUIDs reales de
+   Supabase no matcheaban los ids mock → el editor se veía "sin asignar"
+   aunque estuviera guardado. Ahora usamos editorNombre (viene del JOIN). */
+const EDITOR_COLORS = ['#6fb8d8', '#82a474', '#ffb547', '#ff8fab', '#c9882a', '#d896d4', '#b8895e', '#9f7aea']
+function editorColor(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return EDITOR_COLORS[h % EDITOR_COLORS.length]
+}
+function editorFromPub(pub: PublicacionMock): { nombre: string; color: string } | null {
+  if (!pub.editorNombre) return null
+  return { nombre: pub.editorNombre, color: editorColor(pub.editorNombre) }
+}
 
 type Filters = {
   marcaSlug: string | 'todas'
@@ -280,7 +294,7 @@ function ListadoView({ entries, selected, onToggleSelect }: { entries: Publicaci
 
 function ListRow({ pub, selected, onToggleSelect }: { pub: PublicacionMock; selected: boolean; onToggleSelect: () => void }) {
   const marca = MARCAS_NAV.find((m) => m.slug === pub.marcaSlug)
-  const editor = pub.editorId ? EDITORES_MOCK.find((e) => e.id === pub.editorId) : null
+  const editor = editorFromPub(pub)
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
   const fecha = new Date(pub.fecha + 'T00:00:00')
   const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -458,7 +472,7 @@ function CalendarNav({
 function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 'full' }) {
   const router = useRouter()
   const marca = MARCAS_NAV.find((m) => m.slug === pub.marcaSlug)
-  const editor = pub.editorId ? EDITORES_MOCK.find((e) => e.id === pub.editorId) : null
+  const editor = editorFromPub(pub)
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
 
   return (
