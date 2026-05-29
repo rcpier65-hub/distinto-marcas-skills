@@ -752,22 +752,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           </CardContent>
         </Card>
 
-        {/* 3 CARDS EN FILA — Guión / Opción 2 (video alt) / Notas. */}
-        <div className="grid lg:grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-3 space-y-2">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <span>🎬</span> Guión / Indicaciones
-              </label>
-              <textarea
-                value={form.guion}
-                onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
-                rows={5}
-                placeholder="Gancho, escenas, tomas, voz en off…"
-                className="w-full p-2 rounded-md border bg-background font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-              />
-            </CardContent>
-          </Card>
+        {/* 2 CARDS EN FILA — Versión 2 (video alt) / Notas.
+            La card "Guión / Indicaciones" se removió porque Pedro la usa
+            como lo mismo que el Guión Técnico (tabla de escenas abajo).
+            El campo form.guion se preserva en BD, solo dejamos de mostrarlo. */}
+        <div className="grid lg:grid-cols-2 gap-3">
           <Card>
             <CardContent className="p-3 space-y-2">
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -775,13 +764,13 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               </label>
               <textarea
                 value={form.opcion_2}
-              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
-              rows={6}
-              placeholder="Versión B del copy o guión alternativo…"
-              className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-            />
-          </CardContent>
-        </Card>
+                onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
+                rows={5}
+                placeholder="Segunda versión del video (ej: con música vs sin música)…"
+                className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
+              />
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="p-3 space-y-2">
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -797,7 +786,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             </CardContent>
           </Card>
         </div>
-        {/* Fin del grid 3 cards */}
+        {/* Fin del grid 2 cards */}
         </div>
         {/* Fin columna izquierda */}
 
