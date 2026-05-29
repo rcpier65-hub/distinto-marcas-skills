@@ -469,8 +469,8 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
         display: 'block',
         width: '100%',
         textAlign: 'left',
-        padding: variant === 'full' ? '6px 8px' : '5px 8px',
-        marginBottom: 3,
+        padding: variant === 'full' ? '6px 8px' : '4px 7px',
+        /* marginBottom removido — el gap del contenedor padre ya lo aporta */
         background: `${marca?.color}22`,
         borderLeft: `3px solid ${marca?.color}`,
         borderTop: '1px solid transparent',
@@ -627,8 +627,25 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
         ))}
       </div>
 
-      {/* Date cells */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--mk-border-subtle)', borderRadius: '0 0 var(--mk-radius-lg) var(--mk-radius-lg)', overflow: 'hidden' }}>
+      {/* Date cells.
+          Calendario tipo Google Calendar / Notion: TODAS las filas tienen
+          el MISMO alto exacto (140px). Las celdas con muchas pubs hacen
+          scroll interno. Las vacías quedan con altura limpia.
+
+          Antes usaba minHeight/maxHeight por celda — eso hacía que CSS
+          Grid estirara cada fila al alto de la celda más alta de esa
+          fila → filas asimétricas, celdas vacías gigantes. Bug resuelto. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+          gridAutoRows: '140px',                             /* alto fijo por fila — clave del fix */
+          gap: 1,
+          background: 'var(--mk-border-subtle)',
+          borderRadius: '0 0 var(--mk-radius-lg) var(--mk-radius-lg)',
+          overflow: 'hidden',
+        }}
+      >
         {cells.map((c, i) => {
           const k = dayKey(c.date)
           const pubs = byDay.get(k) ?? []
@@ -639,17 +656,17 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
               key={i}
               style={{
                 background: isToday ? 'var(--mk-bg-selected)' : 'var(--mk-bg-elevated)',
-                /* Calendario tradicional: celdas más compactas y proporcionadas.
-                   Antes 200-280px causaba que el mes se viera "estirado". */
-                minHeight: 130,
-                maxHeight: 220,
                 display: 'flex',
                 flexDirection: 'column',
-                padding: '8px 6px 6px',
+                padding: '6px 6px 6px',
                 opacity: c.thisMonth ? 1 : 0.42,
                 position: 'relative',
                 transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
                 boxShadow: isToday ? `inset 0 0 0 1px var(--mk-accent-glow)` : undefined,
+                /* min-width 0 + overflow hidden: respetar ancho del grid
+                   cell y no estirarlo por el contenido (nowrap del caption). */
+                minWidth: 0,
+                overflow: 'hidden',
               }}
             >
               {/* Day number — más prominente cuando es hoy */}
@@ -678,10 +695,13 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
                 )}
               </div>
 
-              {/* Pubs visibles con scroll vertical si la celda se llena. */}
+              {/* Pubs con scroll vertical si la celda se llena.
+                  minHeight: 0 es CRITICAL en flex children con overflow,
+                  sino el child ignora flex:1 y crece sin límite. */}
               <div
                 style={{
                   flex: 1,
+                  minHeight: 0,
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
