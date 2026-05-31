@@ -31,7 +31,12 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300  /* hasta 5 min: 9 marcas × 3 redes = ~27 calls Metricool */
 
 const NETWORKS: ComentarioNetwork[] = ['instagram', 'facebook', 'tiktok']
-const PEDRO_INTERNAL_GROUP_ALIAS = process.env.WHATSAPP_INTERNAL_GROUP_ALIAS ?? 'distinto-equipo'
+// Destino del digest interno — preferimos chatId (no depende de nombres que cambien)
+const PEDRO_INTERNAL_CHATID = process.env.WHATSAPP_INTERNAL_GROUP_CHATID ?? null
+const PEDRO_INTERNAL_GROUP_NAME = process.env.WHATSAPP_INTERNAL_GROUP_ALIAS ?? 'New team'
+// Feature flag — por defecto NO mandamos nada al grupo del cliente.
+// Activar con MORNING_NOTIFY_CLIENTS=true cuando Pedro lo quiera.
+const NOTIFY_CLIENT_GROUPS = process.env.MORNING_NOTIFY_CLIENTS === 'true'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://distinto-app.vercel.app'
 
 type FetchSummary = {
@@ -163,39 +168,45 @@ export async function GET(request: Request) {
     summaries.push(summary)
   }
 
-  // ----- 3. WhatsApp a cliente — solo si tiene pendientes Y grupo configurado -----
+  // ----- 3. WhatsApp a cliente — solo si MORNING_NOTIFY_CLIENTS=true Y tiene pendientes Y grupo configurado -----
+  //
+  // Por defecto este bloque NO se ejecuta: Pedro quiere revisar los informes
+  // antes de que lleguen al cliente. Para activar cuando esté listo:
+  //   en Vercel → env vars (production): MORNING_NOTIFY_CLIENTS=true
   const notifsCliente: Array<{ marca: string; ok: boolean; error?: string }> = []
-  for (const s of summaries) {
-    if (s.total_pendientes === 0) continue
-    const m = marcas.find((x) => x.slug === s.marca_slug)!
-    if (!m.grupo_whatsapp_chatid && !m.grupo_whatsapp_nombre && !m.grupo_whatsapp_alias) continue
+  if (NOTIFY_CLIENT_GROUPS) {
+    for (const s of summaries) {
+      if (s.total_pendientes === 0) continue
+      const m = marcas.find((x) => x.slug === s.marca_slug)!
+      if (!m.grupo_whatsapp_chatid && !m.grupo_whatsapp_nombre && !m.grupo_whatsapp_alias) continue
 
-    const saludo = m.decisor_tratamiento && m.decisor_nombre
-      ? `${m.decisor_tratamiento} ${m.decisor_nombre}`
-      : (m.decisor_nombre ?? '👋')
-    const mentionPart = m.mention_number ? `@${m.mention_number} ` : ''
-    const url = `${APP_URL}/comentarios?marca=${s.marca_slug}`
-    const text = [
-      `${mentionPart}Buen día ${saludo} 👋`,
-      ``,
-      `📬 Hay *${s.total_pendientes}* ${s.total_pendientes === 1 ? 'comentario nuevo' : 'comentarios nuevos'} para revisar y responder hoy.`,
-      ``,
-      `Mirá las sugerencias y aprobá las que quieras enviar:`,
-      url,
-    ].join('\n')
+      const saludo = m.decisor_tratamiento && m.decisor_nombre
+        ? `${m.decisor_tratamiento} ${m.decisor_nombre}`
+        : (m.decisor_nombre ?? '👋')
+      const mentionPart = m.mention_number ? `@${m.mention_number} ` : ''
+      const url = `${APP_URL}/comentarios?marca=${s.marca_slug}`
+      const text = [
+        `${mentionPart}Buen día ${saludo} 👋`,
+        ``,
+        `📬 Hay *${s.total_pendientes}* ${s.total_pendientes === 1 ? 'comentario nuevo' : 'comentarios nuevos'} para revisar y responder hoy.`,
+        ``,
+        `Mira las sugerencias y aprueba las que quieras enviar:`,
+        url,
+      ].join('\n')
 
-    const sendResult = await sendWhatsAppWithMentions({
-      ...(m.grupo_whatsapp_chatid
-        ? { chatId: m.grupo_whatsapp_chatid }
-        : { group_name: m.grupo_whatsapp_nombre ?? m.grupo_whatsapp_alias! }),
-      text,
-      mentions: m.mention_number ? [m.mention_number] : [],
-    })
-    notifsCliente.push({
-      marca: s.marca_slug,
-      ok: sendResult.ok,
-      error: sendResult.ok ? undefined : sendResult.error,
-    })
+      const sendResult = await sendWhatsAppWithMentions({
+        ...(m.grupo_whatsapp_chatid
+          ? { chatId: m.grupo_whatsapp_chatid }
+          : { group_name: m.grupo_whatsapp_nombre ?? m.grupo_whatsapp_alias! }),
+        text,
+        mentions: m.mention_number ? [m.mention_number] : [],
+      })
+      notifsCliente.push({
+        marca: s.marca_slug,
+        ok: sendResult.ok,
+        error: sendResult.ok ? undefined : sendResult.error,
+      })
+    }
   }
 
   // ----- 4. WhatsApp INTERNO a Pedro con resumen consolidado -----
@@ -210,12 +221,24 @@ export async function GET(request: Request) {
       `📊 ${totalPendientes} comentarios pendientes · ${totalNuevos} nuevos esta noche`,
       ``,
       `*Por marca:*`,
-      ...marcasConPendientes.map((s) => `${s.emoji ?? '•'} ${s.marca_nombre}: ${s.total_pendientes} pend${s.nuevos > 0 ? ` (${s.nuevos} nuevos)` : ''}`),
+      ...marcasConPendientes.map((s) => {
+        const link = `${APP_URL}/comentarios?marca=${s.marca_slug}`
+        const nuevos = s.nuevos > 0 ? ` (${s.nuevos} nuevos)` : ''
+        return `${s.emoji ?? '•'} ${s.marca_nombre}: ${s.total_pendientes} pend${nuevos}\n   ${link}`
+      }),
       ``,
-      `Revisar en ${APP_URL}/comentarios`,
+      `Panel general: ${APP_URL}/comentarios`,
+      ``,
+      NOTIFY_CLIENT_GROUPS
+        ? `📤 Modo activo: estos avisos también se mandaron a cada grupo cliente.`
+        : `🤫 Modo silencioso: ningún cliente fue notificado (MORNING_NOTIFY_CLIENTS=false).`,
     ]
+    // Preferimos chatId directo (más confiable que resolver por nombre)
+    const destinoInterno = PEDRO_INTERNAL_CHATID
+      ? { chatId: PEDRO_INTERNAL_CHATID }
+      : { group_name: PEDRO_INTERNAL_GROUP_NAME }
     const internoResult = await sendWhatsAppWithMentions({
-      group_name: PEDRO_INTERNAL_GROUP_ALIAS,
+      ...destinoInterno,
       text: lines.join('\n'),
       mentions: [],
     })
