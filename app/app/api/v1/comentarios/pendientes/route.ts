@@ -56,6 +56,8 @@ export async function GET(request: Request) {
       post_media_url,
       categoria_sugerida,
       respuesta_sugerida,
+      sugerencia_at,
+      sugerencia_fuente,
       status,
       created_at,
       marca:marcas(id, slug, nombre, emoji_marca)
@@ -106,6 +108,8 @@ export async function GET(request: Request) {
       },
       categoria_sugerida: r.categoria_sugerida,
       respuesta_sugerida: r.respuesta_sugerida,
+      sugerencia_at: r.sugerencia_at,
+      sugerencia_fuente: r.sugerencia_fuente,
       status: r.status,
     }
   })
