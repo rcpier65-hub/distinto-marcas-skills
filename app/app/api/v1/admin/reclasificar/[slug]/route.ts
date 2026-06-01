@@ -1,6 +1,6 @@
-// app/app/api/admin/reclasificar/[slug]/route.ts
+// app/app/api/v1/admin/reclasificar/[slug]/route.ts
 //
-// POST /api/admin/reclasificar/[slug]
+// POST /api/v1/admin/reclasificar/[slug]
 //
 // Re-clasifica los comentarios pendientes de una marca con la versión
 // actual del clasificador heurístico. Útil cuando se mejoran las reglas

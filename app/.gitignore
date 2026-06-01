@@ -49,3 +49,4 @@ next-env.d.ts
 # Drive API auth (NUNCA committear)
 /scripts/credentials.json
 /scripts/token.json
+.env*.local
