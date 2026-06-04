@@ -415,11 +415,51 @@ function blockToText(b: NotionBlock): string {
   }
 }
 
-function isCopyHeading(b: NotionBlock): boolean {
-  if (b.type !== 'heading_3' && b.type !== 'heading_2' && b.type !== 'heading_1') return false
-  const text = blockToText(b).toLowerCase().trim()
-  // Coincide con "💬 COPY", "COPY", "copy del post", etc.
-  return text === 'copy' || text.includes('💬 copy') || text.startsWith('copy ')
+/**
+ * Detecta si un block es el marcador de inicio del COPY.
+ *
+ * Formatos soportados (basados en data real de las marcas):
+ *  1. Little Joe / Typhouse: `### 💬 COPY` (heading_3 con título)
+ *  2. Manrique: `COPY:` como paragraph solo, seguido de los párrafos del copy
+ *  3. Inline: `COPY: Lorem ipsum...` (todo en un solo paragraph)
+ *  4. Variantes de mayúsculas y emoji opcional.
+ *
+ * Devuelve { isMarker, inline } donde inline contiene el copy en la
+ * misma línea (caso 3) o '' (casos 1/2).
+ */
+function detectCopyMarker(b: NotionBlock): { isMarker: boolean; inline: string } {
+  let text = ''
+  if (
+    b.type === 'heading_1' ||
+    b.type === 'heading_2' ||
+    b.type === 'heading_3' ||
+    b.type === 'paragraph'
+  ) {
+    text = blockToText(b)
+  } else {
+    return { isMarker: false, inline: '' }
+  }
+  const trimmed = text.trim()
+  if (!trimmed) return { isMarker: false, inline: '' }
+  const lowered = trimmed.toLowerCase()
+
+  // Casos 1/2: marker exacto (con o sin dos puntos, con o sin emoji)
+  if (
+    lowered === 'copy' ||
+    lowered === 'copy:' ||
+    lowered === '💬 copy' ||
+    lowered === '💬 copy:'
+  ) {
+    return { isMarker: true, inline: '' }
+  }
+
+  // Caso 3: "COPY: Lorem..." en una sola línea
+  const m = trimmed.match(/^(?:💬\s*)?copy\s*:\s*(.+)/i)
+  if (m && m[1].trim()) {
+    return { isMarker: true, inline: m[1].trim() }
+  }
+
+  return { isMarker: false, inline: '' }
 }
 
 /**
@@ -439,23 +479,33 @@ export async function fetchPageContent(
   try {
     const blocks = await fetchChildren(pageIdWithoutDashes, token)
 
-    // 1. Encontrar el heading de COPY
+    // 1. Encontrar el marker de COPY (heading "💬 COPY", paragraph "COPY:" o "COPY: ...")
     let copyStartIdx = -1
+    let markerInline = ''
     for (let i = 0; i < blocks.length; i++) {
-      if (isCopyHeading(blocks[i])) {
+      const r = detectCopyMarker(blocks[i])
+      if (r.isMarker) {
         copyStartIdx = i
+        markerInline = r.inline
         break
       }
     }
 
-    // 2. El copy son los blocks DESPUÉS del heading hasta el próximo heading
-    //    o hasta el final.
+    // 2. El copy son los blocks DESPUÉS del marker hasta el próximo heading,
+    //    table o column_list (esos últimos son guión, no copy).
     let copy: string | null = null
     if (copyStartIdx >= 0) {
       const lines: string[] = []
+      if (markerInline) lines.push(markerInline)
       for (let i = copyStartIdx + 1; i < blocks.length; i++) {
         const b = blocks[i]
-        if (b.type === 'heading_1' || b.type === 'heading_2' || b.type === 'heading_3') break
+        if (
+          b.type === 'heading_1' ||
+          b.type === 'heading_2' ||
+          b.type === 'heading_3'
+        )
+          break
+        if (b.type === 'table' || b.type === 'column_list') break
         const text = blockToText(b)
         if (text) lines.push(text)
       }
