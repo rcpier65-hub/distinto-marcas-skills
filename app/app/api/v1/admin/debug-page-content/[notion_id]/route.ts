@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { fetchPageContent } from '@/lib/integrations/notion'
+import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -91,10 +92,23 @@ export async function GET(
     }
   }
 
+  // 3. Consultar BD para ver QUÉ tiene esa pub guardado
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: dbRow, error: dbErr } = await service
+    .from('publicaciones')
+    .select(
+      'id, nombre, copy, guion, editor_nombre, fecha_publicacion, fecha_edicion, enlace_tomas, enlace_musica, plataformas, tipo_contenido, objetivos, estado, notion_original_id, updated_at',
+    )
+    .eq('notion_original_id', pageId)
+    .maybeSingle()
+
   return NextResponse.json({
     ok: true,
     page_id: pageId,
-    extracted,
+    extracted_from_notion: extracted,
+    db_row: dbRow,
+    db_error: dbErr?.message ?? null,
     raw_blocks_count: rawBlocks.length,
     raw_blocks: rawBlocks,
   })
