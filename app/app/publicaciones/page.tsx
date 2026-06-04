@@ -8,6 +8,7 @@
 // Server component: intenta fetch Supabase, fallback mock.
 
 import { PublicacionesView } from '@/components/views/PublicacionesView'
+import { SyncNotionButton } from './_components/SyncNotionButton'
 import {
   PUBLICACIONES_MOCK,
   type PublicacionMock,
@@ -114,5 +115,12 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
 
 export default async function PublicacionesPage() {
   const pubs = (await fetchFromSupabase()) ?? PUBLICACIONES_MOCK
-  return <PublicacionesView publicaciones={pubs} />
+  return (
+    <>
+      <div className="flex items-center justify-end gap-3 px-6 pt-4">
+        <SyncNotionButton />
+      </div>
+      <PublicacionesView publicaciones={pubs} />
+    </>
+  )
 }

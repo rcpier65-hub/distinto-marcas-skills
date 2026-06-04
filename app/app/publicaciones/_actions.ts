@@ -166,3 +166,87 @@ export async function duplicarPublicacion(sourceId: string): Promise<void> {
   revalidatePath('/publicaciones/tabla')
   redirect(`/publicaciones/${nueva.id}`)
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// SYNC NOTION → PUBLICACIONES (botón "🔄 Sincronizar todo con Notion")
+// ────────────────────────────────────────────────────────────────────────
+
+/**
+ * Llama al endpoint admin que sincroniza Notion → Supabase para todas
+ * las marcas con notion_proyecto_id. Default: mayo + junio 2026.
+ *
+ * Por qué pasa por el endpoint en vez de hacer todo en la action:
+ * - El endpoint ya orquesta paralelo, mapeo de estado, dedup por
+ *   notion_original_id. Reusar en lugar de duplicar.
+ * - El CRON_SECRET vive en el server y nunca llega al cliente.
+ * - Permite trigger desde cron / curl / botón con el mismo path.
+ */
+export async function sincronizarTodoNotion(opts?: {
+  from?: string
+  to?: string
+}): Promise<
+  | {
+      ok: true
+      totals: {
+        fetched: number
+        inserted: number
+        updated: number
+        failed: number
+        ok: number
+        skipped: number
+        errored: number
+      }
+      duration_ms: number
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      por_marca: any[]
+    }
+  | { ok: false; error: string }
+> {
+  await requireUser()
+
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? 'https://distinto-app.vercel.app'
+  const secret = process.env.CRON_SECRET
+  if (!secret) {
+    return { ok: false, error: 'CRON_SECRET no configurado en server' }
+  }
+
+  const body = {
+    from: opts?.from ?? '2026-05-01',
+    to: opts?.to ?? '2026-06-30',
+  }
+
+  try {
+    const res = await fetch(`${appUrl}/api/v1/admin/sync-publicaciones-all`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (!res.ok || !json.ok) {
+      return {
+        ok: false,
+        error: json.error ?? `HTTP ${res.status}`,
+      }
+    }
+    revalidatePath('/publicaciones')
+    revalidatePath('/publicaciones/tabla')
+    revalidatePath('/publicaciones/calendario')
+    revalidatePath('/publicaciones/kanban')
+    return {
+      ok: true,
+      totals: json.totals,
+      duration_ms: json.duration_ms,
+      por_marca: json.por_marca,
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'fetch failed',
+    }
+  }
+}
