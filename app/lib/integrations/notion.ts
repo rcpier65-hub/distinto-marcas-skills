@@ -24,6 +24,9 @@ type NotionDateProp = { type: 'date'; date: { start: string; end: string | null 
 type NotionMultiSelectProp = { type: 'multi_select'; multi_select: { name: string }[] }
 type NotionStatusProp = { type: 'status'; status: { name: string } | null }
 type NotionRelationProp = { type: 'relation'; relation: { id: string }[] }
+type NotionUrlProp = { type: 'url'; url: string | null }
+type NotionCheckboxProp = { type: 'checkbox'; checkbox: boolean }
+type NotionRichTextProp = { type: 'rich_text'; rich_text: NotionRichText[] }
 type NotionUnknownProp = { type: string; [k: string]: unknown }
 
 type NotionProperty =
@@ -32,6 +35,9 @@ type NotionProperty =
   | NotionMultiSelectProp
   | NotionStatusProp
   | NotionRelationProp
+  | NotionUrlProp
+  | NotionCheckboxProp
+  | NotionRichTextProp
   | NotionUnknownProp
 
 type NotionPage = {
@@ -174,6 +180,346 @@ function readStatus(prop: NotionProperty | undefined): string | null {
   if (!prop || prop.type !== 'status') return null
   const s = (prop as NotionStatusProp).status
   return s ? s.name : null
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// EXTENDED: query con todas las properties + fetch del body
+// ════════════════════════════════════════════════════════════════════════
+//
+// La versión "Extended" trae ~12 properties extra (editor, fechas,
+// enlaces, checkboxes, portadas, objetivos) Y permite extraer el copy
+// y el guión del body markdown de cada página.
+//
+// queryGrillaForBrand (la original) sigue existiendo intacta porque la
+// usa el flow de envío de grilla semanal por WhatsApp — que solo
+// necesita título + fecha + plataformas.
+
+export type GrillaPublicacionExtendida = GrillaPublicacion & {
+  editor: string | null
+  fecha_edicion: string | null
+  fecha_diseno: string | null
+  enlace_tomas: string | null
+  enlace_musica: string | null
+  objetivos: string[]
+  copy_listo: boolean
+  musica_lista: boolean
+  portada_lista: boolean
+  video_aprobado: boolean
+  portada_cruda_url: string | null
+  portada_editada_url: string | null
+}
+
+/**
+ * Versión extendida que también extrae editor, fechas, enlaces,
+ * checkboxes y portadas. Mismo filtro y paginación que la original.
+ */
+export async function queryGrillaForBrandExtended(args: {
+  notionProyectoId: string
+  semanaInicio: string
+  semanaFin: string
+}): Promise<GrillaPublicacionExtendida[]> {
+  const token = process.env.NOTION_TOKEN
+  const dbId = process.env.NOTION_GRILLA_DB_ID
+  if (!token) throw new Error('NOTION_TOKEN no configurado')
+  if (!dbId) throw new Error('NOTION_GRILLA_DB_ID no configurado')
+
+  const filter = {
+    and: [
+      { property: 'proyecto', relation: { contains: args.notionProyectoId } },
+      { property: 'Grilla de FIT', date: { on_or_after: args.semanaInicio } },
+      { property: 'Grilla de FIT', date: { on_or_before: args.semanaFin } },
+    ],
+  }
+  const sorts = [{ property: 'Grilla de FIT', direction: 'ascending' as const }]
+
+  const all: GrillaPublicacionExtendida[] = []
+  let cursor: string | undefined = undefined
+
+  for (let i = 0; i < 5; i++) {
+    const body: Record<string, unknown> = { filter, sorts, page_size: 100 }
+    if (cursor) body.start_cursor = cursor
+
+    const res = await fetch(`${NOTION_API}/databases/${dbId}/query`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`Notion API ${res.status}: ${errText.slice(0, 300)}`)
+    }
+    const json = (await res.json()) as NotionQueryResponse
+    for (const page of json.results) {
+      const pub = parseGrillaPageExtended(page)
+      if (pub) all.push(pub)
+    }
+    if (!json.has_more || !json.next_cursor) break
+    cursor = json.next_cursor
+  }
+  return all
+}
+
+function parseGrillaPageExtended(page: NotionPage): GrillaPublicacionExtendida | null {
+  const base = parseGrillaPage(page)
+  if (!base) return null
+  const props = page.properties
+  return {
+    ...base,
+    editor: readMultiSelectFirst(props['Editor']),
+    fecha_edicion: readDateStart(props['Fecha de edicion']),
+    // Notion tiene un espacio al final del nombre "Fecha de diseño "
+    fecha_diseno:
+      readDateStart(props['Fecha de diseño ']) ?? readDateStart(props['Fecha de diseño']),
+    enlace_tomas: readUrl(props['Enlace de tomas']),
+    enlace_musica: readUrl(props['Enlace musica']),
+    objetivos: readMultiSelect(props['Objetivo']),
+    copy_listo: readCheckbox(props['Copy Listo']),
+    musica_lista: readCheckbox(props['MÚSICA']),
+    portada_lista: readCheckbox(props['Portada lista']),
+    video_aprobado: readCheckbox(props['VIDEO APROBADO']),
+    portada_cruda_url: readTextOrUrl(props['PORTADA CRUDA']),
+    portada_editada_url: readUrl(props['PORTADA EDITADA']),
+  }
+}
+
+function readMultiSelectFirst(prop: NotionProperty | undefined): string | null {
+  const arr = readMultiSelect(prop)
+  return arr[0] ?? null
+}
+
+function readUrl(prop: NotionProperty | undefined): string | null {
+  if (!prop || prop.type !== 'url') return null
+  return (prop as NotionUrlProp).url ?? null
+}
+
+function readCheckbox(prop: NotionProperty | undefined): boolean {
+  if (!prop || prop.type !== 'checkbox') return false
+  return (prop as NotionCheckboxProp).checkbox === true
+}
+
+/**
+ * Algunos campos en Notion están como `rich_text` (text). Concatenamos
+ * todos los plain_text. Si NO es rich_text pero es url, devuelve la url.
+ */
+function readTextOrUrl(prop: NotionProperty | undefined): string | null {
+  if (!prop) return null
+  if (prop.type === 'rich_text') {
+    const t = (prop as NotionRichTextProp).rich_text
+      .map((x) => x.plain_text)
+      .join('')
+      .trim()
+    return t || null
+  }
+  if (prop.type === 'url') {
+    return (prop as NotionUrlProp).url ?? null
+  }
+  return null
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Body content: extraer copy + guión del contenido markdown de una página
+// ────────────────────────────────────────────────────────────────────────
+//
+// Notion API: GET /v1/blocks/{page_id}/children?page_size=100
+// Devuelve los bloques top-level. Los nested (ej. items dentro de columnas)
+// requieren recursión. Para el caso de las publicaciones, los blocks
+// que nos interesan son:
+//   - heading_3 "💬 COPY" → el siguiente paragraph/bulleted_list es el copy
+//   - column_list → contiene 2 columns:
+//       column[0]: paragraph "USAR AUDIO OPCIÓN N"
+//       column[1]: table con guión (voz en off | toma/visual)
+//   - table → si aparece suelto, también es guión
+//
+// Estrategia: hacemos UN solo fetch al endpoint, parseamos blocks
+// recursivamente con depth=2 (suficiente para columnas), generamos
+// markdown plano para copy y guion separados.
+
+type NotionBlock = {
+  id: string
+  type: string
+  has_children?: boolean
+  paragraph?: { rich_text: NotionRichText[] }
+  heading_1?: { rich_text: NotionRichText[] }
+  heading_2?: { rich_text: NotionRichText[] }
+  heading_3?: { rich_text: NotionRichText[] }
+  bulleted_list_item?: { rich_text: NotionRichText[] }
+  numbered_list_item?: { rich_text: NotionRichText[] }
+  quote?: { rich_text: NotionRichText[] }
+  callout?: { rich_text: NotionRichText[] }
+  table_row?: { cells: NotionRichText[][] }
+  // Para column_list y column no hay properties especiales, solo has_children
+}
+
+type NotionBlocksResponse = {
+  results: NotionBlock[]
+  next_cursor: string | null
+  has_more: boolean
+}
+
+async function fetchChildren(
+  pageOrBlockId: string,
+  token: string,
+): Promise<NotionBlock[]> {
+  const out: NotionBlock[] = []
+  let cursor: string | undefined = undefined
+  for (let i = 0; i < 5; i++) {
+    const url = new URL(`${NOTION_API}/blocks/${pageOrBlockId}/children`)
+    url.searchParams.set('page_size', '100')
+    if (cursor) url.searchParams.set('start_cursor', cursor)
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Notion-Version': NOTION_VERSION,
+      },
+      cache: 'no-store',
+    })
+    if (!res.ok) break
+    const json = (await res.json()) as NotionBlocksResponse
+    out.push(...json.results)
+    if (!json.has_more || !json.next_cursor) break
+    cursor = json.next_cursor
+  }
+  return out
+}
+
+function richTextToString(rt: NotionRichText[] | undefined): string {
+  if (!rt) return ''
+  return rt.map((x) => x.plain_text).join('')
+}
+
+function blockToText(b: NotionBlock): string {
+  switch (b.type) {
+    case 'paragraph':
+      return richTextToString(b.paragraph?.rich_text)
+    case 'heading_1':
+      return richTextToString(b.heading_1?.rich_text)
+    case 'heading_2':
+      return richTextToString(b.heading_2?.rich_text)
+    case 'heading_3':
+      return richTextToString(b.heading_3?.rich_text)
+    case 'bulleted_list_item':
+      return '• ' + richTextToString(b.bulleted_list_item?.rich_text)
+    case 'numbered_list_item':
+      return richTextToString(b.numbered_list_item?.rich_text)
+    case 'quote':
+      return richTextToString(b.quote?.rich_text)
+    case 'callout':
+      return richTextToString(b.callout?.rich_text)
+    default:
+      return ''
+  }
+}
+
+function isCopyHeading(b: NotionBlock): boolean {
+  if (b.type !== 'heading_3' && b.type !== 'heading_2' && b.type !== 'heading_1') return false
+  const text = blockToText(b).toLowerCase().trim()
+  // Coincide con "💬 COPY", "COPY", "copy del post", etc.
+  return text === 'copy' || text.includes('💬 copy') || text.startsWith('copy ')
+}
+
+/**
+ * Trae el body de una página y extrae:
+ *   - copy:  texto bajo el heading "💬 COPY" (o variantes).
+ *   - guion: tabla de 2 columnas (voz en off | toma/visual) si existe.
+ *
+ * Si el fetch falla, devuelve { copy: null, guion: null } sin lanzar.
+ * Esto evita romper el sync entero por una página con permisos raros.
+ */
+export async function fetchPageContent(
+  pageIdWithoutDashes: string,
+): Promise<{ copy: string | null; guion: string | null }> {
+  const token = process.env.NOTION_TOKEN
+  if (!token) return { copy: null, guion: null }
+
+  try {
+    const blocks = await fetchChildren(pageIdWithoutDashes, token)
+
+    // 1. Encontrar el heading de COPY
+    let copyStartIdx = -1
+    for (let i = 0; i < blocks.length; i++) {
+      if (isCopyHeading(blocks[i])) {
+        copyStartIdx = i
+        break
+      }
+    }
+
+    // 2. El copy son los blocks DESPUÉS del heading hasta el próximo heading
+    //    o hasta el final.
+    let copy: string | null = null
+    if (copyStartIdx >= 0) {
+      const lines: string[] = []
+      for (let i = copyStartIdx + 1; i < blocks.length; i++) {
+        const b = blocks[i]
+        if (b.type === 'heading_1' || b.type === 'heading_2' || b.type === 'heading_3') break
+        const text = blockToText(b)
+        if (text) lines.push(text)
+      }
+      const joined = lines.join('\n').trim()
+      copy = joined || null
+    }
+
+    // 3. El guión: buscamos column_lists y/o tables. Tomamos el primer
+    //    column_list (que tiene 2 columnas: nota+tabla) o la primera table.
+    let guion: string | null = null
+    for (const b of blocks) {
+      if (b.type === 'column_list' && b.has_children) {
+        guion = await extractGuionFromColumnList(b.id, token)
+        if (guion) break
+      }
+      if (b.type === 'table' && b.has_children) {
+        guion = await extractGuionFromTable(b.id, token)
+        if (guion) break
+      }
+    }
+
+    return { copy, guion }
+  } catch {
+    return { copy: null, guion: null }
+  }
+}
+
+async function extractGuionFromColumnList(
+  columnListId: string,
+  token: string,
+): Promise<string | null> {
+  const columns = await fetchChildren(columnListId, token)
+  const parts: string[] = []
+  for (const col of columns) {
+    if (col.type !== 'column' || !col.has_children) continue
+    const children = await fetchChildren(col.id, token)
+    for (const c of children) {
+      if (c.type === 'table' && c.has_children) {
+        const t = await extractGuionFromTable(c.id, token)
+        if (t) parts.push(t)
+      } else {
+        const text = blockToText(c)
+        if (text) parts.push(text)
+      }
+    }
+  }
+  const joined = parts.join('\n').trim()
+  return joined || null
+}
+
+async function extractGuionFromTable(
+  tableId: string,
+  token: string,
+): Promise<string | null> {
+  const rows = await fetchChildren(tableId, token)
+  const lines: string[] = []
+  for (const r of rows) {
+    if (r.type !== 'table_row' || !r.table_row) continue
+    const cells = r.table_row.cells.map((c) => richTextToString(c).trim())
+    if (cells.every((c) => !c)) continue
+    lines.push(cells.join(' | '))
+  }
+  const joined = lines.join('\n').trim()
+  return joined || null
 }
 
 /**

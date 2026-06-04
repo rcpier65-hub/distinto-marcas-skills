@@ -2,159 +2,28 @@
 //
 // POST /api/v1/admin/sync-publicaciones-all
 //
-// Sincroniza Notion → publicaciones para TODAS las marcas activas
-// que tengan notion_proyecto_id. Las que no tienen (ej. warrior-supps)
-// se marcan como "skipped" — NO como failed, porque es comportamiento
-// esperado.
+// Sincroniza TODAS las marcas activas con notion_proyecto_id.
+// Cada marca trae properties + copy + guion de Notion.
 //
-// Body (opcional):
-//   {
-//     "from": "2026-05-01",   // default mayo 2026
-//     "to":   "2026-06-30"    // default junio 2026
-//   }
+// Body opcional: { from, to } — default mayo + junio 2026.
 //
-// Devuelve resumen consolidado + breakdown por marca.
+// Marcas sin notion_proyecto_id (ej. warrior-supps) se marcan como
+// "skipped" — NO failed.
 //
-// Auth: Bearer <CRON_SECRET>. Llamado desde server action del cockpit/publicaciones.
+// Auth: Bearer CRON_SECRET. Llamado por el botón "Sincronizar todo
+// con Notion" via server action sincronizarTodoNotion().
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { queryGrillaForBrand, type GrillaPublicacion } from '@/lib/integrations/notion'
+import { syncMarcaPublicaciones, type SyncResult } from '@/lib/publicaciones/sync'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // hasta 5 min — 7 marcas × ~30s en peor caso
-
-// Mismo mapeo que sync-publicaciones/[slug] — duplicado en este file por
-// simplicidad. Si crece, conviene moverlo a lib/publicaciones/estado-map.ts.
-const ESTADO_MAP: Record<string, string> = {
-  tareas: 'tareas',
-  idear: 'idear',
-  editando: 'editando',
-  editar: 'editar',
-  disenar: 'disenar',
-  enviado: 'enviado',
-  aprobar: 'aprobar',
-  programar: 'programar',
-  'programar anuncios': 'programar_anuncios',
-  programar_anuncios: 'programar_anuncios',
-  archivado: 'archivado',
-  idea: 'idear',
-  ideando: 'idear',
-  edicion: 'editando',
-  'en edicion': 'editando',
-  'por editar': 'editar',
-  diseno: 'disenar',
-  'diseñando': 'disenar',
-  'por disenar': 'disenar',
-  'por diseñar': 'disenar',
-  'enviado al cliente': 'enviado',
-  'por aprobar': 'aprobar',
-  aprobado: 'aprobar',
-  programado: 'programar',
-  archivar: 'archivado',
-}
-
-function normalizeKey(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ')
-}
-
-function mapEstado(notionEstado: string | null): string | null {
-  if (!notionEstado) return null
-  return ESTADO_MAP[normalizeKey(notionEstado)] ?? null
-}
+export const maxDuration = 300 // hasta 5 min
 
 type MarcaResult =
-  | {
-      slug: string
-      status: 'ok'
-      fetched: number
-      inserted: number
-      updated: number
-      failed: number
-      estados_no_mapeados: string[]
-    }
+  | ({ slug: string; status: 'ok' } & SyncResult)
   | { slug: string; status: 'skipped'; reason: string }
   | { slug: string; status: 'error'; error: string }
-
-async function syncMarca(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  service: any,
-  marca: { id: string; slug: string; notion_proyecto_id: string },
-  from: string,
-  to: string,
-): Promise<MarcaResult> {
-  let pubs: GrillaPublicacion[] = []
-  try {
-    pubs = await queryGrillaForBrand({
-      notionProyectoId: marca.notion_proyecto_id,
-      semanaInicio: from,
-      semanaFin: to,
-    })
-  } catch (e) {
-    return {
-      slug: marca.slug,
-      status: 'error',
-      error: e instanceof Error ? e.message : 'unknown',
-    }
-  }
-
-  let inserted = 0
-  let updated = 0
-  let failed = 0
-  const estadosNoMapeados = new Set<string>()
-
-  for (const pub of pubs) {
-    const notionId = pub.notion_id.replace(/-/g, '')
-    const estadoMapeado = mapEstado(pub.estado)
-    if (pub.estado && !estadoMapeado) estadosNoMapeados.add(pub.estado)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const patch: any = {
-      marca_id: marca.id,
-      nombre: pub.titulo,
-      fecha_publicacion: pub.fecha,
-      plataformas: pub.plataformas,
-      tipo_contenido: pub.tipo_contenido,
-      notion_original_id: notionId,
-      notion_url: pub.url,
-    }
-    if (estadoMapeado) patch.estado = estadoMapeado
-
-    const { data: existing } = await service
-      .from('publicaciones')
-      .select('id')
-      .eq('notion_original_id', notionId)
-      .maybeSingle()
-
-    if (existing) {
-      const { error } = await service
-        .from('publicaciones')
-        .update(patch)
-        .eq('id', existing.id)
-      if (error) failed++
-      else updated++
-    } else {
-      const { error } = await service.from('publicaciones').insert(patch)
-      if (error) failed++
-      else inserted++
-    }
-  }
-
-  return {
-    slug: marca.slug,
-    status: 'ok',
-    fetched: pubs.length,
-    inserted,
-    updated,
-    failed,
-    estados_no_mapeados: [...estadosNoMapeados],
-  }
-}
 
 export async function POST(request: Request) {
   const auth = request.headers.get('authorization')
@@ -162,7 +31,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
-  // Parse body opcional
   let from = '2026-05-01'
   let to = '2026-06-30'
   try {
@@ -172,16 +40,15 @@ export async function POST(request: Request) {
       if (typeof body.to === 'string') to = body.to
     }
   } catch {
-    // body vacío ok
+    // body vacío OK
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // Listar marcas activas
   const { data: marcas, error } = await service
     .from('marcas')
-    .select('id, slug, nombre, notion_proyecto_id, activa')
+    .select('id, slug, notion_proyecto_id, activa')
     .eq('activa', true)
     .order('slug')
   if (error) {
@@ -206,11 +73,28 @@ export async function POST(request: Request) {
     }
   }
 
-  // Sync en paralelo (Promise.all — Node es single-threaded pero
-  // el bottleneck es HTTP a Notion + Supabase, así que paralelizar
-  // ahorra tiempo significativo)
+  // Sync marcas en paralelo. Dentro de cada marca, fetchPageContent
+  // ya tiene concurrency 5 — así que el total concurrent en peor caso
+  // es 7 marcas × 5 fetches = 35 requests simultáneas a Notion.
+  // Eso está dentro del rate limit típico (peaks de 27 req/seg, burst).
   const results = await Promise.all(
-    conProyecto.map(m => syncMarca(service, m, from, to)),
+    conProyecto.map(
+      (m): Promise<MarcaResult> =>
+        syncMarcaPublicaciones({
+          service,
+          marca: { id: m.id, notion_proyecto_id: m.notion_proyecto_id },
+          from,
+          to,
+        })
+          .then((r): MarcaResult => ({ slug: m.slug, status: 'ok', ...r }))
+          .catch(
+            (e): MarcaResult => ({
+              slug: m.slug,
+              status: 'error',
+              error: e instanceof Error ? e.message : 'unknown',
+            }),
+          ),
+    ),
   )
 
   const allResults: MarcaResult[] = [...results, ...sinProyecto]
