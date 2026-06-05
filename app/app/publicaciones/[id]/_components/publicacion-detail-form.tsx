@@ -448,18 +448,99 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             Permite a Pedro ver el avance mientras edita el copy. */}
         <Card>
           <div className="flex">
-            {/* Sidebar lateral — workflow checklist */}
-            <aside className="w-[180px] shrink-0 border-r border-border bg-muted/30 p-3 space-y-2">
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="w-3 h-3" /> Workflow
-              </h3>
-              <div className="space-y-1">
-                <ChecklistRowCompact label="Copy listo"    icon={<FileText className="w-3.5 h-3.5" />}    value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
-                <ChecklistRowCompact label="Música"        icon={<Music2 className="w-3.5 h-3.5" />}      value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
-                <ChecklistRowCompact label="Portada lista" icon={<ImageIcon className="w-3.5 h-3.5" />}   value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
-                <ChecklistRowCompact label="Diseñado"      icon={<Palette className="w-3.5 h-3.5" />}     value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
-                <ChecklistRowCompact label="Editado"       icon={<Scissors className="w-3.5 h-3.5" />}    value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
-                <ChecklistRowCompact label="Aprobado"      icon={<CheckCircle2 className="w-3.5 h-3.5" />} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
+            {/* Sidebar lateral — workflow + propiedades.
+                Pedro pidió tener WORKFLOW y PROPIEDADES en el mismo
+                bloque vertical al costado del copy, para no scrollear
+                buscando estado/editor/fechas mientras edita el texto. */}
+            <aside className="w-[240px] shrink-0 border-r border-border bg-muted/30 p-3 space-y-4">
+              {/* Workflow checklist */}
+              <div className="space-y-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3 h-3" /> Workflow
+                </h3>
+                <div className="space-y-1">
+                  <ChecklistRowCompact label="Copy listo"    icon={<FileText className="w-3.5 h-3.5" />}    value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
+                  <ChecklistRowCompact label="Música"        icon={<Music2 className="w-3.5 h-3.5" />}      value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
+                  <ChecklistRowCompact label="Portada lista" icon={<ImageIcon className="w-3.5 h-3.5" />}   value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
+                  <ChecklistRowCompact label="Diseñado"      icon={<Palette className="w-3.5 h-3.5" />}     value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
+                  <ChecklistRowCompact label="Editado"       icon={<Scissors className="w-3.5 h-3.5" />}    value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
+                  <ChecklistRowCompact label="Aprobado"      icon={<CheckCircle2 className="w-3.5 h-3.5" />} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
+                </div>
+              </div>
+
+              {/* Propiedades (Estado, Editor, Publicación, Edición, Sub-estado).
+                  Antes vivía en una Card aparte debajo del copy. Movido acá
+                  por pedido de Pedro para tenerlo siempre visible al costado. */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Propiedades
+                </h3>
+                <div className="space-y-2">
+                  <label className="block text-[11px]">
+                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                      <Target className="w-3 h-3" /> Estado
+                    </span>
+                    <select
+                      value={form.estado}
+                      onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
+                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
+                    >
+                      {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-[11px]">
+                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                      <UserIcon className="w-3 h-3" /> Editor
+                    </span>
+                    <select
+                      value={form.editor_id}
+                      onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
+                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
+                    >
+                      <option value="">— Sin asignar —</option>
+                      {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-[11px]">
+                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                      <CalendarDays className="w-3 h-3" /> Publicación
+                    </span>
+                    <input
+                      type="date"
+                      value={form.fecha_publicacion}
+                      onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))}
+                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
+                    />
+                  </label>
+                  <label className="block text-[11px]">
+                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                      <Scissors className="w-3 h-3" /> Edición
+                    </span>
+                    <input
+                      type="date"
+                      value={form.fecha_edicion}
+                      onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
+                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
+                    />
+                  </label>
+                  <div className="text-[11px]">
+                    <span className="text-muted-foreground text-[10px] block mb-1">Sub-estado tarea</span>
+                    <div className="flex gap-1">
+                      {ESTADOS_TAREA.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
+                          className={`flex-1 h-6 px-0.5 rounded text-[9px] border transition-colors leading-none ${
+                            form.estado_tarea === e
+                              ? 'bg-[#ba41f7] text-white border-[#ba41f7]'
+                              : 'bg-background hover:bg-muted border-border'
+                          }`}
+                        >{ESTADO_TAREA_LABEL[e]}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </aside>
             {/* Contenido del Card del Copy — todo lo que estaba antes */}
@@ -713,81 +794,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           </div>{/* Fin flex wrapper Card del copy */}
         </Card>
 
-        {/* PROPIEDADES — antes estaba en columna derecha, ahora apilada
-            debajo del copy en la columna izquierda según pedido de Pedro. */}
-        <Card>
-          <CardContent className="p-3 space-y-3">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Propiedades
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                  <Target className="w-3 h-3" /> Estado
-                </span>
-                <select
-                  value={form.estado}
-                  onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
-                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                >
-                  {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
-                </select>
-              </label>
-              <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                  <UserIcon className="w-3 h-3" /> Editor
-                </span>
-                <select
-                  value={form.editor_id}
-                  onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
-                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                >
-                  <option value="">— Sin asignar —</option>
-                  {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
-                </select>
-              </label>
-              <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                  <CalendarDays className="w-3 h-3" /> Publicación
-                </span>
-                <input
-                  type="date"
-                  value={form.fecha_publicacion}
-                  onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))}
-                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                />
-              </label>
-              <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                  <Scissors className="w-3 h-3" /> Edición
-                </span>
-                <input
-                  type="date"
-                  value={form.fecha_edicion}
-                  onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
-                  className="w-full h-8 px-2 rounded border border-input bg-background mt-1 text-xs"
-                />
-              </label>
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground text-[10px] block mb-1">Sub-estado tarea</span>
-              <div className="flex gap-1">
-                {ESTADOS_TAREA.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
-                    className={`flex-1 h-7 px-1 rounded text-[10px] border transition-colors ${
-                      form.estado_tarea === e
-                        ? 'bg-[#ba41f7] text-white border-[#ba41f7]'
-                        : 'bg-background hover:bg-muted border-border'
-                    }`}
-                  >{ESTADO_TAREA_LABEL[e]}</button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* PROPIEDADES movido al sidebar lateral izquierdo del Card del
+            copy (junto con el Workflow). Pedro pidió tener Estado/Editor/
+            Publicación/Edición/Sub-estado siempre visible al costado del
+            editor de copy, sin scrollear. */}
 
         {/* PROGRESO WORKFLOW: el bloque grande se movió al sidebar lateral
             izquierdo del Card del COPY (más arriba en este mismo archivo).
