@@ -1,31 +1,75 @@
 'use client'
 
 /* EditorView — tabla Linear-style con edición INLINE de todas las
-   columnas (iter 2). Cada celda es editable con su control natural:
-   - Nombre tarea: click → input inline (Enter/blur guarda, Esc cancela)
-   - Editor: click → popover lista personas
-   - Estado: click → popover lista estados
-   - Fechas: click → input type=date nativo
-   - Click row (no cell editable) → navega a /publicaciones/[id]
+   columnas, persistencia REAL a Supabase, filtro "Mi trabajo para
+   hoy", botón "Editar hoy" por fila, y dashboard de métricas arriba.
 
-   Optimistic updates: cambio local instantáneo + toast confirmando.
-   Mock por ahora; Supabase wire en iter 3. */
+   Cambios principales vs iter 1:
+   - Datos reales (no mock): EditorEntry desde page.tsx
+   - Handlers llaman server actions (updateEditorEntry, marcar/desmarcar)
+   - Optimistic update + revert si la action falla
+   - Editores reales desde tabla editores (no EDITORES_MOCK)
+   - Columna "Enlace tomas" con copiable
+   - Botón "Editar hoy" por fila (toggle marcado/no marcado)
+   - Filtro "Mi trabajo para hoy" al lado de Limpiar
+   - Dashboard arriba: editados/mes, por editar, con/sin guion, alertas
+   - Color de alerta en fecha edición según calcularAlertaFecha */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  EDITOR_ENTRIES_MOCK,
-  EDITORES_MOCK,
-  ESTADO_CONFIG,
-  formatDateES,
-  marcaDisplay,
-  type EditorEntryMock,
+  updateEditorEntry,
+  marcarParaEditarHoy,
+  desmarcarParaEditarHoy,
+} from '@/app/editor/_actions'
+import {
+  type EditorEntry,
+  type EditorOption,
   type EstadoPub,
-} from '@/lib/mock-editor'
-import { MARCAS_NAV } from '@/lib/mock-marcas'
+  type AlertaFecha,
+  calcularAlertaFecha,
+} from '@/lib/editor/types'
 
-/* Categorías de estado UI */
+/* ============================================================
+   Constantes UI (movidas desde mock-editor.ts para que el client
+   no dependa del mock ahora que tiene datos reales)
+   ============================================================ */
+
+const ESTADO_CONFIG: Record<EstadoPub, { label: string; color: string; bg: string }> = {
+  editar:    { label: 'Editar',    color: '#f2c94c', bg: 'rgba(242, 201, 76, 0.12)' },
+  aprobar:   { label: 'Aprobar',   color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
+  programar: { label: 'Programar', color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.12)' },
+  publicar:  { label: 'Publicar',  color: '#4cb782', bg: 'rgba(76, 183, 130, 0.12)' },
+  publicado: { label: 'Publicado', color: '#737373', bg: 'rgba(255, 255, 255, 0.06)' },
+  borrador:  { label: 'Borrador',  color: '#737373', bg: 'rgba(255, 255, 255, 0.04)' },
+}
+
+const ALERTA_COLOR: Record<AlertaFecha, { fg: string; bg: string; label: string }> = {
+  rojo:     { fg: '#fb7185', bg: 'rgba(251, 113, 133, 0.12)', label: 'urgente' },
+  amarillo: { fg: '#fbbf24', bg: 'rgba(251, 191, 36, 0.12)',  label: 'atención' },
+  verde:    { fg: '#34d399', bg: 'rgba(52, 211, 153, 0.10)',  label: 'a tiempo' },
+}
+
+function formatDateES(iso: string) {
+  const d = new Date(iso + 'T00:00:00')
+  if (isNaN(d.getTime())) return '—'
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  return `${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/* ============================================================
+   Tipos públicos del componente
+   ============================================================ */
+
+export type MarcaOption = {
+  slug: string
+  nombre: string
+  nombreCorto: string
+  color: string
+  emoji: string | null
+}
+
 type SortField = 'marca' | 'nombre' | 'editor' | 'grillaFit' | 'estado' | 'fechaEdicion'
 type SortDir = 'asc' | 'desc'
 
@@ -33,32 +77,81 @@ type Filters = {
   estado: EstadoPub | 'todos'
   editorId: string | 'todos'
   marcaSlug: string | 'todas'
+  soloHoy: boolean
 }
 
 type Props = {
-  entries?: EditorEntryMock[]
+  entries: EditorEntry[]
+  editores: EditorOption[]
+  marcas: MarcaOption[]
+  marcaMigrationPendiente?: boolean
 }
 
-export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Props) {
+/* ============================================================
+   Component
+   ============================================================ */
+
+export function EditorView({ entries: initialEntries, editores, marcas, marcaMigrationPendiente }: Props) {
   const router = useRouter()
   const [entries, setEntries] = useState(initialEntries)
+  const [, startTransition] = useTransition()
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>({
-    estado: 'editar',
+    estado: 'editar',  /* default: ver lo pendiente */
     editorId: 'todos',
     marcaSlug: 'todas',
+    soloHoy: false,
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
+
+  /* Helpers para resolver marca/editor desde slug/id */
+  const marcaBySlug = useMemo(() => new Map(marcas.map((m) => [m.slug, m])), [marcas])
+  const editorById = useMemo(() => new Map(editores.map((e) => [e.id, e])), [editores])
+  const hoy = new Date().toISOString().slice(0, 10)
+
+  /* ============ Métricas del dashboard ============ */
+  const metricas = useMemo(() => {
+    const ahora = new Date()
+    const inicioMes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-01`
+    const finMesDate = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0)
+    const finMes = `${finMesDate.getFullYear()}-${String(finMesDate.getMonth() + 1).padStart(2, '0')}-${String(finMesDate.getDate()).padStart(2, '0')}`
+
+    const enMes = entries.filter((e) => e.fechaEdicion >= inicioMes && e.fechaEdicion <= finMes)
+    /* Editado = estado avanzó más allá de 'editar' (aprobar/programar/publicar/publicado) */
+    const ESTADOS_EDITADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
+    const editadosMes = enMes.filter((e) => ESTADOS_EDITADOS.includes(e.estado)).length
+    const objetivoMes = enMes.length  /* auto-calculado: el total del mes es el objetivo */
+
+    const porEditar = entries.filter((e) => e.estado === 'editar').length
+    const conGuion = entries.filter((e) => e.estado === 'editar' && (e.guion?.trim().length ?? 0) > 0).length
+    const sinGuion = entries.filter((e) => e.estado === 'editar' && (e.guion?.trim().length ?? 0) === 0).length
+    const urgentes = entries.filter((e) =>
+      e.estado === 'editar' && calcularAlertaFecha(e.fechaEdicion, e.grillaFit) === 'rojo'
+    ).length
+
+    return { editadosMes, objetivoMes, porEditar, conGuion, sinGuion, urgentes }
+  }, [entries])
 
   /* ============ Filtrado + búsqueda + sort ============ */
   const visible = useMemo(() => {
     let list = entries.filter((e) => {
-      if (filters.estado !== 'todos' && e.estado !== filters.estado) return false
-      if (filters.editorId !== 'todos' && e.editorId !== filters.editorId) return false
+      /* Filtro "Mi trabajo para hoy": ignora el filtro de estado para
+         mostrar todas las tareas marcadas hoy aunque hayan pasado a
+         aprobar/programar. */
+      if (filters.soloHoy) {
+        if (e.fechaMarcadaParaEditar !== hoy) return false
+      } else {
+        if (filters.estado !== 'todos' && e.estado !== filters.estado) return false
+      }
+      if (filters.editorId !== 'todos') {
+        if (filters.editorId === '_sin') {
+          if (e.editorId) return false
+        } else if (e.editorId !== filters.editorId) return false
+      }
       if (filters.marcaSlug !== 'todas' && e.marcaSlug !== filters.marcaSlug) return false
       if (search) {
         const q = search.toLowerCase()
-        const marca = marcaDisplay(e.marcaSlug)
+        const marca = marcaBySlug.get(e.marcaSlug)
         if (
           !e.nombreTarea.toLowerCase().includes(q) &&
           !marca?.nombreCorto.toLowerCase().includes(q)
@@ -68,63 +161,86 @@ export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Pr
     })
     if (sort) {
       list = [...list].sort((a, b) => {
-        const av = sortValue(a, sort.field)
-        const bv = sortValue(b, sort.field)
+        const av = sortValue(a, sort.field, marcaBySlug, editorById)
+        const bv = sortValue(b, sort.field, marcaBySlug, editorById)
         if (av < bv) return sort.dir === 'asc' ? -1 : 1
         if (av > bv) return sort.dir === 'asc' ? 1 : -1
         return 0
       })
     }
     return list
-  }, [entries, filters, search, sort])
+  }, [entries, filters, search, sort, marcaBySlug, editorById, hoy])
 
   const hasActiveFilters =
-    filters.estado !== 'todos' || filters.editorId !== 'todos' || filters.marcaSlug !== 'todas' || !!search
+    filters.estado !== 'editar' ||  /* default es editar, no todos */
+    filters.editorId !== 'todos' ||
+    filters.marcaSlug !== 'todas' ||
+    filters.soloHoy ||
+    !!search
 
-  /* ============ Edit handlers (optimistic) ============ */
-  function updateEntry(id: string, patch: Partial<EditorEntryMock>) {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+  /* ============ Edit handlers (optimistic + persist a BD) ============ */
+
+  function persist(id: string, patch: Partial<EditorEntry>, action: () => Promise<{ ok: true } | { ok: false; error: string }>, mensaje: string) {
+    const prev = entries.find((e) => e.id === id)
+    if (!prev) return
+    setEntries((cur) => cur.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+    startTransition(async () => {
+      const r = await action()
+      if (!r.ok) {
+        /* Revert */
+        setEntries((cur) => cur.map((e) => (e.id === id ? prev : e)))
+        toast.error(`Error al guardar: ${r.error}`)
+      } else {
+        toast.success(mensaje, { duration: 1500 })
+      }
+    })
   }
+
   function setEstado(id: string, estado: EstadoPub) {
-    updateEntry(id, { estado })
-    toast.success(`Estado → ${ESTADO_CONFIG[estado].label}`, { duration: 1500 })
+    persist(id, { estado }, () => updateEditorEntry(id, { estado }), `Estado → ${ESTADO_CONFIG[estado].label}`)
   }
   function setEditor(id: string, editorId: string | null) {
-    updateEntry(id, { editorId })
-    const name = editorId ? EDITORES_MOCK.find((ed) => ed.id === editorId)?.nombre : 'Sin asignar'
-    toast.success(`Editor → ${name}`, { duration: 1500 })
+    const nombre = editorId ? editorById.get(editorId)?.nombre ?? null : null
+    persist(id, { editorId, editorNombre: nombre }, () => updateEditorEntry(id, { editorId }), `Editor → ${nombre ?? 'Sin asignar'}`)
   }
-  function setNombre(id: string, nombreTarea: string) {
-    const trimmed = nombreTarea.trim()
+  function setNombre(id: string, nombre: string) {
+    const trimmed = nombre.trim()
     if (!trimmed) { toast.error('El nombre no puede estar vacío'); return }
-    updateEntry(id, { nombreTarea: trimmed })
-    toast.success('Tarea renombrada', { duration: 1500 })
+    persist(id, { nombreTarea: trimmed }, () => updateEditorEntry(id, { nombre: trimmed }), 'Tarea renombrada')
   }
   function setFechaGrilla(id: string, grillaFit: string) {
-    updateEntry(id, { grillaFit })
-    toast.success(`Grilla FIT → ${formatDateES(grillaFit)}`, { duration: 1500 })
+    persist(id, { grillaFit }, () => updateEditorEntry(id, { fechaPublicacion: grillaFit }), `Grilla FIT → ${formatDateES(grillaFit)}`)
   }
-  function setFechaEdicion(id: string, fechaEdicion: string) {
-    updateEntry(id, { fechaEdicion })
-    toast.success(`Fecha edición → ${formatDateES(fechaEdicion)}`, { duration: 1500 })
+  function setFechaEdicionVal(id: string, fechaEdicion: string) {
+    persist(id, { fechaEdicion }, () => updateEditorEntry(id, { fechaEdicion }), `Fecha edición → ${formatDateES(fechaEdicion)}`)
+  }
+  function toggleEditarHoy(id: string, estaMarcada: boolean) {
+    if (marcaMigrationPendiente) {
+      toast.error('Migration 026 pendiente. Aplicar desde Supabase Dashboard → SQL Editor.')
+      return
+    }
+    if (estaMarcada) {
+      persist(id, { fechaMarcadaParaEditar: null }, () => desmarcarParaEditarHoy(id), 'Quitada de "Hoy"')
+    } else {
+      persist(id, { fechaMarcadaParaEditar: hoy }, () => marcarParaEditarHoy(id), 'Agregada a "Mi trabajo de hoy"')
+    }
   }
 
   function toggleSort(field: SortField) {
     setSort((s) => {
       if (!s || s.field !== field) return { field, dir: 'asc' }
       if (s.dir === 'asc') return { field, dir: 'desc' }
-      return null  /* third click clears sort */
+      return null
     })
   }
 
   function clearAll() {
-    setFilters({ estado: 'todos', editorId: 'todos', marcaSlug: 'todas' })
+    setFilters({ estado: 'editar', editorId: 'todos', marcaSlug: 'todas', soloHoy: false })
     setSearch('')
     setSort(null)
   }
 
   function openRow(id: string) {
-    /* Click row (fuera de cells editables) → vista detalle */
     router.push(`/publicaciones/${id}`)
   }
 
@@ -138,10 +254,15 @@ export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Pr
           <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Editor</span>
         </div>
         <div style={{ flex: 1 }} />
-        <button className="mk-focusable" style={btnPrimaryStyle}>
-          <IconPlus /> Nueva tarea
-        </button>
+        {marcaMigrationPendiente && (
+          <span style={{ fontSize: 'var(--mk-text-xs)', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '4px 10px', borderRadius: 'var(--mk-radius-sm)' }}>
+            ⚠ Migration 026 pendiente — "Editar hoy" deshabilitado
+          </span>
+        )}
       </header>
+
+      {/* ============== DASHBOARD MÉTRICAS ============== */}
+      <DashboardMetricas {...metricas} />
 
       {/* ============== FILTER BAR ============== */}
       <div style={filterBarStyle}>
@@ -182,29 +303,57 @@ export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Pr
         />
         <FilterPill
           label="Editor"
-          value={filters.editorId === 'todos' ? null : EDITORES_MOCK.find((e) => e.id === filters.editorId)?.nombre ?? null}
-          dotColor={filters.editorId === 'todos' ? null : EDITORES_MOCK.find((e) => e.id === filters.editorId)?.color ?? null}
+          value={
+            filters.editorId === 'todos' ? null :
+            filters.editorId === '_sin' ? 'Sin asignar' :
+            editorById.get(filters.editorId)?.nombre ?? null
+          }
+          dotColor={
+            filters.editorId === 'todos' || filters.editorId === '_sin' ? null :
+            editorById.get(filters.editorId)?.color ?? null
+          }
           options={[
             { id: 'todos', label: 'Todos' },
             { id: '_sin', label: 'Sin asignar' },
-            ...EDITORES_MOCK.map((e) => ({ id: e.id, label: e.nombre, color: e.color })),
+            ...editores.map((e) => ({ id: e.id, label: e.nombre, color: e.color })),
           ]}
           onSelect={(id) => setFilters((f) => ({ ...f, editorId: id }))}
         />
         <FilterPill
           label="Marca"
-          value={filters.marcaSlug === 'todas' ? null : marcaDisplay(filters.marcaSlug)?.nombreCorto ?? null}
-          dotColor={filters.marcaSlug === 'todas' ? null : marcaDisplay(filters.marcaSlug)?.color ?? null}
+          value={filters.marcaSlug === 'todas' ? null : marcaBySlug.get(filters.marcaSlug)?.nombreCorto ?? null}
+          dotColor={filters.marcaSlug === 'todas' ? null : marcaBySlug.get(filters.marcaSlug)?.color ?? null}
           options={[
             { id: 'todas', label: 'Todas' },
-            ...MARCAS_NAV.map((m) => ({ id: m.slug, label: m.nombreCorto, color: m.color })),
+            ...marcas.map((m) => ({ id: m.slug, label: m.nombreCorto, color: m.color })),
           ]}
           onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
         />
 
-        {(hasActiveFilters || sort) && (
+        {hasActiveFilters && (
           <button onClick={clearAll} style={clearBtnStyle}>Limpiar</button>
         )}
+
+        {/* "Mi trabajo para hoy" toggle — al lado de Limpiar (decisión de Pedro) */}
+        <button
+          onClick={() => setFilters((f) => ({ ...f, soloHoy: !f.soloHoy }))}
+          style={{
+            ...miTrabajoBtnStyle,
+            background: filters.soloHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.03)',
+            color: filters.soloHoy ? 'white' : 'var(--mk-text-secondary)',
+            border: `1px solid ${filters.soloHoy ? 'var(--mk-accent)' : 'var(--mk-border-subtle)'}`,
+            boxShadow: filters.soloHoy ? '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)' : 'none',
+          }}
+          title="Filtra solo las tareas que marcaste con 'Editar hoy'"
+        >
+          <IconToday />
+          Mi trabajo para hoy
+          {filters.soloHoy && (
+            <span style={{ marginLeft: 4, padding: '0 6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
+              {visible.length}
+            </span>
+          )}
+        </button>
 
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -217,13 +366,15 @@ export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Pr
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 'var(--mk-text-sm)' }}>
           <thead>
             <tr>
-              <Th width="200px" sortable field="marca"       sort={sort} onSort={toggleSort}>Proyecto</Th>
-              <Th             sortable field="nombre"       sort={sort} onSort={toggleSort}>Nombre de la tarea</Th>
-              <Th width="160px" sortable field="editor"      sort={sort} onSort={toggleSort}>Editor</Th>
-              <Th width="130px" sortable field="grillaFit"   sort={sort} onSort={toggleSort}>Grilla de FIT</Th>
-              <Th width="120px" sortable field="estado"      sort={sort} onSort={toggleSort}>Estado</Th>
-              <Th width="140px" sortable field="fechaEdicion" sort={sort} onSort={toggleSort}>Fecha edición</Th>
-              <Th width="50px" align="right" />
+              <Th width="160px" sortable field="marca"        sort={sort} onSort={toggleSort}>Proyecto</Th>
+              <Th              sortable field="nombre"        sort={sort} onSort={toggleSort}>Nombre de la tarea</Th>
+              <Th width="150px" sortable field="editor"       sort={sort} onSort={toggleSort}>Editor</Th>
+              <Th width="120px" sortable field="grillaFit"    sort={sort} onSort={toggleSort}>Grilla de FIT</Th>
+              <Th width="110px" sortable field="estado"       sort={sort} onSort={toggleSort}>Estado</Th>
+              <Th width="130px" sortable field="fechaEdicion" sort={sort} onSort={toggleSort}>Fecha edición</Th>
+              <Th width="110px">Editar hoy</Th>
+              <Th width="120px">Enlace tomas</Th>
+              <Th width="40px" align="right" />
             </tr>
           </thead>
           <tbody>
@@ -231,21 +382,26 @@ export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Pr
               <Row
                 key={e.id}
                 entry={e}
+                marcaInfo={marcaBySlug.get(e.marcaSlug) ?? null}
+                editorInfo={e.editorId ? editorById.get(e.editorId) ?? null : null}
+                editores={editores}
+                hoy={hoy}
                 onOpenDetail={() => openRow(e.id)}
                 onSetEstado={(s) => setEstado(e.id, s)}
                 onSetEditor={(eid) => setEditor(e.id, eid)}
                 onSetNombre={(n) => setNombre(e.id, n)}
                 onSetGrilla={(d) => setFechaGrilla(e.id, d)}
-                onSetFechaEd={(d) => setFechaEdicion(e.id, d)}
+                onSetFechaEd={(d) => setFechaEdicionVal(e.id, d)}
+                onToggleHoy={() => toggleEditarHoy(e.id, e.fechaMarcadaParaEditar === hoy)}
               />
             ))}
             {visible.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: '60px 20px', textAlign: 'center' }}>
+              <tr><td colSpan={9} style={{ padding: '60px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
-                  Sin tareas con esos filtros
+                  {filters.soloHoy ? 'Aún no marcaste tareas para hoy' : 'Sin tareas con esos filtros'}
                 </div>
                 <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
-                  Probá limpiar los filtros o crear una nueva tarea
+                  {filters.soloHoy ? 'Tocá "Editar hoy" en alguna fila para agregarla' : 'Probá limpiar los filtros'}
                 </div>
               </td></tr>
             )}
@@ -257,23 +413,139 @@ export function EditorView({ entries: initialEntries = EDITOR_ENTRIES_MOCK }: Pr
 }
 
 /* ============================================================
+   Dashboard de métricas — Card horizontal arriba de la tabla
+   ============================================================ */
+
+function DashboardMetricas({
+  editadosMes, objetivoMes, porEditar, conGuion, sinGuion, urgentes,
+}: {
+  editadosMes: number; objetivoMes: number; porEditar: number
+  conGuion: number; sinGuion: number; urgentes: number
+}) {
+  const pct = objetivoMes > 0 ? Math.round((editadosMes / objetivoMes) * 100) : 0
+  return (
+    <div style={{
+      padding: '14px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
+      display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap',
+      background: 'rgba(255, 255, 255, 0.01)',
+    }}>
+      {/* Objetivo mensual con círculo */}
+      <MetricaCircle
+        pct={pct}
+        valor={editadosMes}
+        total={objetivoMes}
+        label="Editados este mes"
+        sublabel={`${pct}% del mes`}
+      />
+
+      <MetricaCard
+        valor={porEditar}
+        label="Por editar"
+        color="#f2c94c"
+        icon={<IconClipboard />}
+      />
+      <MetricaCard
+        valor={conGuion}
+        label="Con guion técnico"
+        color="#34d399"
+        icon={<IconScript />}
+      />
+      <MetricaCard
+        valor={sinGuion}
+        label="Sin guion"
+        color="#a78bfa"
+        icon={<IconScriptEmpty />}
+      />
+      <MetricaCard
+        valor={urgentes}
+        label="Fechas urgentes"
+        color={urgentes > 0 ? '#fb7185' : '#737373'}
+        icon={<IconWarn />}
+        highlight={urgentes > 0}
+        hint={urgentes > 0 ? '≤1 día entre edición y publicación' : 'Sin alertas'}
+      />
+    </div>
+  )
+}
+
+function MetricaCircle({ pct, valor, total, label, sublabel }: { pct: number; valor: number; total: number; label: string; sublabel: string }) {
+  /* Círculo SVG con stroke-dashoffset = progress */
+  const R = 22
+  const C = 2 * Math.PI * R
+  const offset = C - (C * Math.min(100, Math.max(0, pct))) / 100
+  return (
+    <div style={metricaCardStyle}>
+      <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
+        <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="28" cy="28" r={R} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="4" />
+          <circle cx="28" cy="28" r={R} fill="none" stroke="#a78bfa" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 600ms ease-out' }} />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'var(--mk-text-primary)' }}>
+          {pct}%
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+          {valor} <span style={{ color: 'var(--mk-text-quaternary)', fontWeight: 400, fontSize: 14 }}>/ {total}</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{sublabel}</div>
+      </div>
+    </div>
+  )
+}
+
+function MetricaCard({ valor, label, color, icon, highlight, hint }: { valor: number; label: string; color: string; icon: React.ReactNode; highlight?: boolean; hint?: string }) {
+  return (
+    <div
+      style={{
+        ...metricaCardStyle,
+        border: highlight ? `1px solid ${color}` : '1px solid var(--mk-border-subtle)',
+        background: highlight ? `${color}10` : 'rgba(255, 255, 255, 0.02)',
+      }}
+      title={hint}
+    >
+      <div style={{
+        width: 36, height: 36, borderRadius: 8,
+        background: `${color}1a`, color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        {icon}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{valor}</div>
+        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>{label}</div>
+        {hint && <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{hint}</div>}
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
    Row — todas las celdas editables
    ============================================================ */
 
 function Row({
-  entry, onOpenDetail, onSetEstado, onSetEditor, onSetNombre, onSetGrilla, onSetFechaEd,
+  entry, marcaInfo, editorInfo, editores, hoy,
+  onOpenDetail, onSetEstado, onSetEditor, onSetNombre, onSetGrilla, onSetFechaEd, onToggleHoy,
 }: {
-  entry: EditorEntryMock
+  entry: EditorEntry
+  marcaInfo: MarcaOption | null
+  editorInfo: EditorOption | null
+  editores: EditorOption[]
+  hoy: string
   onOpenDetail: () => void
   onSetEstado: (s: EstadoPub) => void
   onSetEditor: (eid: string | null) => void
   onSetNombre: (n: string) => void
   onSetGrilla: (d: string) => void
   onSetFechaEd: (d: string) => void
+  onToggleHoy: () => void
 }) {
-  const marca = marcaDisplay(entry.marcaSlug)
-  const editor = (entry.editorId ? EDITORES_MOCK.find((e) => e.id === entry.editorId) : null) ?? null
-  /* estadoCfg sólo se usa adentro de EditableEstado; aquí no se necesita */
+  const alerta = calcularAlertaFecha(entry.fechaEdicion, entry.grillaFit)
+  const estaMarcadaHoy = entry.fechaMarcadaParaEditar === hoy
 
   return (
     <tr
@@ -281,47 +553,85 @@ function Row({
         height: 'var(--mk-row-height)',
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         cursor: 'pointer',
+        background: estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent',
       }}
       onClick={onOpenDetail}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent' }}
     >
-      {/* Marca — no editable, sí navegable */}
+      {/* Marca */}
       <Td>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="mk-dot" style={{ background: marca?.color, boxShadow: marca?.color ? `0 0 6px ${marca.color}` : undefined, width: 8, height: 8 }} />
+          <span className="mk-dot" style={{ background: marcaInfo?.color, boxShadow: marcaInfo?.color ? `0 0 6px ${marcaInfo.color}` : undefined, width: 8, height: 8 }} />
           <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {marca?.nombreCorto ?? entry.marcaSlug}
+            {marcaInfo?.nombreCorto ?? entry.marcaSlug}
           </span>
         </div>
       </Td>
 
-      {/* Nombre tarea — editable inline */}
+      {/* Nombre */}
       <Td>
         <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
       </Td>
 
-      {/* Editor — popover */}
+      {/* Editor — fallback al nombre denormalizado cuando editorInfo es null */}
       <Td>
-        <EditableEditor current={editor} onChange={onSetEditor} />
+        <EditableEditor
+          current={editorInfo}
+          fallbackName={entry.editorNombre}
+          editores={editores}
+          onChange={onSetEditor}
+        />
       </Td>
 
-      {/* Grilla FIT — date input */}
+      {/* Grilla FIT */}
       <Td>
         <InlineDate value={entry.grillaFit} onChange={onSetGrilla} />
       </Td>
 
-      {/* Estado — popover */}
+      {/* Estado */}
       <Td>
         <EditableEstado current={entry.estado} onChange={onSetEstado} />
       </Td>
 
-      {/* Fecha edición — date input */}
+      {/* Fecha edición con color de alerta */}
       <Td>
-        <InlineDate value={entry.fechaEdicion} onChange={onSetFechaEd} />
+        <InlineDate
+          value={entry.fechaEdicion}
+          onChange={onSetFechaEd}
+          colorOverride={ALERTA_COLOR[alerta].fg}
+          bgOverride={ALERTA_COLOR[alerta].bg}
+          alertaLabel={ALERTA_COLOR[alerta].label}
+        />
       </Td>
 
-      {/* Acción rápida — abrir detalle */}
+      {/* Editar hoy — botón toggle */}
+      <Td>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleHoy() }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px',
+            background: estaMarcadaHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.04)',
+            color: estaMarcadaHoy ? 'white' : 'var(--mk-text-secondary)',
+            border: 'none', borderRadius: 'var(--mk-radius-md)',
+            fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+            boxShadow: estaMarcadaHoy ? '0 0 0 1px rgba(113, 112, 255, 0.30), 0 0 12px rgba(113, 112, 255, 0.30)' : 'none',
+          }}
+          title={estaMarcadaHoy ? 'Quitar de "Mi trabajo para hoy"' : 'Marcar para editar hoy'}
+        >
+          {estaMarcadaHoy ? '✓ Hoy' : '＋ Hoy'}
+        </button>
+      </Td>
+
+      {/* Enlace tomas */}
+      <Td>
+        <EnlaceTomasCell url={entry.enlaceTomas} />
+      </Td>
+
+      {/* Abrir detalle */}
       <Td align="right">
         <button
           onClick={(e) => { e.stopPropagation(); onOpenDetail() }}
@@ -337,30 +647,49 @@ function Row({
 }
 
 /* ============================================================
-   Editable primitives — stopPropagation crítico para no triggear openRow
+   Cells y primitives
    ============================================================ */
+
+function EnlaceTomasCell({ url }: { url: string | null }) {
+  if (!url) return <span style={{ color: 'var(--mk-text-quaternary)', fontSize: 11, fontStyle: 'italic' }}>—</span>
+  /* Captura local — TypeScript no propaga el narrowing del `if (!url)`
+     hacia funciones nested por closures (puede haber un re-render entre
+     el if y la callback). Asignamos a const para tener tipo `string`. */
+  const safeUrl: string = url
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation()
+    navigator.clipboard.writeText(safeUrl).then(() => toast.success('Enlace copiado', { duration: 1200 }))
+  }
+  function open(e: React.MouseEvent) {
+    e.stopPropagation()
+    window.open(safeUrl, '_blank', 'noopener,noreferrer')
+  }
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <button onClick={copy} title="Copiar enlace"
+        style={{ padding: '3px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-sm)', color: 'var(--mk-text-tertiary)', cursor: 'pointer' }}>
+        <IconCopy />
+      </button>
+      <button onClick={open} title="Abrir en Drive"
+        style={{ padding: '3px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-sm)', color: 'var(--mk-text-tertiary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontFamily: 'inherit' }}>
+        <IconExternal /> Drive
+      </button>
+    </div>
+  )
+}
 
 function InlineText({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
 
-  function start(e: React.MouseEvent) {
-    e.stopPropagation()
-    setDraft(value); setEditing(true)
-  }
-  function commit() {
-    setEditing(false)
-    if (draft !== value) onSave(draft)
-  }
-  function cancel() {
-    setEditing(false); setDraft(value)
-  }
+  function start(e: React.MouseEvent) { e.stopPropagation(); setDraft(value); setEditing(true) }
+  function commit() { setEditing(false); if (draft !== value) onSave(draft) }
+  function cancel() { setEditing(false); setDraft(value) }
 
   if (editing) {
     return (
       <input
-        autoFocus
-        value={draft}
+        autoFocus value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onClick={(e) => e.stopPropagation()}
         onBlur={commit}
@@ -369,30 +698,21 @@ function InlineText({ value, onSave }: { value: string; onSave: (v: string) => v
           if (e.key === 'Escape') { e.preventDefault(); cancel() }
         }}
         style={{
-          width: '100%',
-          padding: '4px 6px',
-          margin: '-4px -6px',
+          width: '100%', padding: '4px 6px', margin: '-4px -6px',
           background: 'var(--mk-bg-base)',
-          border: '1px solid var(--mk-accent)',
-          borderRadius: 4,
-          color: 'var(--mk-text-primary)',
-          fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
-          outline: 'none',
-          boxShadow: '0 0 0 3px var(--mk-accent-glow)',
+          border: '1px solid var(--mk-accent)', borderRadius: 4,
+          color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)',
         }}
       />
     )
   }
   return (
-    <span
-      onClick={start}
+    <span onClick={start}
       style={{
-        color: 'var(--mk-text-primary)',
-        cursor: 'text',
-        padding: '2px 4px', margin: '-2px -4px',
-        borderRadius: 3,
-        display: 'inline-block',
-        maxWidth: '100%',
+        color: 'var(--mk-text-primary)', cursor: 'text',
+        padding: '2px 4px', margin: '-2px -4px', borderRadius: 3,
+        display: 'inline-block', maxWidth: '100%',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}
       title="Click para editar"
@@ -402,14 +722,18 @@ function InlineText({ value, onSave }: { value: string; onSave: (v: string) => v
   )
 }
 
-function InlineDate({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function InlineDate({
+  value, onChange, colorOverride, bgOverride, alertaLabel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  colorOverride?: string
+  bgOverride?: string
+  alertaLabel?: string
+}) {
   const [editing, setEditing] = useState(false)
-
   function start(e: React.MouseEvent) { e.stopPropagation(); setEditing(true) }
-  function commit(newVal: string) {
-    setEditing(false)
-    if (newVal && newVal !== value) onChange(newVal)
-  }
+  function commit(newVal: string) { setEditing(false); if (newVal && newVal !== value) onChange(newVal) }
 
   if (editing) {
     return (
@@ -424,27 +748,25 @@ function InlineDate({ value, onChange }: { value: string; onChange: (v: string) 
         style={{
           padding: '4px 6px', margin: '-4px -6px',
           background: 'var(--mk-bg-base)',
-          border: '1px solid var(--mk-accent)',
-          borderRadius: 4,
-          color: 'var(--mk-text-primary)',
-          fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
-          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)',
-          colorScheme: 'dark',  /* hace el date picker dark */
+          border: '1px solid var(--mk-accent)', borderRadius: 4,
+          color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)', colorScheme: 'dark',
         }}
       />
     )
   }
   return (
-    <span
-      onClick={start}
+    <span onClick={start}
       style={{
-        color: 'var(--mk-text-secondary)',
-        fontVariantNumeric: 'tabular-nums',
-        cursor: 'text',
-        padding: '2px 4px', margin: '-2px -4px',
-        borderRadius: 3,
+        color: colorOverride ?? 'var(--mk-text-secondary)',
+        background: bgOverride,
+        fontVariantNumeric: 'tabular-nums', cursor: 'text',
+        padding: bgOverride ? '3px 8px' : '2px 4px',
+        margin: bgOverride ? 0 : '-2px -4px',
+        borderRadius: bgOverride ? 'var(--mk-radius-sm)' : 3,
+        fontWeight: bgOverride ? 500 : 400,
       }}
-      title="Click para cambiar fecha"
+      title={alertaLabel ? `Fecha edición · ${alertaLabel}` : 'Click para cambiar fecha'}
     >
       {formatDateES(value)}
     </span>
@@ -465,8 +787,7 @@ function EditableEstado({ current, onChange }: { current: EstadoPub; onChange: (
           fontSize: 10.5, fontWeight: 500,
           borderRadius: 'var(--mk-radius-sm)',
           textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)',
-          border: 'none', cursor: 'pointer',
-          fontFamily: 'inherit',
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
         }}
       >
         <span className="mk-dot" style={{ background: cfg.color, width: 5, height: 5 }} />
@@ -490,8 +811,19 @@ function EditableEstado({ current, onChange }: { current: EstadoPub; onChange: (
   )
 }
 
-function EditableEditor({ current, onChange }: { current: typeof EDITORES_MOCK[number] | null; onChange: (id: string | null) => void }) {
+function EditableEditor({
+  current, fallbackName, editores, onChange,
+}: {
+  current: EditorOption | null
+  fallbackName: string | null
+  editores: EditorOption[]
+  onChange: (id: string | null) => void
+}) {
   const [open, setOpen] = useState(false)
+  /* Si current es null pero hay fallbackName (editor_nombre del sync
+     Notion), lo mostramos como chip "huérfano" en gris. Pedro lo verá
+     y podrá reasignarlo al editor real. */
+  const showOrphan = !current && !!fallbackName
   return (
     <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
       <button
@@ -501,8 +833,7 @@ function EditableEditor({ current, onChange }: { current: typeof EDITORES_MOCK[n
           padding: '2px 8px 2px 2px',
           background: 'rgba(255, 255, 255, 0.04)',
           borderRadius: 'var(--mk-radius-full)',
-          cursor: 'pointer', border: 'none',
-          fontFamily: 'inherit',
+          cursor: 'pointer', border: 'none', fontFamily: 'inherit',
         }}
       >
         {current ? (
@@ -511,6 +842,15 @@ function EditableEditor({ current, onChange }: { current: typeof EDITORES_MOCK[n
               {current.nombre.slice(0, 2).toUpperCase()}
             </span>
             <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-secondary)', fontWeight: 500 }}>{current.nombre}</span>
+          </>
+        ) : showOrphan ? (
+          <>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#737373', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
+              {fallbackName!.slice(0, 2).toUpperCase()}
+            </span>
+            <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontWeight: 500 }} title="Editor sin vincular en BD — reasignar">
+              {fallbackName}
+            </span>
           </>
         ) : (
           <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-quaternary)', fontStyle: 'italic', padding: '0 8px' }}>
@@ -527,7 +867,7 @@ function EditableEditor({ current, onChange }: { current: typeof EDITORES_MOCK[n
             <span style={{ color: 'var(--mk-text-tertiary)' }}>Sin asignar</span>
           </PopoverItem>
           <div style={{ height: 1, background: 'var(--mk-border-subtle)', margin: '4px 0' }} />
-          {EDITORES_MOCK.map((e) => (
+          {editores.map((e) => (
             <PopoverItem key={e.id} onClick={() => { onChange(e.id); setOpen(false) }} selected={current?.id === e.id}>
               <span style={{ width: 18, height: 18, borderRadius: '50%', background: e.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
                 {e.nombre.slice(0, 2).toUpperCase()}
@@ -542,7 +882,7 @@ function EditableEditor({ current, onChange }: { current: typeof EDITORES_MOCK[n
 }
 
 /* ============================================================
-   Popover + cell primitives
+   Popover + cell primitives + Th/Td
    ============================================================ */
 
 function Popover({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
@@ -552,14 +892,12 @@ function Popover({ onClose, children }: { onClose: () => void; children: React.R
       <div
         className="mk-anim-scale-in"
         style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-          minWidth: 180,
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: 180,
           background: 'var(--mk-bg-overlay)',
           border: '1px solid var(--mk-border-default)',
           borderRadius: 'var(--mk-radius-md)',
           boxShadow: 'var(--mk-shadow-lg)',
-          padding: 4, zIndex: 51,
-          maxHeight: 320, overflowY: 'auto',
+          padding: 4, zIndex: 51, maxHeight: 320, overflowY: 'auto',
         }}
       >
         {children}
@@ -577,8 +915,7 @@ function PopoverItem({ children, onClick, selected }: { children: React.ReactNod
         width: '100%', padding: '6px 10px',
         background: selected ? 'var(--mk-bg-selected)' : 'transparent',
         border: 'none', borderRadius: 'var(--mk-radius-sm)',
-        color: 'var(--mk-text-primary)',
-        fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+        color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
         cursor: 'pointer', textAlign: 'left',
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
       }}
@@ -593,11 +930,8 @@ function PopoverItem({ children, onClick, selected }: { children: React.ReactNod
 function Th({
   children, width, align, sortable, field, sort, onSort,
 }: {
-  children?: React.ReactNode
-  width?: string
-  align?: 'left' | 'right'
-  sortable?: boolean
-  field?: SortField
+  children?: React.ReactNode; width?: string; align?: 'left' | 'right'
+  sortable?: boolean; field?: SortField
   sort?: { field: SortField; dir: SortDir } | null
   onSort?: (f: SortField) => void
 }) {
@@ -614,8 +948,7 @@ function Th({
         borderBottom: '1px solid var(--mk-border-subtle)',
         background: 'var(--mk-bg-base)',
         position: 'sticky', top: 0, zIndex: 2, width,
-        cursor: sortable ? 'pointer' : 'default',
-        userSelect: 'none',
+        cursor: sortable ? 'pointer' : 'default', userSelect: 'none',
       }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -639,7 +972,7 @@ function Td({ children, align }: { children: React.ReactNode; align?: 'left' | '
 }
 
 /* ============================================================
-   Filter pill (re-uso del Editor anterior)
+   Filter pill
    ============================================================ */
 
 type FilterOption = { id: string; label: string; color?: string }
@@ -658,8 +991,7 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
           borderRadius: 'var(--mk-radius-md)',
           color: value ? 'var(--mk-text-primary)' : 'var(--mk-text-secondary)',
           fontFamily: 'inherit', fontSize: 'var(--mk-text-xs)', fontWeight: 500,
-          cursor: 'pointer',
-          transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+          cursor: 'pointer', transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
         }}
       >
         {dotColor && <span className="mk-dot" style={{ background: dotColor, width: 6, height: 6 }} />}
@@ -682,14 +1014,19 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
 }
 
 /* ============================================================
-   Sort helpers + styles + icons
+   Sort + styles + icons
    ============================================================ */
 
-function sortValue(e: EditorEntryMock, f: SortField): string | number {
+function sortValue(
+  e: EditorEntry,
+  f: SortField,
+  marcaBySlug: Map<string, MarcaOption>,
+  editorById: Map<string, EditorOption>,
+): string | number {
   switch (f) {
-    case 'marca':        return marcaDisplay(e.marcaSlug)?.nombreCorto ?? e.marcaSlug
+    case 'marca':        return marcaBySlug.get(e.marcaSlug)?.nombreCorto ?? e.marcaSlug
     case 'nombre':       return e.nombreTarea
-    case 'editor':       return EDITORES_MOCK.find((ed) => ed.id === e.editorId)?.nombre ?? 'zzz'  /* nulls last */
+    case 'editor':       return (e.editorId ? editorById.get(e.editorId)?.nombre : e.editorNombre) ?? 'zzz'
     case 'grillaFit':    return e.grillaFit
     case 'estado':       return e.estado
     case 'fechaEdicion': return e.fechaEdicion
@@ -702,20 +1039,9 @@ const headerStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
 }
 const filterBarStyle: React.CSSProperties = {
-  padding: '10px 20px',
-  borderBottom: '1px solid var(--mk-border-subtle)',
+  padding: '10px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
   background: 'rgba(255, 255, 255, 0.01)', flexShrink: 0,
-}
-const btnPrimaryStyle: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  height: 'var(--mk-button-height-lg)', padding: '0 12px',
-  background: 'var(--mk-accent)', border: '1px solid var(--mk-accent)',
-  borderRadius: 'var(--mk-radius-md)',
-  color: 'white', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
-  cursor: 'pointer',
-  boxShadow: '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)',
-  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
 }
 const clearBtnStyle: React.CSSProperties = {
   padding: '4px 10px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit',
@@ -723,15 +1049,35 @@ const clearBtnStyle: React.CSSProperties = {
   color: 'var(--mk-text-tertiary)', cursor: 'pointer',
   borderRadius: 'var(--mk-radius-sm)',
 }
+const miTrabajoBtnStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '4px 12px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit',
+  fontWeight: 500, borderRadius: 'var(--mk-radius-md)', cursor: 'pointer',
+  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+}
 const openBtnStyle: React.CSSProperties = {
   background: 'transparent', border: 'none',
-  color: 'var(--mk-text-tertiary)',
-  cursor: 'pointer', padding: 4,
+  color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4,
   borderRadius: 'var(--mk-radius-sm)',
   transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
   display: 'inline-flex', alignItems: 'center',
 }
+const metricaCardStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 12,
+  padding: '10px 14px',
+  background: 'rgba(255, 255, 255, 0.02)',
+  border: '1px solid var(--mk-border-subtle)',
+  borderRadius: 'var(--mk-radius-md)',
+  minWidth: 200, flex: '1 1 200px',
+}
 
-function IconSearch()   { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" /><path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
-function IconPlus()     { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 2V9M2 5.5H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg> }
-function IconArrowOpen(){ return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 6.5H10M10 6.5L7 3.5M10 6.5L7 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+/* SVG icons inline (sin agregar lucide a este file que usa CSS-in-JS) */
+function IconSearch()       { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" /><path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+function IconArrowOpen()    { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 6.5H10M10 6.5L7 3.5M10 6.5L7 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+function IconToday()        { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 1V3M8 1V3M1.5 5H10.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+function IconClipboard()    { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5.5 2.5H10.5V4.5H5.5z" stroke="currentColor" strokeWidth="1.4"/></svg> }
+function IconScript()       { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h7.5l2.5 2.5v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4"/><path d="M5 7h6M5 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
+function IconScriptEmpty()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h7.5l2.5 2.5v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2 2"/></svg> }
+function IconWarn()         { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 13H2L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8 6V9M8 11V11.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
+function IconCopy()         { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="3" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.2"/><path d="M2 7V2.5a.5.5 0 01.5-.5H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+function IconExternal()     { return <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M3 1H1V8H8V6M5 1H8V4M3.5 5.5L8 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> }
