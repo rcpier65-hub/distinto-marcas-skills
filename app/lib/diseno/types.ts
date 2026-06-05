@@ -8,28 +8,28 @@
 export type EstadoPub =
   | 'disenar' | 'editar' | 'aprobar' | 'programar' | 'publicar' | 'publicado' | 'borrador'
 
-/* Sub-estados específicos del workflow de diseño.
-   Mapeamos al ENUM estado_tarea existente para no crear otra columna. */
-export type SubEstadoDiseno = 'sin_empezar' | 'en_progreso' | 'listo'
+/* Sub-estados del workflow de diseño.
+   'archivado': la tarea ya no se muestra en lista normal. Pedro pidió
+   este estado para sacar cosas del kanban sin borrarlas. */
+export type SubEstadoDiseno = 'sin_empezar' | 'en_progreso' | 'listo' | 'archivado'
 
 export type DisenoEntry = {
   id: string
   marcaSlug: string
+  marcaNombre: string             // para el chip del kanban sin lookup
+  marcaColor: string              // ditto
+  marcaEmoji: string | null
+  esInterno: boolean              // marca='interno' = tarea standalone
+                                  // (Manual de marca, Banner web, etc.)
   nombreTarea: string
-  disenadorId: string | null      // FK a tabla disenadores
-  disenadorNombre: string | null  // denormalizado: cuando el sync de
-                                  // Notion trajo un nombre que aún no
-                                  // existe en `disenadores`
-  fechaPublicacion: string | null // ISO YYYY-MM-DD (deadline real)
-  fechaDiseno: string             // ISO YYYY-MM-DD (cuándo se diseña)
+  descripcion: string | null      // brief largo
+  fechaPublicacion: string | null // null si es tarea standalone
+  fechaDiseno: string | null      // día específico para diseñar
+  fechaEntrega: string | null     // deadline del rango
   estado: EstadoPub
   subEstado: SubEstadoDiseno
-  plataformas: string[]            // ['IG', 'FB', ...]
-  tipoContenido: string[]          // ['Reel', 'Post', 'Manual', ...]
-  portadaCrudaUrl: string | null   // referencia para Ailyn
-  portadaEditadaUrl: string | null // resultado del diseño
-  portadaLista: boolean            // checkbox de listo
-  disenado: boolean                // checkbox "Diseñado" del workflow
+  plataformas: string[]
+  tipoContenido: string[]
   fechaMarcadaParaDisenar: string | null  // YYYY-MM-DD del "hoy"
 }
 
@@ -68,11 +68,12 @@ export function calcularAlertaFecha(
 
 /**
  * Mapea el ENUM estado_tarea de Postgres al sub-estado de diseño.
- * Si el estado_tarea no calza con el ciclo de diseño (ej. "publicado"),
- * default a 'sin_empezar' para no romper la UI.
+ * Si el estado_tarea no calza con el ciclo de diseño, default a
+ * 'sin_empezar' para no romper la UI.
  */
 export function normalizeSubEstado(estadoTarea: string | null | undefined): SubEstadoDiseno {
   const s = (estadoTarea ?? '').toLowerCase().trim()
+  if (s === 'archivado' || s === 'archivada') return 'archivado'
   if (s === 'listo' || s === 'completado') return 'listo'
   if (s === 'en_progreso' || s === 'en progreso' || s.includes('progreso')) return 'en_progreso'
   return 'sin_empezar'

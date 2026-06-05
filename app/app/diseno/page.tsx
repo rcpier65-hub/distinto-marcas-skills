@@ -1,38 +1,23 @@
 // app/app/diseno/page.tsx
 //
-// Vista Diseño — espejo del módulo /editor pero filtrada por las
-// tareas que necesitan diseño (fecha_diseno IS NOT NULL).
-//
-// Pedro pidió cargar mayo + junio 2026 (rango de la skill actual del
-// flujo de Distinto). Hardcodear el rango aquí está ok como v1; si
-// después quiere navegación mes a mes se hace url params como en
-// /grabaciones/calendario.
-//
-// Reusa la tabla `publicaciones`. La columna disenador_id viene de la
-// migration 20260605200001 — si todavía no se aplicó, retry-fallback
-// sin esa columna y bandera marcaMigrationPendiente.
+// Vista Diseño v2 (rediseño Pedro 2026-06-05):
+//   - Carga publicaciones con fecha_diseno en mayo+junio 2026 OR
+//     tareas standalone (marca = 'interno') sin fecha
+//   - Excluye archivadas por default — el filtro está client-side y
+//     se puede invertir con toggle
+//   - Trae descripcion + fecha_entrega (columnas nuevas, defensive
+//     retry sin ellas si la migration aún no se aplicó)
 
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DisenoView } from '@/components/views/DisenoView'
-import type { DisenoEntry, DisenadorOption, EstadoPub } from '@/lib/diseno/types'
+import type { DisenoEntry, EstadoPub } from '@/lib/diseno/types'
 import { normalizeSubEstado } from '@/lib/diseno/types'
 
 export const dynamic = 'force-dynamic'
 
-/* Rango temporal default — mayo + junio 2026. Pedro lo pidió explícito.
-   Cuando agreguemos navegación por mes, este rango sale a URL params. */
 const DESDE = '2026-05-01'
 const HASTA = '2026-06-30'
-
-/* Paleta para asignar a diseñadores que no tienen color_hex en BD.
-   Hash estable por nombre para que no cambie entre refrescos. */
-const COLORS = ['#a78bfa', '#fb7185', '#60a5fa', '#fbbf24', '#34d399', '#f472b6', '#22d3ee', '#fde047']
-function colorForName(nombre: string): string {
-  let hash = 0
-  for (let i = 0; i < nombre.length; i++) hash = (hash * 31 + nombre.charCodeAt(i)) & 0xffffffff
-  return COLORS[Math.abs(hash) % COLORS.length]
-}
 
 function normalizeEstado(estadoBD: string | null | undefined): EstadoPub {
   const s = (estadoBD ?? '').toLowerCase().trim()
@@ -60,103 +45,116 @@ export default async function DisenoPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  /* Query: publicaciones con fecha_diseno en el rango + diseñadores
-     activos + todas las marcas. Solo columnas que la UI usa para
-     mantener el payload bajo. */
-  const [pubsResult, disenadoresResult, marcasResult] = await Promise.all([
-    service
-      .from('publicaciones')
-      .select(`
-        id, nombre, fecha_publicacion, fecha_diseno, estado, estado_tarea,
-        plataformas, tipo_contenido,
-        disenador_id, disenador_nombre,
-        portada_cruda_url, portada_editada_url,
-        portada_lista, disenado,
-        fecha_marcada_para_disenar,
-        marca:marcas(slug)
-      `)
-      .not('fecha_diseno', 'is', null)
-      .gte('fecha_diseno', DESDE)
-      .lte('fecha_diseno', HASTA)
-      .order('fecha_diseno', { ascending: true })
-      .limit(500),
-    service
-      .from('disenadores')
-      .select('id, nombre, activo, color_hex')
-      .eq('activo', true)
-      .order('nombre'),
-    service
-      .from('marcas')
-      .select('id, slug, nombre, color_primario_hex, emoji_marca'),
-  ])
+  /* Traemos:
+     - Las publicaciones con fecha_diseno en mayo+junio (sin importar
+       si tienen fecha_publicacion). Esto incluye tareas para publicar
+       y standalone que ya tienen fecha de diseño asignada.
+     - Las publicaciones de marca='interno' SIN fecha_diseno (Manual
+       de marca recién creada que no tiene fecha aún) — útil para no
+       perderlas en el módulo.
+     - Todas las marcas para el dropdown del modal. */
+  const SELECT = `
+    id, nombre, descripcion,
+    fecha_publicacion, fecha_diseno, fecha_entrega,
+    estado, estado_tarea,
+    plataformas, tipo_contenido,
+    fecha_marcada_para_disenar,
+    marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
+  `
+  const FALLBACK_SELECT = `
+    id, nombre,
+    fecha_publicacion, fecha_diseno,
+    estado, estado_tarea,
+    plataformas, tipo_contenido,
+    marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
+  `
 
-  /* Fallback: si la migration 20260605200001 todavía no corrió, las
-     columnas disenador_* y fecha_marcada_para_disenar no existen.
-     Reintentamos sin esos campos y mostramos banner. */
-  let pubs = pubsResult.data
+  /* Query A: con fecha_diseno en rango */
+  let queryA = service
+    .from('publicaciones')
+    .select(SELECT)
+    .not('fecha_diseno', 'is', null)
+    .gte('fecha_diseno', DESDE)
+    .lte('fecha_diseno', HASTA)
+    .order('fecha_diseno', { ascending: true })
+    .limit(500)
+  let resA = await queryA
+
+  /* Query B: tareas internas sin fecha_diseno (recién creadas) */
+  let queryB = service
+    .from('publicaciones')
+    .select(SELECT)
+    .is('fecha_diseno', null)
+    .order('created_at', { ascending: false })
+    .limit(100)
+    .eq('marca.slug', 'interno')
+  let resB = await queryB
+
   let migrationPendiente = false
+  /* Defensive: si descripcion/fecha_entrega no existen, reintentamos */
   if (
-    pubsResult.error?.code === '42703' ||
-    /disenador_|fecha_marcada_para_disenar/i.test(pubsResult.error?.message ?? '')
+    resA.error?.code === '42703' ||
+    /descripcion|fecha_entrega|fecha_marcada_para_disenar/i.test(resA.error?.message ?? '')
   ) {
     migrationPendiente = true
-    const retry = await service
+    queryA = service
       .from('publicaciones')
-      .select(`
-        id, nombre, fecha_publicacion, fecha_diseno, estado, estado_tarea,
-        plataformas, tipo_contenido,
-        portada_cruda_url, portada_editada_url,
-        portada_lista, disenado,
-        marca:marcas(slug)
-      `)
+      .select(FALLBACK_SELECT)
       .not('fecha_diseno', 'is', null)
       .gte('fecha_diseno', DESDE)
       .lte('fecha_diseno', HASTA)
       .order('fecha_diseno', { ascending: true })
       .limit(500)
-    pubs = retry.data
+    resA = await queryA
+    queryB = service
+      .from('publicaciones')
+      .select(FALLBACK_SELECT)
+      .is('fecha_diseno', null)
+      .order('id', { ascending: false })
+      .limit(100)
+      .eq('marca.slug', 'interno')
+    resB = await queryB
   }
 
-  // Si la tabla disenadores tampoco existe (mismo escenario pre-migration)
-  // disenadoresResult.error → tratamos como lista vacía.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const disenadoresRaw: { id: string; nombre: string; color_hex: string | null }[] =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (disenadoresResult.data ?? []) as any[]
-  const disenadores: DisenadorOption[] = disenadoresRaw.map((d) => ({
-    id: d.id,
-    nombre: d.nombre,
-    color: d.color_hex ?? colorForName(d.nombre),
-  }))
-
-  /* Lookup case-insensitive nombre → id para resolver disenador_id
-     cuando viene solo el nombre del sync de Notion. */
-  const disenadorByName = new Map(disenadoresRaw.map((d) => [d.nombre.toLowerCase().trim(), d.id]))
+  /* Marcas para el modal de nueva tarea — excluye la "interno" del
+     dropdown porque ese es el bucket default cuando NO eligen marca. */
+  const marcasResult = await service
+    .from('marcas')
+    .select('id, slug, nombre, color_primario_hex, emoji_marca')
+    .neq('slug', 'interno')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entries: DisenoEntry[] = (pubs ?? []).map((r: any) => {
+  const rowsA = (resA.data ?? []) as any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rowsB = (resB.data ?? []) as any[]
+  // Dedup por id (por si Query B trae uno que también está en A)
+  const seen = new Set<string>()
+  const allRows = [...rowsA, ...rowsB].filter((r) => {
+    if (seen.has(r.id)) return false
+    seen.add(r.id)
+    return true
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entries: DisenoEntry[] = allRows.map((r: any) => {
     const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
-    let disenadorId: string | null = r.disenador_id ?? null
-    if (!disenadorId && r.disenador_nombre) {
-      disenadorId = disenadorByName.get(String(r.disenador_nombre).toLowerCase().trim()) ?? null
-    }
-
+    const slug = marca?.slug ?? 'unknown'
     return {
       id: r.id,
-      marcaSlug: marca?.slug ?? 'unknown',
+      marcaSlug: slug,
+      marcaNombre: marca?.nombre ?? slug,
+      marcaColor: marca?.color_primario_hex ?? '#737373',
+      marcaEmoji: marca?.emoji_marca ?? null,
+      esInterno: slug === 'interno',
       nombreTarea: r.nombre,
-      disenadorId,
-      disenadorNombre: r.disenador_nombre ?? null,
+      descripcion: r.descripcion ?? null,
       fechaPublicacion: r.fecha_publicacion ?? null,
-      fechaDiseno: r.fecha_diseno,  // garantizado por el .not('is', null)
+      fechaDiseno: r.fecha_diseno ?? null,
+      fechaEntrega: r.fecha_entrega ?? null,
       estado: normalizeEstado(r.estado),
       subEstado: normalizeSubEstado(r.estado_tarea),
       plataformas: (r.plataformas ?? []).map(abbreviatePlataforma),
       tipoContenido: r.tipo_contenido ?? [],
-      portadaCrudaUrl: r.portada_cruda_url ?? null,
-      portadaEditadaUrl: r.portada_editada_url ?? null,
-      portadaLista: r.portada_lista ?? false,
-      disenado: r.disenado ?? false,
       fechaMarcadaParaDisenar: r.fecha_marcada_para_disenar ?? null,
     }
   })
@@ -167,7 +165,6 @@ export default async function DisenoPage() {
   return (
     <DisenoView
       entries={entries}
-      disenadores={disenadores}
       marcas={marcas.map((m) => ({
         slug: m.slug,
         nombre: m.nombre,

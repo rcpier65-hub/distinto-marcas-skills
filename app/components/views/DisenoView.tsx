@@ -1,23 +1,17 @@
 'use client'
 
-/* DisenoView — gemelo visual del EditorView.
+/* DisenoView v2 — rediseño según feedback Pedro 2026-06-05:
  *
- * Misma estructura: header con breadcrumb + dashboard de métricas con
- * cards clickeables (vista rápida) + filter bar + tabla densa Linear-
- * style con edición inline. Cambios respecto a EditorView:
- *   - Columna "Editor" → "Diseñador"
- *   - "Fecha edición" → "Fecha diseño"
- *   - "Enlace tomas" → 2 checkboxes "Portada / Diseñado"
- *   - Métricas adaptadas a workflow de diseño
- *   - Estado default: 'disenar'
- *   - Sub-estado tarea expuesto en una columna extra (Sin empezar /
- *     En progreso / Listo) porque es el indicador principal en
- *     Notion ("Diseño Ailyn" → sin marcar → con sub-estado)
- *
- * El estilo (CSS vars, inline styles) replica EditorView para que el
- * look sea consistente. Si después extraemos a `_shared/`, hacemos
- * refactor incremental — por ahora vale la duplicación para no
- * romper Editor.
+ * Cambios respecto a v1:
+ *   - Toggle vista Tabla | Kanban
+ *   - Tabla: columnas reducidas (Proyecto, Tarea, Descripción,
+ *     Fecha entrega, Fecha diseño, Sub-estado, Diseñar HOY)
+ *   - Sub-estado: Sin empezar | En progreso | Listo | Archivado
+ *     (archivadas no se muestran por default)
+ *   - Botón "+ Nueva tarea" abre modal con formulario condicional
+ *     (¿es para publicar?)
+ *   - Kanban: 3 columnas con drag-and-drop HTML5 nativo
+ *   - Quitado: Diseñador, Publicación, Portada lista, Diseñado
  */
 
 import { useMemo, useState, useTransition } from 'react'
@@ -27,12 +21,11 @@ import {
   updateDisenoEntry,
   marcarParaDisenarHoy,
   desmarcarParaDisenarHoy,
-  togglePortadaLista,
-  toggleDisenado,
+  archivarTarea,
+  crearDisenoTask,
 } from '@/app/diseno/_actions'
 import {
   type DisenoEntry,
-  type DisenadorOption,
   type EstadoPub,
   type SubEstadoDiseno,
   type AlertaFecha,
@@ -40,24 +33,18 @@ import {
 } from '@/lib/diseno/types'
 
 /* ============================================================
-   Constantes UI (estilo igual al EditorView, sin tailwind)
+   Constantes UI
    ============================================================ */
-
-const ESTADO_CONFIG: Record<EstadoPub, { label: string; color: string; bg: string }> = {
-  disenar:   { label: 'Diseñar',   color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.12)' },
-  editar:    { label: 'Editar',    color: '#f2c94c', bg: 'rgba(242, 201, 76, 0.12)' },
-  aprobar:   { label: 'Aprobar',   color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
-  programar: { label: 'Programar', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
-  publicar:  { label: 'Publicar',  color: '#4cb782', bg: 'rgba(76, 183, 130, 0.12)' },
-  publicado: { label: 'Publicado', color: '#737373', bg: 'rgba(255, 255, 255, 0.06)' },
-  borrador:  { label: 'Borrador',  color: '#737373', bg: 'rgba(255, 255, 255, 0.04)' },
-}
 
 const SUBESTADO_CONFIG: Record<SubEstadoDiseno, { label: string; color: string; bg: string }> = {
   sin_empezar:  { label: 'Sin empezar', color: '#737373', bg: 'rgba(115, 115, 115, 0.14)' },
-  en_progreso:  { label: 'En progreso', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
+  en_progreso:  { label: 'En progreso', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.14)' },
   listo:        { label: 'Listo',       color: '#34d399', bg: 'rgba(52, 211, 153, 0.14)' },
+  archivado:    { label: 'Archivado',   color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.10)' },
 }
+
+/* Orden de columnas del kanban (archivado no se muestra ahí). */
+const KANBAN_COLUMNS: SubEstadoDiseno[] = ['sin_empezar', 'en_progreso', 'listo']
 
 const ALERTA_COLOR: Record<AlertaFecha, { fg: string; bg: string; label: string }> = {
   rojo:     { fg: '#fb7185', bg: 'rgba(251, 113, 133, 0.12)', label: 'urgente' },
@@ -84,24 +71,19 @@ export type MarcaOption = {
   emoji: string | null
 }
 
-type SortField = 'marca' | 'nombre' | 'disenador' | 'fechaDiseno' | 'estado' | 'fechaPub' | 'subEstado'
+type SortField = 'marca' | 'nombre' | 'fechaDiseno' | 'fechaEntrega' | 'subEstado'
 type SortDir = 'asc' | 'desc'
-
-/* Vista rápida: cards clickeables del dashboard. Toggle al hacer clic.
-   Cuando hay una vista rápida activa, el filtro de estado se ignora. */
-type VistaRapida = 'todas' | 'porDisenar' | 'conPortada' | 'sinPortada' | 'urgentes' | 'disenados'
+type Vista = 'tabla' | 'kanban'
 
 type Filters = {
-  estado: EstadoPub | 'todos'
-  disenadorId: string | 'todos' | '_sin'
+  subEstado: SubEstadoDiseno | 'activas'  // activas = todas menos archivado
   marcaSlug: string | 'todas'
   soloHoy: boolean
-  vistaRapida: VistaRapida
+  mostrarArchivadas: boolean
 }
 
 type Props = {
   entries: DisenoEntry[]
-  disenadores: DisenadorOption[]
   marcas: MarcaOption[]
   migrationPendiente?: boolean
   rangoDesde: string
@@ -113,96 +95,76 @@ type Props = {
    ============================================================ */
 
 export function DisenoView({
-  entries: initialEntries, disenadores, marcas, migrationPendiente,
-  rangoDesde, rangoHasta,
+  entries: initialEntries, marcas, migrationPendiente, rangoDesde, rangoHasta,
 }: Props) {
   const router = useRouter()
   const [entries, setEntries] = useState(initialEntries)
   const [, startTransition] = useTransition()
+  const [vista, setVista] = useState<Vista>('tabla')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>({
-    estado: 'todos',
-    disenadorId: 'todos',
+    subEstado: 'activas',
     marcaSlug: 'todas',
     soloHoy: false,
-    vistaRapida: 'todas',
+    mostrarArchivadas: false,
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
   const marcaBySlug = useMemo(() => new Map(marcas.map((m) => [m.slug, m])), [marcas])
-  const disenadorById = useMemo(() => new Map(disenadores.map((d) => [d.id, d])), [disenadores])
   const hoy = new Date().toISOString().slice(0, 10)
 
-  /* ============ Métricas del dashboard ============ */
+  /* ============ Métricas ============ */
   const metricas = useMemo(() => {
-    const total = entries.length
-    const disenados = entries.filter((e) => e.disenado).length
-    const porDisenar = entries.filter((e) => !e.disenado).length
-    const conPortada = entries.filter((e) => e.portadaLista && !e.disenado).length
-    const sinPortada = entries.filter((e) => !e.portadaLista && !e.disenado).length
-    const urgentes = entries.filter((e) =>
-      !e.disenado && calcularAlertaFecha(e.fechaDiseno, e.fechaPublicacion) === 'rojo',
+    const activas = entries.filter((e) => e.subEstado !== 'archivado')
+    const sinEmpezar = activas.filter((e) => e.subEstado === 'sin_empezar').length
+    const enProgreso = activas.filter((e) => e.subEstado === 'en_progreso').length
+    const listo = activas.filter((e) => e.subEstado === 'listo').length
+    const archivadas = entries.filter((e) => e.subEstado === 'archivado').length
+    const urgentes = activas.filter((e) =>
+      e.subEstado !== 'listo' && calcularAlertaFecha(e.fechaDiseno, e.fechaEntrega) === 'rojo',
     ).length
-    return { disenados, total, porDisenar, conPortada, sinPortada, urgentes }
-  }, [entries])
+    const hoyMarcadas = activas.filter((e) => e.fechaMarcadaParaDisenar === hoy).length
+    return { sinEmpezar, enProgreso, listo, archivadas, urgentes, hoyMarcadas, total: activas.length }
+  }, [entries, hoy])
 
-  /* ============ Filtrado + búsqueda + sort ============ */
+  /* ============ Filtrado ============ */
   const visible = useMemo(() => {
     let list = entries.filter((e) => {
-      /* "Mi trabajo para hoy" ignora otros filtros. Las vistas rápidas
-         (cards del dashboard) también, para que el drill-down sea claro. */
-      if (filters.soloHoy) {
-        if (e.fechaMarcadaParaDisenar !== hoy) return false
-      } else if (filters.vistaRapida !== 'todas') {
-        const v = filters.vistaRapida
-        if (v === 'porDisenar' && e.disenado) return false
-        if (v === 'conPortada' && (!e.portadaLista || e.disenado)) return false
-        if (v === 'sinPortada' && (e.portadaLista || e.disenado)) return false
-        if (v === 'disenados' && !e.disenado) return false
-        if (v === 'urgentes') {
-          if (e.disenado) return false
-          if (calcularAlertaFecha(e.fechaDiseno, e.fechaPublicacion) !== 'rojo') return false
-        }
-      } else {
-        if (filters.estado !== 'todos' && e.estado !== filters.estado) return false
-      }
-      if (filters.disenadorId !== 'todos') {
-        if (filters.disenadorId === '_sin') {
-          if (e.disenadorId) return false
-        } else if (e.disenadorId !== filters.disenadorId) return false
-      }
+      if (!filters.mostrarArchivadas && e.subEstado === 'archivado') return false
+      if (filters.soloHoy && e.fechaMarcadaParaDisenar !== hoy) return false
+      if (filters.subEstado !== 'activas' && e.subEstado !== filters.subEstado) return false
       if (filters.marcaSlug !== 'todas' && e.marcaSlug !== filters.marcaSlug) return false
       if (search) {
         const q = search.toLowerCase()
-        const marca = marcaBySlug.get(e.marcaSlug)
         if (
           !e.nombreTarea.toLowerCase().includes(q) &&
-          !marca?.nombre.toLowerCase().includes(q)
+          !e.marcaNombre.toLowerCase().includes(q) &&
+          !(e.descripcion ?? '').toLowerCase().includes(q)
         ) return false
       }
       return true
     })
     if (sort) {
       list = [...list].sort((a, b) => {
-        const av = sortValue(a, sort.field, marcaBySlug, disenadorById)
-        const bv = sortValue(b, sort.field, marcaBySlug, disenadorById)
+        const av = sortValue(a, sort.field)
+        const bv = sortValue(b, sort.field)
         if (av < bv) return sort.dir === 'asc' ? -1 : 1
         if (av > bv) return sort.dir === 'asc' ? 1 : -1
         return 0
       })
     }
     return list
-  }, [entries, filters, search, sort, marcaBySlug, disenadorById, hoy])
+  }, [entries, filters, search, sort, hoy])
 
   const hasActiveFilters =
-    filters.estado !== 'todos' ||
-    filters.disenadorId !== 'todos' ||
+    filters.subEstado !== 'activas' ||
     filters.marcaSlug !== 'todas' ||
     filters.soloHoy ||
-    filters.vistaRapida !== 'todas' ||
+    filters.mostrarArchivadas ||
     !!search
 
-  /* ============ Persist helper ============ */
+  /* ============ Persist helper (optimistic + revert) ============ */
 
   function persist(
     id: string,
@@ -217,51 +179,44 @@ export function DisenoView({
       const r = await action()
       if (!r.ok) {
         setEntries((cur) => cur.map((e) => (e.id === id ? prev : e)))
-        toast.error(`Error al guardar: ${r.error}`)
+        toast.error(`Error: ${r.error}`)
       } else {
-        toast.success(mensaje, { duration: 1500 })
+        toast.success(mensaje, { duration: 1200 })
       }
     })
   }
 
-  function setEstado(id: string, estado: EstadoPub) {
-    persist(id, { estado }, () => updateDisenoEntry(id, { estado }), `Estado → ${ESTADO_CONFIG[estado].label}`)
-  }
   function setSubEstado(id: string, subEstado: SubEstadoDiseno) {
-    persist(id, { subEstado }, () => updateDisenoEntry(id, { subEstado }), `Estado → ${SUBESTADO_CONFIG[subEstado].label}`)
-  }
-  function setDisenador(id: string, disenadorId: string | null) {
-    const nombre = disenadorId ? disenadorById.get(disenadorId)?.nombre ?? null : null
-    persist(id, { disenadorId, disenadorNombre: nombre },
-      () => updateDisenoEntry(id, { disenadorId }),
-      `Diseñador → ${nombre ?? 'Sin asignar'}`)
+    persist(id, { subEstado }, () => updateDisenoEntry(id, { subEstado }), `→ ${SUBESTADO_CONFIG[subEstado].label}`)
   }
   function setNombre(id: string, nombre: string) {
-    const trimmed = nombre.trim()
-    if (!trimmed) { toast.error('El nombre no puede estar vacío'); return }
-    persist(id, { nombreTarea: trimmed }, () => updateDisenoEntry(id, { nombre: trimmed }), 'Tarea renombrada')
+    const t = nombre.trim()
+    if (!t) { toast.error('El nombre no puede estar vacío'); return }
+    persist(id, { nombreTarea: t }, () => updateDisenoEntry(id, { nombre: t }), 'Renombrada')
+  }
+  function setDescripcion(id: string, descripcion: string) {
+    const t = descripcion.trim()
+    persist(id, { descripcion: t || null }, () => updateDisenoEntry(id, { descripcion: t || null }), 'Descripción guardada')
   }
   function setFechaDiseno(id: string, fechaDiseno: string) {
     persist(id, { fechaDiseno }, () => updateDisenoEntry(id, { fechaDiseno }), `Fecha diseño → ${formatDateES(fechaDiseno)}`)
   }
-  function setFechaPub(id: string, fechaPublicacion: string) {
-    persist(id, { fechaPublicacion }, () => updateDisenoEntry(id, { fechaPublicacion }), `Publicación → ${formatDateES(fechaPublicacion)}`)
+  function setFechaEntrega(id: string, fechaEntrega: string) {
+    persist(id, { fechaEntrega }, () => updateDisenoEntry(id, { fechaEntrega }), `Fecha entrega → ${formatDateES(fechaEntrega)}`)
   }
-  function setPortada(id: string, value: boolean) {
-    persist(id, { portadaLista: value }, () => togglePortadaLista(id, value), value ? 'Portada ✓' : 'Portada destildada')
-  }
-  function setDisenado(id: string, value: boolean) {
-    persist(id, { disenado: value }, () => toggleDisenado(id, value), value ? '¡Diseñado! 🎨' : 'Reabierto')
+  function archivarVal(id: string, archivar: boolean) {
+    const newSub: SubEstadoDiseno = archivar ? 'archivado' : 'sin_empezar'
+    persist(id, { subEstado: newSub }, () => archivarTarea(id, archivar), archivar ? 'Archivada 📦' : 'Reactivada')
   }
   function toggleDisenarHoy(id: string, estaMarcada: boolean) {
     if (migrationPendiente) {
-      toast.error('Migration disenadores pendiente. Aplicar desde Supabase Dashboard → SQL Editor.')
+      toast.error('Migration pendiente. Aplicar 20260605200001_disenadores.sql.')
       return
     }
     if (estaMarcada) {
       persist(id, { fechaMarcadaParaDisenar: null }, () => desmarcarParaDisenarHoy(id), 'Quitada de "Hoy"')
     } else {
-      persist(id, { fechaMarcadaParaDisenar: hoy }, () => marcarParaDisenarHoy(id), 'Agregada a "Mi trabajo de hoy"')
+      persist(id, { fechaMarcadaParaDisenar: hoy }, () => marcarParaDisenarHoy(id), 'Agregada a "Hoy"')
     }
   }
 
@@ -274,22 +229,28 @@ export function DisenoView({
   }
 
   function clearAll() {
-    setFilters({ estado: 'todos', disenadorId: 'todos', marcaSlug: 'todas', soloHoy: false, vistaRapida: 'todas' })
+    setFilters({ subEstado: 'activas', marcaSlug: 'todas', soloHoy: false, mostrarArchivadas: false })
     setSearch('')
     setSort(null)
-  }
-
-  function toggleVistaRapida(v: VistaRapida) {
-    setFilters((f) => ({ ...f, vistaRapida: f.vistaRapida === v ? 'todas' : v, soloHoy: false }))
   }
 
   function openRow(id: string) {
     router.push(`/publicaciones/${id}`)
   }
 
+  /* Callback del modal cuando se crea una tarea — la agregamos al
+     estado local para que aparezca sin recargar la página. La forma
+     "limpia" sería router.refresh(), pero genera flash; el optimistic
+     update se siente mejor. */
+  function onTareaCreada(nueva: DisenoEntry) {
+    setEntries((cur) => [nueva, ...cur])
+    toast.success(`Tarea creada: ${nueva.nombreTarea}`)
+    setModalOpen(false)
+  }
+
   return (
     <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }}>
-      {/* ============== HEADER ============== */}
+      {/* HEADER */}
       <header style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-sm)' }}>
           <span style={{ color: 'var(--mk-text-tertiary)' }}>Publicaciones</span>
@@ -302,19 +263,59 @@ export function DisenoView({
         <div style={{ flex: 1 }} />
         {migrationPendiente && (
           <span style={{ fontSize: 'var(--mk-text-xs)', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '4px 10px', borderRadius: 'var(--mk-radius-sm)' }}>
-            ⚠ Migration disenadores pendiente
+            ⚠ Migration pendiente
           </span>
         )}
+        {/* Toggle vista Tabla | Kanban */}
+        <div style={{
+          display: 'inline-flex', padding: 2,
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid var(--mk-border-subtle)',
+          borderRadius: 'var(--mk-radius-md)',
+        }}>
+          <ViewToggleBtn active={vista === 'tabla'} onClick={() => setVista('tabla')}>
+            <IconTable /> Tabla
+          </ViewToggleBtn>
+          <ViewToggleBtn active={vista === 'kanban'} onClick={() => setVista('kanban')}>
+            <IconKanban /> Kanban
+          </ViewToggleBtn>
+        </div>
+        {/* Botón Nueva tarea */}
+        <button
+          onClick={() => setModalOpen(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
+            background: 'var(--mk-accent)', color: 'white',
+            border: 'none', borderRadius: 'var(--mk-radius-md)',
+            cursor: 'pointer', fontFamily: 'inherit',
+            boxShadow: '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)',
+          }}
+        >
+          <span style={{ fontSize: 14 }}>＋</span>
+          Nueva tarea
+        </button>
       </header>
 
-      {/* ============== DASHBOARD MÉTRICAS ============== */}
-      <DashboardMetricas
-        {...metricas}
-        vistaActiva={filters.vistaRapida}
-        onToggleVista={toggleVistaRapida}
-      />
+      {/* MÉTRICAS rápidas inline */}
+      <div style={{
+        padding: '10px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
+        display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
+        background: 'rgba(255, 255, 255, 0.01)',
+      }}>
+        <MiniStat label="Sin empezar" value={metricas.sinEmpezar} color="#737373" />
+        <MiniStat label="En progreso" value={metricas.enProgreso} color="#60a5fa" />
+        <MiniStat label="Listo" value={metricas.listo} color="#34d399" />
+        <MiniStat label="Urgentes" value={metricas.urgentes} color={metricas.urgentes > 0 ? '#fb7185' : '#737373'} />
+        <MiniStat label="HOY" value={metricas.hoyMarcadas} color="#fbbf24" />
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
+          {metricas.archivadas > 0 && `${metricas.archivadas} archivadas · `}
+          {metricas.total} activas
+        </span>
+      </div>
 
-      {/* ============== FILTER BAR ============== */}
+      {/* FILTER BAR */}
       <div style={filterBarStyle}>
         <div style={{ position: 'relative', minWidth: 240 }}>
           <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--mk-text-tertiary)' }}>
@@ -323,7 +324,7 @@ export function DisenoView({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar tarea o marca…"
+            placeholder="Buscar tarea, marca o descripción…"
             className="mk-focusable"
             style={{
               width: '100%', height: 'var(--mk-button-height-lg)',
@@ -340,33 +341,20 @@ export function DisenoView({
 
         <FilterPill
           label="Estado"
-          value={filters.estado === 'todos' ? null : ESTADO_CONFIG[filters.estado].label}
-          dotColor={filters.estado === 'todos' ? null : ESTADO_CONFIG[filters.estado].color}
+          value={filters.subEstado === 'activas' ? null : SUBESTADO_CONFIG[filters.subEstado].label}
+          dotColor={filters.subEstado === 'activas' ? null : SUBESTADO_CONFIG[filters.subEstado].color}
           options={[
-            { id: 'todos', label: 'Todos' },
-            ...(Object.entries(ESTADO_CONFIG) as [EstadoPub, typeof ESTADO_CONFIG.disenar][]).map(([k, v]) => ({
-              id: k, label: v.label, color: v.color,
-            })),
+            { id: 'activas', label: 'Todas activas' },
+            { id: 'sin_empezar', label: 'Sin empezar', color: '#737373' },
+            { id: 'en_progreso', label: 'En progreso', color: '#60a5fa' },
+            { id: 'listo', label: 'Listo', color: '#34d399' },
+            { id: 'archivado', label: 'Archivadas', color: '#a78bfa' },
           ]}
-          onSelect={(id) => setFilters((f) => ({ ...f, estado: id as EstadoPub | 'todos' }))}
-        />
-        <FilterPill
-          label="Diseñador"
-          value={
-            filters.disenadorId === 'todos' ? null :
-            filters.disenadorId === '_sin' ? 'Sin asignar' :
-            disenadorById.get(filters.disenadorId)?.nombre ?? null
-          }
-          dotColor={
-            filters.disenadorId === 'todos' || filters.disenadorId === '_sin' ? null :
-            disenadorById.get(filters.disenadorId)?.color ?? null
-          }
-          options={[
-            { id: 'todos', label: 'Todos' },
-            { id: '_sin', label: 'Sin asignar' },
-            ...disenadores.map((d) => ({ id: d.id, label: d.nombre, color: d.color })),
-          ]}
-          onSelect={(id) => setFilters((f) => ({ ...f, disenadorId: id }))}
+          onSelect={(id) => setFilters((f) => ({
+            ...f,
+            subEstado: id as Filters['subEstado'],
+            mostrarArchivadas: id === 'archivado',
+          }))}
         />
         <FilterPill
           label="Marca"
@@ -374,17 +362,17 @@ export function DisenoView({
           dotColor={filters.marcaSlug === 'todas' ? null : marcaBySlug.get(filters.marcaSlug)?.color ?? null}
           options={[
             { id: 'todas', label: 'Todas' },
+            { id: 'interno', label: 'Internas (sin cliente)', color: '#a78bfa' },
             ...marcas.map((m) => ({ id: m.slug, label: m.nombre, color: m.color })),
           ]}
           onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
         />
-
         {hasActiveFilters && (
           <button onClick={clearAll} style={clearBtnStyle}>Limpiar</button>
         )}
 
         <button
-          onClick={() => setFilters((f) => ({ ...f, soloHoy: !f.soloHoy, vistaRapida: 'todas' }))}
+          onClick={() => setFilters((f) => ({ ...f, soloHoy: !f.soloHoy }))}
           style={{
             ...miTrabajoBtnStyle,
             background: filters.soloHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.03)',
@@ -392,10 +380,9 @@ export function DisenoView({
             border: `1px solid ${filters.soloHoy ? 'var(--mk-accent)' : 'var(--mk-border-subtle)'}`,
             boxShadow: filters.soloHoy ? '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)' : 'none',
           }}
-          title="Filtra solo las tareas que marcaste con 'Diseñar hoy'"
         >
           <IconToday />
-          Mi trabajo para hoy
+          Mi trabajo HOY
           {filters.soloHoy && (
             <span style={{ marginLeft: 4, padding: '0 6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
               {visible.length}
@@ -404,397 +391,626 @@ export function DisenoView({
         </button>
 
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
           {visible.length} {visible.length === 1 ? 'tarea' : 'tareas'}
         </span>
       </div>
 
-      {/* ============== TABLE ============== */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 'var(--mk-text-sm)' }}>
-          <thead>
-            <tr>
-              <Th width="160px" sortable field="marca"        sort={sort} onSort={toggleSort}>Proyecto</Th>
-              <Th              sortable field="nombre"        sort={sort} onSort={toggleSort}>Nombre de la tarea</Th>
-              <Th width="150px" sortable field="disenador"    sort={sort} onSort={toggleSort}>Diseñador</Th>
-              <Th width="130px" sortable field="fechaDiseno"  sort={sort} onSort={toggleSort}>Fecha diseño</Th>
-              <Th width="120px" sortable field="fechaPub"     sort={sort} onSort={toggleSort}>Publicación</Th>
-              <Th width="130px" sortable field="subEstado"    sort={sort} onSort={toggleSort}>Sub-estado</Th>
-              <Th width="110px" align="center">Portada</Th>
-              <Th width="110px" align="center">Diseñado</Th>
-              <Th width="110px">Diseñar hoy</Th>
-              <Th width="40px" align="right" />
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((e) => (
-              <Row
-                key={e.id}
-                entry={e}
-                marcaInfo={marcaBySlug.get(e.marcaSlug) ?? null}
-                disenadorInfo={e.disenadorId ? disenadorById.get(e.disenadorId) ?? null : null}
-                disenadores={disenadores}
-                hoy={hoy}
-                onOpenDetail={() => openRow(e.id)}
-                onSetDisenador={(did) => setDisenador(e.id, did)}
-                onSetNombre={(n) => setNombre(e.id, n)}
-                onSetFechaDis={(d) => setFechaDiseno(e.id, d)}
-                onSetFechaPub={(d) => setFechaPub(e.id, d)}
-                onSetSubEstado={(s) => setSubEstado(e.id, s)}
-                onTogglePortada={(v) => setPortada(e.id, v)}
-                onToggleDisenado={(v) => setDisenado(e.id, v)}
-                onToggleHoy={() => toggleDisenarHoy(e.id, e.fechaMarcadaParaDisenar === hoy)}
-              />
-            ))}
-            {visible.length === 0 && (
-              <tr><td colSpan={10} style={{ padding: '60px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
-                  {filters.soloHoy ? 'Aún no marcaste tareas para hoy' : 'Sin tareas con esos filtros'}
-                </div>
-                <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
-                  {filters.soloHoy
-                    ? 'Tocá "＋ Hoy" en alguna fila para agregarla'
-                    : entries.length === 0
-                      ? 'No hay publicaciones con fecha_diseno en este rango. Sincroniza Notion desde /publicaciones.'
-                      : 'Probá limpiar los filtros'}
-                </div>
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* CONTENT: Tabla o Kanban */}
+      {vista === 'tabla' ? (
+        <TablaVista
+          entries={visible}
+          marcaBySlug={marcaBySlug}
+          hoy={hoy}
+          sort={sort}
+          onSort={toggleSort}
+          onOpenRow={openRow}
+          onSetNombre={setNombre}
+          onSetDescripcion={setDescripcion}
+          onSetFechaDis={setFechaDiseno}
+          onSetFechaEntrega={setFechaEntrega}
+          onSetSubEstado={setSubEstado}
+          onArchivar={archivarVal}
+          onToggleHoy={toggleDisenarHoy}
+          onCreateNew={() => setModalOpen(true)}
+        />
+      ) : (
+        <KanbanVista
+          entries={visible.filter((e) => e.subEstado !== 'archivado')}
+          onMoveCard={(id, newSub) => setSubEstado(id, newSub)}
+          onOpenCard={openRow}
+        />
+      )}
 
-      {/* Estilos para que los selects nativos abiertos respeten el tema */}
-      <style jsx global>{`
-        .mk-diseno-row[data-marcada="true"] { background: rgba(167, 139, 250, 0.06); }
-      `}</style>
+      {/* MODAL Nueva tarea */}
+      {modalOpen && (
+        <NuevaTareaModal
+          marcas={marcas}
+          onClose={() => setModalOpen(false)}
+          onCreated={onTareaCreada}
+        />
+      )}
     </div>
   )
 }
 
 /* ============================================================
-   Dashboard de métricas — cards clickeables
+   TablaVista
    ============================================================ */
 
-function DashboardMetricas({
-  disenados, total, porDisenar, conPortada, sinPortada, urgentes,
-  vistaActiva, onToggleVista,
+function TablaVista({
+  entries, marcaBySlug, hoy, sort, onSort, onOpenRow,
+  onSetNombre, onSetDescripcion, onSetFechaDis, onSetFechaEntrega,
+  onSetSubEstado, onArchivar, onToggleHoy, onCreateNew,
 }: {
-  disenados: number; total: number; porDisenar: number
-  conPortada: number; sinPortada: number; urgentes: number
-  vistaActiva: VistaRapida
-  onToggleVista: (v: VistaRapida) => void
+  entries: DisenoEntry[]
+  marcaBySlug: Map<string, MarcaOption>
+  hoy: string
+  sort: { field: SortField; dir: SortDir } | null
+  onSort: (f: SortField) => void
+  onOpenRow: (id: string) => void
+  onSetNombre: (id: string, n: string) => void
+  onSetDescripcion: (id: string, d: string) => void
+  onSetFechaDis: (id: string, d: string) => void
+  onSetFechaEntrega: (id: string, d: string) => void
+  onSetSubEstado: (id: string, s: SubEstadoDiseno) => void
+  onArchivar: (id: string, v: boolean) => void
+  onToggleHoy: (id: string, estaMarcada: boolean) => void
+  onCreateNew: () => void
 }) {
-  const pct = total > 0 ? Math.round((disenados / total) * 100) : 0
+  return (
+    <div style={{ flex: 1, overflow: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 'var(--mk-text-sm)' }}>
+        <thead>
+          <tr>
+            <Th width="160px" sortable field="marca"        sort={sort} onSort={onSort}>Proyecto</Th>
+            <Th              sortable field="nombre"        sort={sort} onSort={onSort}>Nombre de la tarea</Th>
+            <Th width="280px">Descripción</Th>
+            <Th width="130px" sortable field="fechaEntrega" sort={sort} onSort={onSort}>Fecha entrega</Th>
+            <Th width="130px" sortable field="fechaDiseno"  sort={sort} onSort={onSort}>Fecha diseño</Th>
+            <Th width="130px" sortable field="subEstado"    sort={sort} onSort={onSort}>Sub-estado</Th>
+            <Th width="110px">Diseñar hoy</Th>
+            <Th width="80px" align="center">Archivar</Th>
+            <Th width="40px" align="right" />
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => {
+            const marca = marcaBySlug.get(entry.marcaSlug)
+            const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaEntrega)
+            const estaMarcadaHoy = entry.fechaMarcadaParaDisenar === hoy
+            return (
+              <tr
+                key={entry.id}
+                style={{
+                  height: 'var(--mk-row-height)',
+                  transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+                  cursor: 'pointer',
+                  background: estaMarcadaHoy ? 'rgba(167, 139, 250, 0.06)' : 'transparent',
+                }}
+                onClick={() => onOpenRow(entry.id)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = estaMarcadaHoy ? 'rgba(167, 139, 250, 0.06)' : 'transparent' }}
+              >
+                <Td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="mk-dot" style={{ background: marca?.color, boxShadow: marca?.color ? `0 0 6px ${marca.color}` : undefined, width: 8, height: 8 }} />
+                    <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {entry.esInterno && '🎨 '}
+                      {marca?.nombre ?? entry.marcaNombre}
+                    </span>
+                  </div>
+                </Td>
+                <Td><InlineText value={entry.nombreTarea} onSave={(v) => onSetNombre(entry.id, v)} /></Td>
+                <Td>
+                  <InlineDesc
+                    value={entry.descripcion ?? ''}
+                    onSave={(v) => onSetDescripcion(entry.id, v)}
+                  />
+                </Td>
+                <Td>
+                  {entry.fechaEntrega ? (
+                    <InlineDate value={entry.fechaEntrega} onChange={(d) => onSetFechaEntrega(entry.id, d)} />
+                  ) : (
+                    <ClickToSetDate onSet={(d) => onSetFechaEntrega(entry.id, d)} />
+                  )}
+                </Td>
+                <Td>
+                  {entry.fechaDiseno ? (
+                    <InlineDate
+                      value={entry.fechaDiseno}
+                      onChange={(d) => onSetFechaDis(entry.id, d)}
+                      colorOverride={ALERTA_COLOR[alerta].fg}
+                      bgOverride={ALERTA_COLOR[alerta].bg}
+                      alertaLabel={ALERTA_COLOR[alerta].label}
+                    />
+                  ) : (
+                    <ClickToSetDate onSet={(d) => onSetFechaDis(entry.id, d)} />
+                  )}
+                </Td>
+                <Td><EditableSubEstado current={entry.subEstado} onChange={(s) => onSetSubEstado(entry.id, s)} /></Td>
+                <Td>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onToggleHoy(entry.id, estaMarcadaHoy) }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px',
+                      background: estaMarcadaHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.04)',
+                      color: estaMarcadaHoy ? 'white' : 'var(--mk-text-secondary)',
+                      border: 'none', borderRadius: 'var(--mk-radius-md)',
+                      fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
+                      cursor: 'pointer',
+                      boxShadow: estaMarcadaHoy ? '0 0 0 1px rgba(113, 112, 255, 0.30), 0 0 12px rgba(113, 112, 255, 0.30)' : 'none',
+                    }}
+                    title={estaMarcadaHoy ? 'Quitar de "Hoy"' : 'Marcar para diseñar hoy'}
+                  >
+                    {estaMarcadaHoy ? '✓ Hoy' : '＋ Hoy'}
+                  </button>
+                </Td>
+                <Td align="center">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onArchivar(entry.id, entry.subEstado !== 'archivado') }}
+                    style={{
+                      padding: 4, background: 'transparent', border: 'none',
+                      color: entry.subEstado === 'archivado' ? '#a78bfa' : 'var(--mk-text-tertiary)',
+                      cursor: 'pointer', borderRadius: 'var(--mk-radius-sm)',
+                      transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+                    }}
+                    title={entry.subEstado === 'archivado' ? 'Reactivar' : 'Archivar'}
+                  >
+                    <IconArchive />
+                  </button>
+                </Td>
+                <Td align="right">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOpenRow(entry.id) }}
+                    style={openBtnStyle}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--mk-text-primary)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--mk-text-tertiary)' }}
+                  >
+                    <IconArrowOpen />
+                  </button>
+                </Td>
+              </tr>
+            )
+          })}
+          {entries.length === 0 && (
+            <tr><td colSpan={9} style={{ padding: '60px 20px', textAlign: 'center' }}>
+              <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
+                No hay tareas con esos filtros
+              </div>
+              <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)', marginBottom: 16 }}>
+                Crea una tarea nueva o sincroniza Notion desde /publicaciones.
+              </div>
+              <button
+                onClick={onCreateNew}
+                style={{
+                  padding: '6px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
+                  background: 'var(--mk-accent)', color: 'white',
+                  border: 'none', borderRadius: 'var(--mk-radius-md)',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                ＋ Crear primera tarea
+              </button>
+            </td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/* ============================================================
+   KanbanVista — drag & drop HTML5 nativo
+   ============================================================ */
+
+function KanbanVista({
+  entries, onMoveCard, onOpenCard,
+}: {
+  entries: DisenoEntry[]
+  onMoveCard: (id: string, newSub: SubEstadoDiseno) => void
+  onOpenCard: (id: string) => void
+}) {
+  const [dragOver, setDragOver] = useState<SubEstadoDiseno | null>(null)
+
+  function onDragStart(e: React.DragEvent, id: string) {
+    e.dataTransfer.setData('text/plain', id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  function onDragOver(e: React.DragEvent, col: SubEstadoDiseno) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(col)
+  }
+  function onDragLeave() { setDragOver(null) }
+  function onDrop(e: React.DragEvent, col: SubEstadoDiseno) {
+    e.preventDefault()
+    const id = e.dataTransfer.getData('text/plain')
+    setDragOver(null)
+    if (id) onMoveCard(id, col)
+  }
+
   return (
     <div style={{
-      padding: '14px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
-      display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap',
-      background: 'rgba(255, 255, 255, 0.01)',
+      flex: 1, overflow: 'auto', padding: 16,
+      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
     }}>
-      <MetricaCircle
-        pct={pct}
-        valor={disenados}
-        total={total}
-        label="Diseñados del rango"
-        sublabel={`${pct}% del rango`}
-        active={vistaActiva === 'disenados'}
-        onClick={() => onToggleVista('disenados')}
-      />
-
-      <MetricaCard
-        valor={porDisenar}
-        label="Por diseñar"
-        color="#a78bfa"
-        icon={<IconPaint />}
-        active={vistaActiva === 'porDisenar'}
-        onClick={() => onToggleVista('porDisenar')}
-      />
-      <MetricaCard
-        valor={conPortada}
-        label="Con portada lista"
-        color="#34d399"
-        icon={<IconImageCheck />}
-        active={vistaActiva === 'conPortada'}
-        onClick={() => onToggleVista('conPortada')}
-      />
-      <MetricaCard
-        valor={sinPortada}
-        label="Sin portada"
-        color="#f2c94c"
-        icon={<IconImageEmpty />}
-        active={vistaActiva === 'sinPortada'}
-        onClick={() => onToggleVista('sinPortada')}
-      />
-      <MetricaCard
-        valor={urgentes}
-        label="Fechas urgentes"
-        color={urgentes > 0 ? '#fb7185' : '#737373'}
-        icon={<IconWarn />}
-        highlight={urgentes > 0}
-        hint={urgentes > 0 ? '≤1 día margen vs publicación' : 'Sin alertas'}
-        active={vistaActiva === 'urgentes'}
-        onClick={() => onToggleVista('urgentes')}
-      />
+      {KANBAN_COLUMNS.map((col) => {
+        const cfg = SUBESTADO_CONFIG[col]
+        const items = entries.filter((e) => e.subEstado === col)
+        const isOver = dragOver === col
+        return (
+          <div
+            key={col}
+            onDragOver={(e) => onDragOver(e, col)}
+            onDragLeave={onDragLeave}
+            onDrop={(e) => onDrop(e, col)}
+            style={{
+              background: isOver ? `${cfg.color}08` : 'rgba(255, 255, 255, 0.02)',
+              border: `1px solid ${isOver ? cfg.color : 'var(--mk-border-subtle)'}`,
+              borderRadius: 'var(--mk-radius-md)',
+              padding: 10,
+              display: 'flex', flexDirection: 'column', gap: 8,
+              minHeight: 200,
+              transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0 4px 8px', borderBottom: '1px solid var(--mk-border-subtle)',
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 11, fontWeight: 600, color: cfg.color,
+                textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)',
+              }}>
+                <span className="mk-dot" style={{ background: cfg.color, width: 8, height: 8 }} />
+                {cfg.label}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', fontVariantNumeric: 'tabular-nums' }}>
+                {items.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {items.map((entry) => (
+                <KanbanCard
+                  key={entry.id}
+                  entry={entry}
+                  onClick={() => onOpenCard(entry.id)}
+                  onDragStart={(e) => onDragStart(e, entry.id)}
+                />
+              ))}
+              {items.length === 0 && (
+                <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 11 }}>
+                  Sin tareas
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function MetricaCircle({
-  pct, valor, total, label, sublabel, active, onClick,
-}: {
-  pct: number; valor: number; total: number; label: string; sublabel: string
-  active?: boolean; onClick?: () => void
-}) {
-  const R = 22
-  const C = 2 * Math.PI * R
-  const offset = C - (C * Math.min(100, Math.max(0, pct))) / 100
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...metricaCardStyle,
-        cursor: onClick ? 'pointer' : 'default',
-        border: active ? '1px solid #a78bfa' : '1px solid var(--mk-border-subtle)',
-        background: active ? 'rgba(167, 139, 250, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-        textAlign: 'left',
-        fontFamily: 'inherit',
-        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
-      }}
-      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)' }}
-      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)' }}
-    >
-      <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
-        <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx="28" cy="28" r={R} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="4" />
-          <circle cx="28" cy="28" r={R} fill="none" stroke="#a78bfa" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 600ms ease-out' }} />
-        </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'var(--mk-text-primary)' }}>
-          {pct}%
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
-          {valor} <span style={{ color: 'var(--mk-text-quaternary)', fontWeight: 400, fontSize: 14 }}>/ {total}</span>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>
-          {label}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{sublabel}</div>
-      </div>
-    </button>
-  )
-}
-
-function MetricaCard({
-  valor, label, color, icon, highlight, hint, active, onClick,
-}: {
-  valor: number; label: string; color: string; icon: React.ReactNode
-  highlight?: boolean; hint?: string
-  active?: boolean; onClick?: () => void
-}) {
-  const borderColor = active ? color : highlight ? color : 'var(--mk-border-subtle)'
-  const bgColor = active ? `${color}1f` : highlight ? `${color}10` : 'rgba(255, 255, 255, 0.02)'
-  const bgHover = `${color}14`
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={hint}
-      style={{
-        ...metricaCardStyle,
-        cursor: onClick ? 'pointer' : 'default',
-        border: `1px solid ${borderColor}`,
-        background: bgColor,
-        textAlign: 'left',
-        fontFamily: 'inherit',
-        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
-        boxShadow: active ? `0 0 0 1px ${color}40, 0 0 16px ${color}20` : 'none',
-      }}
-      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.background = bgHover }}
-      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.background = bgColor }}
-    >
-      <div style={{
-        width: 36, height: 36, borderRadius: 8,
-        background: `${color}1a`, color,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}>
-        {icon}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{valor}</div>
-        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>{label}</div>
-        {hint && <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{hint}</div>}
-      </div>
-    </button>
-  )
-}
-
-/* ============================================================
-   Row — todas las celdas editables
-   ============================================================ */
-
-function Row({
-  entry, marcaInfo, disenadorInfo, disenadores, hoy,
-  onOpenDetail, onSetDisenador, onSetNombre, onSetFechaDis, onSetFechaPub,
-  onSetSubEstado, onTogglePortada, onToggleDisenado, onToggleHoy,
-}: {
+function KanbanCard({ entry, onClick, onDragStart }: {
   entry: DisenoEntry
-  marcaInfo: MarcaOption | null
-  disenadorInfo: DisenadorOption | null
-  disenadores: DisenadorOption[]
-  hoy: string
-  onOpenDetail: () => void
-  onSetDisenador: (id: string | null) => void
-  onSetNombre: (n: string) => void
-  onSetFechaDis: (d: string) => void
-  onSetFechaPub: (d: string) => void
-  onSetSubEstado: (s: SubEstadoDiseno) => void
-  onTogglePortada: (v: boolean) => void
-  onToggleDisenado: (v: boolean) => void
-  onToggleHoy: () => void
+  onClick: () => void
+  onDragStart: (e: React.DragEvent) => void
 }) {
-  const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaPublicacion)
-  const estaMarcadaHoy = entry.fechaMarcadaParaDisenar === hoy
-
+  const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaEntrega)
   return (
-    <tr
-      className="mk-diseno-row"
-      data-marcada={estaMarcadaHoy}
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onClick={onClick}
       style={{
-        height: 'var(--mk-row-height)',
-        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
-        cursor: 'pointer',
-        background: estaMarcadaHoy ? 'rgba(167, 139, 250, 0.06)' : 'transparent',
+        padding: 10,
+        background: 'var(--mk-bg-elevated)',
+        border: '1px solid var(--mk-border-subtle)',
+        borderRadius: 'var(--mk-radius-sm)',
+        cursor: 'grab',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
       }}
-      onClick={onOpenDetail}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = estaMarcadaHoy ? 'rgba(167, 139, 250, 0.06)' : 'transparent' }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-default)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)' }}
     >
-      <Td>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="mk-dot" style={{ background: marcaInfo?.color, boxShadow: marcaInfo?.color ? `0 0 6px ${marcaInfo.color}` : undefined, width: 8, height: 8 }} />
-          <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {marcaInfo?.nombre ?? entry.marcaSlug}
-          </span>
-        </div>
-      </Td>
-
-      <Td>
-        <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
-      </Td>
-
-      <Td>
-        <EditableDisenador
-          current={disenadorInfo}
-          fallbackName={entry.disenadorNombre}
-          disenadores={disenadores}
-          onChange={onSetDisenador}
-        />
-      </Td>
-
-      <Td>
-        <InlineDate
-          value={entry.fechaDiseno}
-          onChange={onSetFechaDis}
-          colorOverride={ALERTA_COLOR[alerta].fg}
-          bgOverride={ALERTA_COLOR[alerta].bg}
-          alertaLabel={ALERTA_COLOR[alerta].label}
-        />
-      </Td>
-
-      <Td>
-        {entry.fechaPublicacion ? (
-          <InlineDate value={entry.fechaPublicacion} onChange={onSetFechaPub} />
-        ) : (
-          <span style={{ color: 'var(--mk-text-quaternary)', fontSize: 11, fontStyle: 'italic' }}>—</span>
-        )}
-      </Td>
-
-      <Td>
-        <EditableSubEstado current={entry.subEstado} onChange={onSetSubEstado} />
-      </Td>
-
-      <Td align="center">
-        <Checkbox
-          checked={entry.portadaLista}
-          color="#34d399"
-          onChange={(v) => onTogglePortada(v)}
-          title={entry.portadaLista ? 'Quitar portada lista' : 'Marcar portada lista'}
-        />
-      </Td>
-
-      <Td align="center">
-        <Checkbox
-          checked={entry.disenado}
-          color="#a78bfa"
-          onChange={(v) => onToggleDisenado(v)}
-          title={entry.disenado ? 'Marcar como NO diseñado' : 'Marcar como diseñado'}
-        />
-      </Td>
-
-      <Td>
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleHoy() }}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <span
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '4px 10px',
-            background: estaMarcadaHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.04)',
-            color: estaMarcadaHoy ? 'white' : 'var(--mk-text-secondary)',
-            border: 'none', borderRadius: 'var(--mk-radius-md)',
-            fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
-            cursor: 'pointer',
-            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
-            boxShadow: estaMarcadaHoy ? '0 0 0 1px rgba(113, 112, 255, 0.30), 0 0 12px rgba(113, 112, 255, 0.30)' : 'none',
+            fontSize: 10, fontWeight: 500, padding: '2px 6px',
+            background: `${entry.marcaColor}1a`, color: entry.marcaColor,
+            borderRadius: 4,
           }}
-          title={estaMarcadaHoy ? 'Quitar de "Mi trabajo para hoy"' : 'Marcar para diseñar hoy'}
         >
-          {estaMarcadaHoy ? '✓ Hoy' : '＋ Hoy'}
-        </button>
-      </Td>
-
-      <Td align="right">
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpenDetail() }}
-          style={openBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--mk-text-primary)'; e.currentTarget.style.background = 'var(--mk-bg-active)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--mk-text-tertiary)'; e.currentTarget.style.background = 'transparent' }}
-        >
-          <IconArrowOpen />
-        </button>
-      </Td>
-    </tr>
+          {entry.esInterno && '🎨 '}
+          {entry.marcaNombre}
+        </span>
+      </div>
+      <div style={{
+        fontSize: 'var(--mk-text-sm)', fontWeight: 500, color: 'var(--mk-text-primary)',
+        marginBottom: 6, lineHeight: 1.3,
+      }}>
+        {entry.nombreTarea}
+      </div>
+      {entry.descripcion && (
+        <div style={{
+          fontSize: 11, color: 'var(--mk-text-tertiary)', marginBottom: 6,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          {entry.descripcion}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--mk-text-tertiary)' }}>
+        {entry.fechaEntrega && <span>📅 Entrega {formatDateES(entry.fechaEntrega)}</span>}
+        {entry.fechaDiseno && (
+          <span style={{ color: ALERTA_COLOR[alerta].fg }}>
+            🎨 {formatDateES(entry.fechaDiseno)}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
 /* ============================================================
-   Cells y primitives
+   Modal Nueva Tarea
    ============================================================ */
 
-function Checkbox({ checked, color, onChange, title }: {
-  checked: boolean; color: string; onChange: (v: boolean) => void; title: string
+function NuevaTareaModal({
+  marcas, onClose, onCreated,
+}: {
+  marcas: MarcaOption[]
+  onClose: () => void
+  onCreated: (entry: DisenoEntry) => void
 }) {
+  const [nombre, setNombre] = useState('')
+  const [descripcion, setDescripcion] = useState('')
+  const [fechaDiseno, setFechaDiseno] = useState('')
+  const [fechaEntrega, setFechaEntrega] = useState('')
+  const [esParaPublicar, setEsParaPublicar] = useState(false)
+  const [marcaSlug, setMarcaSlug] = useState('')
+  const [fechaPublicacion, setFechaPublicacion] = useState('')
+  const [fechaEdicion, setFechaEdicion] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nombre.trim()) { toast.error('Falta nombre'); return }
+    if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
+    if (esParaPublicar && !fechaPublicacion) { toast.error('Falta fecha de publicación'); return }
+    setSubmitting(true)
+    const r = await crearDisenoTask({
+      nombre: nombre.trim(),
+      descripcion: descripcion.trim() || null,
+      fechaDiseno: fechaDiseno || null,
+      fechaEntrega: fechaEntrega || null,
+      esParaPublicar,
+      marcaSlug: esParaPublicar ? marcaSlug : undefined,
+      fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
+      fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
+    })
+    setSubmitting(false)
+    if (!r.ok) { toast.error(r.error); return }
+
+    const marca = esParaPublicar ? marcas.find((m) => m.slug === marcaSlug) : null
+    onCreated({
+      id: r.data!.id,
+      marcaSlug: marca?.slug ?? 'interno',
+      marcaNombre: marca?.nombre ?? 'Distinto · Interno',
+      marcaColor: marca?.color ?? '#a78bfa',
+      marcaEmoji: marca?.emoji ?? null,
+      esInterno: !esParaPublicar,
+      nombreTarea: nombre.trim(),
+      descripcion: descripcion.trim() || null,
+      fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
+      fechaDiseno: fechaDiseno || null,
+      fechaEntrega: fechaEntrega || null,
+      estado: esParaPublicar ? 'disenar' : 'borrador',
+      subEstado: 'sin_empezar',
+      plataformas: [],
+      tipoContenido: [],
+      fechaMarcadaParaDisenar: null,
+    })
+  }
+
   return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onChange(!checked) }}
-      title={title}
+    <div
+      onClick={onClose}
       style={{
-        width: 18, height: 18, borderRadius: 4,
-        background: checked ? color : 'rgba(255, 255, 255, 0.04)',
-        border: `1px solid ${checked ? color : 'var(--mk-border-subtle)'}`,
-        color: 'white',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}
     >
-      {checked && (
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        style={{
+          width: '100%', maxWidth: 540,
+          background: 'var(--mk-bg-overlay)',
+          border: '1px solid var(--mk-border-default)',
+          borderRadius: 'var(--mk-radius-lg)',
+          boxShadow: 'var(--mk-shadow-lg)',
+          padding: 24,
+          display: 'flex', flexDirection: 'column', gap: 14,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h2 style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0 }}>
+            Nueva tarea de diseño
+          </h2>
+          <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4 }}>
+            ✕
+          </button>
+        </div>
+
+        <Field label="Nombre de la tarea*">
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej. Banner web Kintu"
+            autoFocus
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="Descripción">
+          <textarea
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Brief de la tarea. ¿Qué hay que diseñar? ¿Referencias?"
+            rows={3}
+            style={{ ...inputStyle, resize: 'vertical', minHeight: 60, fontFamily: 'inherit' }}
+          />
+        </Field>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Field label="Fecha de entrega">
+            <input type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} style={inputStyle} />
+          </Field>
+          <Field label="Fecha de diseño">
+            <input type="date" value={fechaDiseno} onChange={(e) => setFechaDiseno(e.target.value)} style={inputStyle} />
+          </Field>
+        </div>
+
+        {/* Toggle ¿Es para publicar? */}
+        <div
+          onClick={() => setEsParaPublicar((v) => !v)}
+          style={{
+            padding: 12, borderRadius: 'var(--mk-radius-md)',
+            border: `1px solid ${esParaPublicar ? 'var(--mk-accent)' : 'var(--mk-border-subtle)'}`,
+            background: esParaPublicar ? 'rgba(113, 112, 255, 0.06)' : 'rgba(255, 255, 255, 0.02)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 10,
+            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={esParaPublicar}
+            onChange={(e) => setEsParaPublicar(e.target.checked)}
+            style={{ accentColor: 'var(--mk-accent)', width: 14, height: 14 }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>
+              ¿Es un diseño para publicar?
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
+              Si lo marcas, también se agrega al calendario de publicaciones.
+            </span>
+          </div>
+        </div>
+
+        {esParaPublicar && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 10,
+            padding: 12, marginTop: -4,
+            background: 'rgba(167, 139, 250, 0.03)',
+            border: '1px solid rgba(167, 139, 250, 0.20)',
+            borderRadius: 'var(--mk-radius-md)',
+          }}>
+            <Field label="Marca / cliente*">
+              <select
+                value={marcaSlug}
+                onChange={(e) => setMarcaSlug(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">— Selecciona la marca —</option>
+                {marcas.map((m) => (
+                  <option key={m.slug} value={m.slug}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>
+                ))}
+              </select>
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="Fecha de publicación*">
+                <input type="date" value={fechaPublicacion} onChange={(e) => setFechaPublicacion(e.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Fecha de edición">
+                <input type="date" value={fechaEdicion} onChange={(e) => setFechaEdicion(e.target.value)} style={inputStyle} />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+          <button
+            type="button" onClick={onClose}
+            style={{
+              padding: '8px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
+              background: 'transparent', color: 'var(--mk-text-secondary)',
+              border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-md)',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit" disabled={submitting}
+            style={{
+              padding: '8px 18px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
+              background: 'var(--mk-accent)', color: 'white',
+              border: 'none', borderRadius: 'var(--mk-radius-md)',
+              cursor: submitting ? 'wait' : 'pointer', fontFamily: 'inherit',
+              opacity: submitting ? 0.6 : 1,
+            }}
+          >
+            {submitting ? 'Creando…' : 'Crear tarea'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontWeight: 500 }}>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+/* ============================================================
+   Cells / primitives
+   ============================================================ */
+
+function MiniStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '4px 10px',
+      background: `${color}10`,
+      border: `1px solid ${color}30`,
+      borderRadius: 'var(--mk-radius-md)',
+    }}>
+      <span style={{ fontSize: 14, fontWeight: 600, color, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)' }}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
+function ViewToggleBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '5px 12px', fontSize: 'var(--mk-text-xs)', fontWeight: 500,
+        background: active ? 'var(--mk-bg-elevated)' : 'transparent',
+        color: active ? 'var(--mk-text-primary)' : 'var(--mk-text-tertiary)',
+        border: 'none', borderRadius: 'var(--mk-radius-sm)',
+        cursor: 'pointer', fontFamily: 'inherit',
+        boxShadow: active ? '0 0 0 1px var(--mk-border-subtle)' : 'none',
+      }}
+    >
+      {children}
     </button>
   )
 }
@@ -837,6 +1053,47 @@ function InlineText({ value, onSave }: { value: string; onSave: (v: string) => v
       title="Click para editar"
     >
       {value}
+    </span>
+  )
+}
+
+function InlineDesc({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  function start(e: React.MouseEvent) { e.stopPropagation(); setDraft(value); setEditing(true) }
+  function commit() { setEditing(false); if (draft !== value) onSave(draft) }
+  if (editing) {
+    return (
+      <textarea
+        autoFocus value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={commit}
+        rows={3}
+        style={{
+          width: '100%', padding: '6px 8px', margin: '-4px -6px',
+          background: 'var(--mk-bg-base)',
+          border: '1px solid var(--mk-accent)', borderRadius: 4,
+          color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-xs)',
+          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)',
+          resize: 'vertical',
+        }}
+      />
+    )
+  }
+  return (
+    <span onClick={start}
+      style={{
+        color: value ? 'var(--mk-text-secondary)' : 'var(--mk-text-quaternary)',
+        fontSize: 'var(--mk-text-xs)', cursor: 'text',
+        padding: '2px 4px', margin: '-2px -4px', borderRadius: 3,
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        overflow: 'hidden', maxWidth: '100%',
+        fontStyle: value ? 'normal' : 'italic',
+      }}
+      title="Click para editar"
+    >
+      {value || 'Sin descripción'}
     </span>
   )
 }
@@ -884,9 +1141,39 @@ function InlineDate({
         borderRadius: bgOverride ? 'var(--mk-radius-sm)' : 3,
         fontWeight: bgOverride ? 500 : 400,
       }}
-      title={alertaLabel ? `Fecha diseño · ${alertaLabel}` : 'Click para cambiar fecha'}
+      title={alertaLabel ? `${alertaLabel}` : 'Click para cambiar fecha'}
     >
       {formatDateES(value)}
+    </span>
+  )
+}
+
+function ClickToSetDate({ onSet }: { onSet: (d: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) {
+    return (
+      <input
+        autoFocus type="date"
+        onClick={(e) => e.stopPropagation()}
+        onBlur={(e) => { setEditing(false); if (e.target.value) onSet(e.target.value) }}
+        style={{
+          padding: '4px 6px', margin: '-4px -6px',
+          background: 'var(--mk-bg-base)',
+          border: '1px solid var(--mk-accent)', borderRadius: 4,
+          color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+          outline: 'none', colorScheme: 'dark',
+        }}
+      />
+    )
+  }
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      style={{
+        color: 'var(--mk-text-quaternary)', fontSize: 11, fontStyle: 'italic', cursor: 'text',
+      }}
+    >
+      + agregar
     </span>
   )
 }
@@ -929,77 +1216,6 @@ function EditableSubEstado({ current, onChange }: { current: SubEstadoDiseno; on
   )
 }
 
-function EditableDisenador({
-  current, fallbackName, disenadores, onChange,
-}: {
-  current: DisenadorOption | null
-  fallbackName: string | null
-  disenadores: DisenadorOption[]
-  onChange: (id: string | null) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const showOrphan = !current && !!fallbackName
-  return (
-    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '2px 8px 2px 2px',
-          background: 'rgba(255, 255, 255, 0.04)',
-          borderRadius: 'var(--mk-radius-full)',
-          cursor: 'pointer', border: 'none', fontFamily: 'inherit',
-        }}
-      >
-        {current ? (
-          <>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: current.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
-              {current.nombre.slice(0, 2).toUpperCase()}
-            </span>
-            <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-secondary)', fontWeight: 500 }}>{current.nombre}</span>
-          </>
-        ) : showOrphan ? (
-          <>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#737373', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
-              {fallbackName!.slice(0, 2).toUpperCase()}
-            </span>
-            <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontWeight: 500 }} title="Diseñador sin vincular en BD — reasignar">
-              {fallbackName}
-            </span>
-          </>
-        ) : (
-          <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-quaternary)', fontStyle: 'italic', padding: '0 8px' }}>
-            Sin asignar
-          </span>
-        )}
-      </button>
-      {open && (
-        <Popover onClose={() => setOpen(false)}>
-          <PopoverItem onClick={() => { onChange(null); setOpen(false) }} selected={!current}>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--mk-bg-hover)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2L8 8M8 2L2 8" stroke="var(--mk-text-quaternary)" strokeWidth="1.3" strokeLinecap="round" /></svg>
-            </span>
-            <span style={{ color: 'var(--mk-text-tertiary)' }}>Sin asignar</span>
-          </PopoverItem>
-          <div style={{ height: 1, background: 'var(--mk-border-subtle)', margin: '4px 0' }} />
-          {disenadores.map((d) => (
-            <PopoverItem key={d.id} onClick={() => { onChange(d.id); setOpen(false) }} selected={current?.id === d.id}>
-              <span style={{ width: 18, height: 18, borderRadius: '50%', background: d.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
-                {d.nombre.slice(0, 2).toUpperCase()}
-              </span>
-              <span>{d.nombre}</span>
-            </PopoverItem>
-          ))}
-        </Popover>
-      )}
-    </div>
-  )
-}
-
-/* ============================================================
-   Popover + Th/Td + FilterPill (copia del EditorView)
-   ============================================================ */
-
 function Popover({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <>
@@ -1032,7 +1248,6 @@ function PopoverItem({ children, onClick, selected }: { children: React.ReactNod
         border: 'none', borderRadius: 'var(--mk-radius-sm)',
         color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
         cursor: 'pointer', textAlign: 'left',
-        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
       }}
       onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
       onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = 'transparent' }}
@@ -1093,7 +1308,6 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
   return (
     <div style={{ position: 'relative' }}>
       <button
-        className="mk-focusable"
         onClick={() => setOpen((o) => !o)}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px',
@@ -1102,7 +1316,7 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
           borderRadius: 'var(--mk-radius-md)',
           color: value ? 'var(--mk-text-primary)' : 'var(--mk-text-secondary)',
           fontFamily: 'inherit', fontSize: 'var(--mk-text-xs)', fontWeight: 500,
-          cursor: 'pointer', transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+          cursor: 'pointer',
         }}
       >
         {dotColor && <span className="mk-dot" style={{ background: dotColor, width: 6, height: 6 }} />}
@@ -1128,20 +1342,13 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
    Sort + styles + icons
    ============================================================ */
 
-function sortValue(
-  e: DisenoEntry,
-  f: SortField,
-  marcaBySlug: Map<string, MarcaOption>,
-  disenadorById: Map<string, DisenadorOption>,
-): string | number {
+function sortValue(e: DisenoEntry, f: SortField): string | number {
   switch (f) {
-    case 'marca':       return marcaBySlug.get(e.marcaSlug)?.nombre ?? e.marcaSlug
-    case 'nombre':      return e.nombreTarea
-    case 'disenador':   return (e.disenadorId ? disenadorById.get(e.disenadorId)?.nombre : e.disenadorNombre) ?? 'zzz'
-    case 'fechaDiseno': return e.fechaDiseno
-    case 'estado':      return e.estado
-    case 'fechaPub':    return e.fechaPublicacion ?? 'zzz'
-    case 'subEstado':   return e.subEstado
+    case 'marca':        return e.marcaNombre
+    case 'nombre':       return e.nombreTarea
+    case 'fechaDiseno':  return e.fechaDiseno ?? 'zzz'
+    case 'fechaEntrega': return e.fechaEntrega ?? 'zzz'
+    case 'subEstado':    return e.subEstado
   }
 }
 
@@ -1165,29 +1372,28 @@ const miTrabajoBtnStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   padding: '4px 12px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit',
   fontWeight: 500, borderRadius: 'var(--mk-radius-md)', cursor: 'pointer',
-  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
 }
 const openBtnStyle: React.CSSProperties = {
   background: 'transparent', border: 'none',
   color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4,
   borderRadius: 'var(--mk-radius-sm)',
-  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
   display: 'inline-flex', alignItems: 'center',
 }
-const metricaCardStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 12,
-  padding: '10px 14px',
-  background: 'rgba(255, 255, 255, 0.02)',
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '6px 10px',
+  background: 'rgba(255, 255, 255, 0.04)',
   border: '1px solid var(--mk-border-subtle)',
   borderRadius: 'var(--mk-radius-md)',
-  minWidth: 200, flex: '1 1 200px',
+  color: 'var(--mk-text-primary)',
+  fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+  outline: 'none',
+  colorScheme: 'dark',
 }
 
-/* SVG icons inline (sin lucide) */
-function IconSearch()       { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" /><path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
-function IconArrowOpen()    { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 6.5H10M10 6.5L7 3.5M10 6.5L7 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
-function IconToday()        { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 1V3M8 1V3M1.5 5H10.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
-function IconPaint()        { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 5L8 1L13 6L9 10L4 5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M4 5L2 9C2 11 4 12 5 12C6 12 7 11 7 10C7 9 6 8 5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
-function IconImageCheck()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/><path d="M2 11L5 8L8 11L11 7L14 10" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/></svg> }
-function IconImageEmpty()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2 2"/><circle cx="5.5" cy="6.5" r="1" stroke="currentColor" strokeWidth="1.2"/></svg> }
-function IconWarn()         { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 13H2L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8 6V9M8 11V11.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
+/* SVG icons */
+function IconSearch()    { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" /><path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+function IconArrowOpen() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 6.5H10M10 6.5L7 3.5M10 6.5L7 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+function IconToday()     { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 1V3M8 1V3M1.5 5H10.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+function IconTable()     { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="1.5" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 4.5H9.5M1.5 7H9.5M4 1.5V9.5" stroke="currentColor" strokeWidth="1.2"/></svg> }
+function IconKanban()    { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="1.5" width="2.5" height="8" rx="0.5" stroke="currentColor" strokeWidth="1.2"/><rect x="4.5" y="1.5" width="2.5" height="5" rx="0.5" stroke="currentColor" strokeWidth="1.2"/><rect x="7.5" y="1.5" width="2.5" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.2"/></svg> }
+function IconArchive()   { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="2" width="10" height="2" rx="0.5" stroke="currentColor" strokeWidth="1.2"/><path d="M2.5 4V10C2.5 10.5 2.8 11 3.5 11H9.5C10.2 11 10.5 10.5 10.5 10V4" stroke="currentColor" strokeWidth="1.2"/><path d="M5 6.5H8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
