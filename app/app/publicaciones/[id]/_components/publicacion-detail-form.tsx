@@ -876,9 +876,13 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               <textarea
                 value={form.guion ?? ''}
                 onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
-                placeholder={`Pegá el guion completo aquí…\n\nFunciona con tablas de Word, Notion (tabs entre columnas), o texto plano.\n\nEjemplo:\nVoz en off\tToma / visual\n"Yo soy Joe…"\tJoe saludando a cámara`}
-                rows={guionExpandido ? 22 : 5}
-                className="w-full px-4 pb-4 pt-0 text-[12px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40 placeholder:font-sans transition-all"
+                placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion, o texto plano."
+                rows={guionExpandido ? 18 : 4}
+                /* leading-snug en lugar de relaxed: para mono a 12px,
+                   relaxed hacía ~20px/línea (mucha respiración vertical)
+                   — snug deja ~15px/línea, queda compacto como editor.
+                   pt-1 pb-3 reduce padding interno también. */
+                className="w-full px-4 pt-1 pb-3 text-[12px] font-mono leading-snug bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40 placeholder:font-sans transition-all"
                 spellCheck={false}
               />
             </div>
@@ -1085,7 +1089,7 @@ function ToolbarBtn({
       onClick={onClick}
       disabled={disabled}
       aria-label={title}
-      className={`flex flex-col items-center justify-center gap-1.5 min-w-[76px] px-3 py-2.5 rounded-lg transition-colors ${
+      className={`flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 py-2.5 rounded-lg transition-colors ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
           : active
@@ -1123,7 +1127,7 @@ function ToolbarBtnPopover({
         type="button"
         onClick={onClick}
         aria-label={title}
-        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[76px] px-3 py-2.5 rounded-lg transition-colors ${
+        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 py-2.5 rounded-lg transition-colors ${
           active
             ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1132,12 +1136,12 @@ function ToolbarBtnPopover({
         <span className="leading-none">{icon}</span>
         <span className="text-[11px] font-medium leading-none whitespace-nowrap">{label}</span>
         {badge && (
-          /* Badge ampliado para que "REEL", "Normal", etc. quepan
-             enteros — antes truncaba a 4 chars y mostraba "Nor…".
-             Subido a -top-2 / -right-2 para asomar bien del botón;
-             el padre tiene pt-4 que da espacio para esto. */
-          <span className="absolute -top-2 -right-2 min-w-[22px] h-[18px] px-1.5 rounded-full bg-[#ba41f7] text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm ring-2 ring-background">
-            {badge.length > 7 ? badge.slice(0, 6) + '…' : badge}
+          /* Badge sin truncar — Pedro vio "REEL F…" en lugar de
+             "REEL FIT". Subimos el límite a 14 chars (entran los
+             valores reales: REEL FIT, Normal, Anuncio, Carrusel).
+             whitespace-nowrap + el flex hacen que crezca al texto. */
+          <span className="absolute -top-2 -right-2 h-[18px] px-2 rounded-full bg-[#ba41f7] text-white text-[10px] font-bold flex items-center justify-center leading-none whitespace-nowrap shadow-sm ring-2 ring-background">
+            {badge.length > 14 ? badge.slice(0, 13) + '…' : badge}
           </span>
         )}
       </button>
