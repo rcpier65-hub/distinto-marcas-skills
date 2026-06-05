@@ -18,6 +18,7 @@ import {
   skipComentario,
   responderBatch,
   dispatchRoutine,
+  generarBorradoresIA,
   previewInformeWhatsapp,
   type RoutineMode,
 } from '../_actions'
@@ -153,6 +154,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
 
   const [isFetching, startFetching] = useTransition()
   const [isResponding, startResponding] = useTransition()
+  const [isGenerating, startGenerating] = useTransition()
 
   const marcaInfo = marcas.find((m) => m.slug === marcaActual)
 
@@ -170,13 +172,27 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
       const result = await fetchComentariosFromMetricool(marcaActual)
       if (result.ok) {
         toast.success(
-          `✅ Cargados ${result.fetched} hilos · ${result.inserted} nuevos en inbox` +
+          `✅ ${result.inserted} nuevos en inbox · ✨ ${result.generados} borradores IA listos` +
             (result.errors.length > 0 ? ` · ${result.errors.length} errores` : ''),
-          { id: 'fetch' },
+          { id: 'fetch', duration: 8000 },
         )
         router.refresh()
       } else {
         toast.error(`Error: ${result.error}`, { id: 'fetch' })
+      }
+    })
+  }
+
+  // Genera borradores con IA (OpenAI) para los pendientes sin respuesta.
+  function handleGenerarIA() {
+    startGenerating(async () => {
+      const toastId = toast.loading('✨ Generando borradores con IA…')
+      const r = await generarBorradoresIA(marcaActual)
+      if (r.ok) {
+        toast.success(`✨ ${r.generados} borradores generados con IA`, { id: toastId, duration: 8000 })
+        router.refresh()
+      } else {
+        toast.error(r.error, { id: toastId, duration: 10000 })
       }
     })
   }
@@ -291,14 +307,14 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
             {isFetching ? '⏳ Cargando…' : '🔄 Cargar comentarios'}
           </button>
 
-          {/* Dispatch Routine — genera borradores con IA (Claude Desktop) */}
+          {/* Generar borradores con IA (OpenAI gpt-4o-mini) — dentro de la app */}
           <button
-            onClick={() => handleDispatchRoutine('generar')}
-            disabled={dispatching !== null}
-            title="Dispara la Routine de Claude Desktop para generar respuestas sugeridas a los comentarios pendientes"
+            onClick={handleGenerarIA}
+            disabled={isGenerating}
+            title="Genera respuestas sugeridas con IA (según post + comentario + voz de la marca) para los pendientes sin borrador"
             className="h-10 px-3 rounded-md text-sm font-medium text-white bg-[#ba41f7] hover:bg-[#9f37db] disabled:opacity-50 transition-colors shadow-sm"
           >
-            {dispatching === 'generar' ? '⏳ Generando…' : '✨ Generar borradores'}
+            {isGenerating ? '⏳ Generando…' : '✨ Generar borradores'}
           </button>
 
           {/* Postear aprobados — solo visible si hay aprobados pendientes de envío */}

@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { listComentarios, responderComentario } from '@/lib/integrations/metricool'
 import { clasificarComentario } from '@/lib/comentarios/clasificador'
 import { sendWhatsAppImage } from '@/lib/integrations/whatsapp-router'
+import { generarRespuestaComentario } from '@/lib/integrations/openai'
 import type {
   ComentarioInboxRow,
   ComentarioCategoria,
@@ -114,15 +115,15 @@ export async function dispatchRoutine(
  */
 export async function fetchComentariosFromMetricool(
   marcaSlug: string,
-): Promise<{ ok: true; fetched: number; inserted: number; errors: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; fetched: number; inserted: number; generados: number; errors: string[] } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // Resolver marca + metricool_blog_id
+  // Resolver marca + metricool_blog_id + voz de marca (para los borradores IA)
   const { data: marca, error: mErr } = await service
     .from('marcas')
-    .select('id, slug, nombre, metricool_blog_id')
+    .select('id, slug, nombre, metricool_blog_id, tono_voz')
     .eq('slug', marcaSlug)
     .maybeSingle()
   if (mErr) return { ok: false, error: mErr.message }
@@ -151,48 +152,154 @@ export async function fetchComentariosFromMetricool(
     }
     for (const c of r.data) {
       fetched++
-      if (c.hasReply) continue  // ya respondimos, skip
-      // upsert por (network, metricool_comment_id)
-      const categoria = clasificarComentario(c.commentText)
-      const respuesta_sugerida = templates[categoria] ?? ''
-      const { error: insErr, data: insData } = await service
+      if (c.hasReply) continue  // ya respondimos en la red, skip
+
+      // ¿Ya existe en la BD? Si sí, lo PRESERVAMOS tal cual — no pisamos la
+      // respuesta sugerida (IA o editada por Pedro), ni el estado. Esto evita
+      // que recargar borre borradores/edits y que se regenere (y se gaste API).
+      const { data: existente } = await service
         .from('comentarios_inbox')
-        .upsert(
-          {
-            marca_id: marca.id,
-            network,
-            metricool_comment_id: c.id,
-            metricool_thread_id: c.threadId,
-            metricool_post_id: c.postId,
-            author_username: c.authorUsername,
-            comment_text: c.commentText,
-            comment_created_at: c.createdAt,
-            post_link: c.postLink,
-            post_text_preview: c.postText,
-            post_media_url: c.postMediaUrl,
-            categoria_sugerida: categoria,
-            respuesta_sugerida,
-            // status sólo se setea en insert (default 'pending'); update preserva
-          },
-          { onConflict: 'network,metricool_comment_id', ignoreDuplicates: false },
-        )
-        .select('id, created_at')
+        .select('id')
+        .eq('network', network)
+        .eq('metricool_comment_id', c.id)
+        .maybeSingle()
+      if (existente) continue
+
+      // Nuevo comentario → insert. Clasificación base por keywords (la IA la
+      // puede refinar al generar el borrador). respuesta_sugerida arranca con el
+      // template enlatado si existe; si no, queda vacío y la IA lo llena.
+      const categoria = clasificarComentario(c.commentText)
+      const { error: insErr } = await service
+        .from('comentarios_inbox')
+        .insert({
+          marca_id: marca.id,
+          network,
+          metricool_comment_id: c.id,
+          metricool_thread_id: c.threadId,
+          metricool_post_id: c.postId,
+          author_username: c.authorUsername,
+          comment_text: c.commentText,
+          comment_created_at: c.createdAt,
+          post_link: c.postLink,
+          post_text_preview: c.postText,
+          post_media_url: c.postMediaUrl,
+          categoria_sugerida: categoria,
+          respuesta_sugerida: templates[categoria] ?? '',
+        })
       if (insErr) {
-        errors.push(`upsert ${network}/${c.id}: ${insErr.message}`)
+        errors.push(`insert ${network}/${c.id}: ${insErr.message}`)
         continue
       }
-      // Si fue insert nuevo (vs update existente), incrementar counter
-      if (insData && insData.length > 0) {
-        // No tenemos forma trivial de saber si fue insert o update con upsert.
-        // Para una mejor métrica, podríamos hacer 2 queries separadas (select then insert).
-        // Por ahora, asumimos que los que vienen son potencialmente nuevos.
-        inserted++
-      }
+      inserted++
     }
   }
 
+  // Generar borradores con IA para los pendientes sin respuesta. Tope por carga
+  // (15) para que "Cargar comentarios" siga siendo rápido; el resto se completa
+  // en la próxima carga o con el botón "Generar borradores". Best-effort: si no
+  // hay OPENAI_API_KEY o falla, los comentarios igual quedaron cargados.
+  let generados = 0
+  try {
+    const g = await generarBorradoresParaMarca(marca.id, marca.nombre, marca.tono_voz, 15)
+    generados = g.generados
+  } catch { /* best-effort */ }
+
   revalidatePath('/comentarios')
-  return { ok: true, fetched, inserted, errors }
+  return { ok: true, fetched, inserted, generados, errors }
+}
+
+/**
+ * Genera respuestas sugeridas con IA (OpenAI) para los comentarios PENDIENTES
+ * de una marca que aún no tienen borrador. Procesa en lotes con concurrencia
+ * acotada para no saturar la API ni el tiempo de la función serverless.
+ *
+ * @returns {generados} cuántos borradores se llenaron exitosamente.
+ */
+async function generarBorradoresParaMarca(
+  marcaId: string,
+  marcaNombre: string,
+  tonoVoz: unknown,
+  cap: number,
+): Promise<{ generados: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // Pendientes recientes; filtramos en JS los que ya tienen borrador no vacío.
+  const { data } = await service
+    .from('comentarios_inbox')
+    .select('id, network, comment_text, post_text_preview, author_username, respuesta_sugerida')
+    .eq('marca_id', marcaId)
+    .eq('status', 'pending')
+    .order('comment_created_at', { ascending: false })
+    .limit(cap * 3)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sinBorrador = ((data ?? []) as any[])
+    .filter((r) => !r.respuesta_sugerida || String(r.respuesta_sugerida).trim() === '')
+    .slice(0, cap)
+
+  if (sinBorrador.length === 0) return { generados: 0 }
+
+  const CONCURRENCIA = 4
+  let generados = 0
+
+  for (let i = 0; i < sinBorrador.length; i += CONCURRENCIA) {
+    const lote = sinBorrador.slice(i, i + CONCURRENCIA)
+    const resultados = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lote.map(async (r: any) => {
+        const gen = await generarRespuestaComentario({
+          marcaNombre,
+          tonoVoz,
+          network: r.network,
+          postTexto: r.post_text_preview,
+          comentario: r.comment_text,
+          autor: r.author_username,
+        })
+        if (!gen) return false
+        const { error } = await service
+          .from('comentarios_inbox')
+          .update({
+            respuesta_sugerida: gen.respuesta,
+            categoria_sugerida: gen.categoria,
+            sugerencia_fuente: 'openai-gpt-4o-mini',
+            sugerencia_at: new Date().toISOString(),
+          })
+          .eq('id', r.id)
+        return !error
+      }),
+    )
+    generados += resultados.filter(Boolean).length
+  }
+
+  return { generados }
+}
+
+/**
+ * Acción pública: genera borradores IA para los pendientes de una marca (botón
+ * "Generar borradores"). Tope mayor que la carga porque es a demanda.
+ */
+export async function generarBorradoresIA(
+  marcaSlug: string,
+): Promise<{ ok: true; generados: number } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  if (!process.env.OPENAI_API_KEY) {
+    return { ok: false, error: 'Falta configurar OPENAI_API_KEY en Vercel para generar borradores con IA.' }
+  }
+
+  const { data: marca } = await service
+    .from('marcas')
+    .select('id, nombre, tono_voz')
+    .eq('slug', marcaSlug)
+    .maybeSingle()
+  if (!marca) return { ok: false, error: `Marca '${marcaSlug}' no encontrada` }
+
+  const { generados } = await generarBorradoresParaMarca(marca.id, marca.nombre, marca.tono_voz, 30)
+  revalidatePath('/comentarios')
+  return { ok: true, generados }
 }
 
 /**

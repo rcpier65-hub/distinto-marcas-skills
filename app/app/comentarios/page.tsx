@@ -8,6 +8,9 @@ import { listInbox, getResumenInbox } from './_actions'
 import { ComentariosClient } from './_components/comentarios-client'
 
 export const dynamic = 'force-dynamic'
+// Las server actions de esta página (cargar comentarios + generar borradores IA)
+// pueden tomar varios segundos por la llamada a OpenAI. Subimos el límite.
+export const maxDuration = 60
 
 type SP = { marca?: string }
 
