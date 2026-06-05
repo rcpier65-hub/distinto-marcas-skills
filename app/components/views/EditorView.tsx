@@ -73,11 +73,19 @@ export type MarcaOption = {
 type SortField = 'marca' | 'nombre' | 'editor' | 'grillaFit' | 'estado' | 'fechaEdicion'
 type SortDir = 'asc' | 'desc'
 
+/* "vistaRapida" se setea cuando el editor hace clic en una card del
+   dashboard arriba (Por editar / Con guion / Sin guion / Urgentes /
+   Editados mes). Cada vista aplica filtros automáticos a la tabla,
+   combinables con marca/editor (pero NO con estado, porque la vista
+   ya implica un estado). 'todas' = sin vista activa, filtros normales. */
+type VistaRapida = 'todas' | 'porEditar' | 'conGuion' | 'sinGuion' | 'urgentes' | 'editadosMes'
+
 type Filters = {
   estado: EstadoPub | 'todos'
   editorId: string | 'todos'
   marcaSlug: string | 'todas'
   soloHoy: boolean
+  vistaRapida: VistaRapida
 }
 
 type Props = {
@@ -101,6 +109,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     editorId: 'todos',
     marcaSlug: 'todas',
     soloHoy: false,
+    vistaRapida: 'todas',
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
 
@@ -134,12 +143,37 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
 
   /* ============ Filtrado + búsqueda + sort ============ */
   const visible = useMemo(() => {
+    /* Pre-cálculo de rango del mes (para vista "editadosMes") */
+    const ahora = new Date()
+    const inicioMes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-01`
+    const finMesDate = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0)
+    const finMes = `${finMesDate.getFullYear()}-${String(finMesDate.getMonth() + 1).padStart(2, '0')}-${String(finMesDate.getDate()).padStart(2, '0')}`
+    const ESTADOS_EDITADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
+
     let list = entries.filter((e) => {
-      /* Filtro "Mi trabajo para hoy": ignora el filtro de estado para
-         mostrar todas las tareas marcadas hoy aunque hayan pasado a
-         aprobar/programar. */
+      /* "Mi trabajo para hoy" tiene prioridad sobre el filtro de
+         estado (queremos ver hoy aunque ya esté en aprobar). */
       if (filters.soloHoy) {
         if (e.fechaMarcadaParaEditar !== hoy) return false
+      } else if (filters.vistaRapida !== 'todas') {
+        /* Vista rápida: cada preset aplica sus propias condiciones y
+           IGNORA filters.estado porque la vista ya implica un estado.
+           Pero respeta editor/marca/search para drill-down combinable. */
+        if (filters.vistaRapida === 'porEditar') {
+          if (e.estado !== 'editar') return false
+        } else if (filters.vistaRapida === 'conGuion') {
+          if (e.estado !== 'editar') return false
+          if ((e.guion?.trim().length ?? 0) === 0) return false
+        } else if (filters.vistaRapida === 'sinGuion') {
+          if (e.estado !== 'editar') return false
+          if ((e.guion?.trim().length ?? 0) > 0) return false
+        } else if (filters.vistaRapida === 'urgentes') {
+          if (e.estado !== 'editar') return false
+          if (calcularAlertaFecha(e.fechaEdicion, e.grillaFit) !== 'rojo') return false
+        } else if (filters.vistaRapida === 'editadosMes') {
+          if (!ESTADOS_EDITADOS.includes(e.estado)) return false
+          if (e.fechaEdicion < inicioMes || e.fechaEdicion > finMes) return false
+        }
       } else {
         if (filters.estado !== 'todos' && e.estado !== filters.estado) return false
       }
@@ -176,6 +210,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     filters.editorId !== 'todos' ||
     filters.marcaSlug !== 'todas' ||
     filters.soloHoy ||
+    filters.vistaRapida !== 'todas' ||
     !!search
 
   /* ============ Edit handlers (optimistic + persist a BD) ============ */
@@ -235,9 +270,16 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
   }
 
   function clearAll() {
-    setFilters({ estado: 'editar', editorId: 'todos', marcaSlug: 'todas', soloHoy: false })
+    setFilters({ estado: 'editar', editorId: 'todos', marcaSlug: 'todas', soloHoy: false, vistaRapida: 'todas' })
     setSearch('')
     setSort(null)
+  }
+
+  /* Handler que las cards del dashboard llaman al hacer clic. Toggle:
+     si la card YA está activa, la desactiva (vuelve a 'todas'). Si no,
+     activa la vista correspondiente. */
+  function toggleVistaRapida(v: VistaRapida) {
+    setFilters((f) => ({ ...f, vistaRapida: f.vistaRapida === v ? 'todas' : v, soloHoy: false }))
   }
 
   function openRow(id: string) {
@@ -262,7 +304,11 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
       </header>
 
       {/* ============== DASHBOARD MÉTRICAS ============== */}
-      <DashboardMetricas {...metricas} />
+      <DashboardMetricas
+        {...metricas}
+        vistaActiva={filters.vistaRapida}
+        onToggleVista={toggleVistaRapida}
+      />
 
       {/* ============== FILTER BAR ============== */}
       <div style={filterBarStyle}>
@@ -418,9 +464,12 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
 
 function DashboardMetricas({
   editadosMes, objetivoMes, porEditar, conGuion, sinGuion, urgentes,
+  vistaActiva, onToggleVista,
 }: {
   editadosMes: number; objetivoMes: number; porEditar: number
   conGuion: number; sinGuion: number; urgentes: number
+  vistaActiva: VistaRapida
+  onToggleVista: (v: VistaRapida) => void
 }) {
   const pct = objetivoMes > 0 ? Math.round((editadosMes / objetivoMes) * 100) : 0
   return (
@@ -429,13 +478,15 @@ function DashboardMetricas({
       display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap',
       background: 'rgba(255, 255, 255, 0.01)',
     }}>
-      {/* Objetivo mensual con círculo */}
+      {/* Objetivo mensual con círculo — clickeable, drill-down a editados del mes */}
       <MetricaCircle
         pct={pct}
         valor={editadosMes}
         total={objetivoMes}
         label="Editados este mes"
         sublabel={`${pct}% del mes`}
+        active={vistaActiva === 'editadosMes'}
+        onClick={() => onToggleVista('editadosMes')}
       />
 
       <MetricaCard
@@ -443,18 +494,24 @@ function DashboardMetricas({
         label="Por editar"
         color="#f2c94c"
         icon={<IconClipboard />}
+        active={vistaActiva === 'porEditar'}
+        onClick={() => onToggleVista('porEditar')}
       />
       <MetricaCard
         valor={conGuion}
         label="Con guion técnico"
         color="#34d399"
         icon={<IconScript />}
+        active={vistaActiva === 'conGuion'}
+        onClick={() => onToggleVista('conGuion')}
       />
       <MetricaCard
         valor={sinGuion}
         label="Sin guion"
         color="#a78bfa"
         icon={<IconScriptEmpty />}
+        active={vistaActiva === 'sinGuion'}
+        onClick={() => onToggleVista('sinGuion')}
       />
       <MetricaCard
         valor={urgentes}
@@ -463,18 +520,39 @@ function DashboardMetricas({
         icon={<IconWarn />}
         highlight={urgentes > 0}
         hint={urgentes > 0 ? '≤1 día entre edición y publicación' : 'Sin alertas'}
+        active={vistaActiva === 'urgentes'}
+        onClick={() => onToggleVista('urgentes')}
       />
     </div>
   )
 }
 
-function MetricaCircle({ pct, valor, total, label, sublabel }: { pct: number; valor: number; total: number; label: string; sublabel: string }) {
+function MetricaCircle({
+  pct, valor, total, label, sublabel, active, onClick,
+}: {
+  pct: number; valor: number; total: number; label: string; sublabel: string
+  active?: boolean; onClick?: () => void
+}) {
   /* Círculo SVG con stroke-dashoffset = progress */
   const R = 22
   const C = 2 * Math.PI * R
   const offset = C - (C * Math.min(100, Math.max(0, pct))) / 100
   return (
-    <div style={metricaCardStyle}>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...metricaCardStyle,
+        cursor: onClick ? 'pointer' : 'default',
+        border: active ? '1px solid #a78bfa' : '1px solid var(--mk-border-subtle)',
+        background: active ? 'rgba(167, 139, 250, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+        textAlign: 'left',
+        fontFamily: 'inherit',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+      }}
+      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)' }}
+      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)' }}
+    >
       <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
         <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
           <circle cx="28" cy="28" r={R} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="4" />
@@ -493,19 +571,40 @@ function MetricaCircle({ pct, valor, total, label, sublabel }: { pct: number; va
         </div>
         <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{sublabel}</div>
       </div>
-    </div>
+    </button>
   )
 }
 
-function MetricaCard({ valor, label, color, icon, highlight, hint }: { valor: number; label: string; color: string; icon: React.ReactNode; highlight?: boolean; hint?: string }) {
+function MetricaCard({
+  valor, label, color, icon, highlight, hint, active, onClick,
+}: {
+  valor: number; label: string; color: string; icon: React.ReactNode
+  highlight?: boolean; hint?: string
+  active?: boolean; onClick?: () => void
+}) {
+  /* Si active=true, el highlight del color de la card gana sobre el
+     highlight rojo (urgentes). Si solo highlight=true sin active,
+     mantiene el aviso rojo pero sin "seleccionada". */
+  const borderColor = active ? color : highlight ? color : 'var(--mk-border-subtle)'
+  const bgColor = active ? `${color}1f` : highlight ? `${color}10` : 'rgba(255, 255, 255, 0.02)'
+  const bgHover = `${color}14`
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      title={hint}
       style={{
         ...metricaCardStyle,
-        border: highlight ? `1px solid ${color}` : '1px solid var(--mk-border-subtle)',
-        background: highlight ? `${color}10` : 'rgba(255, 255, 255, 0.02)',
+        cursor: onClick ? 'pointer' : 'default',
+        border: `1px solid ${borderColor}`,
+        background: bgColor,
+        textAlign: 'left',
+        fontFamily: 'inherit',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+        boxShadow: active ? `0 0 0 1px ${color}40, 0 0 16px ${color}20` : 'none',
       }}
-      title={hint}
+      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.background = bgHover }}
+      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.background = bgColor }}
     >
       <div style={{
         width: 36, height: 36, borderRadius: 8,
@@ -519,7 +618,7 @@ function MetricaCard({ valor, label, color, icon, highlight, hint }: { valor: nu
         <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>{label}</div>
         {hint && <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{hint}</div>}
       </div>
-    </div>
+    </button>
   )
 }
 
