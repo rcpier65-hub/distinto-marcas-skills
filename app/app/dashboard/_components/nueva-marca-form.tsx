@@ -26,6 +26,15 @@ function previewSlug(s: string): string {
 const INPUT_CLS =
   'mt-1 h-10 px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40'
 
+// Grilla curada de emojis para elegir, pensada para los rubros de Distinto.
+const EMOJIS = [
+  '🏷️', '✨', '💪', '🏋️', '🥗', '🌿', '🌱', '🧴',
+  '💄', '💅', '🦷', '😁', '💡', '🔦', '🪑', '🛋️',
+  '🏗️', '🪵', '🔨', '🚗', '🚙', '🧠', '💙', '❤️',
+  '⚡', '🔥', '🛒', '📦', '🎯', '🏆', '📸', '🎬',
+  '🎨', '🏠', '☕', '🌸', '🐶', '🍔', '📈', '🩺',
+]
+
 export function NuevaMarcaForm({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
@@ -34,11 +43,12 @@ export function NuevaMarcaForm({ defaultOpen = false }: { defaultOpen?: boolean 
   const [emoji, setEmoji] = useState('🏷️')
   const [color, setColor] = useState(VIOLETA)
   const [objetivo, setObjetivo] = useState(0)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const slug = previewSlug(nombre)
 
   function reset() {
-    setNombre(''); setEmoji('🏷️'); setColor(VIOLETA); setObjetivo(0)
+    setNombre(''); setEmoji('🏷️'); setColor(VIOLETA); setObjetivo(0); setPickerOpen(false)
   }
 
   async function submit() {
@@ -102,16 +112,37 @@ export function NuevaMarcaForm({ defaultOpen = false }: { defaultOpen?: boolean 
           />
         </label>
 
-        {/* Emoji */}
-        <label className="block">
+        {/* Emoji (selector visual) */}
+        <div className="block relative">
           <span className="text-xs font-medium text-muted-foreground">Emoji</span>
-          <input
-            type="text"
-            value={emoji}
-            onChange={(e) => setEmoji(e.target.value.slice(0, 4))}
-            className="mt-1 w-16 h-10 px-2 rounded-md border bg-background text-center text-lg focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-          />
-        </label>
+          <button
+            type="button"
+            onClick={() => setPickerOpen((o) => !o)}
+            className="mt-1 w-16 h-10 rounded-md border bg-background flex items-center justify-center text-2xl leading-none hover:bg-muted focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
+            aria-label="Elegir emoji"
+            title="Clic para elegir un icono"
+          >
+            {emoji}
+          </button>
+          {pickerOpen && (
+            <>
+              {/* Capa para cerrar al hacer clic afuera */}
+              <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
+              <div className="absolute right-0 z-20 mt-1 p-2 rounded-lg border bg-card shadow-lg w-72 grid grid-cols-8 gap-1 max-h-52 overflow-y-auto">
+                {EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => { setEmoji(e); setPickerOpen(false) }}
+                    className={`w-8 h-8 flex items-center justify-center text-xl rounded hover:bg-muted ${emoji === e ? 'bg-[#ba41f7]/15 ring-1 ring-[#ba41f7]/50' : ''}`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Color */}
         <label className="block">
