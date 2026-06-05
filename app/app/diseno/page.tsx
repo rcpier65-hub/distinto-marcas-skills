@@ -69,22 +69,32 @@ export default async function DisenoPage() {
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
 
-  /* Query A: con fecha_diseno en rango */
+  /* Query A: con fecha_diseno en rango Y portada NO lista.
+     Pedro confirmó que la vista en Notion "Diseño Ailyn" usa el filtro
+     "Portada lista: Sin marcar" — solo aparecen las tareas que faltan
+     diseñar. Las que ya tienen portada lista están en otro flujo (post
+     producción, listas para publicar) y no deben aparecer en /diseno.
+     Esto deja solo las 4 que Pedro mostró: Manual de marca TYPHOUSE,
+     CTA video x2, Banner web Kintu. */
   let queryA = service
     .from('publicaciones')
     .select(SELECT)
     .not('fecha_diseno', 'is', null)
     .gte('fecha_diseno', DESDE)
     .lte('fecha_diseno', HASTA)
+    .eq('portada_lista', false)
     .order('fecha_diseno', { ascending: true })
     .limit(500)
   let resA = await queryA
 
-  /* Query B: tareas internas sin fecha_diseno (recién creadas) */
+  /* Query B: tareas internas sin fecha_diseno aún (recién creadas
+     desde el modal "+ Nueva tarea"). También filtramos por portada_lista
+     false aunque por default las nuevas vienen con false. */
   let queryB = service
     .from('publicaciones')
     .select(SELECT)
     .is('fecha_diseno', null)
+    .eq('portada_lista', false)
     .order('created_at', { ascending: false })
     .limit(100)
     .eq('marca.slug', 'interno')
@@ -103,6 +113,7 @@ export default async function DisenoPage() {
       .not('fecha_diseno', 'is', null)
       .gte('fecha_diseno', DESDE)
       .lte('fecha_diseno', HASTA)
+      .eq('portada_lista', false)
       .order('fecha_diseno', { ascending: true })
       .limit(500)
     resA = await queryA
@@ -110,6 +121,7 @@ export default async function DisenoPage() {
       .from('publicaciones')
       .select(FALLBACK_SELECT)
       .is('fecha_diseno', null)
+      .eq('portada_lista', false)
       .order('id', { ascending: false })
       .limit(100)
       .eq('marca.slug', 'interno')

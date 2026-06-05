@@ -100,7 +100,9 @@ export function DisenoView({
   const router = useRouter()
   const [entries, setEntries] = useState(initialEntries)
   const [, startTransition] = useTransition()
-  const [vista, setVista] = useState<Vista>('tabla')
+  /* Default Kanban: Pedro confirmó que es la vista principal del
+     diseñador. La tabla queda como vista secundaria para edición masiva. */
+  const [vista, setVista] = useState<Vista>('kanban')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>({
     subEstado: 'activas',
@@ -406,7 +408,6 @@ export function DisenoView({
           onSort={toggleSort}
           onOpenRow={openRow}
           onSetNombre={setNombre}
-          onSetDescripcion={setDescripcion}
           onSetFechaDis={setFechaDiseno}
           onSetFechaEntrega={setFechaEntrega}
           onSetSubEstado={setSubEstado}
@@ -419,6 +420,7 @@ export function DisenoView({
           entries={visible.filter((e) => e.subEstado !== 'archivado')}
           onMoveCard={(id, newSub) => setSubEstado(id, newSub)}
           onOpenCard={openRow}
+          onArchive={(id) => archivarVal(id, true)}
         />
       )}
 
@@ -440,7 +442,7 @@ export function DisenoView({
 
 function TablaVista({
   entries, marcaBySlug, hoy, sort, onSort, onOpenRow,
-  onSetNombre, onSetDescripcion, onSetFechaDis, onSetFechaEntrega,
+  onSetNombre, onSetFechaDis, onSetFechaEntrega,
   onSetSubEstado, onArchivar, onToggleHoy, onCreateNew,
 }: {
   entries: DisenoEntry[]
@@ -450,7 +452,6 @@ function TablaVista({
   onSort: (f: SortField) => void
   onOpenRow: (id: string) => void
   onSetNombre: (id: string, n: string) => void
-  onSetDescripcion: (id: string, d: string) => void
   onSetFechaDis: (id: string, d: string) => void
   onSetFechaEntrega: (id: string, d: string) => void
   onSetSubEstado: (id: string, s: SubEstadoDiseno) => void
@@ -465,13 +466,11 @@ function TablaVista({
           <tr>
             <Th width="160px" sortable field="marca"        sort={sort} onSort={onSort}>Proyecto</Th>
             <Th              sortable field="nombre"        sort={sort} onSort={onSort}>Nombre de la tarea</Th>
-            <Th width="280px">Descripción</Th>
             <Th width="130px" sortable field="fechaEntrega" sort={sort} onSort={onSort}>Fecha entrega</Th>
             <Th width="130px" sortable field="fechaDiseno"  sort={sort} onSort={onSort}>Fecha diseño</Th>
             <Th width="130px" sortable field="subEstado"    sort={sort} onSort={onSort}>Sub-estado</Th>
             <Th width="110px">Diseñar hoy</Th>
             <Th width="80px" align="center">Archivar</Th>
-            <Th width="40px" align="right" />
           </tr>
         </thead>
         <tbody>
@@ -501,12 +500,32 @@ function TablaVista({
                     </span>
                   </div>
                 </Td>
-                <Td><InlineText value={entry.nombreTarea} onSave={(v) => onSetNombre(entry.id, v)} /></Td>
                 <Td>
-                  <InlineDesc
-                    value={entry.descripcion ?? ''}
-                    onSave={(v) => onSetDescripcion(entry.id, v)}
-                  />
+                  {/* Nombre editable + botón "abrir tarea" estilo Notion.
+                      El botón aparece como icono al costado del nombre,
+                      visible siempre (no solo hover) porque Pedro pidió
+                      que sea claro que se puede abrir el detalle. */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <InlineText value={entry.nombreTarea} onSave={(v) => onSetNombre(entry.id, v)} />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onOpenRow(entry.id) }}
+                      title="Abrir tarea"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid var(--mk-border-subtle)',
+                        color: 'var(--mk-text-tertiary)',
+                        cursor: 'pointer',
+                        padding: '2px 4px', borderRadius: 'var(--mk-radius-sm)',
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        fontFamily: 'inherit', fontSize: 10,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--mk-text-primary)'; e.currentTarget.style.borderColor = 'var(--mk-border-default)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--mk-text-tertiary)'; e.currentTarget.style.borderColor = 'var(--mk-border-subtle)' }}
+                    >
+                      <IconOpenInPage />
+                      Abrir
+                    </button>
+                  </div>
                 </Td>
                 <Td>
                   {entry.fechaEntrega ? (
@@ -561,21 +580,11 @@ function TablaVista({
                     <IconArchive />
                   </button>
                 </Td>
-                <Td align="right">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onOpenRow(entry.id) }}
-                    style={openBtnStyle}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--mk-text-primary)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--mk-text-tertiary)' }}
-                  >
-                    <IconArrowOpen />
-                  </button>
-                </Td>
               </tr>
             )
           })}
           {entries.length === 0 && (
-            <tr><td colSpan={9} style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <tr><td colSpan={7} style={{ padding: '60px 20px', textAlign: 'center' }}>
               <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
                 No hay tareas con esos filtros
               </div>
@@ -606,11 +615,12 @@ function TablaVista({
    ============================================================ */
 
 function KanbanVista({
-  entries, onMoveCard, onOpenCard,
+  entries, onMoveCard, onOpenCard, onArchive,
 }: {
   entries: DisenoEntry[]
   onMoveCard: (id: string, newSub: SubEstadoDiseno) => void
   onOpenCard: (id: string) => void
+  onArchive: (id: string) => void
 }) {
   const [dragOver, setDragOver] = useState<SubEstadoDiseno | null>(null)
 
@@ -679,6 +689,7 @@ function KanbanVista({
                   entry={entry}
                   onClick={() => onOpenCard(entry.id)}
                   onDragStart={(e) => onDragStart(e, entry.id)}
+                  onArchive={() => onArchive(entry.id)}
                 />
               ))}
               {items.length === 0 && (
@@ -694,29 +705,55 @@ function KanbanVista({
   )
 }
 
-function KanbanCard({ entry, onClick, onDragStart }: {
+function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
   entry: DisenoEntry
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
+  onArchive: () => void
 }) {
   const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaEntrega)
+  const [hover, setHover] = useState(false)
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
+        position: 'relative',
         padding: 10,
         background: 'var(--mk-bg-elevated)',
-        border: '1px solid var(--mk-border-subtle)',
+        border: `1px solid ${hover ? 'var(--mk-border-default)' : 'var(--mk-border-subtle)'}`,
         borderRadius: 'var(--mk-radius-sm)',
         cursor: 'grab',
         transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-default)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+      {/* Botón archivar — top-right de la card, visible al hover.
+          Pedro pidió que en Kanban se pueda archivar cada tarea
+          directamente (sin tener que ir a la tabla). */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onArchive() }}
+        title="Archivar tarea"
+        style={{
+          position: 'absolute', top: 6, right: 6,
+          padding: '3px 5px',
+          background: 'rgba(255, 255, 255, 0.06)',
+          border: '1px solid var(--mk-border-subtle)',
+          borderRadius: 'var(--mk-radius-sm)',
+          color: 'var(--mk-text-tertiary)',
+          cursor: 'pointer',
+          opacity: hover ? 1 : 0,
+          transition: 'opacity var(--mk-dur-fast) var(--mk-ease-out)',
+          display: 'inline-flex', alignItems: 'center', gap: 3,
+          fontFamily: 'inherit', fontSize: 10,
+        }}
+      >
+        <IconArchive />
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, paddingRight: 28 }}>
         <span
           style={{
             fontSize: 10, fontWeight: 500, padding: '2px 6px',
@@ -734,6 +771,10 @@ function KanbanCard({ entry, onClick, onDragStart }: {
       }}>
         {entry.nombreTarea}
       </div>
+      {/* Descripción visible en el card del Kanban (no en la tabla).
+          Pedro confirmó que en card del Kanban sí ayuda al diseñador
+          ver el brief de un vistazo, pero en la tabla NO porque la
+          tabla ya es muy ancha. */}
       {entry.descripcion && (
         <div style={{
           fontSize: 11, color: 'var(--mk-text-tertiary)', marginBottom: 6,
@@ -1397,3 +1438,6 @@ function IconToday()     { return <svg width="12" height="12" viewBox="0 0 12 12
 function IconTable()     { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="1.5" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 4.5H9.5M1.5 7H9.5M4 1.5V9.5" stroke="currentColor" strokeWidth="1.2"/></svg> }
 function IconKanban()    { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="1.5" width="2.5" height="8" rx="0.5" stroke="currentColor" strokeWidth="1.2"/><rect x="4.5" y="1.5" width="2.5" height="5" rx="0.5" stroke="currentColor" strokeWidth="1.2"/><rect x="7.5" y="1.5" width="2.5" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.2"/></svg> }
 function IconArchive()   { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="2" width="10" height="2" rx="0.5" stroke="currentColor" strokeWidth="1.2"/><path d="M2.5 4V10C2.5 10.5 2.8 11 3.5 11H9.5C10.2 11 10.5 10.5 10.5 10V4" stroke="currentColor" strokeWidth="1.2"/><path d="M5 6.5H8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+/* IconOpenInPage: estilo Notion — flecha diagonal saliendo de un cuadro,
+   significa "abrir esta tarea en su página de detalle". */
+function IconOpenInPage(){ return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 9V2.5C2 2.2 2.2 2 2.5 2H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M8 2H10V4M10 2L6.5 5.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 6.5V9C8.5 9.3 8.3 9.5 8 9.5H3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
