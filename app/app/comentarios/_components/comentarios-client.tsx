@@ -17,10 +17,9 @@ import {
   actualizarComentarioBorrador,
   skipComentario,
   responderBatch,
-  dispatchRoutine,
+  postearAprobados,
   generarBorradoresIA,
   previewInformeWhatsapp,
-  type RoutineMode,
 } from '../_actions'
 import { ComentarioRow } from './comentario-row'
 import type { ComentarioInboxRow, ComentarioCategoria } from '@/lib/types/database'
@@ -89,9 +88,8 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [enviarInforme, setEnviarInforme] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  // Dispatch Routine (Claude Desktop trigger)
-  const [dispatching, setDispatching] = useState<RoutineMode | null>(null)
-  const [, startDispatchTransition] = useTransition()
+  // Postear aprobados directo a Metricool (sin rutina de Claude)
+  const [isPosting, startPosting] = useTransition()
 
   // Preview informe (modo prueba — manda al número personal de Pedro sin tocar Metricool)
   const [previewing, setPreviewing] = useState(false)
@@ -118,37 +116,20 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
     })
   }
 
-  function handleDispatchRoutine(mode: RoutineMode) {
-    setDispatching(mode)
-    startDispatchTransition(async () => {
-      const labels: Record<RoutineMode, string> = {
-        generar: 'Generando borradores',
-        postear: 'Posteando aprobados a Metricool',
-        ambas: 'Generación + posteo',
-      }
-      const toastId = toast.loading(`🤖 ${labels[mode]}…`)
-      const r = await dispatchRoutine(mode)
+  // Postea los aprobados directo a Metricool (sin rutina de Claude).
+  function handlePostearAprobados() {
+    startPosting(async () => {
+      const toastId = toast.loading(`Posteando ${resumen.approved} aprobados a Metricool…`)
+      const r = await postearAprobados(marcaActual)
       if (r.ok) {
-        // Si el dispatch devolvió session_url, agregamos action para abrirla
-        // en vivo (ver la Routine ejecutándose paso por paso).
-        toast.success(r.message, {
-          id: toastId,
-          duration: 12000,
-          action: r.sessionUrl
-            ? {
-                label: 'Ver en vivo',
-                onClick: () => window.open(r.sessionUrl!, '_blank'),
-              }
-            : undefined,
-        })
-        // Refrescar la página después de 60s para que aparezcan los borradores
-        if (mode === 'generar' || mode === 'ambas') {
-          setTimeout(() => router.refresh(), 60_000)
-        }
+        toast.success(
+          `✅ ${r.respondidos} posteados a Metricool${r.fallidos > 0 ? ` · ${r.fallidos} fallidos` : ''}`,
+          { id: toastId, duration: 8000 },
+        )
+        router.refresh()
       } else {
-        toast.error(`Error: ${r.error}`, { id: toastId, duration: 10000 })
+        toast.error(`Error: ${r.error}`, { id: toastId, duration: 9000 })
       }
-      setDispatching(null)
     })
   }
 
@@ -317,15 +298,15 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
             {isGenerating ? '⏳ Generando…' : '✨ Generar borradores'}
           </button>
 
-          {/* Postear aprobados — solo visible si hay aprobados pendientes de envío */}
+          {/* Postear aprobados — directo a Metricool, sin rutina de Claude */}
           {resumen.approved > 0 && (
             <button
-              onClick={() => handleDispatchRoutine('postear')}
-              disabled={dispatching !== null}
-              title={`Dispara la Routine para postear los ${resumen.approved} aprobados a Metricool`}
+              onClick={handlePostearAprobados}
+              disabled={isPosting}
+              title={`Postea los ${resumen.approved} aprobados directo a Metricool`}
               className="h-10 px-3 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
             >
-              {dispatching === 'postear' ? '⏳ Posteando…' : `✅ Postear ${resumen.approved} aprobados`}
+              {isPosting ? '⏳ Posteando…' : `✅ Postear ${resumen.approved} aprobados`}
             </button>
           )}
         </div>

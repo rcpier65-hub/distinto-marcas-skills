@@ -410,6 +410,31 @@ export async function skipComentario(id: string): Promise<{ ok: true } | { ok: f
  * Diseño fail-safe: si Metricool falla en uno, sigue con los demás. Al final
  * el informe distingue exitosos vs fallidos.
  */
+/**
+ * Postea TODOS los comentarios aprobados de una marca directo a Metricool
+ * (sin rutina de Claude). Reusa responderBatch, que llama la API de Metricool.
+ */
+export async function postearAprobados(
+  marcaSlug: string,
+): Promise<{ ok: true; respondidos: number; fallidos: number } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: marca } = await service.from('marcas').select('id').eq('slug', marcaSlug).maybeSingle()
+  if (!marca) return { ok: false, error: `Marca '${marcaSlug}' no encontrada` }
+  const { data: aprobados } = await service
+    .from('comentarios_inbox')
+    .select('id')
+    .eq('marca_id', marca.id)
+    .eq('status', 'approved')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ids = ((aprobados ?? []) as any[]).map((r) => r.id as string)
+  if (ids.length === 0) return { ok: false, error: 'No hay comentarios aprobados para postear' }
+  const r = await responderBatch(ids, true)
+  if (!r.ok) return r
+  return { ok: true, respondidos: r.respondidos, fallidos: r.fallidos }
+}
+
 export async function responderBatch(
   ids: string[],
   enviarInforme: boolean = true,
