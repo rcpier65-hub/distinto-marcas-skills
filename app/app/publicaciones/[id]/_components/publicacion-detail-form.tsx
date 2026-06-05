@@ -76,15 +76,15 @@ function TikTokIcon({ className = '' }: { className?: string }) {
 }
 
 // Plataformas con iconos custom/lucide + color de marca social
-// (solo aparece en hover/active para mantener look limpio en idle)
+// (solo aparece en hover/active para mantener look limpio en idle).
+// Pinterest / WhatsApp / Exterior se quitaron del menú fijo; ahora se
+// pueden agregar como "otra plataforma" en el input custom (ver botón
+// "＋ Otra" en la sección de tabs).
 const PLATAFORMAS = [
   { key: 'Instagram', Icon: InstagramIcon, label: 'Instagram', brand: '#E1306C' },
   { key: 'Facebook',  Icon: FacebookIcon,  label: 'Facebook',  brand: '#1877F2' },
   { key: 'Tiktok',    Icon: TikTokIcon,    label: 'TikTok',    brand: '#000000' },
   { key: 'Youtube',   Icon: YoutubeIcon,   label: 'YouTube',   brand: '#FF0000' },
-  { key: 'Pinterest', Icon: Pin,           label: 'Pinterest', brand: '#E60023' },
-  { key: 'WhatsApp',  Icon: MessageCircle, label: 'WhatsApp',  brand: '#25D366' },
-  { key: 'Exterior',  Icon: Globe,         label: 'Exterior',  brand: '#6B7280' },
 ] as const
 
 const TIPO_OPTS = ['REEL', 'POST', 'CARRUSEL', 'STORY', 'REEL FRASE', 'VIDEO REEL TIKTOK', 'VIDEO']
@@ -130,6 +130,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
   const [isDeleting, startDelete] = useTransition()
   const [isDuplicating, startDuplicate] = useTransition()
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null)
+  // Plataforma custom inline: cuando el equipo necesita marcar la pub
+  // para un canal que no es Instagram/Facebook/TikTok/YouTube (banner,
+  // exterior, pieza impresa, etc.).
+  const [addingCustomPlat, setAddingCustomPlat] = useState(false)
+  const [customPlatInput, setCustomPlatInput] = useState('')
   const [previewPlatform, setPreviewPlatform] = useState<string>(
     initial.plataformas?.[0] ?? 'Instagram',
   )
@@ -339,6 +344,63 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 </button>
               )
             })}
+
+            {/* Chips custom — plataformas que el equipo agregó manual
+                (banner, exterior, etc.) que ya están en form.plataformas
+                pero NO en el array fijo de arriba. Click para quitarlas. */}
+            {form.plataformas
+              .filter((p) => !PLATAFORMAS.some((fixed) => fixed.key === p))
+              .map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => toggleArrayItem('plataformas', p)}
+                  title="Click para quitar esta plataforma"
+                  className="group flex items-center gap-2 h-10 px-4 rounded-full text-sm font-medium transition-all border bg-foreground/5 border-foreground/15 text-foreground shadow-sm"
+                >
+                  <span>{p}</span>
+                  <span className="opacity-40 group-hover:opacity-100 text-xs">×</span>
+                </button>
+              ))}
+
+            {/* Botón "＋ Otra" → input inline → agrega plataforma custom */}
+            {addingCustomPlat ? (
+              <input
+                type="text"
+                autoFocus
+                value={customPlatInput}
+                onChange={(e) => setCustomPlatInput(e.target.value)}
+                onBlur={() => {
+                  const v = customPlatInput.trim()
+                  if (v && !form.plataformas.includes(v)) {
+                    setForm((s) => ({ ...s, plataformas: [...s.plataformas, v] }))
+                  }
+                  setCustomPlatInput('')
+                  setAddingCustomPlat(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    ;(e.target as HTMLInputElement).blur()
+                  } else if (e.key === 'Escape') {
+                    setCustomPlatInput('')
+                    setAddingCustomPlat(false)
+                  }
+                }}
+                placeholder="Banner, Exterior…"
+                className="h-10 px-4 rounded-full text-sm border border-dashed border-foreground/30 bg-background focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 placeholder:text-muted-foreground/60 min-w-[160px]"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingCustomPlat(true)}
+                title="Agregar otra plataforma (Banner, Exterior, etc.)"
+                className="flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-medium border border-dashed border-foreground/25 text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+              >
+                <span className="text-base leading-none">＋</span>
+                <span>Otra</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
