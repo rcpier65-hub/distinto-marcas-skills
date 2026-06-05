@@ -607,53 +607,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   </div>
                 </ToolbarBtnPopover>
 
-                {/* Hashtag */}
-                <ToolbarBtn
-                  icon={<span className="text-lg font-bold leading-none">#</span>}
-                  label="Hashtag"
-                  title="Agregar # en el copy"
-                  onClick={() => insertAtCursor(' #')}
-                />
-
-                {/* Enlace */}
-                <ToolbarBtn
-                  icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
-                  label="Enlace"
-                  title="Pegar URL en el copy"
-                  onClick={() => {
-                    const url = prompt('URL del enlace:')
-                    if (url) insertAtCursor(' ' + url + ' ')
-                  }}
-                />
-
-                {/* Emoji */}
-                <ToolbarBtnPopover
-                  icon={<Smile className="w-5 h-5" />}
-                  label="Emoji"
-                  title="Insertar emoji en el copy"
-                  active={openPopover === 'emoji'}
-                  onClick={() => setOpenPopover(openPopover === 'emoji' ? null : 'emoji')}
-                >
-                  <div className="w-[280px]">
-                    <div className="font-semibold text-xs mb-2 text-muted-foreground">Insertar emoji</div>
-                    <div className="grid grid-cols-10 gap-1">
-                      {EMOJI_PICKER.map((e) => (
-                        <button
-                          key={e}
-                          type="button"
-                          onClick={() => {
-                            insertAtCursor(e)
-                            setOpenPopover(null)
-                          }}
-                          className="w-6 h-6 flex items-center justify-center hover:bg-muted rounded text-base"
-                        >{e}</button>
-                      ))}
-                    </div>
-                  </div>
-                </ToolbarBtnPopover>
-
-                {/* IA */}
-                <ToolbarBtn icon="🤖" label="IA" title="Asistente IA (próximo)" disabled />
+                {/* Removidos por pedido de Pedro (2026-06-05):
+                    Hashtag, Enlace, Emoji, IA — no se usan en el flujo
+                    operativo y agregan ruido al toolbar. */}
               </div>
             </div>
           </CardContent>
