@@ -5,7 +5,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { MARCAS_NAV } from '@/lib/mock-marcas'
+import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 
 type Action = {
   id: string
@@ -22,9 +22,11 @@ type Action = {
 type Props = {
   open: boolean
   onClose: () => void
+  /* Marcas desde la base (vía layout raíz). Fallback a la lista fija. */
+  marcas?: MarcaNav[]
 }
 
-export function CommandPalette({ open, onClose }: Props) {
+export function CommandPalette({ open, onClose, marcas = MARCAS_NAV }: Props) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [selectedIdx, setSelectedIdx] = useState(0)
@@ -45,7 +47,7 @@ export function CommandPalette({ open, onClose }: Props) {
     { id: 'create-nota',       title: 'Nueva nota',                                                          category: 'crear', icon: <IconNote />,    keywords: 'apunte memo',              href: '/historial' },
 
     // Por marca
-    ...MARCAS_NAV.map<Action>((m) => ({
+    ...marcas.map<Action>((m) => ({
       id: `marca-${m.slug}`,
       title: `Abrir ${m.nombreCorto}`,
       subtitle: `${m.industria} · ${m.pendientes} pendientes`,
@@ -54,7 +56,7 @@ export function CommandPalette({ open, onClose }: Props) {
       keywords: `${m.slug} ${m.nombre} ${m.industria}`,
       href: `/marca/${m.slug}`,
     })),
-  ], [])
+  ], [marcas])
 
   // Filtro fuzzy
   const filtered = useMemo(() => {

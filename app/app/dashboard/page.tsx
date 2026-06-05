@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth/get-user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MarcaCard, type MarcaCardData } from './_components/marca-card'
+import { NuevaMarcaForm } from './_components/nueva-marca-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,19 @@ export default async function DashboardPage() {
           Hola {user.email}. {cards.length} marcas activas.
         </p>
       </header>
+
+      {/* Encabezado de sección + botón crear marca */}
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+        <h2 className="text-xl font-semibold">
+          Tus marcas{' '}
+          <span className="text-muted-foreground font-normal text-base">· {cards.length}</span>
+        </h2>
+      </div>
+
+      {/* Botón "+ Nueva marca" (se expande a formulario al abrir) */}
+      <div className="mb-6">
+        <NuevaMarcaForm />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {cards.map((m) => (

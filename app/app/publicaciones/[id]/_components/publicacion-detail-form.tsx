@@ -316,7 +316,18 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     : 'empty'
 
   return (
-    <div className="space-y-4 pb-20">
+    /* Root wrapper. Antes el HEADER (chips marca/estado + título + tabs
+       plataformas + Duplicar/Eliminar) estaba FUERA del grid en su
+       propia fila, y eso empujaba el preview lateral hacia abajo. Pedro
+       pidió que el preview arranque a la altura del chip "kintu" (parte
+       superior del HEADER), así que ahora el HEADER vive como primer
+       hijo de la columna izquierda del grid; META footer y STICKY save
+       bar quedan FUERA del grid (hermanos), por eso necesitamos un
+       wrapper pb-20 que envuelva todo. */
+    <div className="pb-20">
+      <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
+      {/* COLUMNA IZQUIERDA — HEADER + Card del copy + resto */}
+      <div className="space-y-4 min-w-0">
       {/* HEADER */}
       <div className="flex items-start gap-4">
         <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: marca?.color_primario_hex ?? '#283B6F' }} />
@@ -461,16 +472,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         </div>
       </div>
 
-      {/* SPLIT — columna izquierda (todo: copy + props + workflow +
-          guion + opción 2 + notas + guion técnico) + columna derecha (preview sticky).
-          items-start hace que cada columna tenga su altura natural y
-          el preview puede ser sticky mientras vos scrolleás en la izquierda. */}
-      <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
-        {/* Wrapper de la columna izquierda — apila todas las secciones */}
-        <div className="space-y-3 min-w-0">
-        {/* COPY + WORKFLOW LATERAL: el Card del copy ahora tiene un
-            sidebar izquierdo (180px) con el progreso del workflow.
-            Permite a Pedro ver el avance mientras edita el copy. */}
+      {/* COPY + WORKFLOW LATERAL: el Card del copy ahora tiene un
+          sidebar izquierdo (180px) con el progreso del workflow.
+          Permite a Pedro ver el avance mientras edita el copy.
+          Nota: el grid wrapper y el wrapper col-izq antes vivían aquí,
+          se subieron al return root para que el preview lateral arranque
+          a la altura del HEADER, no debajo de él. */}
         <Card>
           <div className="flex">
             {/* Sidebar lateral — workflow + propiedades.
@@ -649,12 +656,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             </div>
 
             {/* TOOLBAR con popovers expandibles.
-                pt-4: padding extra arriba para que las badges (arriba-
-                derecha del botón) tengan espacio y no se corten cuando
-                el contenedor scrollee.
-                gap-2 + min-w-[72px]: respiración entre y dentro de cada
-                botón. Pedro pidió que los iconos no se vean apretados. */}
-            <div ref={toolbarRef} className="border-t bg-muted/20 px-3 pt-4 pb-2 relative">
+                Los badges ahora viven dentro del botón (top-0.5) y no
+                sobresalen, así que el contenedor no necesita pt extra.
+                gap-2 mantiene la respiración entre iconos. */}
+            <div ref={toolbarRef} className="border-t bg-muted/20 px-3 py-2 relative">
               <div className="flex items-end justify-start gap-2 flex-nowrap overflow-x-auto overflow-y-visible [scrollbar-width:thin]">
                 {/* Tipo de contenido */}
                 <ToolbarBtnPopover
@@ -1089,7 +1094,7 @@ function ToolbarBtn({
       onClick={onClick}
       disabled={disabled}
       aria-label={title}
-      className={`flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 py-2.5 rounded-lg transition-colors ${
+      className={`flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 pt-5 pb-2 rounded-lg transition-colors ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
           : active
@@ -1127,7 +1132,7 @@ function ToolbarBtnPopover({
         type="button"
         onClick={onClick}
         aria-label={title}
-        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 py-2.5 rounded-lg transition-colors ${
+        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 pt-5 pb-2 rounded-lg transition-colors ${
           active
             ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1136,11 +1141,14 @@ function ToolbarBtnPopover({
         <span className="leading-none">{icon}</span>
         <span className="text-[11px] font-medium leading-none whitespace-nowrap">{label}</span>
         {badge && (
-          /* Badge sin truncar — Pedro vio "REEL F…" en lugar de
-             "REEL FIT". Subimos el límite a 14 chars (entran los
-             valores reales: REEL FIT, Normal, Anuncio, Carrusel).
-             whitespace-nowrap + el flex hacen que crezca al texto. */
-          <span className="absolute -top-2 -right-2 h-[18px] px-2 rounded-full bg-[#ba41f7] text-white text-[10px] font-bold flex items-center justify-center leading-none whitespace-nowrap shadow-sm ring-2 ring-background">
+          /* Badge pegado al borde superior del botón (top-0) en lugar
+             de superpuesto. Antes "-top-2" + "py-2.5" hacían que el
+             badge cubriera los primeros 10px del icono (Pedro vio que
+             "REEL FRASE" tapaba el film icon, "Normal" tapaba la
+             diana, etc.). Ahora con pt-5 el botón tiene 20px de
+             padding-top y el badge en top-0 h-[18px] queda íntegro
+             arriba del icono SIN solaparlo. */
+          <span className="absolute top-0.5 right-1 h-[18px] px-2 rounded-full bg-[#ba41f7] text-white text-[10px] font-bold flex items-center justify-center leading-none whitespace-nowrap shadow-sm">
             {badge.length > 14 ? badge.slice(0, 13) + '…' : badge}
           </span>
         )}

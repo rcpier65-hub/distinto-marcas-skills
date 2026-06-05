@@ -10,14 +10,18 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
+import type { MarcaNav } from '@/lib/mock-marcas'
 
 const NO_SHELL_ROUTES = ['/login', '/mockup', '/portal']
 
 type Props = {
   children: React.ReactNode
+  /* Marcas desde la base, inyectadas por el layout raíz (server). Se reparten
+     al sidebar y al command palette para que toda la nav esté sincronizada. */
+  marcas?: MarcaNav[]
 }
 
-export function AppShell({ children }: Props) {
+export function AppShell({ children, marcas }: Props) {
   const pathname = usePathname()
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -41,11 +45,11 @@ export function AppShell({ children }: Props) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--mk-bg-base)' }}>
-      <Sidebar onOpenPalette={() => setPaletteOpen(true)} />
+      <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} />
       <main style={{ flex: 1, minWidth: 0 }}>
         {children}
       </main>
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} />
     </div>
   )
 }

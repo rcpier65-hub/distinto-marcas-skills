@@ -6,15 +6,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { MARCAS_NAV } from '@/lib/mock-marcas'
+import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 
 type Props = {
   onOpenPalette: () => void
+  /* Marcas a mostrar. Vienen de la base vía el layout raíz. Si no se pasan,
+     cae a la lista fija para no dejar el menú vacío. */
+  marcas?: MarcaNav[]
 }
 
 const STORAGE_KEY = 'mk:sidebar:sections'
 
-export function Sidebar({ onOpenPalette }: Props) {
+export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
   const pathname = usePathname()
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     workspace: true,
@@ -113,11 +116,11 @@ export function Sidebar({ onOpenPalette }: Props) {
         </Section>
 
         <Section
-          label={`Marcas · ${MARCAS_NAV.length}`}
+          label={`Marcas · ${marcas.length}`}
           open={openSections.marcas}
           onToggle={() => setOpenSections((s) => ({ ...s, marcas: !s.marcas }))}
         >
-          {MARCAS_NAV.map((m) => (
+          {marcas.map((m) => (
             <NavItem
               key={m.slug}
               href={`/marca/${m.slug}`}

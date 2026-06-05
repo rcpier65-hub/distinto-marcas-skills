@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter_Tight, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
+import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import './globals.css'
 
 /* Inter Tight — la fuente signature de Linear. Sustituye Geist Sans.
@@ -24,11 +25,17 @@ export const metadata: Metadata = {
   description: 'Sistema operativo de Agencia Distinto',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Marcas desde la base (fuente única). Se inyectan al shell para que el
+  // sidebar y el command palette muestren SIEMPRE las marcas reales — incluidas
+  // las que se crean desde el Dashboard. Defensivo: el helper ya cae a la lista
+  // fija si la base falla.
+  const marcas = await getMarcasNav()
+
   return (
     <html
       lang="es"
@@ -40,7 +47,7 @@ export default function RootLayout({
       className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppShell>{children}</AppShell>
+        <AppShell marcas={marcas}>{children}</AppShell>
         <Toaster />
       </body>
     </html>
