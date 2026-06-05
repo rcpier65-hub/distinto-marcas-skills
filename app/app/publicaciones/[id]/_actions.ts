@@ -133,6 +133,31 @@ export async function togglePublicacionField(
 }
 
 /**
+ * Guarda el texto del guion técnico (campo `guion`). Pedro pidió cambiar
+ * la tabla estructurada por un textarea libre para poder pegar el guion
+ * tal cual como está en Notion (tabla con tabs, párrafos, lo que sea).
+ *
+ * Auto-save: se llama al onBlur del textarea, no requiere botón.
+ */
+export async function updateGuionTexto(
+  id: string,
+  guion: string,
+): Promise<ActionResult> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { error } = await service
+    .from('publicaciones')
+    .update({ guion: guion || null, updated_by: user.id })
+    .eq('id', id)
+
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/publicaciones/${id}`)
+  return { ok: true }
+}
+
+/**
  * Borra una publicación. Hard delete por ahora.
  * Si en el futuro queremos soft delete, cambiar a UPDATE estado='archivado'.
  */
