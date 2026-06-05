@@ -268,7 +268,11 @@ export function DisenoView({
             ⚠ Migration pendiente
           </span>
         )}
-        {/* Toggle vista Tabla | Kanban */}
+        {/* Toggle vista Tabla | Kanban. El botón "+ Nueva tarea" se
+            movió del header al filter bar (línea de "Mi trabajo HOY")
+            — Pedro pidió que esté a la altura de los filtros, no del
+            header, porque es una acción de la LISTA (agregar item),
+            no del módulo entero. */}
         <div style={{
           display: 'inline-flex', padding: 2,
           background: 'rgba(255, 255, 255, 0.04)',
@@ -282,21 +286,6 @@ export function DisenoView({
             <IconKanban /> Kanban
           </ViewToggleBtn>
         </div>
-        {/* Botón Nueva tarea */}
-        <button
-          onClick={() => setModalOpen(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
-            background: 'var(--mk-accent)', color: 'white',
-            border: 'none', borderRadius: 'var(--mk-radius-md)',
-            cursor: 'pointer', fontFamily: 'inherit',
-            boxShadow: '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)',
-          }}
-        >
-          <span style={{ fontSize: 14 }}>＋</span>
-          Nueva tarea
-        </button>
       </header>
 
       {/* MÉTRICAS rápidas inline */}
@@ -393,7 +382,30 @@ export function DisenoView({
         </button>
 
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
+
+        {/* Botón "+ Nueva tarea" — pasado del header al filter bar a
+            pedido de Pedro. Misma altura/línea que "Mi trabajo HOY",
+            pero alineado a la derecha del filter bar para que sea el
+            CTA primario de la fila. Tamaño un poco más chico que en
+            el header anterior para que entre en altura del filter bar
+            sin romper la línea de los pills. */}
+        <button
+          onClick={() => setModalOpen(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '5px 14px',
+            fontSize: 'var(--mk-text-xs)', fontWeight: 500, fontFamily: 'inherit',
+            background: 'var(--mk-accent)', color: 'white',
+            border: '1px solid var(--mk-accent)', borderRadius: 'var(--mk-radius-md)',
+            cursor: 'pointer',
+            boxShadow: '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)',
+          }}
+        >
+          <span style={{ fontSize: 13 }}>＋</span>
+          Nueva tarea
+        </button>
+
+        <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', marginLeft: 4 }}>
           {visible.length} {visible.length === 1 ? 'tarea' : 'tareas'}
         </span>
       </div>
