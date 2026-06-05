@@ -440,11 +440,30 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           guion + opción 2 + notas + guion técnico) + columna derecha (preview sticky).
           items-start hace que cada columna tenga su altura natural y
           el preview puede ser sticky mientras vos scrolleás en la izquierda. */}
-      <div className="grid lg:grid-cols-[1fr_400px] gap-4 items-start">
+      <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
         {/* Wrapper de la columna izquierda — apila todas las secciones */}
         <div className="space-y-3 min-w-0">
+        {/* COPY + WORKFLOW LATERAL: el Card del copy ahora tiene un
+            sidebar izquierdo (180px) con el progreso del workflow.
+            Permite a Pedro ver el avance mientras edita el copy. */}
         <Card>
-          <CardContent className="p-0 flex flex-col">
+          <div className="flex">
+            {/* Sidebar lateral — workflow checklist */}
+            <aside className="w-[180px] shrink-0 border-r border-border bg-muted/30 p-3 space-y-2">
+              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3" /> Workflow
+              </h3>
+              <div className="space-y-1">
+                <ChecklistRowCompact label="Copy listo"    icon={<FileText className="w-3.5 h-3.5" />}    value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
+                <ChecklistRowCompact label="Música"        icon={<Music2 className="w-3.5 h-3.5" />}      value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
+                <ChecklistRowCompact label="Portada lista" icon={<ImageIcon className="w-3.5 h-3.5" />}   value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
+                <ChecklistRowCompact label="Diseñado"      icon={<Palette className="w-3.5 h-3.5" />}     value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
+                <ChecklistRowCompact label="Editado"       icon={<Scissors className="w-3.5 h-3.5" />}    value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
+                <ChecklistRowCompact label="Aprobado"      icon={<CheckCircle2 className="w-3.5 h-3.5" />} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
+              </div>
+            </aside>
+            {/* Contenido del Card del Copy — todo lo que estaba antes */}
+            <div className="p-0 flex flex-col flex-1 min-w-0">
             {/* Header de sección "1. COPY" + botón copiar al portapapeles.
                 Pedro publica manualmente y quiere copiar con 1 click el
                 texto del copy para pegarlo en Instagram/Facebook. */}
@@ -697,7 +716,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                     operativo y agregan ruido al toolbar. */}
               </div>
             </div>
-          </CardContent>
+            </div>{/* Fin contenido del Card del copy (sidebar workflow al lado) */}
+          </div>{/* Fin flex wrapper Card del copy */}
         </Card>
 
         {/* PROPIEDADES — antes estaba en columna derecha, ahora apilada
@@ -709,8 +729,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             </h3>
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                  <span>🎯</span> Estado
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                  <Target className="w-3 h-3" /> Estado
                 </span>
                 <select
                   value={form.estado}
@@ -721,8 +741,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 </select>
               </label>
               <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                  <span>👤</span> Editor
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                  <UserIcon className="w-3 h-3" /> Editor
                 </span>
                 <select
                   value={form.editor_id}
@@ -734,8 +754,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 </select>
               </label>
               <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                  <span>📅</span> Publicación
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                  <CalendarDays className="w-3 h-3" /> Publicación
                 </span>
                 <input
                   type="date"
@@ -745,8 +765,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 />
               </label>
               <label className="block text-xs">
-                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
-                  <span>✂️</span> Edición
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
+                  <Scissors className="w-3 h-3" /> Edición
                 </span>
                 <input
                   type="date"
@@ -776,22 +796,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           </CardContent>
         </Card>
 
-        {/* PROGRESO WORKFLOW — checklist con 6 ítems */}
-        <Card>
-          <CardContent className="p-3 space-y-2">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              ✓ Progreso workflow
-            </h3>
-            <div className="space-y-1">
-              <ChecklistRowCompact label="Copy listo"    icon={<span className="text-sm leading-none">📝</span>} value={checklist.copy_listo}     onToggle={() => toggleCheck('copy_listo')} />
-              <ChecklistRowCompact label="Música"        icon={<span className="text-sm leading-none">🎵</span>} value={checklist.musica_lista}   onToggle={() => toggleCheck('musica_lista')} />
-              <ChecklistRowCompact label="Portada lista" icon={<span className="text-sm leading-none">🖼️</span>} value={checklist.portada_lista}  onToggle={() => toggleCheck('portada_lista')} />
-              <ChecklistRowCompact label="Diseñado"      icon={<span className="text-sm leading-none">🎨</span>} value={checklist.disenado}       onToggle={() => toggleCheck('disenado')} />
-              <ChecklistRowCompact label="Editado"       icon={<span className="text-sm leading-none">✂️</span>} value={checklist.editado}        onToggle={() => toggleCheck('editado')} />
-              <ChecklistRowCompact label="Aprobado"      icon={<span className="text-sm leading-none">✅</span>} value={checklist.video_aprobado} onToggle={() => toggleCheck('video_aprobado')} />
-            </div>
-          </CardContent>
-        </Card>
+        {/* PROGRESO WORKFLOW: el bloque grande se movió al sidebar lateral
+            izquierdo del Card del COPY (más arriba en este mismo archivo).
+            Pedro pidió tenerlo al costado del editor de copy en vez de
+            apilado abajo, así puede ver el avance del workflow mientras
+            edita el texto del post. */}
 
         {/* Removidos por pedido de Pedro (2026-06-05):
             "Versión 2 (video alt.)" y "Notas internas". La versión 2 se
@@ -833,7 +842,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   {previewMode === 'empty' && '➖'}
                 </Badge>
               </div>
-              <div className="aspect-[9/16] bg-black flex items-center justify-center relative">
+              {/* Aspect ratio del preview: antes era 9:16 (vertical pleno
+                  estilo TikTok/Reel), pero quedaba MUY largo y dejaba huecos
+                  blancos al costado de Propiedades. Cambio a 4:5 (Instagram
+                  feed retrato) que es más compacto y se alinea bien con el
+                  alto del Card del copy + propiedades. */}
+              <div className="aspect-[4/5] bg-black flex items-center justify-center relative">
                 {previewMode === 'editada' || previewMode === 'cruda' ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
