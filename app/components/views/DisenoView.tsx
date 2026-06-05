@@ -43,8 +43,10 @@ const SUBESTADO_CONFIG: Record<SubEstadoDiseno, { label: string; color: string; 
   archivado:    { label: 'Archivado',   color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.10)' },
 }
 
-/* Orden de columnas del kanban (archivado no se muestra ahí). */
-const KANBAN_COLUMNS: SubEstadoDiseno[] = ['sin_empezar', 'en_progreso', 'listo']
+/* Orden de columnas del kanban. Pedro pidió incluir 'archivado' como
+   4ta columna — útil para mover cards terminadas/canceladas sin
+   perderlas, y arrastrarlas devuelta si fue por error. */
+const KANBAN_COLUMNS: SubEstadoDiseno[] = ['sin_empezar', 'en_progreso', 'listo', 'archivado']
 
 const ALERTA_COLOR: Record<AlertaFecha, { fg: string; bg: string; label: string }> = {
   rojo:     { fg: '#fb7185', bg: 'rgba(251, 113, 133, 0.12)', label: 'urgente' },
@@ -428,8 +430,27 @@ export function DisenoView({
           onCreateNew={() => setModalOpen(true)}
         />
       ) : (
+        /* Kanban muestra TODAS las entries (incluyendo archivadas en
+            su propia columna) — Pedro pidió tener archivado como
+            estado destino visible. */
         <KanbanVista
-          entries={visible.filter((e) => e.subEstado !== 'archivado')}
+          entries={entries.filter((e) => {
+            /* Replicar filtros relevantes para Kanban, pero ignorar
+               filters.subEstado (que en tabla esconde por default
+               las archivadas). En Kanban queremos ver TODOS los
+               estados como columnas. */
+            if (filters.soloHoy && e.fechaMarcadaParaDisenar !== hoy) return false
+            if (filters.marcaSlug !== 'todas' && e.marcaSlug !== filters.marcaSlug) return false
+            if (search) {
+              const q = search.toLowerCase()
+              if (
+                !e.nombreTarea.toLowerCase().includes(q) &&
+                !e.marcaNombre.toLowerCase().includes(q) &&
+                !(e.descripcion ?? '').toLowerCase().includes(q)
+              ) return false
+            }
+            return true
+          })}
           onMoveCard={(id, newSub) => setSubEstado(id, newSub)}
           onOpenCard={openRow}
           onArchive={(id) => archivarVal(id, true)}
@@ -654,65 +675,108 @@ function KanbanVista({
   }
 
   return (
+    /* Container con max-width centrado: en pantallas anchas las
+       columnas no estiraban hasta 1/4 cada una (Pedro: "demasiado
+       ancha, se ve feo"). Ahora máximo 1200px centrado, columnas
+       de ~280px cada una — anchos de Linear/Notion modernos. */
     <div style={{
-      flex: 1, overflow: 'auto', padding: 16,
-      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+      flex: 1, overflow: 'auto',
+      background: 'var(--mk-bg-base)',
     }}>
-      {KANBAN_COLUMNS.map((col) => {
-        const cfg = SUBESTADO_CONFIG[col]
-        const items = entries.filter((e) => e.subEstado === col)
-        const isOver = dragOver === col
-        return (
-          <div
-            key={col}
-            onDragOver={(e) => onDragOver(e, col)}
-            onDragLeave={onDragLeave}
-            onDrop={(e) => onDrop(e, col)}
-            style={{
-              background: isOver ? `${cfg.color}08` : 'rgba(255, 255, 255, 0.02)',
-              border: `1px solid ${isOver ? cfg.color : 'var(--mk-border-subtle)'}`,
-              borderRadius: 'var(--mk-radius-md)',
-              padding: 10,
-              display: 'flex', flexDirection: 'column', gap: 8,
-              minHeight: 200,
-              transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
-            }}
-          >
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '0 4px 8px', borderBottom: '1px solid var(--mk-border-subtle)',
-            }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontSize: 11, fontWeight: 600, color: cfg.color,
-                textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)',
+      <div style={{
+        maxWidth: 1200, margin: '0 auto', padding: '18px 20px',
+        display: 'grid', gridTemplateColumns: 'repeat(4, minmax(260px, 1fr))', gap: 14,
+      }}>
+        {KANBAN_COLUMNS.map((col) => {
+          const cfg = SUBESTADO_CONFIG[col]
+          const items = entries.filter((e) => e.subEstado === col)
+          const isOver = dragOver === col
+          const isArchived = col === 'archivado'
+          return (
+            <div
+              key={col}
+              onDragOver={(e) => onDragOver(e, col)}
+              onDragLeave={onDragLeave}
+              onDrop={(e) => onDrop(e, col)}
+              style={{
+                /* Estructura visual de columna: gradient sutil arriba
+                   con el color del estado, padding más generoso, sin
+                   bordes "duros" — sensación de surface flotante.
+                   Cuando dragOver, ring del color + bg ligeramente
+                   más fuerte para indicar drop zone. */
+                position: 'relative',
+                background: isOver ? `${cfg.color}10` : 'rgba(255, 255, 255, 0.018)',
+                border: `1px solid ${isOver ? cfg.color : 'rgba(255, 255, 255, 0.06)'}`,
+                borderRadius: 12,
+                padding: 12,
+                display: 'flex', flexDirection: 'column', gap: 8,
+                minHeight: 'calc(100vh - 280px)',
+                transition: 'all 120ms ease',
+                opacity: isArchived ? 0.85 : 1,
+                boxShadow: isOver ? `0 0 0 3px ${cfg.color}20, 0 8px 24px ${cfg.color}15` : 'none',
+              }}
+            >
+              {/* Header de columna: chip color + label + contador. Si
+                  archivado, el chip es más sutil porque visualmente
+                  no debe competir con sin_empezar/en_progreso/listo. */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0 2px 10px',
+                marginBottom: 2,
               }}>
-                <span className="mk-dot" style={{ background: cfg.color, width: 8, height: 8 }} />
-                {cfg.label}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', fontVariantNumeric: 'tabular-nums' }}>
-                {items.length}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {items.map((entry) => (
-                <KanbanCard
-                  key={entry.id}
-                  entry={entry}
-                  onClick={() => onOpenCard(entry.id)}
-                  onDragStart={(e) => onDragStart(e, entry.id)}
-                  onArchive={() => onArchive(entry.id)}
-                />
-              ))}
-              {items.length === 0 && (
-                <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 11 }}>
-                  Sin tareas
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: 999,
+                    background: cfg.color,
+                    boxShadow: `0 0 8px ${cfg.color}80`,
+                  }} />
+                  <span style={{
+                    fontSize: 12, fontWeight: 600, color: cfg.color,
+                    letterSpacing: '0.02em',
+                  }}>
+                    {cfg.label}
+                  </span>
                 </div>
-              )}
+                <span style={{
+                  fontSize: 11, fontWeight: 500,
+                  color: 'var(--mk-text-quaternary)',
+                  fontVariantNumeric: 'tabular-nums',
+                  padding: '2px 8px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  borderRadius: 999,
+                }}>
+                  {items.length}
+                </span>
+              </div>
+
+              {/* Cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {items.map((entry) => (
+                  <KanbanCard
+                    key={entry.id}
+                    entry={entry}
+                    onClick={() => onOpenCard(entry.id)}
+                    onDragStart={(e) => onDragStart(e, entry.id)}
+                    onArchive={() => onArchive(entry.id)}
+                  />
+                ))}
+                {items.length === 0 && (
+                  <div style={{
+                    padding: '32px 8px', textAlign: 'center',
+                    color: 'var(--mk-text-quaternary)', fontSize: 11,
+                    border: '1px dashed rgba(255, 255, 255, 0.06)',
+                    borderRadius: 8,
+                  }}>
+                    Arrastra aquí
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -725,6 +789,9 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
 }) {
   const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaEntrega)
   const [hover, setHover] = useState(false)
+  /* Iniciales de la marca para el avatar circular: si la marca tiene
+     emoji, usamos eso (más bonito). Si no, primeras 2 letras. */
+  const avatarText = entry.marcaEmoji || entry.marcaNombre.slice(0, 2).toUpperCase()
   return (
     <div
       draggable
@@ -733,77 +800,122 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
+        /* Card moderna: bg con leve gradient para sentido de "lift",
+           borde casi invisible que se intensifica al hover, accent
+           lateral del color de la marca para identificación rápida
+           visual sin chip ocupando espacio. */
         position: 'relative',
-        padding: 10,
-        background: 'var(--mk-bg-elevated)',
-        border: `1px solid ${hover ? 'var(--mk-border-default)' : 'var(--mk-border-subtle)'}`,
-        borderRadius: 'var(--mk-radius-sm)',
+        padding: '10px 12px 10px 14px',
+        background: hover
+          ? 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.025) 100%)'
+          : 'rgba(255, 255, 255, 0.025)',
+        border: `1px solid ${hover ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.05)'}`,
+        borderLeft: `3px solid ${entry.marcaColor}`,
+        borderRadius: 10,
         cursor: 'grab',
-        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+        transition: 'all 120ms ease',
+        transform: hover ? 'translateY(-1px)' : 'translateY(0)',
+        boxShadow: hover ? '0 4px 12px rgba(0, 0, 0, 0.18)' : 'none',
       }}
     >
-      {/* Botón archivar — top-right de la card, visible al hover.
-          Pedro pidió que en Kanban se pueda archivar cada tarea
-          directamente (sin tener que ir a la tabla). */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onArchive() }}
-        title="Archivar tarea"
-        style={{
-          position: 'absolute', top: 6, right: 6,
-          padding: '3px 5px',
-          background: 'rgba(255, 255, 255, 0.06)',
-          border: '1px solid var(--mk-border-subtle)',
-          borderRadius: 'var(--mk-radius-sm)',
+      {/* Top row: avatar marca circular + nombre marca + botón archivar
+          (este último aparece solo en hover) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{
+          width: 22, height: 22, borderRadius: '50%',
+          background: entry.marcaColor,
+          color: 'white',
+          fontSize: entry.marcaEmoji ? 13 : 10, fontWeight: 700,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: `0 0 0 1px ${entry.marcaColor}40, 0 2px 4px ${entry.marcaColor}30`,
+        }}>
+          {avatarText}
+        </span>
+        <span style={{
+          fontSize: 10.5, fontWeight: 500,
           color: 'var(--mk-text-tertiary)',
-          cursor: 'pointer',
-          opacity: hover ? 1 : 0,
-          transition: 'opacity var(--mk-dur-fast) var(--mk-ease-out)',
-          display: 'inline-flex', alignItems: 'center', gap: 3,
-          fontFamily: 'inherit', fontSize: 10,
-        }}
-      >
-        <IconArchive />
-      </button>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, paddingRight: 28 }}>
-        <span
-          style={{
-            fontSize: 10, fontWeight: 500, padding: '2px 6px',
-            background: `${entry.marcaColor}1a`, color: entry.marcaColor,
-            borderRadius: 4,
-          }}
-        >
-          {entry.esInterno && '🎨 '}
+          letterSpacing: '0.01em',
+          flex: 1, minWidth: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
           {entry.marcaNombre}
         </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onArchive() }}
+          title="Archivar tarea"
+          style={{
+            padding: '3px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: 'none',
+            borderRadius: 5,
+            color: 'var(--mk-text-tertiary)',
+            cursor: 'pointer',
+            opacity: hover ? 1 : 0,
+            transition: 'opacity 120ms ease',
+            display: 'inline-flex', alignItems: 'center',
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.10)'; e.currentTarget.style.color = 'var(--mk-text-primary)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.color = 'var(--mk-text-tertiary)' }}
+        >
+          <IconArchive />
+        </button>
       </div>
+
+      {/* Título de la tarea — el elemento principal de la card */}
       <div style={{
-        fontSize: 'var(--mk-text-sm)', fontWeight: 500, color: 'var(--mk-text-primary)',
-        marginBottom: 6, lineHeight: 1.3,
+        fontSize: 13.5, fontWeight: 600,
+        color: 'var(--mk-text-primary)',
+        lineHeight: 1.35,
+        marginBottom: entry.descripcion ? 6 : 8,
+        letterSpacing: '-0.01em',
       }}>
         {entry.nombreTarea}
       </div>
-      {/* Descripción visible en el card del Kanban (no en la tabla).
-          Pedro confirmó que en card del Kanban sí ayuda al diseñador
-          ver el brief de un vistazo, pero en la tabla NO porque la
-          tabla ya es muy ancha. */}
+
+      {/* Descripción truncada — 2 líneas máximo */}
       {entry.descripcion && (
         <div style={{
-          fontSize: 11, color: 'var(--mk-text-tertiary)', marginBottom: 6,
+          fontSize: 11.5, color: 'var(--mk-text-tertiary)',
+          lineHeight: 1.4, marginBottom: 8,
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
         }}>
           {entry.descripcion}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--mk-text-tertiary)' }}>
-        {entry.fechaEntrega && <span>📅 Entrega {formatDateES(entry.fechaEntrega)}</span>}
-        {entry.fechaDiseno && (
-          <span style={{ color: ALERTA_COLOR[alerta].fg }}>
-            🎨 {formatDateES(entry.fechaDiseno)}
-          </span>
-        )}
-      </div>
+
+      {/* Footer: pills de fechas. Si hay alerta de urgencia, el pill
+          del color de alerta. Los pills son más sutiles que en v1. */}
+      {(entry.fechaEntrega || entry.fechaDiseno) && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {entry.fechaEntrega && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 10, fontWeight: 500,
+              padding: '3px 7px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              color: 'var(--mk-text-tertiary)',
+              borderRadius: 5,
+            }}>
+              <IconCalendar /> {formatDateES(entry.fechaEntrega).replace(' 2026', '')}
+            </span>
+          )}
+          {entry.fechaDiseno && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 10, fontWeight: 500,
+              padding: '3px 7px',
+              background: `${ALERTA_COLOR[alerta].fg}15`,
+              color: ALERTA_COLOR[alerta].fg,
+              borderRadius: 5,
+            }}>
+              <IconPalette /> {formatDateES(entry.fechaDiseno).replace(' 2026', '')}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -1453,3 +1565,6 @@ function IconArchive()   { return <svg width="13" height="13" viewBox="0 0 13 13
 /* IconOpenInPage: estilo Notion — flecha diagonal saliendo de un cuadro,
    significa "abrir esta tarea en su página de detalle". */
 function IconOpenInPage(){ return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 9V2.5C2 2.2 2.2 2 2.5 2H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M8 2H10V4M10 2L6.5 5.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M8.5 6.5V9C8.5 9.3 8.3 9.5 8 9.5H3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+/* Icons compactos usados en los footer pills de KanbanCard */
+function IconCalendar()  { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M3 1V3M7 1V3M1 4.5H9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg> }
+function IconPalette()   { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1C2.79 1 1 2.79 1 5C1 6.5 2 7 3 7C3.5 7 3.5 6.5 3.5 6.2C3.5 5.6 4 5.5 4.5 5.5C5.5 5.5 6 6 6 6.5C6 7.5 5.5 8 5 8.5C4.7 8.8 5 9 5 9C7.21 9 9 7.21 9 5C9 2.79 7.21 1 5 1Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg> }
