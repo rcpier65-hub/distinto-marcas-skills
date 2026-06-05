@@ -582,11 +582,21 @@ function DashboardMetricas({
 }) {
   const pct = objetivoMes > 0 ? Math.round((editadosMes / objetivoMes) * 100) : 0
   return (
-    <div style={{
-      padding: '14px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
-      display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap',
-      background: 'rgba(255, 255, 255, 0.01)',
-    }}>
+    /* Carrusel horizontal scrolleable: en pantallas anchas se ven
+       todas las cards a la vez; en pantallas chicas o cuando hay 6+
+       cards, el editor arrastra para ver las demás. flex-nowrap evita
+       que la última salte a una fila propia ocupando todo el ancho
+       (que es lo que se veía antes con la card "Editados por día"
+       gigante). */
+    <div
+      style={{
+        padding: '14px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
+        display: 'flex', gap: 12, alignItems: 'stretch',
+        flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'thin', scrollBehavior: 'smooth',
+        background: 'rgba(255, 255, 255, 0.01)',
+      }}
+    >
       {/* Objetivo mensual con círculo — clickeable, drill-down a editados del mes */}
       <MetricaCircle
         pct={pct}
@@ -1868,12 +1878,15 @@ const openBtnStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center',
 }
 const metricaCardStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 12,
+  display: 'flex', alignItems: 'center', gap: 10,
   padding: '10px 14px',
   background: 'rgba(255, 255, 255, 0.02)',
   border: '1px solid var(--mk-border-subtle)',
   borderRadius: 'var(--mk-radius-md)',
-  minWidth: 200, flex: '1 1 200px',
+  /* Ancho fijo + flex-shrink: 0 = no crece ni encoge → carrusel.
+     Si lo dejara con flex: 1 las cards crecerían a llenar el espacio
+     y la última saltaba a una fila propia. */
+  width: 200, flexShrink: 0,
 }
 
 /* SVG icons inline (sin agregar lucide a este file que usa CSS-in-JS) */
