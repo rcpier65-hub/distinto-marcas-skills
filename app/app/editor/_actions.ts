@@ -189,6 +189,85 @@ export async function marcarEnEdicion(id: string): Promise<ActionResult> {
 }
 
 /**
+ * Crea una nueva publicación con datos mínimos. Pedro pidió un botón
+ * "+" en /editor para empezar tareas rápido — esta action recibe solo
+ * marca + nombre, crea la publicación con valores razonables por
+ * defecto (estado=editar, fecha_publicacion = hoy + 7 días), y
+ * devuelve el id para que el cliente redireccione a /publicaciones/[id]
+ * donde el editor completa el resto.
+ *
+ * El editor opcional, si se pasa, queda asignado de entrada.
+ */
+export async function crearPublicacion(args: {
+  marcaId: string
+  nombre: string
+  editorId?: string | null
+  fechaPublicacion?: string  // ISO YYYY-MM-DD; default = hoy + 7 días
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const nombre = args.nombre.trim()
+  if (!nombre) return { ok: false, error: 'El nombre es obligatorio' }
+  if (!args.marcaId) return { ok: false, error: 'La marca es obligatoria' }
+
+  /* Default: fecha publicación = hoy + 7 días (una semana de margen
+     razonable para que la alerta de fecha arranque en VERDE). */
+  let fechaPub = args.fechaPublicacion
+  if (!fechaPub) {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    fechaPub = d.toISOString().slice(0, 10)
+  }
+
+  /* Lookup nombre del editor para guardar denormalizado. */
+  let editorNombre: string | null = null
+  if (args.editorId) {
+    const { data: ed } = await service
+      .from('editores')
+      .select('nombre')
+      .eq('id', args.editorId)
+      .maybeSingle()
+    editorNombre = ed?.nombre ?? null
+  }
+
+  const { data, error } = await service
+    .from('publicaciones')
+    .insert({
+      marca_id: args.marcaId,
+      nombre,
+      estado: 'editar',
+      estado_tarea: 'sin_empezar',
+      fecha_publicacion: fechaPub,
+      editor_id: args.editorId ?? null,
+      editor_nombre: editorNombre,
+      plataformas: [],
+      tipo_contenido: [],
+      objetivos: [],
+      copy_listo: false,
+      musica_lista: false,
+      portada_lista: false,
+      disenado: false,
+      editado: false,
+      video_aprobado: false,
+      created_by: user.id,
+      updated_by: user.id,
+    })
+    .select('id')
+    .maybeSingle()
+
+  if (error || !data) {
+    console.error('[crearPublicacion] error:', error)
+    return { ok: false, error: error?.message ?? 'No se pudo crear la tarea' }
+  }
+
+  revalidatePath('/editor')
+  revalidatePath('/publicaciones')
+  return { ok: true, id: data.id }
+}
+
+/**
  * Quita el flag "en edición" (por si el editor lo activó por error).
  * También se puede usar para reiniciar el cronómetro.
  */

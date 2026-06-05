@@ -151,6 +151,7 @@ export default async function EditorPage() {
       entries={entries}
       editores={editores}
       marcas={marcas.map((m) => ({
+        id: m.id,
         slug: m.slug,
         nombre: m.nombre,
         nombreCorto: m.nombre,

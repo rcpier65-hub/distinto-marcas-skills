@@ -24,6 +24,7 @@ import {
   desmarcarParaEditarHoy,
   marcarEnEdicion,
   desmarcarEnEdicion,
+  crearPublicacion,
 } from '@/app/editor/_actions'
 import {
   type EditorEntry,
@@ -67,6 +68,7 @@ function formatDateES(iso: string) {
    ============================================================ */
 
 export type MarcaOption = {
+  id: string
   slug: string
   nombre: string
   nombreCorto: string
@@ -116,6 +118,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     vistaRapida: 'todas',
   })
   const [reporteOpen, setReporteOpen] = useState(false)
+  const [nuevaTareaOpen, setNuevaTareaOpen] = useState(false)
 
   /* Ticker para actualizar los cronómetros "tiempo editando" cada
      minuto. No re-renderiza si nadie tiene iniciado_edicion_at. */
@@ -370,9 +373,17 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
         <div style={{ flex: 1 }} />
         {marcaMigrationPendiente && (
           <span style={{ fontSize: 'var(--mk-text-xs)', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '4px 10px', borderRadius: 'var(--mk-radius-sm)' }}>
-            ⚠ Migration 026 pendiente — "Editar hoy" deshabilitado
+            ⚠ Migration 026 pendiente
           </span>
         )}
+        <button
+          onClick={() => setNuevaTareaOpen(true)}
+          className="mk-focusable"
+          style={btnPrimaryStyle}
+          title="Crear una nueva tarea (atajo: tecla N próximamente)"
+        >
+          <IconPlus /> Nueva tarea
+        </button>
       </header>
 
       {/* ============== DASHBOARD MÉTRICAS ============== */}
@@ -535,6 +546,18 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
           editores={editores}
           marcas={marcas}
           onClose={() => setReporteOpen(false)}
+        />
+      )}
+
+      {nuevaTareaOpen && (
+        <NuevaTareaModal
+          marcas={marcas}
+          editores={editores}
+          onClose={() => setNuevaTareaOpen(false)}
+          onCreated={(id) => {
+            setNuevaTareaOpen(false)
+            router.push(`/publicaciones/${id}`)
+          }}
         />
       )}
     </div>
@@ -914,6 +937,196 @@ function EnlaceTomasCell({ url }: { url: string | null }) {
       </button>
     </div>
   )
+}
+
+/* ============================================================
+   NuevaTareaModal — pequeño modal para crear una publicación rápida.
+   Pide solo lo mínimo (marca + nombre + fecha + editor opcional).
+   Después de crear, redirige al detalle /publicaciones/[id] donde
+   el editor llena los demás campos (copy, guion, portada, etc.).
+   ============================================================ */
+
+function NuevaTareaModal({
+  marcas, editores, onClose, onCreated,
+}: {
+  marcas: MarcaOption[]
+  editores: EditorOption[]
+  onClose: () => void
+  onCreated: (id: string) => void
+}) {
+  const [marcaId, setMarcaId] = useState<string>('')
+  const [nombre, setNombre] = useState('')
+  /* Fecha publicación: default = hoy + 7 días, formato yyyy-mm-dd */
+  const [fechaPub, setFechaPub] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    return d.toISOString().slice(0, 10)
+  })
+  const [editorId, setEditorId] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+
+  /* Esc cierra + bloquear scroll del body */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose, saving])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!marcaId || !nombre.trim()) {
+      toast.error('Marca y nombre son obligatorios')
+      return
+    }
+    setSaving(true)
+    const r = await crearPublicacion({
+      marcaId,
+      nombre: nombre.trim(),
+      editorId: editorId || null,
+      fechaPublicacion: fechaPub,
+    })
+    setSaving(false)
+    if (r.ok) {
+      toast.success('Tarea creada — abriendo detalle…', { duration: 1500 })
+      onCreated(r.id)
+    } else {
+      toast.error(r.error)
+    }
+  }
+
+  return (
+    <div
+      onClick={() => { if (!saving) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
+        className="mk-anim-scale-in"
+        style={{
+          background: 'var(--mk-bg-overlay)',
+          border: '1px solid var(--mk-border-default)',
+          borderRadius: 'var(--mk-radius-xl)',
+          boxShadow: 'var(--mk-shadow-lg)',
+          width: '100%', maxWidth: 480,
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--mk-border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--mk-accent-bg)', color: 'var(--mk-accent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconPlus />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--mk-text-primary)' }}>Nueva tarea</div>
+            <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>Después de crear vas al detalle a completar el resto</div>
+          </div>
+          <button type="button" onClick={onClose} disabled={saving} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: saving ? 'not-allowed' : 'pointer', padding: 4, borderRadius: 'var(--mk-radius-sm)' }}>
+            <IconClose />
+          </button>
+        </div>
+
+        {/* Body — formulario */}
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Campo label="Marca *">
+            <select
+              required value={marcaId} onChange={(e) => setMarcaId(e.target.value)}
+              autoFocus disabled={saving}
+              style={fieldStyle}
+            >
+              <option value="">— Elegí una marca —</option>
+              {marcas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.emoji ? `${m.emoji} ${m.nombreCorto}` : m.nombreCorto}
+                </option>
+              ))}
+            </select>
+          </Campo>
+
+          <Campo label="Nombre de la tarea *">
+            <input
+              required value={nombre} onChange={(e) => setNombre(e.target.value)}
+              disabled={saving}
+              placeholder="Ej. 12. NO HABLA / Reel cólicos / Carrusel closets…"
+              style={fieldStyle}
+            />
+          </Campo>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Campo label="Fecha de publicación">
+              <input
+                type="date" value={fechaPub} onChange={(e) => setFechaPub(e.target.value)}
+                disabled={saving}
+                style={fieldStyle}
+              />
+            </Campo>
+            <Campo label="Editor asignado">
+              <select value={editorId} onChange={(e) => setEditorId(e.target.value)} disabled={saving} style={fieldStyle}>
+                <option value="">— Sin asignar —</option>
+                {editores.map((ed) => (
+                  <option key={ed.id} value={ed.id}>{ed.nombre}</option>
+                ))}
+              </select>
+            </Campo>
+          </div>
+
+          <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', lineHeight: 1.5 }}>
+            La tarea se crea con estado <strong style={{ color: 'var(--mk-text-tertiary)' }}>Editar</strong> y sub-estado <strong style={{ color: 'var(--mk-text-tertiary)' }}>Sin empezar</strong>. Plataformas, copy, guion técnico y portada los completás en el siguiente paso.
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--mk-border-subtle)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button
+            type="button" onClick={onClose} disabled={saving}
+            style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'inherit', background: 'transparent', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-md)', color: 'var(--mk-text-secondary)', cursor: saving ? 'not-allowed' : 'pointer' }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit" disabled={saving || !marcaId || !nombre.trim()}
+            style={{
+              ...btnPrimaryStyle,
+              height: 'auto', padding: '6px 14px', fontSize: 12,
+              opacity: (saving || !marcaId || !nombre.trim()) ? 0.5 : 1,
+              cursor: (saving || !marcaId || !nombre.trim()) ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {saving ? 'Creando…' : 'Crear y abrir'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function Campo({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)' }}>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+const fieldStyle: React.CSSProperties = {
+  height: 36, padding: '0 10px',
+  background: 'rgba(255, 255, 255, 0.03)',
+  border: '1px solid var(--mk-border-subtle)',
+  borderRadius: 'var(--mk-radius-md)',
+  color: 'var(--mk-text-primary)',
+  fontFamily: 'inherit', fontSize: 13,
+  outline: 'none',
+  colorScheme: 'dark',
 }
 
 /* ============================================================
@@ -1558,6 +1771,16 @@ const headerStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--mk-border-subtle)',
   display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
 }
+const btnPrimaryStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  height: 'var(--mk-button-height-lg)', padding: '0 12px',
+  background: 'var(--mk-accent)', border: '1px solid var(--mk-accent)',
+  borderRadius: 'var(--mk-radius-md)',
+  color: 'white', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
+  cursor: 'pointer',
+  boxShadow: '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)',
+  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+}
 const filterBarStyle: React.CSSProperties = {
   padding: '10px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
@@ -1606,3 +1829,4 @@ function IconPlay()         { return <svg width="10" height="10" viewBox="0 0 10
 function IconPause()        { return <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="2" y="1.5" width="2" height="7" rx="0.5"/><rect x="6" y="1.5" width="2" height="7" rx="0.5"/></svg> }
 function IconClock()        { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 3V5.5L7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
 function IconClose()        { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
+function IconPlus()         { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 2V9M2 5.5H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg> }

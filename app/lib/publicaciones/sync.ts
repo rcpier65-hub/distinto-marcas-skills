@@ -128,6 +128,23 @@ export async function syncMarcaPublicaciones(args: {
 }): Promise<SyncResult> {
   const concurrency = args.concurrency ?? 5
 
+  // 0. Cargamos editores activos para resolver editor_id desde el
+  // editor_nombre que viene de Notion. Sin esto, el sync solo guarda
+  // texto y crea "huérfanos" (publicaciones con nombre pero sin FK)
+  // que en la página detalle aparecen como "Sin asignar".
+  // Cache name → id case-insensitive.
+  const { data: editoresData } = await args.service
+    .from('editores')
+    .select('id, nombre')
+    .eq('activo', true)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorIdByName = new Map<string, string>(
+    ((editoresData ?? []) as any[]).map((e) => [
+      String(e.nombre).toLowerCase().trim(),
+      e.id,
+    ]),
+  )
+
   // 1. Fetch properties bulk
   const pubs = await queryGrillaForBrandExtended({
     notionProyectoId: args.marca.notion_proyecto_id,
@@ -181,6 +198,9 @@ export async function syncMarcaPublicaciones(args: {
       video_con_musica_url: pub.video_con_musica_url,
       video_sin_musica_url: pub.video_sin_musica_url,
       editor_nombre: pub.editor,
+      editor_id: pub.editor
+        ? editorIdByName.get(String(pub.editor).toLowerCase().trim()) ?? null
+        : null,
       copy_listo: pub.copy_listo,
       musica_lista: pub.musica_lista,
       portada_lista: pub.portada_lista,
