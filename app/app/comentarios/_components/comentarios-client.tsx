@@ -87,6 +87,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
   const [conInforme, setConInforme] = useState(true)  // si el responder lleva informe WhatsApp
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [respondiendoId, setRespondiendoId] = useState<string | null>(null)  // respuesta individual en curso
 
   // Postear aprobados directo a Metricool (sin rutina de Claude)
   const [isPosting, startPosting] = useTransition()
@@ -257,6 +258,26 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
     })
   }
 
+  // Responder UN comentario individual → postea a Metricool (sin informe) y pasa a 'respondido'.
+  function handleResponderIndividual(id: string) {
+    setRespondiendoId(id)
+    startResponding(async () => {
+      await persistEdicion(id)   // guarda primero el texto editado
+      const toastId = toast.loading('Respondiendo comentario via Metricool…')
+      const r = await responderBatch([id], false)
+      if (r.ok && r.respondidos > 0) {
+        toast.success('✅ Comentario respondido', { id: toastId, duration: 5000 })
+        setSeleccionados((prev) => { const n = new Set(prev); n.delete(id); return n })
+        router.refresh()
+      } else if (r.ok) {
+        toast.error('No se pudo responder (¿la respuesta está vacía?)', { id: toastId, duration: 6000 })
+      } else {
+        toast.error(`Error: ${r.error}`, { id: toastId, duration: 8000 })
+      }
+      setRespondiendoId(null)
+    })
+  }
+
   // Preview para confirm dialog
   const previewSeleccionados = useMemo(() => {
     return rowsIniciales.filter((r) => seleccionados.has(r.id))
@@ -365,6 +386,8 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
                     onChangeTexto={(t) => updateEdicion(r.id, { texto: t })}
                     onChangeCategoria={(c) => updateEdicion(r.id, { categoria: c })}
                     onSkip={() => handleSkip(r.id)}
+                    onResponder={() => handleResponderIndividual(r.id)}
+                    responding={respondiendoId === r.id}
                   />
                 )
               })}
