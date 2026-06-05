@@ -11,6 +11,7 @@
 //   - El comentario + autor + red social
 
 import type { ComentarioCategoria } from '@/lib/types/database'
+import { createServiceClient } from '@/lib/supabase/service'
 
 const CATEGORIAS: ComentarioCategoria[] = [
   'pregunta_info', 'testimonial', 'empatia', 'derivar', 'reaccion',
@@ -41,9 +42,26 @@ function vozATexto(tono: unknown): string {
   return parts.join(' · ')
 }
 
-/** ¿Está configurada la API key? Útil para que la UI muestre un aviso. */
-export function openaiConfigurado(): boolean {
-  return !!process.env.OPENAI_API_KEY
+/**
+ * Resuelve la API key de OpenAI. Prioridad:
+ *   1. integraciones.openai_api_key (configurada desde /settings)
+ *   2. process.env.OPENAI_API_KEY (fallback Vercel)
+ * Devuelve null si no hay ninguna. Tolera que la columna/tabla no exista aún.
+ */
+export async function getOpenAIApiKey(): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const service = createServiceClient() as any
+    const { data, error } = await service
+      .from('integraciones')
+      .select('openai_api_key')
+      .eq('id', 1)
+      .maybeSingle()
+    if (!error && data?.openai_api_key) return String(data.openai_api_key)
+  } catch {
+    /* tabla/columna puede no existir todavía → caemos al env */
+  }
+  return process.env.OPENAI_API_KEY || null
 }
 
 /**
@@ -53,7 +71,7 @@ export function openaiConfigurado(): boolean {
 export async function generarRespuestaComentario(
   input: GenComentarioInput,
 ): Promise<GenComentarioResult | null> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = await getOpenAIApiKey()
   if (!apiKey) return null
 
   const voz = vozATexto(input.tonoVoz)

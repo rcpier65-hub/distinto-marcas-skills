@@ -7,7 +7,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { listComentarios, responderComentario } from '@/lib/integrations/metricool'
 import { clasificarComentario } from '@/lib/comentarios/clasificador'
 import { sendWhatsAppImage } from '@/lib/integrations/whatsapp-router'
-import { generarRespuestaComentario } from '@/lib/integrations/openai'
+import { generarRespuestaComentario, getOpenAIApiKey } from '@/lib/integrations/openai'
 import type {
   ComentarioInboxRow,
   ComentarioCategoria,
@@ -286,8 +286,8 @@ export async function generarBorradoresIA(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  if (!process.env.OPENAI_API_KEY) {
-    return { ok: false, error: 'Falta configurar OPENAI_API_KEY en Vercel para generar borradores con IA.' }
+  if (!(await getOpenAIApiKey())) {
+    return { ok: false, error: 'Falta tu API key de OpenAI. Configúrala en Settings → Integraciones (IA).' }
   }
 
   const { data: marca } = await service

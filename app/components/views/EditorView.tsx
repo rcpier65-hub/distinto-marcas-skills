@@ -15,7 +15,7 @@
    - Dashboard arriba: editados/mes, por editar, con/sin guion, alertas
    - Color de alerta en fecha edición según calcularAlertaFecha */
 
-import { useMemo, useState, useTransition, useEffect } from 'react'
+import { useMemo, useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -956,10 +956,16 @@ function NuevaTareaModal({
 }) {
   const [marcaId, setMarcaId] = useState<string>('')
   const [nombre, setNombre] = useState('')
-  /* Fecha publicación: default = hoy + 7 días, formato yyyy-mm-dd */
+  /* Defaults: publicación = hoy + 7 días, edición = hoy + 4 días.
+     Margen de 3 días entre ambas → arranca en VERDE en calcularAlertaFecha. */
   const [fechaPub, setFechaPub] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 7)
+    return d.toISOString().slice(0, 10)
+  })
+  const [fechaEdicion, setFechaEdicion] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 4)
     return d.toISOString().slice(0, 10)
   })
   const [editorId, setEditorId] = useState<string>('')
@@ -989,6 +995,7 @@ function NuevaTareaModal({
       nombre: nombre.trim(),
       editorId: editorId || null,
       fechaPublicacion: fechaPub,
+      fechaEdicion: fechaEdicion || undefined,
     })
     setSaving(false)
     if (r.ok) {
@@ -1063,21 +1070,30 @@ function NuevaTareaModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <Campo label="Fecha de publicación">
-              <input
-                type="date" value={fechaPub} onChange={(e) => setFechaPub(e.target.value)}
+              <DatePickerInput
+                value={fechaPub}
+                onChange={setFechaPub}
                 disabled={saving}
-                style={fieldStyle}
               />
             </Campo>
-            <Campo label="Editor asignado">
-              <select value={editorId} onChange={(e) => setEditorId(e.target.value)} disabled={saving} style={fieldStyle}>
-                <option value="">— Sin asignar —</option>
-                {editores.map((ed) => (
-                  <option key={ed.id} value={ed.id}>{ed.nombre}</option>
-                ))}
-              </select>
+            <Campo label="Fecha de edición">
+              <DatePickerInput
+                value={fechaEdicion}
+                onChange={setFechaEdicion}
+                disabled={saving}
+                max={fechaPub}
+              />
             </Campo>
           </div>
+
+          <Campo label="Editor asignado">
+            <select value={editorId} onChange={(e) => setEditorId(e.target.value)} disabled={saving} style={fieldStyle}>
+              <option value="">— Sin asignar —</option>
+              {editores.map((ed) => (
+                <option key={ed.id} value={ed.id}>{ed.nombre}</option>
+              ))}
+            </select>
+          </Campo>
 
           <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', lineHeight: 1.5 }}>
             La tarea se crea con estado <strong style={{ color: 'var(--mk-text-tertiary)' }}>Editar</strong> y sub-estado <strong style={{ color: 'var(--mk-text-tertiary)' }}>Sin empezar</strong>. Plataformas, copy, guion técnico y portada los completás en el siguiente paso.
@@ -1115,6 +1131,37 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
       <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)' }}>{label}</span>
       {children}
     </label>
+  )
+}
+
+/* Wrapper de <input type="date"> que abre el date picker nativo al
+   hacer clic en CUALQUIER parte del input — no solo en el iconito de
+   calendario a la derecha (que es lo que el browser hace por default
+   y Pedro encontró confuso). Usa la API showPicker() de HTML estándar
+   (Chrome 99+, Safari 16+, Firefox 101+). */
+function DatePickerInput({
+  value, onChange, disabled, max,
+}: {
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  max?: string
+}) {
+  return (
+    <input
+      type="date"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      max={max}
+      onClick={(e) => {
+        /* showPicker() puede tirar error si lo llama por un trigger
+           no-user-gesture o no soportado — silenciamos para no
+           crashear y caer en el comportamiento default del browser. */
+        try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {}
+      }}
+      style={{ ...fieldStyle, cursor: 'pointer' }}
+    />
   )
 }
 
@@ -1465,14 +1512,28 @@ function InlineDate({
   alertaLabel?: string
 }) {
   const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   function start(e: React.MouseEvent) { e.stopPropagation(); setEditing(true) }
   function commit(newVal: string) { setEditing(false); if (newVal && newVal !== value) onChange(newVal) }
+
+  /* Cuando el input entra en modo edit, autofocus + abrir el picker
+     inmediatamente para que el editor no tenga que hacer un segundo
+     clic en el iconito del calendario. */
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      try { (inputRef.current as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {}
+    }
+  }, [editing])
 
   if (editing) {
     return (
       <input
+        ref={inputRef}
         autoFocus type="date" defaultValue={value}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {}
+        }}
         onBlur={(e) => commit(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); commit((e.target as HTMLInputElement).value) }
@@ -1483,7 +1544,8 @@ function InlineDate({
           background: 'var(--mk-bg-base)',
           border: '1px solid var(--mk-accent)', borderRadius: 4,
           color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
-          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)', colorScheme: 'dark',
+          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)',
+          cursor: 'pointer',
         }}
       />
     )

@@ -203,6 +203,8 @@ export async function crearPublicacion(args: {
   nombre: string
   editorId?: string | null
   fechaPublicacion?: string  // ISO YYYY-MM-DD; default = hoy + 7 días
+  fechaEdicion?: string      // ISO YYYY-MM-DD; default = hoy + 4 días
+                             // (3 días antes de publicación → arranca en verde)
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,6 +221,15 @@ export async function crearPublicacion(args: {
     const d = new Date()
     d.setDate(d.getDate() + 7)
     fechaPub = d.toISOString().slice(0, 10)
+  }
+  /* Default fecha edición: 3 días antes de publicación → cae en
+     VERDE (4+ días de margen ya no aplica, así que va en AMARILLO
+     en realidad — pero mejor mostrar el patrón al editor). */
+  let fechaEd = args.fechaEdicion
+  if (!fechaEd) {
+    const pubDate = new Date(fechaPub + 'T00:00:00')
+    pubDate.setDate(pubDate.getDate() - 3)
+    fechaEd = pubDate.toISOString().slice(0, 10)
   }
 
   /* Lookup nombre del editor para guardar denormalizado. */
@@ -240,6 +251,7 @@ export async function crearPublicacion(args: {
       estado: 'editar',
       estado_tarea: 'sin_empezar',
       fecha_publicacion: fechaPub,
+      fecha_edicion: fechaEd,
       editor_id: args.editorId ?? null,
       editor_nombre: editorNombre,
       plataformas: [],

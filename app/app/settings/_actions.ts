@@ -13,6 +13,7 @@ import {
   testMetricoolConnection,
   invalidateMetricoolCredsCache,
 } from '@/lib/integrations/metricool'
+import { getOpenAIApiKey } from '@/lib/integrations/openai'
 
 /**
  * Actualiza el logo_url de una marca.
@@ -203,15 +204,18 @@ export async function getIntegracionesConfig(): Promise<{
     metricool_user_id: string  // safe to show — es un número público
     metricool_has_token: boolean  // never expose el token
     metricool_user_id_set: boolean
+    openai_has_key: boolean       // never expose la key — solo si está puesta
     updated_at: string | null
   }
 } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+  // SELECT * para tolerar que la columna openai_api_key aún no exista
+  // (se crea sola en el primer guardado de la key).
   const { data, error } = await service
     .from('integraciones')
-    .select('metricool_user_id, metricool_user_token, updated_at')
+    .select('*')
     .eq('id', 1)
     .maybeSingle()
   if (error) {
@@ -222,6 +226,7 @@ export async function getIntegracionesConfig(): Promise<{
           metricool_user_id: '',
           metricool_has_token: false,
           metricool_user_id_set: false,
+          openai_has_key: false,
           updated_at: null,
         },
       }
@@ -234,8 +239,108 @@ export async function getIntegracionesConfig(): Promise<{
       metricool_user_id: data?.metricool_user_id ?? '',
       metricool_has_token: !!data?.metricool_user_token,
       metricool_user_id_set: !!data?.metricool_user_id,
+      openai_has_key: !!data?.openai_api_key,
       updated_at: data?.updated_at ?? null,
     },
+  }
+}
+
+// ============================================================
+// OpenAI — API key configurable desde Settings (IA)
+// ============================================================
+
+/**
+ * Crea la columna integraciones.openai_api_key si no existe, con una conexión
+ * pg directa usando SUPABASE_DB_URL (válida en el runtime de Vercel). Self-
+ * healing: evita tener que aplicar la migración a mano.
+ */
+async function ensureOpenAIColumn(): Promise<void> {
+  const dbUrl = process.env.SUPABASE_DB_URL || process.env.SUPABASE_DB_URL_DIRECT
+  if (!dbUrl) throw new Error('SUPABASE_DB_URL no disponible en el runtime')
+  const { Client } = await import('pg')
+  const u = new URL(dbUrl)
+  const client = new Client({
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    host: u.hostname,
+    port: parseInt(u.port || '5432', 10),
+    database: u.pathname.replace(/^\//, '') || 'postgres',
+    ssl: { rejectUnauthorized: false },
+  })
+  await client.connect()
+  try {
+    await client.query('ALTER TABLE integraciones ADD COLUMN IF NOT EXISTS openai_api_key text')
+  } finally {
+    await client.end()
+  }
+}
+
+/**
+ * Guarda (o borra) la API key de OpenAI en integraciones. Si la columna no
+ * existe todavía, la crea al vuelo y reintenta. La key NUNCA vuelve al cliente.
+ *
+ * @param key  la key (sk-...). Vacío = borrar la key guardada.
+ */
+export async function updateOpenAIKey(
+  key: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const value = key.trim() || null
+  if (value && !value.startsWith('sk-')) {
+    return { ok: false, error: 'La key de OpenAI debe empezar con "sk-". Revisa que la copiaste completa.' }
+  }
+
+  const doUpdate = () =>
+    service.from('integraciones').update({ openai_api_key: value, updated_by_user_id: user.id }).eq('id', 1)
+
+  let { error } = await doUpdate()
+  // Columna inexistente (42703 / mensaje "column") → crearla y reintentar.
+  if (error && (error.code === '42703' || /openai_api_key|column/i.test(error.message ?? ''))) {
+    try {
+      await ensureOpenAIColumn()
+    } catch (e) {
+      return { ok: false, error: `No pude crear la columna openai_api_key: ${(e as Error).message}` }
+    }
+    ;({ error } = await doUpdate())
+  }
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/settings')
+  return { ok: true }
+}
+
+/**
+ * Prueba la API key de OpenAI con una llamada mínima (1 token). Confirma que la
+ * key es válida y tiene saldo.
+ */
+export async function probarOpenAI(): Promise<
+  { ok: true; modelo: string } | { ok: false; error: string }
+> {
+  await requireUser()
+  const apiKey = await getOpenAIApiKey()
+  if (!apiKey) return { ok: false, error: 'No hay API key configurada todavía.' }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ok' }],
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (res.ok) return { ok: true, modelo: 'gpt-4o-mini' }
+    const body = await res.json().catch(() => null)
+    if (res.status === 401) return { ok: false, error: 'Key inválida (401). Revisa que la copiaste bien.' }
+    if (res.status === 429) return { ok: false, error: 'Sin saldo o límite alcanzado (429). Carga crédito en OpenAI.' }
+    return { ok: false, error: body?.error?.message ?? `HTTP ${res.status}` }
+  } catch (e) {
+    return { ok: false, error: `Error de red: ${(e as Error).message}` }
   }
 }
 
