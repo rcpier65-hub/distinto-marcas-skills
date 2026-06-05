@@ -887,51 +887,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             </a>
           )}
 
-          {/* BOTONES DE DESCARGA — 2 versiones del video editado.
-              Pedro entra desde celular y descarga el que necesita en
-              el momento. Botones grandes (h-12) para ser tappables fácil
-              con el dedo. Solo aparecen si hay URL cargado. */}
-          {(form.video_sin_musica_url || form.video_con_musica_url) && (
-            <div className="space-y-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">
-                Descargar video
-              </div>
-              {form.video_sin_musica_url && (
-                <a
-                  href={form.video_sin_musica_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 h-12 px-4 rounded-lg border border-input bg-background hover:bg-muted hover:border-[#ba41f7]/40 transition-colors active:scale-[0.98]"
-                >
-                  <div className="w-8 h-8 rounded-full bg-foreground/5 flex items-center justify-center shrink-0">
-                    <VideoIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium leading-tight">Sin música</div>
-                    <div className="text-[10px] text-muted-foreground">Tocá para abrir en Drive</div>
-                  </div>
-                  <Download className="w-4 h-4 text-muted-foreground shrink-0" />
-                </a>
-              )}
-              {form.video_con_musica_url && (
-                <a
-                  href={form.video_con_musica_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 h-12 px-4 rounded-lg border border-input bg-background hover:bg-muted hover:border-[#ba41f7]/40 transition-colors active:scale-[0.98]"
-                >
-                  <div className="w-8 h-8 rounded-full bg-[#ba41f7]/10 flex items-center justify-center shrink-0">
-                    <Music2 className="w-4 h-4 text-[#ba41f7]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium leading-tight">Con música</div>
-                    <div className="text-[10px] text-muted-foreground">Tocá para abrir en Drive</div>
-                  </div>
-                  <Download className="w-4 h-4 text-muted-foreground shrink-0" />
-                </a>
-              )}
-            </div>
-          )}
+          {/* Removido por pedido de Pedro (2026-06-05):
+              "Descargar video" con cards Sin/Con música. Era duplicado
+              porque el popover "Videos" del toolbar ya tiene los enlaces
+              con el componente LinkInput (copiar/abrir/editar). */}
         </div>
       </div>
       {/* Fin SPLIT */}
