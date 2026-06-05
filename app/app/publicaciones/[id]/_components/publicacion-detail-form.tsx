@@ -477,8 +477,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           Permite a Pedro ver el avance mientras edita el copy.
           Nota: el grid wrapper y el wrapper col-izq antes vivían aquí,
           se subieron al return root para que el preview lateral arranque
-          a la altura del HEADER, no debajo de él. */}
-        <Card>
+          a la altura del HEADER, no debajo de él.
+          overflow-visible: shadcn Card trae overflow-hidden por default
+          y eso recortaba los popovers del toolbar que se abren arriba
+          (Pedro hacía clic en "Tipo" y no veía la info). */}
+        <Card className="overflow-visible">
           <div className="flex">
             {/* Sidebar lateral — workflow + propiedades.
                 Pedro pidió tener WORKFLOW y PROPIEDADES en el mismo
@@ -656,11 +659,15 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             </div>
 
             {/* TOOLBAR con popovers expandibles.
-                Los badges ahora viven dentro del botón (top-0.5) y no
-                sobresalen, así que el contenedor no necesita pt extra.
-                gap-2 mantiene la respiración entre iconos. */}
+                IMPORTANTE: NO usar overflow-x-auto aquí. Los browsers
+                convierten overflow-y: visible → auto cuando el otro eje
+                tiene auto, y eso recorta los popovers que salen hacia
+                arriba (Pedro hizo clic en "Tipo" y no veía el popover).
+                Con min-w-[68px] × 6 + gap-2 los iconos caben en ~440px,
+                en desktop normal no hace falta scroll. Si en mobile no
+                caben, flex-wrap los pasa a 2 filas (mejor que clipear). */}
             <div ref={toolbarRef} className="border-t bg-muted/20 px-3 py-2 relative">
-              <div className="flex items-end justify-start gap-2 flex-nowrap overflow-x-auto overflow-y-visible [scrollbar-width:thin]">
+              <div className="flex items-end justify-start gap-2 flex-wrap">
                 {/* Tipo de contenido */}
                 <ToolbarBtnPopover
                   icon={<Film className="w-5 h-5" />}
