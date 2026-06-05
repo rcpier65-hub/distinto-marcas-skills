@@ -1035,11 +1035,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   </div>
                 )
               })()}
-              {form.copy && (
-                <div className="p-3 text-xs whitespace-pre-wrap line-clamp-6">
-                  <span className="font-semibold">{brandHandle}</span> {form.copy}
-                </div>
-              )}
+              {/* Removido por pedido de Pedro (2026-06-05):
+                  vista previa del copy con @brandHandle (estilo
+                  Instagram caption). Pedro la ve redundante con el
+                  Card del copy editable a la izquierda — solo necesita
+                  el video preview, no el mock del caption. */}
             </CardContent>
           </Card>
           {previewMode === 'drive' && form.enlace_tomas && (
