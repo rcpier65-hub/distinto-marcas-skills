@@ -162,6 +162,8 @@ export async function syncMarcaPublicaciones(args: {
       enlace_musica: pub.enlace_musica,
       portada_cruda_url: pub.portada_cruda_url,
       portada_editada_url: pub.portada_editada_url,
+      video_con_musica_url: pub.video_con_musica_url,
+      video_sin_musica_url: pub.video_sin_musica_url,
       editor_nombre: pub.editor,
       copy_listo: pub.copy_listo,
       musica_lista: pub.musica_lista,

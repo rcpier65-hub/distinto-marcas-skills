@@ -207,6 +207,11 @@ export type GrillaPublicacionExtendida = GrillaPublicacion & {
   video_aprobado: boolean
   portada_cruda_url: string | null
   portada_editada_url: string | null
+  // Videos editados (Drive):
+  //   "Editado 😁"     en Notion → con música (video terminado)
+  //   "SIN NADA🔇 1"  en Notion → sin música (track limpio)
+  video_con_musica_url: string | null
+  video_sin_musica_url: string | null
 }
 
 /**
@@ -284,6 +289,8 @@ function parseGrillaPageExtended(page: NotionPage): GrillaPublicacionExtendida |
     video_aprobado: readCheckbox(props['VIDEO APROBADO']),
     portada_cruda_url: readTextOrUrl(props['PORTADA CRUDA']),
     portada_editada_url: readUrl(props['PORTADA EDITADA']),
+    video_con_musica_url: readUrl(props['Editado 😁']),
+    video_sin_musica_url: readUrl(props['SIN NADA🔇 1']),
   }
 }
 
