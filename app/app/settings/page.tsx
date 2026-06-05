@@ -7,6 +7,7 @@ import { LogoUrlInput } from './_components/logo-url-input'
 import { WhatsappConfigInput } from './_components/whatsapp-config-input'
 import { MetricoolConfig } from './_components/metricool-config'
 import { OpenaiConfig } from './_components/openai-config'
+import { InstruccionesComentarios, type MarcaInstr } from './_components/instrucciones-comentarios'
 import { MarcaFactsCard } from './_components/marca-facts-card'
 import { listWhatsAppGroups } from '@/lib/integrations/rubi'
 import { getIntegracionesConfig } from './_actions'
@@ -30,6 +31,17 @@ export default async function SettingsPage() {
   const integraciones = integracionesResult.ok
     ? integracionesResult.config
     : { metricool_user_id: '', metricool_has_token: false, metricool_user_id_set: false, openai_has_key: false, updated_at: null }
+
+  // Marcas con sus instrucciones de respuesta a comentarios (guardadas en tono_voz.instrucciones)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcasInstr: MarcaInstr[] = (marcas ?? []).map((m: any) => ({
+    slug: m.slug,
+    nombre: m.nombre,
+    emoji: m.emoji_marca ?? null,
+    instrucciones: (m.tono_voz && typeof m.tono_voz === 'object' && typeof m.tono_voz.instrucciones === 'string')
+      ? m.tono_voz.instrucciones
+      : '',
+  }))
 
   return (
     <main className="container mx-auto p-8 max-w-4xl space-y-6">
@@ -125,6 +137,21 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <OpenaiConfig initial={integraciones} />
+        </CardContent>
+      </Card>
+
+      {/* Instrucciones de respuesta a comentarios — por marca (tono_voz.instrucciones) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>🧠 Instrucciones de respuesta a comentarios (por marca)</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Reglas de cómo responde la IA los comentarios de <strong>cada marca</strong> (qué responder, qué no, cuándo
+            solo un emoji, etc.). La IA les da <strong>máxima prioridad</strong>. Con <strong>Copiar para ChatGPT</strong>
+            obtienes el mismo prompt para usarlo afuera.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <InstruccionesComentarios marcas={marcasInstr} />
         </CardContent>
       </Card>
 

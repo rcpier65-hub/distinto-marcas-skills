@@ -404,6 +404,46 @@ export async function probarMetricool(): Promise<
 }
 
 // ============================================================
+// Instrucciones de respuesta a comentarios (IA) por marca
+// ============================================================
+// Se guardan dentro de marcas.tono_voz (jsonb) bajo la key "instrucciones".
+// La generación de borradores (lib/integrations/openai.ts) las lee y les da
+// MÁXIMA prioridad sobre las reglas generales.
+
+/**
+ * Guarda (o borra) las instrucciones de respuesta a comentarios de una marca,
+ * fusionándolas en el jsonb tono_voz sin pisar las otras keys (tono, arquetipo…).
+ */
+export async function updateMarcaInstrucciones(
+  slug: string,
+  texto: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { data: marca, error: e1 } = await service
+    .from('marcas')
+    .select('tono_voz')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (e1) return { ok: false, error: e1.message }
+  if (!marca) return { ok: false, error: `Marca '${slug}' no encontrada` }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tono = (marca.tono_voz && typeof marca.tono_voz === 'object') ? (marca.tono_voz as Record<string, any>) : {}
+  const value = texto.trim()
+  const nuevo = { ...tono, instrucciones: value || null }
+
+  const { error } = await service.from('marcas').update({ tono_voz: nuevo }).eq('slug', slug)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/settings')
+  revalidatePath('/comentarios')
+  return { ok: true }
+}
+
+// ============================================================
 // MARCA_FACTS — Migration 022 — datos canon por marca
 // ============================================================
 // Consumidos por la Routine antes de redactar respuestas. Decisión:
