@@ -69,13 +69,25 @@ export default async function DisenoPage() {
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
 
-  /* Query A: con fecha_diseno en rango Y portada NO lista.
-     Pedro confirmó que la vista en Notion "Diseño Ailyn" usa el filtro
-     "Portada lista: Sin marcar" — solo aparecen las tareas que faltan
-     diseñar. Las que ya tienen portada lista están en otro flujo (post
-     producción, listas para publicar) y no deben aparecer en /diseno.
-     Esto deja solo las 4 que Pedro mostró: Manual de marca TYPHOUSE,
-     CTA video x2, Banner web Kintu. */
+  /* Antes el query B usaba `.eq('marca.slug', 'interno')` con dot-notation
+     sobre la tabla relacionada. PostgREST NO interpreta eso como filter
+     INNER — termina trayendo TODAS las pubs sin fecha_diseno (~65) que
+     no son internas. Pedro las vió todas en el Kanban (POST DIA DE LA
+     MADRE, 6. EDAD DIAGNOSTICO, etc.) como "unknown" porque el JOIN
+     fallaba con el filter mal aplicado.
+     Fix: resolver el id de la marca 'interno' como UUID primero y
+     usar `.eq('marca_id', internoId)` que SÍ filtra correctamente. */
+  const { data: internoRow } = await service
+    .from('marcas')
+    .select('id')
+    .eq('slug', 'interno')
+    .maybeSingle()
+  const internoId = internoRow?.id ?? null
+
+  /* Query A: con fecha_diseno en rango Y portada NO lista Y no archivada.
+     Replica el filtro de la vista "Diseño Ailyn" de Notion + excluye
+     archivadas (el campo estado_tarea sólo tiene 'sin_empezar' |
+     'en_progreso' | 'listo' | 'archivado'). */
   let queryA = service
     .from('publicaciones')
     .select(SELECT)
@@ -83,22 +95,30 @@ export default async function DisenoPage() {
     .gte('fecha_diseno', DESDE)
     .lte('fecha_diseno', HASTA)
     .eq('portada_lista', false)
+    .neq('estado_tarea', 'archivado')
     .order('fecha_diseno', { ascending: true })
     .limit(500)
   let resA = await queryA
 
-  /* Query B: tareas internas sin fecha_diseno aún (recién creadas
-     desde el modal "+ Nueva tarea"). También filtramos por portada_lista
-     false aunque por default las nuevas vienen con false. */
-  let queryB = service
-    .from('publicaciones')
-    .select(SELECT)
-    .is('fecha_diseno', null)
-    .eq('portada_lista', false)
-    .order('created_at', { ascending: false })
-    .limit(100)
-    .eq('marca.slug', 'interno')
-  let resB = await queryB
+  /* Query B: tareas internas SIN fecha_diseno (recién creadas desde el
+     modal "+ Nueva tarea" antes de asignarles fecha). Filtramos por
+     marca_id (uuid) — NO por marca.slug — y excluimos archivadas. Si
+     internoId es null (marca no creada aún → migration 21 pendiente),
+     omitimos la query B. */
+  let resB: { data: unknown[] | null; error: { code?: string; message?: string } | null } =
+    { data: [], error: null }
+  if (internoId) {
+    const queryB = service
+      .from('publicaciones')
+      .select(SELECT)
+      .is('fecha_diseno', null)
+      .eq('marca_id', internoId)
+      .eq('portada_lista', false)
+      .neq('estado_tarea', 'archivado')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    resB = await queryB
+  }
 
   let migrationPendiente = false
   /* Defensive: si descripcion/fecha_entrega no existen, reintentamos */
@@ -114,18 +134,24 @@ export default async function DisenoPage() {
       .gte('fecha_diseno', DESDE)
       .lte('fecha_diseno', HASTA)
       .eq('portada_lista', false)
+      .neq('estado_tarea', 'archivado')
       .order('fecha_diseno', { ascending: true })
       .limit(500)
     resA = await queryA
-    queryB = service
-      .from('publicaciones')
-      .select(FALLBACK_SELECT)
-      .is('fecha_diseno', null)
-      .eq('portada_lista', false)
-      .order('id', { ascending: false })
-      .limit(100)
-      .eq('marca.slug', 'interno')
-    resB = await queryB
+    if (internoId) {
+      const queryB2 = service
+        .from('publicaciones')
+        .select(FALLBACK_SELECT)
+        .is('fecha_diseno', null)
+        .eq('marca_id', internoId)
+        .eq('portada_lista', false)
+        .neq('estado_tarea', 'archivado')
+        .order('id', { ascending: false })
+        .limit(100)
+      resB = await queryB2
+    } else {
+      resB = { data: [], error: null }
+    }
   }
 
   /* Marcas para el modal de nueva tarea — excluye la "interno" del
