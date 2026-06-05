@@ -15,13 +15,15 @@
    - Dashboard arriba: editados/mes, por editar, con/sin guion, alertas
    - Color de alerta en fecha edición según calcularAlertaFecha */
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   updateEditorEntry,
   marcarParaEditarHoy,
   desmarcarParaEditarHoy,
+  marcarEnEdicion,
+  desmarcarEnEdicion,
 } from '@/app/editor/_actions'
 import {
   type EditorEntry,
@@ -29,6 +31,8 @@ import {
   type EstadoPub,
   type AlertaFecha,
   calcularAlertaFecha,
+  fechaLima,
+  formatDuracion,
 } from '@/lib/editor/types'
 
 /* ============================================================
@@ -111,6 +115,17 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     soloHoy: false,
     vistaRapida: 'todas',
   })
+  const [reporteOpen, setReporteOpen] = useState(false)
+
+  /* Ticker para actualizar los cronómetros "tiempo editando" cada
+     minuto. No re-renderiza si nadie tiene iniciado_edicion_at. */
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const hayEditando = initialEntries.some((e) => e.iniciadoEdicionAt && !e.editadoAt)
+    if (!hayEditando) return
+    const id = setInterval(() => setTick((t) => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [initialEntries])
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
 
   /* Helpers para resolver marca/editor desde slug/id */
@@ -126,10 +141,9 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     const finMes = `${finMesDate.getFullYear()}-${String(finMesDate.getMonth() + 1).padStart(2, '0')}-${String(finMesDate.getDate()).padStart(2, '0')}`
 
     const enMes = entries.filter((e) => e.fechaEdicion >= inicioMes && e.fechaEdicion <= finMes)
-    /* Editado = estado avanzó más allá de 'editar' (aprobar/programar/publicar/publicado) */
     const ESTADOS_EDITADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
     const editadosMes = enMes.filter((e) => ESTADOS_EDITADOS.includes(e.estado)).length
-    const objetivoMes = enMes.length  /* auto-calculado: el total del mes es el objetivo */
+    const objetivoMes = enMes.length
 
     const porEditar = entries.filter((e) => e.estado === 'editar').length
     const conGuion = entries.filter((e) => e.estado === 'editar' && (e.guion?.trim().length ?? 0) > 0).length
@@ -138,7 +152,44 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
       e.estado === 'editar' && calcularAlertaFecha(e.fechaEdicion, e.grillaFit) === 'rojo'
     ).length
 
-    return { editadosMes, objetivoMes, porEditar, conGuion, sinGuion, urgentes }
+    /* ===== Métrica: editados POR DÍA (basado en editado_at) =====
+       Pedro pidió 4 datos:
+       - Promedio editados por día (los días que sí editó algo)
+       - Días editados al mes (count distinct días con al menos 1 video)
+       - Total editados en el mes
+       - Tiempo medio de edición (avg(editado_at - iniciado_edicion_at)) */
+    const editadosConFecha = entries.filter((e) => e.editadoAt)
+    const editadosMesPorFecha = editadosConFecha.filter((e) => {
+      const dia = fechaLima(e.editadoAt!)
+      return dia >= inicioMes && dia <= finMes
+    })
+    /* Map<diaLima, count> para "videos por día" */
+    const porDiaMap = new Map<string, number>()
+    for (const e of editadosMesPorFecha) {
+      const dia = fechaLima(e.editadoAt!)
+      porDiaMap.set(dia, (porDiaMap.get(dia) ?? 0) + 1)
+    }
+    const diasEditadosMes = porDiaMap.size
+    const promPorDia = diasEditadosMes > 0
+      ? Math.round((editadosMesPorFecha.length / diasEditadosMes) * 10) / 10
+      : 0
+
+    /* Tiempo medio: solo entries que tienen AMBOS timestamps */
+    const conTiempos = editadosMesPorFecha.filter((e) => e.iniciadoEdicionAt)
+    const tiempos = conTiempos.map((e) =>
+      new Date(e.editadoAt!).getTime() - new Date(e.iniciadoEdicionAt!).getTime()
+    ).filter((ms) => ms > 0)
+    const tiempoMedioMs = tiempos.length > 0
+      ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length
+      : null
+
+    return {
+      editadosMes, objetivoMes, porEditar, conGuion, sinGuion, urgentes,
+      promPorDia, diasEditadosMes,
+      totalEditadosMes: editadosMesPorFecha.length,
+      tiempoMedioMs,
+      porDiaMap,
+    }
   }, [entries])
 
   /* ============ Filtrado + búsqueda + sort ============ */
@@ -232,7 +283,19 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
   }
 
   function setEstado(id: string, estado: EstadoPub) {
-    persist(id, { estado }, () => updateEditorEntry(id, { estado }), `Estado → ${ESTADO_CONFIG[estado].label}`)
+    /* Optimistic: si pasa a un estado avanzado y editado_at está null,
+       lo seteamos local ya. El backend hace la misma lógica y persiste. */
+    const ESTADOS_AVANZADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
+    const prevEntry = entries.find((e) => e.id === id)
+    const patch: Partial<EditorEntry> = { estado }
+    if (
+      ESTADOS_AVANZADOS.includes(estado) &&
+      prevEntry &&
+      !prevEntry.editadoAt
+    ) {
+      patch.editadoAt = new Date().toISOString()
+    }
+    persist(id, patch, () => updateEditorEntry(id, { estado }), `Estado → ${ESTADO_CONFIG[estado].label}`)
   }
   function setEditor(id: string, editorId: string | null) {
     const nombre = editorId ? editorById.get(editorId)?.nombre ?? null : null
@@ -249,6 +312,15 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
   function setFechaEdicionVal(id: string, fechaEdicion: string) {
     persist(id, { fechaEdicion }, () => updateEditorEntry(id, { fechaEdicion }), `Fecha edición → ${formatDateES(fechaEdicion)}`)
   }
+  function toggleEnEdicion(id: string, estaEnEdicion: boolean) {
+    if (estaEnEdicion) {
+      persist(id, { iniciadoEdicionAt: null }, () => desmarcarEnEdicion(id), 'Edición pausada')
+    } else {
+      const ahora = new Date().toISOString()
+      persist(id, { iniciadoEdicionAt: ahora }, () => marcarEnEdicion(id), '▶ Editando — cronómetro iniciado')
+    }
+  }
+
   function toggleEditarHoy(id: string, estaMarcada: boolean) {
     if (marcaMigrationPendiente) {
       toast.error('Migration 026 pendiente. Aplicar desde Supabase Dashboard → SQL Editor.')
@@ -308,6 +380,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
         {...metricas}
         vistaActiva={filters.vistaRapida}
         onToggleVista={toggleVistaRapida}
+        onOpenReporte={() => setReporteOpen(true)}
       />
 
       {/* ============== FILTER BAR ============== */}
@@ -439,6 +512,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
                 onSetGrilla={(d) => setFechaGrilla(e.id, d)}
                 onSetFechaEd={(d) => setFechaEdicionVal(e.id, d)}
                 onToggleHoy={() => toggleEditarHoy(e.id, e.fechaMarcadaParaEditar === hoy)}
+                onToggleEnEdicion={() => toggleEnEdicion(e.id, !!e.iniciadoEdicionAt && !e.editadoAt)}
               />
             ))}
             {visible.length === 0 && (
@@ -454,6 +528,15 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
           </tbody>
         </table>
       </div>
+
+      {reporteOpen && (
+        <ReporteEdicion
+          entries={entries}
+          editores={editores}
+          marcas={marcas}
+          onClose={() => setReporteOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -464,12 +547,15 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
 
 function DashboardMetricas({
   editadosMes, objetivoMes, porEditar, conGuion, sinGuion, urgentes,
-  vistaActiva, onToggleVista,
+  promPorDia, tiempoMedioMs,
+  vistaActiva, onToggleVista, onOpenReporte,
 }: {
   editadosMes: number; objetivoMes: number; porEditar: number
   conGuion: number; sinGuion: number; urgentes: number
+  promPorDia: number; tiempoMedioMs: number | null
   vistaActiva: VistaRapida
   onToggleVista: (v: VistaRapida) => void
+  onOpenReporte: () => void
 }) {
   const pct = objetivoMes > 0 ? Math.round((editadosMes / objetivoMes) * 100) : 0
   return (
@@ -522,6 +608,18 @@ function DashboardMetricas({
         hint={urgentes > 0 ? '≤1 día entre edición y publicación' : 'Sin alertas'}
         active={vistaActiva === 'urgentes'}
         onClick={() => onToggleVista('urgentes')}
+      />
+      {/* Editados por día — abre el reporte completo en modal cuando
+          se hace clic. No filtra la tabla porque es una métrica de
+          PERFORMANCE, no de drill-down. */}
+      <MetricaCard
+        valor={promPorDia}
+        valorSuffix=" / día"
+        label="Editados por día"
+        color="#22d3ee"
+        icon={<IconBarChart />}
+        hint={tiempoMedioMs !== null ? `Tiempo medio: ${formatDuracion(tiempoMedioMs)}` : 'Sin tiempo medido aún'}
+        onClick={onOpenReporte}
       />
     </div>
   )
@@ -576,9 +674,10 @@ function MetricaCircle({
 }
 
 function MetricaCard({
-  valor, label, color, icon, highlight, hint, active, onClick,
+  valor, valorSuffix, label, color, icon, highlight, hint, active, onClick,
 }: {
-  valor: number; label: string; color: string; icon: React.ReactNode
+  valor: number; valorSuffix?: string
+  label: string; color: string; icon: React.ReactNode
   highlight?: boolean; hint?: string
   active?: boolean; onClick?: () => void
 }) {
@@ -614,7 +713,9 @@ function MetricaCard({
         {icon}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{valor}</div>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+          {valor}{valorSuffix && <span style={{ fontSize: 12, color: 'var(--mk-text-quaternary)', fontWeight: 400 }}>{valorSuffix}</span>}
+        </div>
         <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>{label}</div>
         {hint && <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{hint}</div>}
       </div>
@@ -628,7 +729,7 @@ function MetricaCard({
 
 function Row({
   entry, marcaInfo, editorInfo, editores, hoy,
-  onOpenDetail, onSetEstado, onSetEditor, onSetNombre, onSetGrilla, onSetFechaEd, onToggleHoy,
+  onOpenDetail, onSetEstado, onSetEditor, onSetNombre, onSetGrilla, onSetFechaEd, onToggleHoy, onToggleEnEdicion,
 }: {
   entry: EditorEntry
   marcaInfo: MarcaOption | null
@@ -642,9 +743,17 @@ function Row({
   onSetGrilla: (d: string) => void
   onSetFechaEd: (d: string) => void
   onToggleHoy: () => void
+  onToggleEnEdicion: () => void
 }) {
   const alerta = calcularAlertaFecha(entry.fechaEdicion, entry.grillaFit)
   const estaMarcadaHoy = entry.fechaMarcadaParaEditar === hoy
+  /* "En edición activa" = tiene timestamp de inicio Y aún no se editó
+     (no pasó a aprobar). Si ya tiene editadoAt, el video terminó y
+     mostramos el tiempo final en lugar del botón. */
+  const enEdicion = !!entry.iniciadoEdicionAt && !entry.editadoAt
+  const yaEditado = !!entry.editadoAt
+  const bgDefault = enEdicion ? 'rgba(34, 211, 238, 0.08)'  /* cyan tenue para "editando" */
+    : estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent'
 
   return (
     <tr
@@ -652,11 +761,11 @@ function Row({
         height: 'var(--mk-row-height)',
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         cursor: 'pointer',
-        background: estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent',
+        background: bgDefault,
       }}
       onClick={onOpenDetail}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = bgDefault }}
     >
       {/* Marca */}
       <Td>
@@ -668,9 +777,39 @@ function Row({
         </div>
       </Td>
 
-      {/* Nombre */}
+      {/* Nombre + botón "Editando" si está marcada para hoy.
+          El botón solo aparece en filas que el editor marcó para
+          trabajar hoy (decisión de Pedro: no llenar de botones
+          videos que no se van a editar). */}
       <Td>
-        <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
+          </span>
+          {estaMarcadaHoy && !yaEditado && (
+            <BotonEditando
+              enEdicion={enEdicion}
+              iniciadoAt={entry.iniciadoEdicionAt}
+              onToggle={onToggleEnEdicion}
+            />
+          )}
+          {yaEditado && entry.iniciadoEdicionAt && (
+            <span
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '2px 8px',
+                background: 'rgba(52, 211, 153, 0.12)', color: '#34d399',
+                borderRadius: 'var(--mk-radius-sm)',
+                fontSize: 10.5, fontWeight: 500,
+                fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+              }}
+              title={`Editado el ${new Date(entry.editadoAt!).toLocaleString('es-PE')}`}
+            >
+              <IconClock />
+              {formatDuracion(new Date(entry.editadoAt!).getTime() - new Date(entry.iniciadoEdicionAt).getTime())}
+            </span>
+          )}
+        </div>
       </Td>
 
       {/* Editor — fallback al nombre denormalizado cuando editorInfo es null */}
@@ -774,6 +913,288 @@ function EnlaceTomasCell({ url }: { url: string | null }) {
         <IconExternal /> Drive
       </button>
     </div>
+  )
+}
+
+/* ============================================================
+   ReporteEdicion — modal full-screen con métricas del mes actual.
+   Pedro pidió: videos por día, días editados, total mes, tiempo medio,
+   breakdown por día. Se abre desde la card "Editados por día".
+   ============================================================ */
+
+function ReporteEdicion({
+  entries, editores, marcas, onClose,
+}: {
+  entries: EditorEntry[]
+  editores: EditorOption[]
+  marcas: MarcaOption[]
+  onClose: () => void
+}) {
+  /* Cerrar con Esc y bloquear scroll del body */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  /* Cálculos del reporte. Usa el mes actual (en Lima) como ventana
+     primaria pero incluye breakdown por día con counts y tiempo
+     medio por día. */
+  const data = useMemo(() => {
+    const ahora = new Date()
+    const año = ahora.getFullYear()
+    const mes = ahora.getMonth()  /* 0-indexed */
+    const inicioMes = `${año}-${String(mes + 1).padStart(2, '0')}-01`
+    const finMesDate = new Date(año, mes + 1, 0)
+    const finMes = `${finMesDate.getFullYear()}-${String(finMesDate.getMonth() + 1).padStart(2, '0')}-${String(finMesDate.getDate()).padStart(2, '0')}`
+    const nombreMes = ahora.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
+
+    /* Filtrado: solo entries con editado_at en el mes */
+    const enMes = entries.filter((e) => {
+      if (!e.editadoAt) return false
+      const dia = fechaLima(e.editadoAt)
+      return dia >= inicioMes && dia <= finMes
+    })
+
+    /* Group por día */
+    type DiaStat = { dia: string; count: number; tiempoMedioMs: number | null; videos: EditorEntry[] }
+    const porDia = new Map<string, DiaStat>()
+    for (const e of enMes) {
+      const dia = fechaLima(e.editadoAt!)
+      const existing = porDia.get(dia) ?? { dia, count: 0, tiempoMedioMs: null, videos: [] }
+      existing.count++
+      existing.videos.push(e)
+      porDia.set(dia, existing)
+    }
+    /* Calcular tiempo medio por día */
+    for (const stat of porDia.values()) {
+      const tiempos = stat.videos
+        .filter((v) => v.iniciadoEdicionAt)
+        .map((v) => new Date(v.editadoAt!).getTime() - new Date(v.iniciadoEdicionAt!).getTime())
+        .filter((ms) => ms > 0)
+      stat.tiempoMedioMs = tiempos.length > 0
+        ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length
+        : null
+    }
+    const diasOrdenados = [...porDia.values()].sort((a, b) => b.dia.localeCompare(a.dia))
+    const maxCount = Math.max(1, ...diasOrdenados.map((d) => d.count))
+
+    /* Top por editor */
+    const porEditor = new Map<string, { editorId: string | null; nombre: string; count: number; tiempoMs: number[] }>()
+    for (const e of enMes) {
+      const key = e.editorId ?? e.editorNombre ?? '__sin'
+      const editor = e.editorId ? editores.find((x) => x.id === e.editorId) : null
+      const nombre = editor?.nombre ?? e.editorNombre ?? 'Sin asignar'
+      const existing = porEditor.get(key) ?? { editorId: e.editorId, nombre, count: 0, tiempoMs: [] }
+      existing.count++
+      if (e.iniciadoEdicionAt) {
+        const ms = new Date(e.editadoAt!).getTime() - new Date(e.iniciadoEdicionAt).getTime()
+        if (ms > 0) existing.tiempoMs.push(ms)
+      }
+      porEditor.set(key, existing)
+    }
+    const topEditores = [...porEditor.values()].sort((a, b) => b.count - a.count)
+
+    /* Tiempo medio global */
+    const tiemposGlobales = enMes
+      .filter((e) => e.iniciadoEdicionAt)
+      .map((e) => new Date(e.editadoAt!).getTime() - new Date(e.iniciadoEdicionAt!).getTime())
+      .filter((ms) => ms > 0)
+    const tiempoMedioGlobal = tiemposGlobales.length > 0
+      ? tiemposGlobales.reduce((a, b) => a + b, 0) / tiemposGlobales.length
+      : null
+
+    return {
+      nombreMes,
+      total: enMes.length,
+      diasUnicos: porDia.size,
+      promPorDia: porDia.size > 0 ? Math.round((enMes.length / porDia.size) * 10) / 10 : 0,
+      tiempoMedioGlobal,
+      diasOrdenados,
+      maxCount,
+      topEditores,
+    }
+  }, [entries, editores])
+
+  const marcaByPub = useMemo(() => {
+    const m = new Map(marcas.map((mm) => [mm.slug, mm]))
+    return (slug: string) => m.get(slug)
+  }, [marcas])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="mk-anim-scale-in"
+        style={{
+          background: 'var(--mk-bg-overlay)',
+          border: '1px solid var(--mk-border-default)',
+          borderRadius: 'var(--mk-radius-xl)',
+          boxShadow: 'var(--mk-shadow-lg)',
+          width: '100%', maxWidth: 980, maxHeight: '90vh',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--mk-border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(34, 211, 238, 0.15)', color: '#22d3ee', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconBarChart />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--mk-text-primary)' }}>Reporte de edición</div>
+            <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'capitalize' }}>{data.nombreMes}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4, borderRadius: 'var(--mk-radius-sm)' }}>
+            <IconClose />
+          </button>
+        </div>
+
+        {/* Resumen 4 columnas */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--mk-border-subtle)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <ResumenItem label="Total mes" valor={data.total.toString()} />
+          <ResumenItem label="Días editados" valor={data.diasUnicos.toString()} />
+          <ResumenItem label="Promedio / día" valor={data.promPorDia.toString()} />
+          <ResumenItem label="Tiempo medio" valor={data.tiempoMedioGlobal !== null ? formatDuracion(data.tiempoMedioGlobal) : '—'} hint={data.tiempoMedioGlobal === null ? 'sin tiempos medidos' : undefined} />
+        </div>
+
+        {/* Body scrolleable: breakdown por día + top editores */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '0 20px 20px' }}>
+          <h3 style={sectionTitle}>Desglose por día</h3>
+          {data.diasOrdenados.length === 0 ? (
+            <div style={emptyHint}>No hay videos editados este mes todavía.</div>
+          ) : (
+            <div>
+              {data.diasOrdenados.map((d) => (
+                <div key={d.dia} style={{ padding: '8px 0', borderBottom: '1px solid var(--mk-border-subtle)', display: 'grid', gridTemplateColumns: '120px 1fr 80px 90px', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 12, color: 'var(--mk-text-secondary)', fontVariantNumeric: 'tabular-nums', textTransform: 'capitalize' }}>
+                    {new Date(d.dia + 'T00:00:00').toLocaleDateString('es-PE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, height: 6, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${(d.count / data.maxCount) * 100}%`, height: '100%', background: '#22d3ee', transition: 'width 400ms ease-out' }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--mk-text-primary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {d.count} {d.count === 1 ? 'video' : 'videos'}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textAlign: 'right' }}>
+                    {d.tiempoMedioMs !== null ? formatDuracion(d.tiempoMedioMs) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <h3 style={{ ...sectionTitle, marginTop: 24 }}>Por editor</h3>
+          {data.topEditores.length === 0 ? (
+            <div style={emptyHint}>—</div>
+          ) : (
+            <div>
+              {data.topEditores.map((ed) => {
+                const tiempoMedio = ed.tiempoMs.length > 0
+                  ? ed.tiempoMs.reduce((a, b) => a + b, 0) / ed.tiempoMs.length
+                  : null
+                const editorInfo = ed.editorId ? editores.find((x) => x.id === ed.editorId) : null
+                return (
+                  <div key={ed.nombre} style={{ padding: '8px 0', borderBottom: '1px solid var(--mk-border-subtle)', display: 'grid', gridTemplateColumns: '160px 1fr 80px 90px', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span style={{ width: 18, height: 18, borderRadius: '50%', background: editorInfo?.color ?? '#737373', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600, flexShrink: 0 }}>
+                        {ed.nombre.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ed.nombre}</span>
+                    </div>
+                    <div style={{ height: 6, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${(ed.count / data.topEditores[0].count) * 100}%`, height: '100%', background: editorInfo?.color ?? '#a78bfa' }} />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--mk-text-primary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {ed.count}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textAlign: 'right' }}>
+                      {tiempoMedio !== null ? formatDuracion(tiempoMedio) : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '10px 20px', borderTop: '1px solid var(--mk-border-subtle)', background: 'rgba(255, 255, 255, 0.01)', fontSize: 11, color: 'var(--mk-text-quaternary)' }}>
+          Datos calculados desde la fecha en que cada video pasó del estado "Editar" a uno avanzado. Esc para cerrar.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ResumenItem({ label, valor, hint }: { label: string; valor: string; hint?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{valor}</div>
+      <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 4 }}>{label}</div>
+      {hint && <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{hint}</div>}
+    </div>
+  )
+}
+
+const sectionTitle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)',
+  color: 'var(--mk-text-tertiary)', margin: '20px 0 8px',
+}
+const emptyHint: React.CSSProperties = {
+  padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--mk-text-quaternary)',
+}
+
+/* Botón "▶ Editar" / "⏸ Editando..." con cronómetro vivo.
+   El cronómetro lo refresca el ticker del padre cada 60s (sin polling
+   por fila). Color cyan para diferenciar del morado de "Editar hoy". */
+function BotonEditando({
+  enEdicion, iniciadoAt, onToggle,
+}: {
+  enEdicion: boolean
+  iniciadoAt: string | null
+  onToggle: () => void
+}) {
+  let textoTiempo = ''
+  if (enEdicion && iniciadoAt) {
+    const ms = Date.now() - new Date(iniciadoAt).getTime()
+    textoTiempo = formatDuracion(ms)
+  }
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggle() }}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '3px 9px',
+        background: enEdicion ? '#22d3ee' : 'rgba(34, 211, 238, 0.10)',
+        color: enEdicion ? '#0a2530' : '#22d3ee',
+        border: enEdicion ? '1px solid #22d3ee' : '1px solid rgba(34, 211, 238, 0.30)',
+        borderRadius: 'var(--mk-radius-sm)',
+        fontSize: 10.5, fontWeight: 600,
+        cursor: 'pointer', flexShrink: 0,
+        fontFamily: 'inherit',
+        boxShadow: enEdicion ? '0 0 12px rgba(34, 211, 238, 0.40)' : 'none',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+      }}
+      title={enEdicion ? 'Pausar edición (clic para parar el cronómetro)' : 'Empezar a editar (inicia el cronómetro)'}
+    >
+      {enEdicion ? <IconPause /> : <IconPlay />}
+      {enEdicion ? `Editando · ${textoTiempo}` : 'Editar'}
+    </button>
   )
 }
 
@@ -1180,3 +1601,8 @@ function IconScriptEmpty()  { return <svg width="16" height="16" viewBox="0 0 16
 function IconWarn()         { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 13H2L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8 6V9M8 11V11.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
 function IconCopy()         { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="3" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.2"/><path d="M2 7V2.5a.5.5 0 01.5-.5H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
 function IconExternal()     { return <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M3 1H1V8H8V6M5 1H8V4M3.5 5.5L8 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> }
+function IconBarChart()     { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 14V2M2 14H14M5 11V8M8 11V5M11 11V9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> }
+function IconPlay()         { return <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M2.5 1.5V8.5L8 5L2.5 1.5Z"/></svg> }
+function IconPause()        { return <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="2" y="1.5" width="2" height="7" rx="0.5"/><rect x="6" y="1.5" width="2" height="7" rx="0.5"/></svg> }
+function IconClock()        { return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 3V5.5L7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+function IconClose()        { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }

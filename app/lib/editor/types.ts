@@ -22,6 +22,12 @@ export type EditorEntry = {
   enlaceTomas: string | null   // URL Drive de las tomas
   guion: string | null         // texto del guion técnico
   fechaMarcadaParaEditar: string | null  // YYYY-MM-DD si está en "hoy"
+  /* Tracking de tiempo de edición — migration 027.
+     iniciadoEdicionAt: cuando el editor hizo clic en "▶ Editando".
+     editadoAt: cuando el estado pasó de 'editar' a un estado avanzado
+     por primera vez. La diferencia entre ambos es el tiempo total. */
+  iniciadoEdicionAt: string | null  // ISO timestamp con TZ
+  editadoAt: string | null          // ISO timestamp con TZ
 }
 
 export type EditorOption = {
@@ -55,4 +61,36 @@ export function calcularAlertaFecha(
   if (dias <= 1) return 'rojo'
   if (dias <= 3) return 'amarillo'
   return 'verde'
+}
+
+/**
+ * Convierte un timestamp ISO a la FECHA Lima (YYYY-MM-DD).
+ * Necesario para agrupar "videos editados por día" en zona horaria
+ * de Lima — si usáramos UTC, videos editados a las 7pm-12am de Lima
+ * caerían al día siguiente (medianoche UTC) y la métrica diaria
+ * mentiría.
+ */
+export function fechaLima(ts: string | Date): string {
+  const d = typeof ts === 'string' ? new Date(ts) : ts
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+}
+
+/**
+ * Formatea una duración en milisegundos a "Xh Ym" o "Xm Ys" según
+ * magnitud. Para tiempo medio de edición y "tiempo en edición".
+ */
+export function formatDuracion(ms: number | null): string {
+  if (ms === null || isNaN(ms) || ms < 0) return '—'
+  const minutos = Math.floor(ms / 60_000)
+  if (minutos < 60) {
+    if (minutos < 1) return '<1m'
+    return `${minutos}m`
+  }
+  const horas = Math.floor(minutos / 60)
+  const minRest = minutos % 60
+  if (horas < 24) return `${horas}h ${minRest}m`
+  const dias = Math.floor(horas / 24)
+  const horasRest = horas % 24
+  return `${dias}d ${horasRest}h`
 }

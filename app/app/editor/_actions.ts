@@ -120,7 +120,40 @@ export async function updateEditorEntry(
     }
   }
 
-  const { error } = await service.from('publicaciones').update(update).eq('id', id)
+  /* AUTO-SET de editado_at cuando el estado pasa de 'editar' a uno
+     avanzado (aprobar/programar/publicar/publicado) por primera vez.
+     Necesitamos leer editado_at actual para no sobreescribir si ya
+     había uno (Pedro: "el tiempo se calcula desde la PRIMERA vez que
+     pasó a aprobar", no la última).
+
+     Sólo aplicamos si patch.estado viene definido y es estado avanzado. */
+  const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
+  if (patch.estado !== undefined && ESTADOS_AVANZADOS.includes(patch.estado)) {
+    const { data: actual } = await service
+      .from('publicaciones')
+      .select('estado, editado_at')
+      .eq('id', id)
+      .maybeSingle()
+    /* Set editado_at solo si:
+       - editado_at está null (primera vez que termina)
+       - el estado actual era 'editar' o 'editando' o 'borrador' (no
+         estaba ya en avanzado) — protege contra updates idempotentes */
+    if (actual && !actual.editado_at) {
+      update.editado_at = new Date().toISOString()
+    }
+  }
+
+  let { error } = await service.from('publicaciones').update(update).eq('id', id)
+
+  /* DEFENSIVO: si editado_at no existe (migration 027 pendiente),
+     retry sin esa columna para no bloquear el resto del update. */
+  if (error && (error.code === '42703' || /editado_at|iniciado_edicion_at/i.test(error.message ?? ''))) {
+    delete update.editado_at
+    delete update.iniciado_edicion_at
+    const retry = await service.from('publicaciones').update(update).eq('id', id)
+    error = retry.error
+  }
+
   if (error) {
     console.error('[updateEditorEntry] error:', error)
     return { ok: false, error: error.message }
@@ -128,5 +161,46 @@ export async function updateEditorEntry(
 
   revalidatePath('/editor')
   revalidatePath(`/publicaciones/${id}`)
+  return { ok: true }
+}
+
+/**
+ * Marca una publicación como "en edición activa" — registra el
+ * timestamp de inicio. Aparece en la fila como botón cambiando a
+ * "⏸ Editando..." con color destacado. Se compara con editado_at
+ * más tarde para calcular el tiempo total de edición.
+ */
+export async function marcarEnEdicion(id: string): Promise<ActionResult> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { error } = await service
+    .from('publicaciones')
+    .update({ iniciado_edicion_at: new Date().toISOString(), updated_by: user.id })
+    .eq('id', id)
+  if (error) {
+    if (error.code === '42703' || /iniciado_edicion_at/i.test(error.message ?? '')) {
+      return { ok: false, error: 'Migration 027 pendiente: falta columna iniciado_edicion_at.' }
+    }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/editor')
+  return { ok: true }
+}
+
+/**
+ * Quita el flag "en edición" (por si el editor lo activó por error).
+ * También se puede usar para reiniciar el cronómetro.
+ */
+export async function desmarcarEnEdicion(id: string): Promise<ActionResult> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { error } = await service
+    .from('publicaciones')
+    .update({ iniciado_edicion_at: null, updated_by: user.id })
+    .eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/editor')
   return { ok: true }
 }

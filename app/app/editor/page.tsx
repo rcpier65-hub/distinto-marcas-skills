@@ -64,6 +64,7 @@ export default async function EditorPage() {
       .select(`
         id, nombre, fecha_publicacion, fecha_edicion, estado, plataformas,
         editor_id, editor_nombre, enlace_tomas, guion, fecha_marcada_para_editar,
+        iniciado_edicion_at, editado_at,
         marca:marcas(slug)
       `)
       .order('fecha_publicacion', { ascending: true, nullsFirst: false })
@@ -78,13 +79,17 @@ export default async function EditorPage() {
       .select('id, slug, nombre, color_primario_hex, emoji_marca'),
   ])
 
-  /* Si la columna fecha_marcada_para_editar no existe todavía (migration
-     026 pendiente), reintentamos el query sin ella. La feature "Editar
-     hoy" queda deshabilitada hasta que aplique la migration, pero el
-     resto de la vista funciona. */
+  /* Si alguna columna de las migrations recientes no existe (026 o 027),
+     reintentamos sin esas columnas. Las features asociadas se
+     deshabilitan en UI pero el resto sigue funcionando.
+     026 = fecha_marcada_para_editar (Editar hoy)
+     027 = iniciado_edicion_at + editado_at (tiempo edición + reporte) */
   let pubs = pubsResult.data
   let marcaMigrationPendiente = false
-  if (pubsResult.error?.code === '42703' || /fecha_marcada_para_editar/i.test(pubsResult.error?.message ?? '')) {
+  if (
+    pubsResult.error?.code === '42703' ||
+    /fecha_marcada_para_editar|iniciado_edicion_at|editado_at/i.test(pubsResult.error?.message ?? '')
+  ) {
     marcaMigrationPendiente = true
     const retry = await service
       .from('publicaciones')
@@ -133,6 +138,8 @@ export default async function EditorPage() {
       enlaceTomas: r.enlace_tomas ?? null,
       guion: r.guion ?? null,
       fechaMarcadaParaEditar: r.fecha_marcada_para_editar ?? null,
+      iniciadoEdicionAt: r.iniciado_edicion_at ?? null,
+      editadoAt: r.editado_at ?? null,
     }
   })
 
