@@ -20,6 +20,7 @@ import {
   postearAprobados,
   generarBorradoresIA,
   previewInformeNewTeam,
+  enviarInformeResueltos,
 } from '../_actions'
 import { ComentarioRow } from './comentario-row'
 import type { ComentarioInboxRow, ComentarioCategoria } from '@/lib/types/database'
@@ -137,6 +138,21 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [isFetching, startFetching] = useTransition()
   const [isResponding, startResponding] = useTransition()
   const [isGenerating, startGenerating] = useTransition()
+  const [informando, startInforme] = useTransition()
+
+  // Envía el informe de lo respondido HOY (sin necesidad de seleccionar comentarios).
+  function handleInforme(modo: 'cliente' | 'newteam') {
+    startInforme(async () => {
+      const destinoTxt = modo === 'newteam' ? 'New team (prueba)' : 'el grupo del cliente'
+      const toastId = toast.loading(`Enviando informe a ${destinoTxt}…`)
+      const r = await enviarInformeResueltos(marcaActual, modo)
+      if (r.ok) {
+        toast.success(`✅ Informe de ${r.comentarios} comentarios enviado a ${r.sent_to}`, { id: toastId, duration: 8000 })
+      } else {
+        toast.error(r.error, { id: toastId, duration: 9000 })
+      }
+    })
+  }
 
   const marcaInfo = marcas.find((m) => m.slug === marcaActual)
 
@@ -318,6 +334,24 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
             className="h-10 px-3 rounded-md text-sm font-medium text-white bg-[#ba41f7] hover:bg-[#9f37db] disabled:opacity-50 transition-colors shadow-sm"
           >
             {isGenerating ? '⏳ Generando…' : '✨ Generar borradores'}
+          </button>
+
+          {/* Informe de lo respondido HOY — no necesita comentarios seleccionados */}
+          <button
+            onClick={() => handleInforme('cliente')}
+            disabled={informando}
+            title="Envía el informe de los comentarios respondidos hoy al grupo de WhatsApp configurado de la marca."
+            className="h-10 px-3 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {informando ? '⏳…' : '📲 Informe a WhatsApp'}
+          </button>
+          <button
+            onClick={() => handleInforme('newteam')}
+            disabled={informando}
+            title="Envía el informe de los comentarios respondidos hoy al grupo interno 'New team' (prueba)."
+            className="h-10 px-3 rounded-md border border-amber-400 bg-amber-50 text-amber-900 text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
+          >
+            {informando ? '⏳…' : '🧪 Informe de prueba a New team'}
           </button>
 
           {/* Postear aprobados — directo a Metricool, sin rutina de Claude */}

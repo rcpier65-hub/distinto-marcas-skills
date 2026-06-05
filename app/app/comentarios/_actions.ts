@@ -683,6 +683,53 @@ export async function previewInformeNewTeam(
   return previewInformeWhatsapp(comentarioIds, newTeam)
 }
 
+/**
+ * Envía el informe de los comentarios RESPONDIDOS HOY de una marca, sin
+ * necesidad de tenerlos seleccionados (útil cuando ya respondiste todo).
+ *   modo 'cliente'  → al grupo de WhatsApp configurado de la marca
+ *   modo 'newteam'  → al grupo interno de prueba "New team"
+ * No postea nada a Metricool (los comentarios ya fueron respondidos).
+ */
+export async function enviarInformeResueltos(
+  marcaSlug: string,
+  modo: 'cliente' | 'newteam',
+): Promise<{ ok: true; comentarios: number; sent_to: string } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: marca } = await service
+    .from('marcas')
+    .select('id, nombre, grupo_whatsapp_chatid')
+    .eq('slug', marcaSlug)
+    .maybeSingle()
+  if (!marca) return { ok: false, error: `Marca '${marcaSlug}' no encontrada` }
+
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const { data: rows } = await service
+    .from('comentarios_inbox')
+    .select('id')
+    .eq('marca_id', marca.id)
+    .eq('status', 'responded')
+    .gte('responded_at', todayStart.toISOString())
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ids = ((rows ?? []) as any[]).map((r) => r.id as string)
+  if (ids.length === 0) return { ok: false, error: 'No hay comentarios respondidos hoy para informar.' }
+
+  let destino: string
+  if (modo === 'newteam') {
+    destino = process.env.WHATSAPP_TEST_GROUP_CHATID ?? '120363427129444398@g.us'
+  } else {
+    const chatId = marca.grupo_whatsapp_chatid as string | null
+    if (!chatId) return { ok: false, error: `${marca.nombre} no tiene grupo de WhatsApp configurado (Settings → WhatsApp por marca).` }
+    destino = chatId
+  }
+
+  const r = await previewInformeWhatsapp(ids, destino)
+  if (!r.ok) return r
+  return { ok: true, comentarios: ids.length, sent_to: r.sent_to }
+}
+
 export async function previewInformeWhatsapp(
   comentarioIds: string[],
   destinoOverride?: string,
