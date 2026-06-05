@@ -55,7 +55,10 @@ type NotionQueryResponse = {
 export type GrillaPublicacion = {
   notion_id: string
   titulo: string
-  fecha: string // ISO YYYY-MM-DD
+  /* fecha de publicación (Grilla de FIT). Puede ser null cuando es
+     una tarea de diseño pura (ej. Manual de Marca, Banner web) que
+     no se publica en redes pero sí tiene `Fecha de diseño`. */
+  fecha: string | null
   plataformas: string[]
   tipo_contenido: string[]
   estado: string | null
@@ -144,8 +147,12 @@ export async function queryGrillaForBrand(args: {
 function parseGrillaPage(page: NotionPage): GrillaPublicacion | null {
   const props = page.properties
   const titulo = readTitle(props['Nombre de la tarea'])
+  /* Antes requeríamos `Grilla de FIT` para considerar la tarea válida.
+     Ahora aceptamos tareas que SOLO tienen `Fecha de diseño` — son
+     piezas de diseño puras (Manual de Marca, Banner web, etc.) que
+     no se publican en redes pero sí tienen workflow de diseño. */
+  if (!titulo) return null
   const fecha = readDateStart(props['Grilla de FIT'])
-  if (!titulo || !fecha) return null
 
   return {
     notion_id: page.id,
@@ -228,11 +235,33 @@ export async function queryGrillaForBrandExtended(args: {
   if (!token) throw new Error('NOTION_TOKEN no configurado')
   if (!dbId) throw new Error('NOTION_GRILLA_DB_ID no configurado')
 
+  /* Filter: tareas del proyecto AND (fecha publicación en rango OR
+     fecha diseño en rango). Pedro pidió que el módulo /diseno cargue
+     también las tareas que SOLO tienen Fecha de diseño (Manual de
+     marca, Banner web, etc.) — esas no entran si filtramos solo por
+     Grilla de FIT. Notion soporta `or` nested dentro de `and`.
+
+     Nota sobre el nombre: la property en Notion es "Fecha de diseño "
+     con un espacio al final en algunas marcas; probamos ambos. */
   const filter = {
     and: [
       { property: 'proyecto', relation: { contains: args.notionProyectoId } },
-      { property: 'Grilla de FIT', date: { on_or_after: args.semanaInicio } },
-      { property: 'Grilla de FIT', date: { on_or_before: args.semanaFin } },
+      {
+        or: [
+          {
+            and: [
+              { property: 'Grilla de FIT', date: { on_or_after: args.semanaInicio } },
+              { property: 'Grilla de FIT', date: { on_or_before: args.semanaFin } },
+            ],
+          },
+          {
+            and: [
+              { property: 'Fecha de diseño ', date: { on_or_after: args.semanaInicio } },
+              { property: 'Fecha de diseño ', date: { on_or_before: args.semanaFin } },
+            ],
+          },
+        ],
+      },
     ],
   }
   const sorts = [{ property: 'Grilla de FIT', direction: 'ascending' as const }]
@@ -256,6 +285,39 @@ export async function queryGrillaForBrandExtended(args: {
     })
     if (!res.ok) {
       const errText = await res.text()
+      /* Fallback: si Notion rechaza el filter (ej. la property
+         "Fecha de diseño " no existe en alguna marca con otro
+         nombre), reintentamos sin la rama de fecha_diseno para no
+         perder el sync entero. Solo loggeamos para no spammear. */
+      if (i === 0 && errText.includes('Fecha de diseño')) {
+        console.warn('[notion] Filter con Fecha de diseño falló, fallback a solo Grilla de FIT:', errText.slice(0, 200))
+        body.filter = {
+          and: [
+            { property: 'proyecto', relation: { contains: args.notionProyectoId } },
+            { property: 'Grilla de FIT', date: { on_or_after: args.semanaInicio } },
+            { property: 'Grilla de FIT', date: { on_or_before: args.semanaFin } },
+          ],
+        }
+        const retry = await fetch(`${NOTION_API}/databases/${dbId}/query`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Notion-Version': NOTION_VERSION,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          cache: 'no-store',
+        })
+        if (!retry.ok) throw new Error(`Notion API ${retry.status}: ${(await retry.text()).slice(0, 300)}`)
+        const retryJson = (await retry.json()) as NotionQueryResponse
+        for (const page of retryJson.results) {
+          const pub = parseGrillaPageExtended(page)
+          if (pub) all.push(pub)
+        }
+        if (!retryJson.has_more || !retryJson.next_cursor) break
+        cursor = retryJson.next_cursor
+        continue
+      }
       throw new Error(`Notion API ${res.status}: ${errText.slice(0, 300)}`)
     }
     const json = (await res.json()) as NotionQueryResponse

@@ -1,26 +1,28 @@
 'use client'
 
-/* DisenoView — módulo de diseño paralelo al de edición.
+/* DisenoView — gemelo visual del EditorView.
  *
- * Reusa el patrón de EditorView pero adaptado al workflow del diseñador:
- *   - Métricas: por diseñar, diseñados/mes, urgentes, con portada lista
- *   - Filtros: estado, diseñador, marca, "mi trabajo de hoy"
- *   - Edición inline: nombre, diseñador, fecha diseño, fecha publicación
- *   - Toggles rápidos: portada lista, diseñado
- *   - Acciones: marcar para diseñar hoy, abrir detalle
+ * Misma estructura: header con breadcrumb + dashboard de métricas con
+ * cards clickeables (vista rápida) + filter bar + tabla densa Linear-
+ * style con edición inline. Cambios respecto a EditorView:
+ *   - Columna "Editor" → "Diseñador"
+ *   - "Fecha edición" → "Fecha diseño"
+ *   - "Enlace tomas" → 2 checkboxes "Portada / Diseñado"
+ *   - Métricas adaptadas a workflow de diseño
+ *   - Estado default: 'disenar'
+ *   - Sub-estado tarea expuesto en una columna extra (Sin empezar /
+ *     En progreso / Listo) porque es el indicador principal en
+ *     Notion ("Diseño Ailyn" → sin marcar → con sub-estado)
  *
- * Estilo: Tailwind con tokens del design system (bg-card, text-foreground,
- * etc.) — más conciso que los inline styles del EditorView pero misma
- * vibra visual.
+ * El estilo (CSS vars, inline styles) replica EditorView para que el
+ * look sea consistente. Si después extraemos a `_shared/`, hacemos
+ * refactor incremental — por ahora vale la duplicación para no
+ * romper Editor.
  */
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import {
-  Search, Calendar, Image as ImageIcon, CheckCircle2, AlertTriangle,
-  PaintBucket, ChevronDown, ExternalLink, Sparkles, ChevronUp,
-} from 'lucide-react'
 import {
   updateDisenoEntry,
   marcarParaDisenarHoy,
@@ -38,7 +40,7 @@ import {
 } from '@/lib/diseno/types'
 
 /* ============================================================
-   Constantes UI
+   Constantes UI (estilo igual al EditorView, sin tailwind)
    ============================================================ */
 
 const ESTADO_CONFIG: Record<EstadoPub, { label: string; color: string; bg: string }> = {
@@ -47,14 +49,14 @@ const ESTADO_CONFIG: Record<EstadoPub, { label: string; color: string; bg: strin
   aprobar:   { label: 'Aprobar',   color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
   programar: { label: 'Programar', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
   publicar:  { label: 'Publicar',  color: '#4cb782', bg: 'rgba(76, 183, 130, 0.12)' },
-  publicado: { label: 'Publicado', color: '#737373', bg: 'rgba(115, 115, 115, 0.10)' },
-  borrador:  { label: 'Borrador',  color: '#737373', bg: 'rgba(115, 115, 115, 0.08)' },
+  publicado: { label: 'Publicado', color: '#737373', bg: 'rgba(255, 255, 255, 0.06)' },
+  borrador:  { label: 'Borrador',  color: '#737373', bg: 'rgba(255, 255, 255, 0.04)' },
 }
 
 const SUBESTADO_CONFIG: Record<SubEstadoDiseno, { label: string; color: string; bg: string }> = {
-  sin_empezar:  { label: 'Sin empezar', color: '#737373', bg: 'rgba(115, 115, 115, 0.10)' },
+  sin_empezar:  { label: 'Sin empezar', color: '#737373', bg: 'rgba(115, 115, 115, 0.14)' },
   en_progreso:  { label: 'En progreso', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
-  listo:        { label: 'Listo',       color: '#34d399', bg: 'rgba(52, 211, 153, 0.12)' },
+  listo:        { label: 'Listo',       color: '#34d399', bg: 'rgba(52, 211, 153, 0.14)' },
 }
 
 const ALERTA_COLOR: Record<AlertaFecha, { fg: string; bg: string; label: string }> = {
@@ -82,15 +84,19 @@ export type MarcaOption = {
   emoji: string | null
 }
 
-type SortField = 'marca' | 'nombre' | 'disenador' | 'fechaDiseno' | 'fechaPublicacion'
+type SortField = 'marca' | 'nombre' | 'disenador' | 'fechaDiseno' | 'estado' | 'fechaPub' | 'subEstado'
 type SortDir = 'asc' | 'desc'
 
+/* Vista rápida: cards clickeables del dashboard. Toggle al hacer clic.
+   Cuando hay una vista rápida activa, el filtro de estado se ignora. */
+type VistaRapida = 'todas' | 'porDisenar' | 'conPortada' | 'sinPortada' | 'urgentes' | 'disenados'
+
 type Filters = {
-  subEstado: SubEstadoDiseno | 'todos'
+  estado: EstadoPub | 'todos'
   disenadorId: string | 'todos' | '_sin'
   marcaSlug: string | 'todas'
   soloHoy: boolean
-  conPortadaLista: 'todos' | 'si' | 'no'
+  vistaRapida: VistaRapida
 }
 
 type Props = {
@@ -115,11 +121,11 @@ export function DisenoView({
   const [, startTransition] = useTransition()
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>({
-    subEstado: 'todos',
+    estado: 'todos',
     disenadorId: 'todos',
     marcaSlug: 'todas',
     soloHoy: false,
-    conPortadaLista: 'todos',
+    vistaRapida: 'todas',
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
 
@@ -127,41 +133,38 @@ export function DisenoView({
   const disenadorById = useMemo(() => new Map(disenadores.map((d) => [d.id, d])), [disenadores])
   const hoy = new Date().toISOString().slice(0, 10)
 
-  /* ============ Métricas ============ */
+  /* ============ Métricas del dashboard ============ */
   const metricas = useMemo(() => {
-    /* Diseñados/mes: contar las que tienen disenado=true Y cuya
-       fecha_diseno cae en el rango cargado (mayo + junio en v1). */
-    const enRango = entries
-    const disenadosMes = enRango.filter((e) => e.disenado).length
-    const totalMes = enRango.length
-
-    /* Por diseñar = no diseñado todavía */
+    const total = entries.length
+    const disenados = entries.filter((e) => e.disenado).length
     const porDisenar = entries.filter((e) => !e.disenado).length
-
-    /* Portada lista pero falta diseño final (Ailyn ya armó la referencia
-       pero aún no terminó). Útil para identificar trabajo a medias. */
-    const portadaLista = entries.filter((e) => e.portadaLista && !e.disenado).length
-
-    /* Urgentes: fecha_diseno está cerca o pasó la fecha_publicacion */
+    const conPortada = entries.filter((e) => e.portadaLista && !e.disenado).length
+    const sinPortada = entries.filter((e) => !e.portadaLista && !e.disenado).length
     const urgentes = entries.filter((e) =>
-      !e.disenado && calcularAlertaFecha(e.fechaDiseno, e.fechaPublicacion) === 'rojo'
+      !e.disenado && calcularAlertaFecha(e.fechaDiseno, e.fechaPublicacion) === 'rojo',
     ).length
+    return { disenados, total, porDisenar, conPortada, sinPortada, urgentes }
+  }, [entries])
 
-    /* Marcadas como "diseñar hoy" */
-    const hoyMarcadas = entries.filter((e) => e.fechaMarcadaParaDisenar === hoy).length
-
-    return { disenadosMes, totalMes, porDisenar, portadaLista, urgentes, hoyMarcadas }
-  }, [entries, hoy])
-
-  /* ============ Filtros + búsqueda + sort ============ */
+  /* ============ Filtrado + búsqueda + sort ============ */
   const visible = useMemo(() => {
     let list = entries.filter((e) => {
-      /* "Mi trabajo de hoy" ignora otros filtros de estado para
-         mostrar todo lo marcado hoy, aunque ya esté diseñado. */
+      /* "Mi trabajo para hoy" ignora otros filtros. Las vistas rápidas
+         (cards del dashboard) también, para que el drill-down sea claro. */
       if (filters.soloHoy) {
         if (e.fechaMarcadaParaDisenar !== hoy) return false
+      } else if (filters.vistaRapida !== 'todas') {
+        const v = filters.vistaRapida
+        if (v === 'porDisenar' && e.disenado) return false
+        if (v === 'conPortada' && (!e.portadaLista || e.disenado)) return false
+        if (v === 'sinPortada' && (e.portadaLista || e.disenado)) return false
+        if (v === 'disenados' && !e.disenado) return false
+        if (v === 'urgentes') {
+          if (e.disenado) return false
+          if (calcularAlertaFecha(e.fechaDiseno, e.fechaPublicacion) !== 'rojo') return false
+        }
       } else {
-        if (filters.subEstado !== 'todos' && e.subEstado !== filters.subEstado) return false
+        if (filters.estado !== 'todos' && e.estado !== filters.estado) return false
       }
       if (filters.disenadorId !== 'todos') {
         if (filters.disenadorId === '_sin') {
@@ -169,8 +172,6 @@ export function DisenoView({
         } else if (e.disenadorId !== filters.disenadorId) return false
       }
       if (filters.marcaSlug !== 'todas' && e.marcaSlug !== filters.marcaSlug) return false
-      if (filters.conPortadaLista === 'si' && !e.portadaLista) return false
-      if (filters.conPortadaLista === 'no' && e.portadaLista) return false
       if (search) {
         const q = search.toLowerCase()
         const marca = marcaBySlug.get(e.marcaSlug)
@@ -194,14 +195,14 @@ export function DisenoView({
   }, [entries, filters, search, sort, marcaBySlug, disenadorById, hoy])
 
   const hasActiveFilters =
-    filters.subEstado !== 'todos' ||
+    filters.estado !== 'todos' ||
     filters.disenadorId !== 'todos' ||
     filters.marcaSlug !== 'todas' ||
-    filters.conPortadaLista !== 'todos' ||
     filters.soloHoy ||
+    filters.vistaRapida !== 'todas' ||
     !!search
 
-  /* ============ Edit handlers ============ */
+  /* ============ Persist helper ============ */
 
   function persist(
     id: string,
@@ -223,14 +224,17 @@ export function DisenoView({
     })
   }
 
+  function setEstado(id: string, estado: EstadoPub) {
+    persist(id, { estado }, () => updateDisenoEntry(id, { estado }), `Estado → ${ESTADO_CONFIG[estado].label}`)
+  }
+  function setSubEstado(id: string, subEstado: SubEstadoDiseno) {
+    persist(id, { subEstado }, () => updateDisenoEntry(id, { subEstado }), `Estado → ${SUBESTADO_CONFIG[subEstado].label}`)
+  }
   function setDisenador(id: string, disenadorId: string | null) {
     const nombre = disenadorId ? disenadorById.get(disenadorId)?.nombre ?? null : null
-    persist(
-      id,
-      { disenadorId, disenadorNombre: nombre },
+    persist(id, { disenadorId, disenadorNombre: nombre },
       () => updateDisenoEntry(id, { disenadorId }),
-      `Diseñador → ${nombre ?? 'Sin asignar'}`,
-    )
+      `Diseñador → ${nombre ?? 'Sin asignar'}`)
   }
   function setNombre(id: string, nombre: string) {
     const trimmed = nombre.trim()
@@ -241,20 +245,17 @@ export function DisenoView({
     persist(id, { fechaDiseno }, () => updateDisenoEntry(id, { fechaDiseno }), `Fecha diseño → ${formatDateES(fechaDiseno)}`)
   }
   function setFechaPub(id: string, fechaPublicacion: string) {
-    persist(id, { fechaPublicacion }, () => updateDisenoEntry(id, { fechaPublicacion }), `Fecha pub → ${formatDateES(fechaPublicacion)}`)
+    persist(id, { fechaPublicacion }, () => updateDisenoEntry(id, { fechaPublicacion }), `Publicación → ${formatDateES(fechaPublicacion)}`)
   }
-  function setSubEstado(id: string, subEstado: SubEstadoDiseno) {
-    persist(id, { subEstado }, () => updateDisenoEntry(id, { subEstado }), `Estado → ${SUBESTADO_CONFIG[subEstado].label}`)
+  function setPortada(id: string, value: boolean) {
+    persist(id, { portadaLista: value }, () => togglePortadaLista(id, value), value ? 'Portada ✓' : 'Portada destildada')
   }
-  function togglePortada(id: string, value: boolean) {
-    persist(id, { portadaLista: value }, () => togglePortadaLista(id, value), value ? 'Portada lista ✓' : 'Portada des-marcada')
-  }
-  function toggleDisenadoVal(id: string, value: boolean) {
+  function setDisenado(id: string, value: boolean) {
     persist(id, { disenado: value }, () => toggleDisenado(id, value), value ? '¡Diseñado! 🎨' : 'Reabierto')
   }
   function toggleDisenarHoy(id: string, estaMarcada: boolean) {
     if (migrationPendiente) {
-      toast.error('Migration pendiente. Aplicar 20260605200001_disenadores.sql en Supabase Dashboard.')
+      toast.error('Migration disenadores pendiente. Aplicar desde Supabase Dashboard → SQL Editor.')
       return
     }
     if (estaMarcada) {
@@ -273,484 +274,920 @@ export function DisenoView({
   }
 
   function clearAll() {
-    setFilters({ subEstado: 'todos', disenadorId: 'todos', marcaSlug: 'todas', soloHoy: false, conPortadaLista: 'todos' })
+    setFilters({ estado: 'todos', disenadorId: 'todos', marcaSlug: 'todas', soloHoy: false, vistaRapida: 'todas' })
     setSearch('')
     setSort(null)
   }
 
+  function toggleVistaRapida(v: VistaRapida) {
+    setFilters((f) => ({ ...f, vistaRapida: f.vistaRapida === v ? 'todas' : v, soloHoy: false }))
+  }
+
+  function openRow(id: string) {
+    router.push(`/publicaciones/${id}`)
+  }
+
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-background">
-      {/* HEADER breadcrumb + warnings */}
-      <header className="flex items-center gap-3 px-6 py-3 border-b border-border bg-background">
-        <div className="flex items-center gap-1.5 text-sm">
-          <PaintBucket className="w-4 h-4 text-[#a78bfa]" />
-          <span className="text-muted-foreground">Módulo</span>
-          <span className="text-muted-foreground/60">/</span>
-          <span className="text-foreground font-medium">Diseño</span>
-          <span className="text-[11px] text-muted-foreground/60 ml-2">
+    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }}>
+      {/* ============== HEADER ============== */}
+      <header style={headerStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-sm)' }}>
+          <span style={{ color: 'var(--mk-text-tertiary)' }}>Publicaciones</span>
+          <span style={{ color: 'var(--mk-text-quaternary)' }}>/</span>
+          <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Diseño</span>
+          <span style={{ marginLeft: 10, fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-quaternary)' }}>
             {formatDateES(rangoDesde)} → {formatDateES(rangoHasta)}
           </span>
         </div>
-        <div className="flex-1" />
+        <div style={{ flex: 1 }} />
         {migrationPendiente && (
-          <span className="text-[11px] text-yellow-500 bg-yellow-500/10 px-2.5 py-1 rounded-md">
-            ⚠ Migration disenadores pendiente — algunas columnas no disponibles
+          <span style={{ fontSize: 'var(--mk-text-xs)', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '4px 10px', borderRadius: 'var(--mk-radius-sm)' }}>
+            ⚠ Migration disenadores pendiente
           </span>
         )}
       </header>
 
-      {/* DASHBOARD de métricas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 px-6 py-4 border-b border-border bg-muted/20">
-        <MetricCard
-          icon={<Sparkles className="w-4 h-4" />}
-          label="Diseñados"
-          value={`${metricas.disenadosMes} / ${metricas.totalMes}`}
-          subtitle="del rango"
-          color="#a78bfa"
-        />
-        <MetricCard
-          icon={<PaintBucket className="w-4 h-4" />}
-          label="Por diseñar"
-          value={metricas.porDisenar}
-          subtitle="pendientes"
-          color="#60a5fa"
-        />
-        <MetricCard
-          icon={<ImageIcon className="w-4 h-4" />}
-          label="Portada lista"
-          value={metricas.portadaLista}
-          subtitle="referencia ✓"
-          color="#34d399"
-        />
-        <MetricCard
-          icon={<AlertTriangle className="w-4 h-4" />}
-          label="Urgentes"
-          value={metricas.urgentes}
-          subtitle="< 1 día margen"
-          color="#fb7185"
-        />
-        <MetricCard
-          icon={<CheckCircle2 className="w-4 h-4" />}
-          label="Mi trabajo HOY"
-          value={metricas.hoyMarcadas}
-          subtitle="marcadas"
-          color="#fbbf24"
-        />
-      </div>
+      {/* ============== DASHBOARD MÉTRICAS ============== */}
+      <DashboardMetricas
+        {...metricas}
+        vistaActiva={filters.vistaRapida}
+        onToggleVista={toggleVistaRapida}
+      />
 
-      {/* TOOLBAR de filtros */}
-      <div className="flex flex-wrap items-center gap-2 px-6 py-2.5 border-b border-border bg-background">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+      {/* ============== FILTER BAR ============== */}
+      <div style={filterBarStyle}>
+        <div style={{ position: 'relative', minWidth: 240 }}>
+          <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--mk-text-tertiary)' }}>
+            <IconSearch />
+          </span>
           <input
-            type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o marca…"
-            className="pl-8 pr-3 py-1.5 w-64 text-sm bg-muted/40 border border-border/40 rounded-md focus:outline-none focus:ring-2 focus:ring-[#a78bfa]/30"
+            placeholder="Buscar tarea o marca…"
+            className="mk-focusable"
+            style={{
+              width: '100%', height: 'var(--mk-button-height-lg)',
+              padding: '0 8px 0 28px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--mk-border-subtle)',
+              borderRadius: 'var(--mk-radius-md)',
+              color: 'var(--mk-text-primary)',
+              fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+              outline: 'none',
+            }}
           />
         </div>
 
-        <FilterSelect
+        <FilterPill
           label="Estado"
-          value={filters.subEstado}
-          onChange={(v) => setFilters((f) => ({ ...f, subEstado: v as Filters['subEstado'] }))}
+          value={filters.estado === 'todos' ? null : ESTADO_CONFIG[filters.estado].label}
+          dotColor={filters.estado === 'todos' ? null : ESTADO_CONFIG[filters.estado].color}
           options={[
-            { value: 'todos', label: 'Todos' },
-            { value: 'sin_empezar', label: 'Sin empezar' },
-            { value: 'en_progreso', label: 'En progreso' },
-            { value: 'listo', label: 'Listo' },
+            { id: 'todos', label: 'Todos' },
+            ...(Object.entries(ESTADO_CONFIG) as [EstadoPub, typeof ESTADO_CONFIG.disenar][]).map(([k, v]) => ({
+              id: k, label: v.label, color: v.color,
+            })),
           ]}
+          onSelect={(id) => setFilters((f) => ({ ...f, estado: id as EstadoPub | 'todos' }))}
         />
-
-        <FilterSelect
+        <FilterPill
           label="Diseñador"
-          value={filters.disenadorId}
-          onChange={(v) => setFilters((f) => ({ ...f, disenadorId: v }))}
+          value={
+            filters.disenadorId === 'todos' ? null :
+            filters.disenadorId === '_sin' ? 'Sin asignar' :
+            disenadorById.get(filters.disenadorId)?.nombre ?? null
+          }
+          dotColor={
+            filters.disenadorId === 'todos' || filters.disenadorId === '_sin' ? null :
+            disenadorById.get(filters.disenadorId)?.color ?? null
+          }
           options={[
-            { value: 'todos', label: 'Todos' },
-            { value: '_sin', label: 'Sin asignar' },
-            ...disenadores.map((d) => ({ value: d.id, label: d.nombre })),
+            { id: 'todos', label: 'Todos' },
+            { id: '_sin', label: 'Sin asignar' },
+            ...disenadores.map((d) => ({ id: d.id, label: d.nombre, color: d.color })),
           ]}
+          onSelect={(id) => setFilters((f) => ({ ...f, disenadorId: id }))}
         />
-
-        <FilterSelect
+        <FilterPill
           label="Marca"
-          value={filters.marcaSlug}
-          onChange={(v) => setFilters((f) => ({ ...f, marcaSlug: v }))}
+          value={filters.marcaSlug === 'todas' ? null : marcaBySlug.get(filters.marcaSlug)?.nombre ?? null}
+          dotColor={filters.marcaSlug === 'todas' ? null : marcaBySlug.get(filters.marcaSlug)?.color ?? null}
           options={[
-            { value: 'todas', label: 'Todas' },
-            ...marcas.map((m) => ({ value: m.slug, label: m.nombre })),
+            { id: 'todas', label: 'Todas' },
+            ...marcas.map((m) => ({ id: m.slug, label: m.nombre, color: m.color })),
           ]}
+          onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
         />
-
-        <FilterSelect
-          label="Portada"
-          value={filters.conPortadaLista}
-          onChange={(v) => setFilters((f) => ({ ...f, conPortadaLista: v as Filters['conPortadaLista'] }))}
-          options={[
-            { value: 'todos', label: 'Todas' },
-            { value: 'si', label: 'Con portada lista' },
-            { value: 'no', label: 'Sin portada' },
-          ]}
-        />
-
-        <button
-          type="button"
-          onClick={() => setFilters((f) => ({ ...f, soloHoy: !f.soloHoy }))}
-          className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-            filters.soloHoy
-              ? 'bg-[#fbbf24]/15 border-[#fbbf24]/40 text-[#fbbf24]'
-              : 'bg-muted/40 border-border/40 text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          ☀ Mi trabajo HOY
-        </button>
 
         {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={clearAll}
-            className="px-2.5 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            Limpiar
-          </button>
+          <button onClick={clearAll} style={clearBtnStyle}>Limpiar</button>
         )}
 
-        <div className="flex-1" />
-        <span className="text-xs text-muted-foreground">{visible.length} de {entries.length}</span>
+        <button
+          onClick={() => setFilters((f) => ({ ...f, soloHoy: !f.soloHoy, vistaRapida: 'todas' }))}
+          style={{
+            ...miTrabajoBtnStyle,
+            background: filters.soloHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.03)',
+            color: filters.soloHoy ? 'white' : 'var(--mk-text-secondary)',
+            border: `1px solid ${filters.soloHoy ? 'var(--mk-accent)' : 'var(--mk-border-subtle)'}`,
+            boxShadow: filters.soloHoy ? '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)' : 'none',
+          }}
+          title="Filtra solo las tareas que marcaste con 'Diseñar hoy'"
+        >
+          <IconToday />
+          Mi trabajo para hoy
+          {filters.soloHoy && (
+            <span style={{ marginLeft: 4, padding: '0 6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
+              {visible.length}
+            </span>
+          )}
+        </button>
+
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+          {visible.length} {visible.length === 1 ? 'tarea' : 'tareas'}
+        </span>
       </div>
 
-      {/* TABLA */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead className="sticky top-0 bg-muted/40 backdrop-blur z-10 border-b border-border">
-            <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              <TH onClick={() => toggleSort('marca')} sort={sort} field="marca">Marca</TH>
-              <TH onClick={() => toggleSort('nombre')} sort={sort} field="nombre">Tarea</TH>
-              <TH onClick={() => toggleSort('disenador')} sort={sort} field="disenador">Diseñador</TH>
-              <TH onClick={() => toggleSort('fechaDiseno')} sort={sort} field="fechaDiseno">Fecha diseño</TH>
-              <TH onClick={() => toggleSort('fechaPublicacion')} sort={sort} field="fechaPublicacion">Publicación</TH>
-              <th className="text-left px-3 py-2 font-medium">Estado</th>
-              <th className="text-center px-2 py-2 font-medium">Portada</th>
-              <th className="text-center px-2 py-2 font-medium">Diseñado</th>
-              <th className="text-center px-2 py-2 font-medium">Hoy</th>
-              <th className="text-center px-2 py-2 font-medium">Abrir</th>
+      {/* ============== TABLE ============== */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 'var(--mk-text-sm)' }}>
+          <thead>
+            <tr>
+              <Th width="160px" sortable field="marca"        sort={sort} onSort={toggleSort}>Proyecto</Th>
+              <Th              sortable field="nombre"        sort={sort} onSort={toggleSort}>Nombre de la tarea</Th>
+              <Th width="150px" sortable field="disenador"    sort={sort} onSort={toggleSort}>Diseñador</Th>
+              <Th width="130px" sortable field="fechaDiseno"  sort={sort} onSort={toggleSort}>Fecha diseño</Th>
+              <Th width="120px" sortable field="fechaPub"     sort={sort} onSort={toggleSort}>Publicación</Th>
+              <Th width="130px" sortable field="subEstado"    sort={sort} onSort={toggleSort}>Sub-estado</Th>
+              <Th width="110px" align="center">Portada</Th>
+              <Th width="110px" align="center">Diseñado</Th>
+              <Th width="110px">Diseñar hoy</Th>
+              <Th width="40px" align="right" />
             </tr>
           </thead>
           <tbody>
-            {visible.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="text-center py-12 text-muted-foreground">
-                  {hasActiveFilters
-                    ? <>No hay resultados con los filtros aplicados. <button onClick={clearAll} className="text-[#a78bfa] underline">Limpiar</button></>
-                    : 'No hay tareas de diseño en este rango.'}
-                </td>
-              </tr>
-            ) : visible.map((entry) => {
-              const marca = marcaBySlug.get(entry.marcaSlug)
-              const disenador = entry.disenadorId ? disenadorById.get(entry.disenadorId) : null
-              const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaPublicacion)
-              const estaMarcada = entry.fechaMarcadaParaDisenar === hoy
-              const sub = SUBESTADO_CONFIG[entry.subEstado]
-              return (
-                <tr
-                  key={entry.id}
-                  className="border-b border-border/60 hover:bg-muted/30 transition-colors group"
-                >
-                  {/* Marca */}
-                  <td className="px-3 py-2 align-middle">
-                    {marca ? (
-                      <span
-                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium"
-                        style={{ backgroundColor: `${marca.color}1f`, color: marca.color }}
-                      >
-                        {marca.emoji && <span>{marca.emoji}</span>}
-                        <span className="truncate max-w-[110px]">{marca.nombre}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-[11px]">—</span>
-                    )}
-                  </td>
-
-                  {/* Nombre (editable inline) */}
-                  <td className="px-3 py-2 align-middle min-w-[200px]">
-                    <InlineText
-                      value={entry.nombreTarea}
-                      onSave={(v) => setNombre(entry.id, v)}
-                    />
-                    {entry.tipoContenido.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {entry.tipoContenido.slice(0, 3).map((t) => (
-                          <span key={t} className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Diseñador */}
-                  <td className="px-3 py-2 align-middle">
-                    <InlineSelect
-                      value={entry.disenadorId ?? ''}
-                      onChange={(v) => setDisenador(entry.id, v || null)}
-                      options={[
-                        { value: '', label: '— Sin asignar' },
-                        ...disenadores.map((d) => ({ value: d.id, label: d.nombre })),
-                      ]}
-                      chipColor={disenador?.color}
-                    />
-                  </td>
-
-                  {/* Fecha diseño */}
-                  <td className="px-3 py-2 align-middle whitespace-nowrap">
-                    <input
-                      type="date"
-                      value={entry.fechaDiseno}
-                      onChange={(e) => setFechaDiseno(entry.id, e.target.value)}
-                      className="text-[12px] bg-transparent border-0 px-1 py-0.5 rounded hover:bg-muted/50 focus:outline-none focus:bg-muted/50 focus:ring-1 focus:ring-[#a78bfa]/40"
-                      style={{ color: ALERTA_COLOR[alerta].fg }}
-                    />
-                  </td>
-
-                  {/* Fecha publicación */}
-                  <td className="px-3 py-2 align-middle whitespace-nowrap">
-                    <input
-                      type="date"
-                      value={entry.fechaPublicacion ?? ''}
-                      onChange={(e) => setFechaPub(entry.id, e.target.value)}
-                      className="text-[12px] bg-transparent border-0 px-1 py-0.5 rounded text-muted-foreground hover:bg-muted/50 focus:outline-none focus:bg-muted/50 focus:ring-1 focus:ring-[#a78bfa]/40"
-                    />
-                  </td>
-
-                  {/* Sub-estado (chip clickeable que abre dropdown) */}
-                  <td className="px-3 py-2 align-middle">
-                    <InlineSelect
-                      value={entry.subEstado}
-                      onChange={(v) => setSubEstado(entry.id, v as SubEstadoDiseno)}
-                      options={[
-                        { value: 'sin_empezar', label: 'Sin empezar' },
-                        { value: 'en_progreso', label: 'En progreso' },
-                        { value: 'listo', label: 'Listo' },
-                      ]}
-                      chipColor={sub.color}
-                      chipBg={sub.bg}
-                    />
-                  </td>
-
-                  {/* Portada lista */}
-                  <td className="px-2 py-2 text-center align-middle">
-                    <button
-                      onClick={() => togglePortada(entry.id, !entry.portadaLista)}
-                      title={entry.portadaLista ? 'Quitar portada lista' : 'Marcar portada lista'}
-                      className={`w-5 h-5 rounded border transition-colors ${
-                        entry.portadaLista
-                          ? 'bg-[#34d399] border-[#34d399] text-white'
-                          : 'bg-transparent border-border hover:border-[#34d399]/60'
-                      }`}
-                    >
-                      {entry.portadaLista && '✓'}
-                    </button>
-                  </td>
-
-                  {/* Diseñado */}
-                  <td className="px-2 py-2 text-center align-middle">
-                    <button
-                      onClick={() => toggleDisenadoVal(entry.id, !entry.disenado)}
-                      title={entry.disenado ? 'Quitar diseñado' : 'Marcar diseñado'}
-                      className={`w-5 h-5 rounded border transition-colors ${
-                        entry.disenado
-                          ? 'bg-[#a78bfa] border-[#a78bfa] text-white'
-                          : 'bg-transparent border-border hover:border-[#a78bfa]/60'
-                      }`}
-                    >
-                      {entry.disenado && '✓'}
-                    </button>
-                  </td>
-
-                  {/* Diseñar hoy */}
-                  <td className="px-2 py-2 text-center align-middle">
-                    <button
-                      onClick={() => toggleDisenarHoy(entry.id, estaMarcada)}
-                      title={estaMarcada ? 'Quitar de "Hoy"' : 'Marcar para diseñar hoy'}
-                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                        estaMarcada
-                          ? 'bg-[#fbbf24]/20 text-[#fbbf24] ring-1 ring-[#fbbf24]/40'
-                          : 'text-muted-foreground/50 hover:text-[#fbbf24]'
-                      }`}
-                    >
-                      ☀
-                    </button>
-                  </td>
-
-                  {/* Abrir detalle */}
-                  <td className="px-2 py-2 text-center align-middle">
-                    <button
-                      onClick={() => router.push(`/publicaciones/${entry.id}`)}
-                      className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Abrir detalle"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
+            {visible.map((e) => (
+              <Row
+                key={e.id}
+                entry={e}
+                marcaInfo={marcaBySlug.get(e.marcaSlug) ?? null}
+                disenadorInfo={e.disenadorId ? disenadorById.get(e.disenadorId) ?? null : null}
+                disenadores={disenadores}
+                hoy={hoy}
+                onOpenDetail={() => openRow(e.id)}
+                onSetDisenador={(did) => setDisenador(e.id, did)}
+                onSetNombre={(n) => setNombre(e.id, n)}
+                onSetFechaDis={(d) => setFechaDiseno(e.id, d)}
+                onSetFechaPub={(d) => setFechaPub(e.id, d)}
+                onSetSubEstado={(s) => setSubEstado(e.id, s)}
+                onTogglePortada={(v) => setPortada(e.id, v)}
+                onToggleDisenado={(v) => setDisenado(e.id, v)}
+                onToggleHoy={() => toggleDisenarHoy(e.id, e.fechaMarcadaParaDisenar === hoy)}
+              />
+            ))}
+            {visible.length === 0 && (
+              <tr><td colSpan={10} style={{ padding: '60px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
+                  {filters.soloHoy ? 'Aún no marcaste tareas para hoy' : 'Sin tareas con esos filtros'}
+                </div>
+                <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
+                  {filters.soloHoy
+                    ? 'Tocá "＋ Hoy" en alguna fila para agregarla'
+                    : entries.length === 0
+                      ? 'No hay publicaciones con fecha_diseno en este rango. Sincroniza Notion desde /publicaciones.'
+                      : 'Probá limpiar los filtros'}
+                </div>
+              </td></tr>
+            )}
           </tbody>
         </table>
       </div>
+
+      {/* Estilos para que los selects nativos abiertos respeten el tema */}
+      <style jsx global>{`
+        .mk-diseno-row[data-marcada="true"] { background: rgba(167, 139, 250, 0.06); }
+      `}</style>
     </div>
   )
 }
 
 /* ============================================================
-   Sub-componentes
+   Dashboard de métricas — cards clickeables
    ============================================================ */
 
-function MetricCard({ icon, label, value, subtitle, color }: {
-  icon: React.ReactNode
-  label: string
-  value: React.ReactNode
-  subtitle: string
-  color: string
+function DashboardMetricas({
+  disenados, total, porDisenar, conPortada, sinPortada, urgentes,
+  vistaActiva, onToggleVista,
+}: {
+  disenados: number; total: number; porDisenar: number
+  conPortada: number; sinPortada: number; urgentes: number
+  vistaActiva: VistaRapida
+  onToggleVista: (v: VistaRapida) => void
 }) {
+  const pct = total > 0 ? Math.round((disenados / total) * 100) : 0
   return (
-    <div className="bg-card rounded-xl ring-1 ring-border p-3 flex items-start gap-3">
-      <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-        style={{ backgroundColor: `${color}1f`, color }}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</div>
-        <div className="text-xl font-semibold text-foreground leading-tight">{value}</div>
-        <div className="text-[10px] text-muted-foreground/70">{subtitle}</div>
-      </div>
+    <div style={{
+      padding: '14px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
+      display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap',
+      background: 'rgba(255, 255, 255, 0.01)',
+    }}>
+      <MetricaCircle
+        pct={pct}
+        valor={disenados}
+        total={total}
+        label="Diseñados del rango"
+        sublabel={`${pct}% del rango`}
+        active={vistaActiva === 'disenados'}
+        onClick={() => onToggleVista('disenados')}
+      />
+
+      <MetricaCard
+        valor={porDisenar}
+        label="Por diseñar"
+        color="#a78bfa"
+        icon={<IconPaint />}
+        active={vistaActiva === 'porDisenar'}
+        onClick={() => onToggleVista('porDisenar')}
+      />
+      <MetricaCard
+        valor={conPortada}
+        label="Con portada lista"
+        color="#34d399"
+        icon={<IconImageCheck />}
+        active={vistaActiva === 'conPortada'}
+        onClick={() => onToggleVista('conPortada')}
+      />
+      <MetricaCard
+        valor={sinPortada}
+        label="Sin portada"
+        color="#f2c94c"
+        icon={<IconImageEmpty />}
+        active={vistaActiva === 'sinPortada'}
+        onClick={() => onToggleVista('sinPortada')}
+      />
+      <MetricaCard
+        valor={urgentes}
+        label="Fechas urgentes"
+        color={urgentes > 0 ? '#fb7185' : '#737373'}
+        icon={<IconWarn />}
+        highlight={urgentes > 0}
+        hint={urgentes > 0 ? '≤1 día margen vs publicación' : 'Sin alertas'}
+        active={vistaActiva === 'urgentes'}
+        onClick={() => onToggleVista('urgentes')}
+      />
     </div>
   )
 }
 
-function FilterSelect({ label, value, onChange, options }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
+function MetricaCircle({
+  pct, valor, total, label, sublabel, active, onClick,
+}: {
+  pct: number; valor: number; total: number; label: string; sublabel: string
+  active?: boolean; onClick?: () => void
 }) {
+  const R = 22
+  const C = 2 * Math.PI * R
+  const offset = C - (C * Math.min(100, Math.max(0, pct))) / 100
   return (
-    <label className="flex items-center gap-1.5 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="appearance-none pl-2.5 pr-7 py-1.5 text-xs bg-muted/40 border border-border/40 rounded-md hover:bg-muted/60 focus:outline-none focus:ring-2 focus:ring-[#a78bfa]/30"
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...metricaCardStyle,
+        cursor: onClick ? 'pointer' : 'default',
+        border: active ? '1px solid #a78bfa' : '1px solid var(--mk-border-subtle)',
+        background: active ? 'rgba(167, 139, 250, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+        textAlign: 'left',
+        fontFamily: 'inherit',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+      }}
+      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)' }}
+      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)' }}
+    >
+      <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
+        <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="28" cy="28" r={R} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="4" />
+          <circle cx="28" cy="28" r={R} fill="none" stroke="#a78bfa" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 600ms ease-out' }} />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'var(--mk-text-primary)' }}>
+          {pct}%
+        </div>
       </div>
-    </label>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+          {valor} <span style={{ color: 'var(--mk-text-quaternary)', fontWeight: 400, fontSize: 14 }}>/ {total}</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{sublabel}</div>
+      </div>
+    </button>
   )
 }
 
-function TH({ children, onClick, sort, field }: {
-  children: React.ReactNode
-  onClick: () => void
-  sort: { field: SortField; dir: SortDir } | null
-  field: SortField
+function MetricaCard({
+  valor, label, color, icon, highlight, hint, active, onClick,
+}: {
+  valor: number; label: string; color: string; icon: React.ReactNode
+  highlight?: boolean; hint?: string
+  active?: boolean; onClick?: () => void
 }) {
-  const active = sort?.field === field
+  const borderColor = active ? color : highlight ? color : 'var(--mk-border-subtle)'
+  const bgColor = active ? `${color}1f` : highlight ? `${color}10` : 'rgba(255, 255, 255, 0.02)'
+  const bgHover = `${color}14`
   return (
-    <th
-      className="text-left px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors"
+    <button
+      type="button"
       onClick={onClick}
+      title={hint}
+      style={{
+        ...metricaCardStyle,
+        cursor: onClick ? 'pointer' : 'default',
+        border: `1px solid ${borderColor}`,
+        background: bgColor,
+        textAlign: 'left',
+        fontFamily: 'inherit',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+        boxShadow: active ? `0 0 0 1px ${color}40, 0 0 16px ${color}20` : 'none',
+      }}
+      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.background = bgHover }}
+      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.background = bgColor }}
     >
-      <span className="inline-flex items-center gap-1">
-        {children}
-        {active && (sort.dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-      </span>
-    </th>
+      <div style={{
+        width: 36, height: 36, borderRadius: 8,
+        background: `${color}1a`, color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        {icon}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{valor}</div>
+        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)', marginTop: 2 }}>{label}</div>
+        {hint && <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', marginTop: 1 }}>{hint}</div>}
+      </div>
+    </button>
+  )
+}
+
+/* ============================================================
+   Row — todas las celdas editables
+   ============================================================ */
+
+function Row({
+  entry, marcaInfo, disenadorInfo, disenadores, hoy,
+  onOpenDetail, onSetDisenador, onSetNombre, onSetFechaDis, onSetFechaPub,
+  onSetSubEstado, onTogglePortada, onToggleDisenado, onToggleHoy,
+}: {
+  entry: DisenoEntry
+  marcaInfo: MarcaOption | null
+  disenadorInfo: DisenadorOption | null
+  disenadores: DisenadorOption[]
+  hoy: string
+  onOpenDetail: () => void
+  onSetDisenador: (id: string | null) => void
+  onSetNombre: (n: string) => void
+  onSetFechaDis: (d: string) => void
+  onSetFechaPub: (d: string) => void
+  onSetSubEstado: (s: SubEstadoDiseno) => void
+  onTogglePortada: (v: boolean) => void
+  onToggleDisenado: (v: boolean) => void
+  onToggleHoy: () => void
+}) {
+  const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaPublicacion)
+  const estaMarcadaHoy = entry.fechaMarcadaParaDisenar === hoy
+
+  return (
+    <tr
+      className="mk-diseno-row"
+      data-marcada={estaMarcadaHoy}
+      style={{
+        height: 'var(--mk-row-height)',
+        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+        cursor: 'pointer',
+        background: estaMarcadaHoy ? 'rgba(167, 139, 250, 0.06)' : 'transparent',
+      }}
+      onClick={onOpenDetail}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = estaMarcadaHoy ? 'rgba(167, 139, 250, 0.06)' : 'transparent' }}
+    >
+      <Td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="mk-dot" style={{ background: marcaInfo?.color, boxShadow: marcaInfo?.color ? `0 0 6px ${marcaInfo.color}` : undefined, width: 8, height: 8 }} />
+          <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {marcaInfo?.nombre ?? entry.marcaSlug}
+          </span>
+        </div>
+      </Td>
+
+      <Td>
+        <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
+      </Td>
+
+      <Td>
+        <EditableDisenador
+          current={disenadorInfo}
+          fallbackName={entry.disenadorNombre}
+          disenadores={disenadores}
+          onChange={onSetDisenador}
+        />
+      </Td>
+
+      <Td>
+        <InlineDate
+          value={entry.fechaDiseno}
+          onChange={onSetFechaDis}
+          colorOverride={ALERTA_COLOR[alerta].fg}
+          bgOverride={ALERTA_COLOR[alerta].bg}
+          alertaLabel={ALERTA_COLOR[alerta].label}
+        />
+      </Td>
+
+      <Td>
+        {entry.fechaPublicacion ? (
+          <InlineDate value={entry.fechaPublicacion} onChange={onSetFechaPub} />
+        ) : (
+          <span style={{ color: 'var(--mk-text-quaternary)', fontSize: 11, fontStyle: 'italic' }}>—</span>
+        )}
+      </Td>
+
+      <Td>
+        <EditableSubEstado current={entry.subEstado} onChange={onSetSubEstado} />
+      </Td>
+
+      <Td align="center">
+        <Checkbox
+          checked={entry.portadaLista}
+          color="#34d399"
+          onChange={(v) => onTogglePortada(v)}
+          title={entry.portadaLista ? 'Quitar portada lista' : 'Marcar portada lista'}
+        />
+      </Td>
+
+      <Td align="center">
+        <Checkbox
+          checked={entry.disenado}
+          color="#a78bfa"
+          onChange={(v) => onToggleDisenado(v)}
+          title={entry.disenado ? 'Marcar como NO diseñado' : 'Marcar como diseñado'}
+        />
+      </Td>
+
+      <Td>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleHoy() }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px',
+            background: estaMarcadaHoy ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.04)',
+            color: estaMarcadaHoy ? 'white' : 'var(--mk-text-secondary)',
+            border: 'none', borderRadius: 'var(--mk-radius-md)',
+            fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+            boxShadow: estaMarcadaHoy ? '0 0 0 1px rgba(113, 112, 255, 0.30), 0 0 12px rgba(113, 112, 255, 0.30)' : 'none',
+          }}
+          title={estaMarcadaHoy ? 'Quitar de "Mi trabajo para hoy"' : 'Marcar para diseñar hoy'}
+        >
+          {estaMarcadaHoy ? '✓ Hoy' : '＋ Hoy'}
+        </button>
+      </Td>
+
+      <Td align="right">
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenDetail() }}
+          style={openBtnStyle}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--mk-text-primary)'; e.currentTarget.style.background = 'var(--mk-bg-active)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--mk-text-tertiary)'; e.currentTarget.style.background = 'transparent' }}
+        >
+          <IconArrowOpen />
+        </button>
+      </Td>
+    </tr>
+  )
+}
+
+/* ============================================================
+   Cells y primitives
+   ============================================================ */
+
+function Checkbox({ checked, color, onChange, title }: {
+  checked: boolean; color: string; onChange: (v: boolean) => void; title: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onChange(!checked) }}
+      title={title}
+      style={{
+        width: 18, height: 18, borderRadius: 4,
+        background: checked ? color : 'rgba(255, 255, 255, 0.04)',
+        border: `1px solid ${checked ? color : 'var(--mk-border-subtle)'}`,
+        color: 'white',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+      }}
+    >
+      {checked && (
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
   )
 }
 
 function InlineText({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false)
-  const [v, setV] = useState(value)
+  const [draft, setDraft] = useState(value)
+  function start(e: React.MouseEvent) { e.stopPropagation(); setDraft(value); setEditing(true) }
+  function commit() { setEditing(false); if (draft !== value) onSave(draft) }
+  function cancel() { setEditing(false); setDraft(value) }
   if (editing) {
     return (
       <input
-        type="text"
-        autoFocus
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onBlur={() => { if (v !== value) onSave(v); setEditing(false) }}
+        autoFocus value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-          if (e.key === 'Escape') { setV(value); setEditing(false) }
+          if (e.key === 'Enter') { e.preventDefault(); commit() }
+          if (e.key === 'Escape') { e.preventDefault(); cancel() }
         }}
-        className="w-full px-1.5 py-0.5 text-sm bg-background border border-[#a78bfa]/40 rounded focus:outline-none focus:ring-2 focus:ring-[#a78bfa]/30"
+        style={{
+          width: '100%', padding: '4px 6px', margin: '-4px -6px',
+          background: 'var(--mk-bg-base)',
+          border: '1px solid var(--mk-accent)', borderRadius: 4,
+          color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)',
+        }}
       />
     )
   }
   return (
-    <button
-      onClick={() => setEditing(true)}
-      className="w-full text-left text-sm text-foreground hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors"
+    <span onClick={start}
+      style={{
+        color: 'var(--mk-text-primary)', cursor: 'text',
+        padding: '2px 4px', margin: '-2px -4px', borderRadius: 3,
+        display: 'inline-block', maxWidth: '100%',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}
+      title="Click para editar"
     >
-      {value || <span className="text-muted-foreground italic">Sin nombre</span>}
-    </button>
+      {value}
+    </span>
   )
 }
 
-function InlineSelect({ value, onChange, options, chipColor, chipBg }: {
+function InlineDate({
+  value, onChange, colorOverride, bgOverride, alertaLabel,
+}: {
   value: string
   onChange: (v: string) => void
-  options: { value: string; label: string }[]
-  chipColor?: string
-  chipBg?: string
+  colorOverride?: string
+  bgOverride?: string
+  alertaLabel?: string
 }) {
-  const current = options.find((o) => o.value === value) ?? options[0]
+  const [editing, setEditing] = useState(false)
+  function start(e: React.MouseEvent) { e.stopPropagation(); setEditing(true) }
+  function commit(newVal: string) { setEditing(false); if (newVal && newVal !== value) onChange(newVal) }
+  if (editing) {
+    return (
+      <input
+        autoFocus type="date" defaultValue={value}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit((e.target as HTMLInputElement).value) }
+          if (e.key === 'Escape') { e.preventDefault(); setEditing(false) }
+        }}
+        style={{
+          padding: '4px 6px', margin: '-4px -6px',
+          background: 'var(--mk-bg-base)',
+          border: '1px solid var(--mk-accent)', borderRadius: 4,
+          color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+          outline: 'none', boxShadow: '0 0 0 3px var(--mk-accent-glow)', colorScheme: 'dark',
+        }}
+      />
+    )
+  }
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="appearance-none pl-2 pr-6 py-0.5 text-[12px] rounded bg-muted/40 border border-transparent hover:border-border/60 focus:outline-none focus:ring-2 focus:ring-[#a78bfa]/30"
-        style={chipColor && chipBg ? { color: chipColor, backgroundColor: chipBg } : chipColor ? { color: chipColor } : undefined}
+    <span onClick={start}
+      style={{
+        color: colorOverride ?? 'var(--mk-text-secondary)',
+        background: bgOverride,
+        fontVariantNumeric: 'tabular-nums', cursor: 'text',
+        padding: bgOverride ? '3px 8px' : '2px 4px',
+        margin: bgOverride ? 0 : '-2px -4px',
+        borderRadius: bgOverride ? 'var(--mk-radius-sm)' : 3,
+        fontWeight: bgOverride ? 500 : 400,
+      }}
+      title={alertaLabel ? `Fecha diseño · ${alertaLabel}` : 'Click para cambiar fecha'}
+    >
+      {formatDateES(value)}
+    </span>
+  )
+}
+
+function EditableSubEstado({ current, onChange }: { current: SubEstadoDiseno; onChange: (e: SubEstadoDiseno) => void }) {
+  const [open, setOpen] = useState(false)
+  const cfg = SUBESTADO_CONFIG[current]
+  return (
+    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '2px 8px',
+          background: cfg.bg, color: cfg.color,
+          fontSize: 10.5, fontWeight: 500,
+          borderRadius: 'var(--mk-radius-sm)',
+          textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)',
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        }}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value} style={{ color: 'var(--foreground)', backgroundColor: 'var(--background)' }}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-50" />
-      {/* Tooltip-like span para mostrar el label en pantalla pequeña */}
-      <span className="sr-only">{current.label}</span>
+        <span className="mk-dot" style={{ background: cfg.color, width: 5, height: 5 }} />
+        {cfg.label}
+      </button>
+      {open && (
+        <Popover onClose={() => setOpen(false)}>
+          {(Object.entries(SUBESTADO_CONFIG) as [SubEstadoDiseno, typeof SUBESTADO_CONFIG.sin_empezar][]).map(([k, v]) => (
+            <PopoverItem
+              key={k}
+              onClick={() => { onChange(k); setOpen(false) }}
+              selected={k === current}
+            >
+              <span className="mk-dot" style={{ background: v.color, width: 8, height: 8 }} />
+              <span>{v.label}</span>
+            </PopoverItem>
+          ))}
+        </Popover>
+      )}
+    </div>
+  )
+}
+
+function EditableDisenador({
+  current, fallbackName, disenadores, onChange,
+}: {
+  current: DisenadorOption | null
+  fallbackName: string | null
+  disenadores: DisenadorOption[]
+  onChange: (id: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const showOrphan = !current && !!fallbackName
+  return (
+    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '2px 8px 2px 2px',
+          background: 'rgba(255, 255, 255, 0.04)',
+          borderRadius: 'var(--mk-radius-full)',
+          cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+        }}
+      >
+        {current ? (
+          <>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: current.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
+              {current.nombre.slice(0, 2).toUpperCase()}
+            </span>
+            <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-secondary)', fontWeight: 500 }}>{current.nombre}</span>
+          </>
+        ) : showOrphan ? (
+          <>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#737373', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
+              {fallbackName!.slice(0, 2).toUpperCase()}
+            </span>
+            <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontWeight: 500 }} title="Diseñador sin vincular en BD — reasignar">
+              {fallbackName}
+            </span>
+          </>
+        ) : (
+          <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-quaternary)', fontStyle: 'italic', padding: '0 8px' }}>
+            Sin asignar
+          </span>
+        )}
+      </button>
+      {open && (
+        <Popover onClose={() => setOpen(false)}>
+          <PopoverItem onClick={() => { onChange(null); setOpen(false) }} selected={!current}>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--mk-bg-hover)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2L8 8M8 2L2 8" stroke="var(--mk-text-quaternary)" strokeWidth="1.3" strokeLinecap="round" /></svg>
+            </span>
+            <span style={{ color: 'var(--mk-text-tertiary)' }}>Sin asignar</span>
+          </PopoverItem>
+          <div style={{ height: 1, background: 'var(--mk-border-subtle)', margin: '4px 0' }} />
+          {disenadores.map((d) => (
+            <PopoverItem key={d.id} onClick={() => { onChange(d.id); setOpen(false) }} selected={current?.id === d.id}>
+              <span style={{ width: 18, height: 18, borderRadius: '50%', background: d.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600 }}>
+                {d.nombre.slice(0, 2).toUpperCase()}
+              </span>
+              <span>{d.nombre}</span>
+            </PopoverItem>
+          ))}
+        </Popover>
+      )}
     </div>
   )
 }
 
 /* ============================================================
-   Sort helper
+   Popover + Th/Td + FilterPill (copia del EditorView)
+   ============================================================ */
+
+function Popover({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
+      <div
+        className="mk-anim-scale-in"
+        style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: 180,
+          background: 'var(--mk-bg-overlay)',
+          border: '1px solid var(--mk-border-default)',
+          borderRadius: 'var(--mk-radius-md)',
+          boxShadow: 'var(--mk-shadow-lg)',
+          padding: 4, zIndex: 51, maxHeight: 320, overflowY: 'auto',
+        }}
+      >
+        {children}
+      </div>
+    </>
+  )
+}
+
+function PopoverItem({ children, onClick, selected }: { children: React.ReactNode; onClick: () => void; selected?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        width: '100%', padding: '6px 10px',
+        background: selected ? 'var(--mk-bg-selected)' : 'transparent',
+        border: 'none', borderRadius: 'var(--mk-radius-sm)',
+        color: 'var(--mk-text-primary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)',
+        cursor: 'pointer', textAlign: 'left',
+        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+      }}
+      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
+      onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = 'transparent' }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Th({
+  children, width, align, sortable, field, sort, onSort,
+}: {
+  children?: React.ReactNode; width?: string; align?: 'left' | 'right' | 'center'
+  sortable?: boolean; field?: SortField
+  sort?: { field: SortField; dir: SortDir } | null
+  onSort?: (f: SortField) => void
+}) {
+  const isActive = sortable && field && sort?.field === field
+  return (
+    <th
+      onClick={sortable && field && onSort ? () => onSort(field) : undefined}
+      style={{
+        textAlign: align ?? 'left', padding: '8px 14px',
+        fontSize: 'var(--mk-text-xs)', textTransform: 'uppercase',
+        letterSpacing: 'var(--mk-tracking-caps)',
+        color: isActive ? 'var(--mk-text-primary)' : 'var(--mk-text-tertiary)',
+        fontWeight: 500,
+        borderBottom: '1px solid var(--mk-border-subtle)',
+        background: 'var(--mk-bg-base)',
+        position: 'sticky', top: 0, zIndex: 2, width,
+        cursor: sortable ? 'pointer' : 'default', userSelect: 'none',
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {children}
+        {sortable && (
+          <span style={{ opacity: isActive ? 1 : 0.3, fontSize: 8, color: isActive ? 'var(--mk-accent)' : 'inherit' }}>
+            {isActive ? (sort!.dir === 'asc' ? '↑' : '↓') : '↕'}
+          </span>
+        )}
+      </span>
+    </th>
+  )
+}
+
+function Td({ children, align }: { children: React.ReactNode; align?: 'left' | 'right' | 'center' }) {
+  return (
+    <td style={{ padding: '0 14px', textAlign: align ?? 'left', borderBottom: '1px solid var(--mk-border-subtle)', verticalAlign: 'middle' }}>
+      {children}
+    </td>
+  )
+}
+
+type FilterOption = { id: string; label: string; color?: string }
+
+function FilterPill({ label, value, dotColor, options, onSelect }: { label: string; value: string | null; dotColor: string | null; options: FilterOption[]; onSelect: (id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        className="mk-focusable"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px',
+          background: value ? 'var(--mk-accent-bg)' : 'rgba(255, 255, 255, 0.03)',
+          border: `1px solid ${value ? 'var(--mk-border-accent)' : 'var(--mk-border-subtle)'}`,
+          borderRadius: 'var(--mk-radius-md)',
+          color: value ? 'var(--mk-text-primary)' : 'var(--mk-text-secondary)',
+          fontFamily: 'inherit', fontSize: 'var(--mk-text-xs)', fontWeight: 500,
+          cursor: 'pointer', transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+        }}
+      >
+        {dotColor && <span className="mk-dot" style={{ background: dotColor, width: 6, height: 6 }} />}
+        <span style={{ opacity: 0.7 }}>{label}:</span>
+        <span>{value ?? 'Todos'}</span>
+        <span style={{ opacity: 0.4, fontSize: 8 }}>▼</span>
+      </button>
+      {open && (
+        <Popover onClose={() => setOpen(false)}>
+          {options.map((o) => (
+            <PopoverItem key={o.id} onClick={() => { onSelect(o.id); setOpen(false) }}>
+              {o.color && <span className="mk-dot" style={{ background: o.color, width: 8, height: 8 }} />}
+              <span>{o.label}</span>
+            </PopoverItem>
+          ))}
+        </Popover>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+   Sort + styles + icons
    ============================================================ */
 
 function sortValue(
   e: DisenoEntry,
-  field: SortField,
+  f: SortField,
   marcaBySlug: Map<string, MarcaOption>,
   disenadorById: Map<string, DisenadorOption>,
-): string {
-  switch (field) {
-    case 'marca':     return marcaBySlug.get(e.marcaSlug)?.nombre ?? ''
-    case 'nombre':    return e.nombreTarea
-    case 'disenador': return e.disenadorId ? disenadorById.get(e.disenadorId)?.nombre ?? '' : ''
+): string | number {
+  switch (f) {
+    case 'marca':       return marcaBySlug.get(e.marcaSlug)?.nombre ?? e.marcaSlug
+    case 'nombre':      return e.nombreTarea
+    case 'disenador':   return (e.disenadorId ? disenadorById.get(e.disenadorId)?.nombre : e.disenadorNombre) ?? 'zzz'
     case 'fechaDiseno': return e.fechaDiseno
-    case 'fechaPublicacion': return e.fechaPublicacion ?? ''
+    case 'estado':      return e.estado
+    case 'fechaPub':    return e.fechaPublicacion ?? 'zzz'
+    case 'subEstado':   return e.subEstado
   }
 }
+
+const headerStyle: React.CSSProperties = {
+  height: 'var(--mk-header-height)', padding: '0 20px',
+  borderBottom: '1px solid var(--mk-border-subtle)',
+  display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+}
+const filterBarStyle: React.CSSProperties = {
+  padding: '10px 20px', borderBottom: '1px solid var(--mk-border-subtle)',
+  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+  background: 'rgba(255, 255, 255, 0.01)', flexShrink: 0,
+}
+const clearBtnStyle: React.CSSProperties = {
+  padding: '4px 10px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit',
+  background: 'transparent', border: 'none',
+  color: 'var(--mk-text-tertiary)', cursor: 'pointer',
+  borderRadius: 'var(--mk-radius-sm)',
+}
+const miTrabajoBtnStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '4px 12px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit',
+  fontWeight: 500, borderRadius: 'var(--mk-radius-md)', cursor: 'pointer',
+  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+}
+const openBtnStyle: React.CSSProperties = {
+  background: 'transparent', border: 'none',
+  color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4,
+  borderRadius: 'var(--mk-radius-sm)',
+  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+  display: 'inline-flex', alignItems: 'center',
+}
+const metricaCardStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 12,
+  padding: '10px 14px',
+  background: 'rgba(255, 255, 255, 0.02)',
+  border: '1px solid var(--mk-border-subtle)',
+  borderRadius: 'var(--mk-radius-md)',
+  minWidth: 200, flex: '1 1 200px',
+}
+
+/* SVG icons inline (sin lucide) */
+function IconSearch()       { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" /><path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+function IconArrowOpen()    { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 6.5H10M10 6.5L7 3.5M10 6.5L7 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+function IconToday()        { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 1V3M8 1V3M1.5 5H10.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> }
+function IconPaint()        { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 5L8 1L13 6L9 10L4 5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M4 5L2 9C2 11 4 12 5 12C6 12 7 11 7 10C7 9 6 8 5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
+function IconImageCheck()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/><path d="M2 11L5 8L8 11L11 7L14 10" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/></svg> }
+function IconImageEmpty()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2 2"/><circle cx="5.5" cy="6.5" r="1" stroke="currentColor" strokeWidth="1.2"/></svg> }
+function IconWarn()         { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 13H2L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8 6V9M8 11V11.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
