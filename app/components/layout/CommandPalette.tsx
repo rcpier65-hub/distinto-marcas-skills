@@ -54,7 +54,7 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV }: Props) {
       category: 'marca' as const,
       icon: <span className="mk-dot" style={{ background: m.color, width: 8, height: 8, boxShadow: `0 0 4px ${m.color}` }} />,
       keywords: `${m.slug} ${m.nombre} ${m.industria}`,
-      href: `/marca/${m.slug}`,
+      href: `/grilla/${m.slug}`,
     })),
   ], [marcas])
 

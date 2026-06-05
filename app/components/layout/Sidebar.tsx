@@ -137,7 +137,9 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
           {marcas.map((m) => (
             <NavItem
               key={m.slug}
-              href={`/marca/${m.slug}`}
+              /* Clic en marca → grilla de la semana YA cargada (preview + mensaje
+                 + enviar al grupo), no la vista de aprobación vacía. */
+              href={`/grilla/${m.slug}`}
               icon={
                 <span
                   className="mk-dot"
@@ -145,7 +147,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
                 />
               }
               label={m.nombreCorto}
-              active={isActive(`/marca/${m.slug}`)}
+              active={isActive(`/grilla/${m.slug}`)}
               badge={m.pendientes > 0 ? m.pendientes : undefined}
             />
           ))}
