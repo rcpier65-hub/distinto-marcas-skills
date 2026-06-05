@@ -329,12 +329,23 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   }}
                   onDoubleClick={() => setPreviewPlatform(p.key)}
                   title={`${p.label} — click: activar/desactivar · doble-click: previsualizar`}
-                  className={`group flex items-center gap-2 h-10 px-4 rounded-full text-sm font-medium transition-all border ${
+                  className={`group flex items-center gap-2 h-10 px-4 rounded-full text-sm font-semibold transition-all border-2 ${
                     isSelected
-                      ? 'bg-foreground/5 border-foreground/15 text-foreground shadow-sm'
-                      : 'bg-background border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                  } ${isPreview && isSelected ? 'ring-2 ring-[#ba41f7]/30' : ''}`}
-                  style={isSelected ? { borderColor: `${p.brand}33` } : undefined}
+                      ? 'shadow-sm'
+                      : 'bg-background border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground font-medium'
+                  } ${isPreview && isSelected ? 'ring-2 ring-[#ba41f7]/40' : ''}`}
+                  style={
+                    isSelected
+                      ? {
+                          // Color de marca social en TODO el chip cuando está activo:
+                          // borde + fondo tintado + texto. Mucho más visible que el
+                          // 'bg-foreground/5' anterior que era casi invisible.
+                          borderColor: p.brand,
+                          backgroundColor: `${p.brand}14`, // ~8% opacity tint
+                          color: p.brand,
+                        }
+                      : undefined
+                  }
                 >
                   {/* Wrapper span para colorear el SVG via currentColor.
                       Los iconos custom (InstagramIcon, FacebookIcon, etc.)
@@ -362,10 +373,16 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   type="button"
                   onClick={() => toggleArrayItem('plataformas', p)}
                   title="Click para quitar esta plataforma"
-                  className="group flex items-center gap-2 h-10 px-4 rounded-full text-sm font-medium transition-all border bg-foreground/5 border-foreground/15 text-foreground shadow-sm"
+                  className="group flex items-center gap-2 h-10 px-4 rounded-full text-sm font-semibold transition-all border-2 shadow-sm"
+                  style={{
+                    // Accent violeta de Distinto para chips custom
+                    borderColor: '#ba41f7',
+                    backgroundColor: '#ba41f714', // ~8% opacity tint
+                    color: '#ba41f7',
+                  }}
                 >
                   <span>{p}</span>
-                  <span className="opacity-40 group-hover:opacity-100 text-xs">×</span>
+                  <span className="opacity-50 group-hover:opacity-100 text-xs">×</span>
                 </button>
               ))}
 
