@@ -120,6 +120,20 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
           open={openSections.marcas}
           onToggle={() => setOpenSections((s) => ({ ...s, marcas: !s.marcas }))}
         >
+          {/* Acceso al panel con TODAS las marcas (dashboard de tarjetas + pedir grilla) */}
+          <NavItem
+            href="/dashboard"
+            icon={
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--mk-text-tertiary)' }}>
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            }
+            label="Ver todas"
+            active={isActive('/dashboard')}
+          />
           {marcas.map((m) => (
             <NavItem
               key={m.slug}
