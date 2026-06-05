@@ -19,7 +19,7 @@ import {
   responderBatch,
   postearAprobados,
   generarBorradoresIA,
-  previewInformeWhatsapp,
+  previewInformeNewTeam,
 } from '../_actions'
 import { ComentarioRow } from './comentario-row'
 import type { ComentarioInboxRow, ComentarioCategoria } from '@/lib/types/database'
@@ -85,7 +85,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
 
   // Selección
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
-  const [enviarInforme, setEnviarInforme] = useState(true)
+  const [conInforme, setConInforme] = useState(true)  // si el responder lleva informe WhatsApp
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   // Postear aprobados directo a Metricool (sin rutina de Claude)
@@ -95,18 +95,18 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [previewing, setPreviewing] = useState(false)
   const [, startPreviewTransition] = useTransition()
 
-  function handlePreviewInforme() {
+  function handlePruebaNewTeam() {
     if (seleccionados.size === 0) {
       toast.error('Seleccioná al menos 1 comentario primero')
       return
     }
     setPreviewing(true)
     startPreviewTransition(async () => {
-      const toastId = toast.loading(`🧪 Mandando informe de prueba con ${seleccionados.size} comentarios…`)
-      const r = await previewInformeWhatsapp(Array.from(seleccionados))
+      const toastId = toast.loading(`🧪 Enviando informe de prueba a "New team" con ${seleccionados.size} comentarios…`)
+      const r = await previewInformeNewTeam(Array.from(seleccionados))
       if (r.ok) {
         toast.success(
-          `✅ Informe enviado a tu WhatsApp personal (${r.marcas_procesadas} marca${r.marcas_procesadas > 1 ? 's' : ''}). NO se posteó nada a Metricool ni a clientes.`,
+          `✅ Informe de prueba enviado al grupo "New team" (${r.marcas_procesadas} marca${r.marcas_procesadas > 1 ? 's' : ''}). NO se posteó nada a Metricool ni a clientes.`,
           { id: toastId, duration: 10000 },
         )
       } else {
@@ -224,11 +224,12 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
     })
   }
 
-  function handleResponderClick() {
+  function handleResponderClick(informe: boolean) {
     if (seleccionados.size === 0) {
       toast.warning('Seleccioná al menos un comentario')
       return
     }
+    setConInforme(informe)
     setConfirmOpen(true)
   }
 
@@ -240,7 +241,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
       await Promise.all(promesas)
 
       toast.loading(`Respondiendo ${seleccionados.size} comentarios via Metricool…`, { id: 'batch' })
-      const r = await responderBatch(Array.from(seleccionados), enviarInforme)
+      const r = await responderBatch(Array.from(seleccionados), conInforme)
       if (r.ok) {
         toast.success(
           `✅ Respondidos ${r.respondidos}` +
@@ -378,44 +379,40 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
           <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3 text-sm">
               <span className="font-semibold">{seleccionados.size} seleccionados</span>
-              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enviarInforme}
-                  onChange={(e) => setEnviarInforme(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                Enviar informe WhatsApp al grupo{' '}
-                <strong>
-                  {marcaInfo?.reporte_comentarios_grupo === 'cliente'
-                    ? `${marcaInfo?.nombre} (cliente)`
-                    : marcaInfo?.reporte_comentarios_grupo === 'ninguno'
-                    ? '(ninguno — desactivado)'
-                    : 'New team'}
-                </strong>
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
               <button
                 onClick={() => setSeleccionados(new Set())}
-                className="h-9 px-3 rounded-md border text-sm hover:bg-muted"
+                className="text-xs text-muted-foreground hover:text-foreground underline"
               >
-                Cancelar selección
+                Quitar selección
               </button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 1) Responder comentarios (postea a Metricool, sin informe) */}
               <button
-                onClick={handlePreviewInforme}
-                disabled={previewing || isResponding}
-                title="Manda el informe que SE ENVIARÍA a tu número personal de WhatsApp. NO postea a Metricool. NO toca clientes."
-                className="h-9 px-3 rounded-md border border-amber-400 bg-amber-50 text-amber-900 text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
-              >
-                {previewing ? '⏳ Enviando…' : `🧪 Probar informe a mi número`}
-              </button>
-              <button
-                onClick={handleResponderClick}
+                onClick={() => handleResponderClick(false)}
                 disabled={isResponding}
+                title="Postea las respuestas a Metricool. Sin informe de WhatsApp."
                 className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
               >
-                {isResponding ? '⏳ Enviando…' : `📤 Responder ${seleccionados.size}`}
+                {isResponding ? '⏳ Enviando…' : `📤 Responder ${seleccionados.size} comentarios`}
+              </button>
+              {/* 2) Responder + informe al grupo de WhatsApp configurado */}
+              <button
+                onClick={() => handleResponderClick(true)}
+                disabled={isResponding}
+                title="Postea las respuestas a Metricool y envía el informe al grupo de WhatsApp configurado de la marca."
+                className="h-9 px-4 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {isResponding ? '⏳ Enviando…' : `📲 Responder + informe a WhatsApp`}
+              </button>
+              {/* 3) Informe de PRUEBA al grupo interno New team (no postea nada) */}
+              <button
+                onClick={handlePruebaNewTeam}
+                disabled={previewing || isResponding}
+                title="Manda el informe que SE ENVIARÍA, pero al grupo interno 'New team'. NO postea a Metricool ni a clientes."
+                className="h-9 px-3 rounded-md border border-amber-400 bg-amber-50 text-amber-900 text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
+              >
+                {previewing ? '⏳ Enviando…' : `🧪 Informe de prueba a New team`}
               </button>
             </div>
           </div>
@@ -444,7 +441,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
                 )
               })}
             </div>
-            {enviarInforme && (
+            {conInforme && (
               <p className="text-xs text-muted-foreground">
                 📲 Después se envía informe WhatsApp al grupo{' '}
                 <strong>

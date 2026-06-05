@@ -669,6 +669,20 @@ export async function getResumenInbox(marcaSlug: string): Promise<{
  * @param comentarioIds — los IDs seleccionados en la UI
  * @param destinoOverride — chat WhatsApp donde mandar (default: número personal de Pedro)
  */
+/**
+ * Informe de PRUEBA al grupo interno "New team" (NO a clientes, NO postea a
+ * Metricool). Reusa previewInformeWhatsapp apuntando al chat de New team.
+ */
+export async function previewInformeNewTeam(
+  comentarioIds: string[],
+): Promise<
+  | { ok: true; preview_text: string; sent_to: string; marcas_procesadas: number }
+  | { ok: false; error: string }
+> {
+  const newTeam = process.env.WHATSAPP_TEST_GROUP_CHATID ?? '120363427129444398@g.us'
+  return previewInformeWhatsapp(comentarioIds, newTeam)
+}
+
 export async function previewInformeWhatsapp(
   comentarioIds: string[],
   destinoOverride?: string,
