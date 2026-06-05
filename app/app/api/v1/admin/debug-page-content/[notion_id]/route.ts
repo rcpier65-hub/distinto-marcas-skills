@@ -98,7 +98,7 @@ export async function GET(
   const { data: dbRow, error: dbErr } = await service
     .from('publicaciones')
     .select(
-      'id, nombre, copy, guion, editor_nombre, fecha_publicacion, fecha_edicion, enlace_tomas, enlace_musica, plataformas, tipo_contenido, objetivos, estado, notion_original_id, updated_at',
+      'id, nombre, copy, guion, editor_nombre, fecha_publicacion, fecha_edicion, enlace_tomas, enlace_musica, plataformas, tipo_contenido, objetivos, estado, video_con_musica_url, video_sin_musica_url, portada_cruda_url, portada_editada_url, notion_original_id, updated_at',
     )
     .eq('notion_original_id', pageId)
     .maybeSingle()
