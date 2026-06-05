@@ -144,8 +144,18 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     const finMes = `${finMesDate.getFullYear()}-${String(finMesDate.getMonth() + 1).padStart(2, '0')}-${String(finMesDate.getDate()).padStart(2, '0')}`
 
     const enMes = entries.filter((e) => e.fechaEdicion >= inicioMes && e.fechaEdicion <= finMes)
-    const ESTADOS_EDITADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
-    const editadosMes = enMes.filter((e) => ESTADOS_EDITADOS.includes(e.estado)).length
+    /* "Editados este mes" = videos con editado_at EN este mes (Lima).
+       Antes era una heurística (estado avanzado + fecha programada),
+       Pedro pidió usar el dato real desde el backfill aplicado.
+       editado_at es el timestamp del momento en que el estado pasó de
+       'editar' a un estado avanzado por primera vez. */
+    const editadosMes = entries.filter((e) => {
+      if (!e.editadoAt) return false
+      const dia = fechaLima(e.editadoAt)
+      return dia >= inicioMes && dia <= finMes
+    }).length
+    /* Objetivo del mes = lo planeado para este mes = todas las que
+       tienen fecha de edición programada en este mes. */
     const objetivoMes = enMes.length
 
     const porEditar = entries.filter((e) => e.estado === 'editar').length
