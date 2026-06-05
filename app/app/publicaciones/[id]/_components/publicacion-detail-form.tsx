@@ -708,41 +708,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           </CardContent>
         </Card>
 
-        {/* 2 CARDS EN FILA — Versión 2 (video alt) / Notas.
-            La card "Guión / Indicaciones" se removió porque Pedro la usa
-            como lo mismo que el Guión Técnico (tabla de escenas abajo).
-            El campo form.guion se preserva en BD, solo dejamos de mostrarlo. */}
-        <div className="grid lg:grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="p-3 space-y-2">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <span>🎞️</span> Versión 2 (video alt.)
-              </label>
-              <textarea
-                value={form.opcion_2}
-                onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
-                rows={5}
-                placeholder="Segunda versión del video (ej: con música vs sin música)…"
-                className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 space-y-2">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <span>📝</span> Notas internas
-              </label>
-              <textarea
-                value={form.notas}
-                onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
-                rows={5}
-                placeholder="Notas privadas del equipo…"
-                className="w-full p-2 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40"
-              />
-            </CardContent>
-          </Card>
-        </div>
-        {/* Fin del grid 2 cards */}
+        {/* Removidos por pedido de Pedro (2026-06-05):
+            "Versión 2 (video alt.)" y "Notas internas". La versión 2 se
+            superpone con el panel "Videos editados (Drive)" del header
+            del copy (que ya tiene Sin/Con música). Las notas internas
+            no se usan en el flujo. Los campos form.opcion_2 y form.notas
+            se preservan en BD por si los reactivamos. */}
         </div>
         {/* Fin columna izquierda */}
 
