@@ -336,10 +336,16 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   } ${isPreview && isSelected ? 'ring-2 ring-[#ba41f7]/30' : ''}`}
                   style={isSelected ? { borderColor: `${p.brand}33` } : undefined}
                 >
-                  <p.Icon
-                    className="w-4 h-4 transition-colors"
+                  {/* Wrapper span para colorear el SVG via currentColor.
+                      Los iconos custom (InstagramIcon, FacebookIcon, etc.)
+                      no aceptan style prop según su typing, así que el
+                      color va en el wrapper y el SVG lo hereda. */}
+                  <span
+                    className="inline-flex w-4 h-4 transition-colors"
                     style={{ color: isSelected ? p.brand : undefined }}
-                  />
+                  >
+                    <p.Icon className="w-4 h-4" />
+                  </span>
                   <span>{p.label}</span>
                 </button>
               )
