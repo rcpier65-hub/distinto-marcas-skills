@@ -6,7 +6,7 @@
 //  - ZONA INFERIOR: checklist a la izquierda bonito + resto a la derecha
 'use client'
 
-import { useState, useTransition, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -15,7 +15,7 @@ import {
   CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
   Download, Video as VideoIcon, Check, Pencil, ChevronDown,
-  Volume2, VolumeX, Maximize2, X,
+  Volume2, VolumeX, Maximize2, X, Table2, Type as TypeIcon,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -1101,6 +1101,37 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
    GuionModal — popup full-size para editar el guion
    ============================================================ */
 
+/**
+ * Parsea un guion que viene como tabla (con `|` o `\t` entre columnas)
+ * y devuelve headers + rows. Si no parece tabla → null y se muestra
+ * el texto plano.
+ *
+ * Heurística:
+ *  - Necesita al menos 2 líneas no vacías.
+ *  - Detecta separador dominante: prefiere `|` (lo más común en Notion);
+ *    cae a `\t` si pegaron desde Word o Google Docs.
+ *  - Todas las filas deben dividirse en >= 2 columnas con ese separador.
+ */
+function parseGuionAsTable(text: string): { headers: string[]; rows: string[][] } | null {
+  const raw = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (raw.length < 2) return null
+
+  const usePipe = raw[0].includes('|')
+  const useTab = !usePipe && raw[0].includes('\t')
+  if (!usePipe && !useTab) return null
+
+  const sep = usePipe ? /\s*\|\s*/ : /\t+/
+  // .filter(Boolean) elimina celdas vacías que aparecen si el texto
+  // tiene un `|` al inicio o al final ("| a | b |" → ['', 'a', 'b', '']).
+  const split = (l: string) => l.split(sep).filter((c) => c.length > 0)
+
+  const rows = raw.map(split)
+  if (!rows.every((r) => r.length >= 2)) return null
+
+  const [headers, ...body] = rows
+  return { headers, rows: body }
+}
+
 function GuionModal({
   value, onChange, onClose,
 }: {
@@ -1108,6 +1139,19 @@ function GuionModal({
   onChange: (v: string) => void
   onClose: () => void
 }) {
+  /* Modo de visualización: tabla renderizada vs textarea editable.
+     Por default arranca en 'table' si el contenido parece tabla; sino
+     en 'text' para no mostrar una tabla vacía/rara. */
+  const tableData = useMemo(() => parseGuionAsTable(value), [value])
+  const [mode, setMode] = useState<'table' | 'text'>(() => (tableData ? 'table' : 'text'))
+
+  /* Si Pedro pega contenido en modo texto y de pronto pasa a parecer
+     tabla, dejarlo decidir cuándo cambiar — no forzar el mode aquí.
+     Solo forzamos a 'text' si elige 'table' pero no hay tabla parseable. */
+  useEffect(() => {
+    if (mode === 'table' && !tableData) setMode('text')
+  }, [tableData, mode])
+
   // Cerrar con tecla Esc + bloquear scroll del body mientras está abierto.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -1124,51 +1168,130 @@ function GuionModal({
   const charCount = value.length
 
   return (
-    /* z-50 está por encima del STICKY save bar (z-30) y de los popovers
-       del toolbar (z-20). Backdrop click cierra; clicks dentro de la
-       card NO (stopPropagation). */
+    /* z-50 por encima del STICKY save bar (z-30) y popovers del
+       toolbar (z-20). Backdrop click cierra; clicks dentro NO. */
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-background rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+        /* max-w-5xl y max-h-[95vh] = look "hoja de Word" pidió Pedro.
+           Tan grande como caiga en pantalla, no centrado en un cuadrito
+           chico como antes. */
+        className="bg-background rounded-2xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b">
-          <div className="flex items-center gap-2">
-            <Film className="w-4 h-4 text-[#ba41f7]" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+        {/* HEADER con título + toggle Tabla/Texto + close */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b">
+          <div className="flex items-center gap-2 min-w-0">
+            <Film className="w-4 h-4 text-[#ba41f7] shrink-0" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
               Guion técnico
             </span>
-            <span className="text-[11px] text-muted-foreground/60">
+            <span className="text-[11px] text-muted-foreground/60 whitespace-nowrap">
               · {lineCount} {lineCount === 1 ? 'línea' : 'líneas'} · {charCount} chars
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          {/* TOGGLE Tabla / Texto — segmented control estilo iOS.
+              Si no hay tabla detectada, el botón Tabla queda disabled
+              con tooltip explicativo. */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-muted/60 p-0.5 rounded-lg text-[11px]">
+              <button
+                type="button"
+                onClick={() => tableData && setMode('table')}
+                disabled={!tableData}
+                title={tableData ? 'Ver como tabla' : 'No se detectó formato de tabla (con | o tabs)'}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-colors ${
+                  mode === 'table'
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-black/[0.04]'
+                    : 'text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground'
+                }`}
+              >
+                <Table2 className="w-3 h-3" /> Tabla
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('text')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-colors ${
+                  mode === 'text'
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-black/[0.04]'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <TypeIcon className="w-3 h-3" /> Texto
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Textarea grande */}
-        <textarea
-          autoFocus
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion, o texto plano."
-          className="flex-1 w-full px-5 py-4 text-[13px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/40 placeholder:font-sans"
-          spellCheck={false}
-        />
+        {/* BODY — tabla renderizada O textarea editable */}
+        {mode === 'table' && tableData ? (
+          <div className="flex-1 overflow-auto px-6 py-6 bg-muted/10">
+            {/* Render tipo "hoja de doc": fondo levemente diferente,
+                tabla con bordes claros, headers con fondo, padding
+                generoso. */}
+            <div className="max-w-4xl mx-auto bg-background rounded-lg ring-1 ring-border shadow-sm overflow-hidden">
+              <table className="w-full border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-muted/40">
+                    {tableData.headers.map((h, i) => (
+                      <th
+                        key={i}
+                        className="text-left font-semibold text-foreground px-4 py-3 border-b border-border align-top"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableData.rows.map((row, ri) => (
+                    <tr key={ri} className="hover:bg-muted/20 transition-colors">
+                      {tableData.headers.map((_, ci) => (
+                        <td
+                          key={ci}
+                          className="text-foreground px-4 py-3 border-b border-border/60 align-top leading-relaxed whitespace-pre-wrap break-words"
+                        >
+                          {row[ci] ?? ''}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-muted-foreground text-center mt-4">
+              Modo lectura. Para editar, cambia a <span className="font-medium">Texto</span>.
+            </p>
+          </div>
+        ) : (
+          <textarea
+            autoFocus
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion (con | o tabs entre columnas), o texto plano."
+            className="flex-1 w-full px-6 py-5 text-[13px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/40 placeholder:font-sans"
+            spellCheck={false}
+          />
+        )}
 
-        {/* Footer con hint */}
+        {/* FOOTER */}
         <div className="px-5 py-2.5 border-t bg-muted/30 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Esc para cerrar. Los cambios se guardan con el botón Guardar abajo.</span>
+          <span>
+            {mode === 'table'
+              ? 'Vista tabla detectada. Esc para cerrar.'
+              : 'Esc para cerrar. Los cambios se guardan con el botón Guardar abajo.'}
+          </span>
           <button
             type="button"
             onClick={onClose}
