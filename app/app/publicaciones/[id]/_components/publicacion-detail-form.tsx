@@ -649,11 +649,13 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
             </div>
 
             {/* TOOLBAR con popovers expandibles.
-                flex-nowrap + overflow-x-auto = los 6 iconos siempre en 1 fila;
-                si no entran en pantallas chicas, se hace scroll horizontal.
-                Pedro pidió no romper la fila en 2 (antes Tomas bajaba al wrap). */}
-            <div ref={toolbarRef} className="border-t bg-muted/20 px-2 py-2 relative">
-              <div className="flex items-end justify-start gap-1 flex-nowrap overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+                pt-4: padding extra arriba para que las badges (arriba-
+                derecha del botón) tengan espacio y no se corten cuando
+                el contenedor scrollee.
+                gap-2 + min-w-[72px]: respiración entre y dentro de cada
+                botón. Pedro pidió que los iconos no se vean apretados. */}
+            <div ref={toolbarRef} className="border-t bg-muted/20 px-3 pt-4 pb-2 relative">
+              <div className="flex items-end justify-start gap-2 flex-nowrap overflow-x-auto overflow-y-visible [scrollbar-width:thin]">
                 {/* Tipo de contenido */}
                 <ToolbarBtnPopover
                   icon={<Film className="w-5 h-5" />}
@@ -1083,7 +1085,7 @@ function ToolbarBtn({
       onClick={onClick}
       disabled={disabled}
       aria-label={title}
-      className={`flex flex-col items-center justify-center gap-1 min-w-[64px] px-2.5 py-2 rounded-md transition-colors ${
+      className={`flex flex-col items-center justify-center gap-1.5 min-w-[76px] px-3 py-2.5 rounded-lg transition-colors ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
           : active
@@ -1092,7 +1094,7 @@ function ToolbarBtn({
       }`}
     >
       <span className="leading-none">{icon}</span>
-      <span className="text-[10px] font-medium leading-none">{label}</span>
+      <span className="text-[11px] font-medium leading-none whitespace-nowrap">{label}</span>
     </button>
   )
 }
@@ -1121,17 +1123,21 @@ function ToolbarBtnPopover({
         type="button"
         onClick={onClick}
         aria-label={title}
-        className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] px-2.5 py-2 rounded-md transition-colors ${
+        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[76px] px-3 py-2.5 rounded-lg transition-colors ${
           active
             ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         }`}
       >
         <span className="leading-none">{icon}</span>
-        <span className="text-[10px] font-medium leading-none">{label}</span>
+        <span className="text-[11px] font-medium leading-none whitespace-nowrap">{label}</span>
         {badge && (
-          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-[#ba41f7] text-white text-[9px] font-bold flex items-center justify-center leading-none">
-            {badge.length > 4 ? badge.slice(0, 3) + '…' : badge}
+          /* Badge ampliado para que "REEL", "Normal", etc. quepan
+             enteros — antes truncaba a 4 chars y mostraba "Nor…".
+             Subido a -top-2 / -right-2 para asomar bien del botón;
+             el padre tiene pt-4 que da espacio para esto. */
+          <span className="absolute -top-2 -right-2 min-w-[22px] h-[18px] px-1.5 rounded-full bg-[#ba41f7] text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-sm ring-2 ring-background">
+            {badge.length > 7 ? badge.slice(0, 6) + '…' : badge}
           </span>
         )}
       </button>
