@@ -15,7 +15,7 @@ import {
   CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
   Download, Video as VideoIcon, Check, Pencil, ChevronDown,
-  Volume2, VolumeX, Maximize2,
+  Volume2, VolumeX, Maximize2, X,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -158,8 +158,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
   // 'sin' = video sin música (track limpio). Default: 'con' si hay con
   // música; si no, 'sin'.
   const [videoAudioMode, setVideoAudioMode] = useState<'con' | 'sin'>('con')
-  // Expandir el textarea del guion (modo full o compacto).
-  const [guionExpandido, setGuionExpandido] = useState(false)
+  // Modal del guion completo. Pedro pidió que "Ver guion completo"
+  // abra un popup centrado en lugar de expandir el textarea inline
+  // (que empujaba la página hacia abajo).
+  const [guionModalOpen, setGuionModalOpen] = useState(false)
   const [previewPlatform, setPreviewPlatform] = useState<string>(
     initial.plataformas?.[0] ?? 'Instagram',
   )
@@ -877,23 +879,23 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 </div>
                 <button
                   type="button"
-                  onClick={() => setGuionExpandido((v) => !v)}
+                  onClick={() => setGuionModalOpen(true)}
                   className="text-[10px] text-[#ba41f7] hover:underline flex items-center gap-1 font-medium"
-                  title={guionExpandido ? 'Compactar' : 'Ver guion completo'}
+                  title="Abrir guion completo en popup"
                 >
                   <Maximize2 className="w-3 h-3" />
-                  {guionExpandido ? 'Compactar' : 'Ver guion completo'}
+                  Ver guion completo
                 </button>
               </div>
               <textarea
                 value={form.guion ?? ''}
                 onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
                 placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion, o texto plano."
-                rows={guionExpandido ? 18 : 4}
-                /* leading-snug en lugar de relaxed: para mono a 12px,
-                   relaxed hacía ~20px/línea (mucha respiración vertical)
-                   — snug deja ~15px/línea, queda compacto como editor.
-                   pt-1 pb-3 reduce padding interno también. */
+                rows={4}
+                /* Textarea inline siempre 4 filas. La vista "completa"
+                   ahora abre en modal (ver GuionModal abajo) en lugar
+                   de expandir aquí, así no empuja el resto de la
+                   página hacia abajo. */
                 className="w-full px-4 pt-1 pb-3 text-[12px] font-mono leading-snug bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40 placeholder:font-sans transition-all"
                 spellCheck={false}
               />
@@ -1076,6 +1078,105 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         <Button onClick={handleSave} disabled={isPending} size="lg">
           {isPending ? 'Guardando…' : '💾 Guardar cambios'}
         </Button>
+      </div>
+
+      {/* MODAL GUION COMPLETO
+          Se abre con el botón "Ver guion completo" del Card del copy.
+          Patrón: backdrop + card centrada. El textarea adentro edita
+          el MISMO form.guion que el textarea inline (no hay copia de
+          estado), así cualquier cambio se persiste al cerrar y se
+          refleja en el textarea pequeño. */}
+      {guionModalOpen && (
+        <GuionModal
+          value={form.guion ?? ''}
+          onChange={(v) => setForm((s) => ({ ...s, guion: v }))}
+          onClose={() => setGuionModalOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+   GuionModal — popup full-size para editar el guion
+   ============================================================ */
+
+function GuionModal({
+  value, onChange, onClose,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onClose: () => void
+}) {
+  // Cerrar con tecla Esc + bloquear scroll del body mientras está abierto.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [onClose])
+
+  const lineCount = value ? value.split('\n').length : 0
+  const charCount = value.length
+
+  return (
+    /* z-50 está por encima del STICKY save bar (z-30) y de los popovers
+       del toolbar (z-20). Backdrop click cierra; clicks dentro de la
+       card NO (stopPropagation). */
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-background rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <Film className="w-4 h-4 text-[#ba41f7]" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              Guion técnico
+            </span>
+            <span className="text-[11px] text-muted-foreground/60">
+              · {lineCount} {lineCount === 1 ? 'línea' : 'líneas'} · {charCount} chars
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Textarea grande */}
+        <textarea
+          autoFocus
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion, o texto plano."
+          className="flex-1 w-full px-5 py-4 text-[13px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/40 placeholder:font-sans"
+          spellCheck={false}
+        />
+
+        {/* Footer con hint */}
+        <div className="px-5 py-2.5 border-t bg-muted/30 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>Esc para cerrar. Los cambios se guardan con el botón Guardar abajo.</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#ba41f7] hover:underline font-medium"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   )
