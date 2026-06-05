@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { PublicacionDetailForm } from './_components/publicacion-detail-form'
-import { GuionTextarea } from './_components/guion-textarea'
 import type { PublicacionRow, EditorRow, EscenaRow } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -79,13 +78,9 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
         editores={editores}
       />
 
-      {/* GUION TÉCNICO — textarea libre (Pedro pidió texto plano para
-          poder pegar el guion como está en Notion sin estar atado a un
-          schema fijo Diálogo/Plano/Notas). El campo guarda en publicaciones.guion.
-          La tabla escenas sigue poblándose por el sync pero la UI ya no la usa. */}
-      <div className="mt-6">
-        <GuionTextarea publicacionId={id} initialGuion={pub.guion as string | null} />
-      </div>
+      {/* GUION TÉCNICO movido adentro del PublicacionDetailForm, debajo
+          del toolbar de iconos. Pedro pidió tenerlo en línea con el copy
+          y no en una sección separada al final. */}
     </main>
   )
 }

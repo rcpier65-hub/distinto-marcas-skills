@@ -15,6 +15,7 @@ import {
   CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
   Download, Video as VideoIcon, Check, Pencil, ChevronDown,
+  Volume2, VolumeX, Maximize2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -90,6 +91,24 @@ const PLATAFORMAS = [
 const TIPO_OPTS = ['REEL', 'POST', 'CARRUSEL', 'STORY', 'REEL FRASE', 'VIDEO REEL TIKTOK', 'VIDEO']
 const OBJETIVO_OPTS = ['Normal', 'Anuncio', 'Conversión', 'Alcance', 'Engagement']
 
+/**
+ * Extrae el file ID de un link de Drive. Soporta los 3 formatos comunes:
+ *   - https://drive.google.com/file/d/{ID}/view
+ *   - https://drive.google.com/open?id={ID}
+ *   - https://drive.google.com/uc?id={ID}
+ * Si no hay match, devuelve null y el player muestra fallback.
+ */
+function extractDriveFileId(url: string | null | undefined): string | null {
+  if (!url) return null
+  // /file/d/{ID}/
+  const m1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (m1) return m1[1]
+  // ?id={ID} o &id={ID}
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+  if (m2) return m2[1]
+  return null
+}
+
 const EMOJI_PICKER = [
   '😀', '😊', '😍', '🥰', '😎', '🤩', '😂', '🤣', '😉', '😘',
   '👍', '👏', '🙌', '✨', '⭐', '🌟', '💯', '🔥', '💪', '🎉',
@@ -135,6 +154,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
   // exterior, pieza impresa, etc.).
   const [addingCustomPlat, setAddingCustomPlat] = useState(false)
   const [customPlatInput, setCustomPlatInput] = useState('')
+  // Toggle audio del preview de video: 'con' = video con música (final),
+  // 'sin' = video sin música (track limpio). Default: 'con' si hay con
+  // música; si no, 'sin'.
+  const [videoAudioMode, setVideoAudioMode] = useState<'con' | 'sin'>('con')
+  // Expandir el textarea del guion (modo full o compacto).
+  const [guionExpandido, setGuionExpandido] = useState(false)
   const [previewPlatform, setPreviewPlatform] = useState<string>(
     initial.plataformas?.[0] ?? 'Instagram',
   )
@@ -623,9 +648,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               </div>
             </div>
 
-            {/* TOOLBAR con popovers expandibles */}
+            {/* TOOLBAR con popovers expandibles.
+                flex-nowrap + overflow-x-auto = los 6 iconos siempre en 1 fila;
+                si no entran en pantallas chicas, se hace scroll horizontal.
+                Pedro pidió no romper la fila en 2 (antes Tomas bajaba al wrap). */}
             <div ref={toolbarRef} className="border-t bg-muted/20 px-2 py-2 relative">
-              <div className="flex items-end justify-start gap-1 flex-wrap">
+              <div className="flex items-end justify-start gap-1 flex-nowrap overflow-x-auto pb-0.5 [scrollbar-width:thin]">
                 {/* Tipo de contenido */}
                 <ToolbarBtnPopover
                   icon={<Film className="w-5 h-5" />}
@@ -814,6 +842,44 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                     operativo y agregan ruido al toolbar. */}
               </div>
             </div>
+
+            {/* GUION TÉCNICO inline — debajo del toolbar, dentro del Card
+                del copy. Pedro pidió tenerlo acá en vez de en una card
+                separada al final. Textarea libre que acepta cualquier
+                contenido pegado (incluido tablas de Word con tabs y
+                newlines preservados). Auto-save al onBlur del form. */}
+            <div className="border-t bg-background">
+              <div className="px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Film className="w-3.5 h-3.5 text-[#ba41f7]" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                    Guion técnico
+                  </span>
+                  {form.guion && (
+                    <span className="text-[10px] text-muted-foreground/60">
+                      · {form.guion.split('\n').length} líneas
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setGuionExpandido((v) => !v)}
+                  className="text-[10px] text-[#ba41f7] hover:underline flex items-center gap-1 font-medium"
+                  title={guionExpandido ? 'Compactar' : 'Ver guion completo'}
+                >
+                  <Maximize2 className="w-3 h-3" />
+                  {guionExpandido ? 'Compactar' : 'Ver guion completo'}
+                </button>
+              </div>
+              <textarea
+                value={form.guion ?? ''}
+                onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
+                placeholder={`Pegá el guion completo aquí…\n\nFunciona con tablas de Word, Notion (tabs entre columnas), o texto plano.\n\nEjemplo:\nVoz en off\tToma / visual\n"Yo soy Joe…"\tJoe saludando a cámara`}
+                rows={guionExpandido ? 22 : 5}
+                className="w-full px-4 pb-4 pt-0 text-[12px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40 placeholder:font-sans transition-all"
+                spellCheck={false}
+              />
+            </div>
             </div>{/* Fin contenido del Card del copy (sidebar workflow al lado) */}
           </div>{/* Fin flex wrapper Card del copy */}
         </Card>
@@ -869,35 +935,88 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   {previewMode === 'empty' && '➖'}
                 </Badge>
               </div>
-              {/* Aspect ratio del preview: antes era 9:16 (vertical pleno
-                  estilo TikTok/Reel), pero quedaba MUY largo y dejaba huecos
-                  blancos al costado de Propiedades. Cambio a 4:5 (Instagram
-                  feed retrato) que es más compacto y se alinea bien con el
-                  alto del Card del copy + propiedades. */}
-              <div className="aspect-[4/5] bg-black flex items-center justify-center relative">
-                {previewMode === 'editada' || previewMode === 'cruda' ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewMode === 'editada' ? form.portada_editada_url : form.portada_cruda_url}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                ) : previewMode === 'drive' && driveFolderId ? (
-                  <iframe
-                    src={`https://drive.google.com/embeddedfolderview?id=${driveFolderId}#grid`}
-                    className="w-full h-full bg-white"
-                    title="Carpeta de tomas en Drive"
-                  />
-                ) : (
-                  <div className="text-white/60 text-sm text-center px-4">
-                    Imagen/vídeo no disponible
-                    <div className="text-[10px] mt-1 text-white/40">
-                      Pegá URL en 🖼️ Portada o 📎 Tomas
-                    </div>
+              {/* Aspect 9:16 (vertical TikTok/Reel 1920×1080 → invertido).
+                  Si hay video URL: render iframe de Drive con toggle
+                  audio (con música / sin música). Si no, fallback a la
+                  portada (editada > cruda > carpeta tomas > placeholder). */}
+              {(() => {
+                const conMusicaId = extractDriveFileId(form.video_con_musica_url)
+                const sinMusicaId = extractDriveFileId(form.video_sin_musica_url)
+                const hayVideo = !!(conMusicaId || sinMusicaId)
+                // Default audio mode: si solo hay sin música, mostrar esa
+                const effectiveMode: 'con' | 'sin' =
+                  videoAudioMode === 'con' && !conMusicaId ? 'sin'
+                  : videoAudioMode === 'sin' && !sinMusicaId ? 'con'
+                  : videoAudioMode
+                const activeId = effectiveMode === 'con' ? conMusicaId : sinMusicaId
+
+                return (
+                  <div className="aspect-[9/16] bg-black flex items-center justify-center relative">
+                    {hayVideo && activeId ? (
+                      <>
+                        <iframe
+                          key={activeId} // forzar reload al cambiar audio mode
+                          src={`https://drive.google.com/file/d/${activeId}/preview`}
+                          className="w-full h-full"
+                          allow="autoplay"
+                          allowFullScreen
+                          title={effectiveMode === 'con' ? 'Video con música' : 'Video sin música'}
+                        />
+                        {/* Toggle audio overlay — solo si HAY ambos URLs */}
+                        {conMusicaId && sinMusicaId && (
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 p-1 rounded-full bg-black/70 backdrop-blur-sm">
+                            <button
+                              type="button"
+                              onClick={() => setVideoAudioMode('sin')}
+                              title="Sin música (track limpio)"
+                              className={`flex items-center justify-center w-9 h-9 rounded-full transition-all ${
+                                effectiveMode === 'sin'
+                                  ? 'bg-white text-black shadow-md'
+                                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              <VolumeX className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setVideoAudioMode('con')}
+                              title="Con música (video final)"
+                              className={`flex items-center justify-center w-9 h-9 rounded-full transition-all ${
+                                effectiveMode === 'con'
+                                  ? 'bg-[#ba41f7] text-white shadow-md'
+                                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              <Volume2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : previewMode === 'editada' || previewMode === 'cruda' ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previewMode === 'editada' ? form.portada_editada_url : form.portada_cruda_url}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    ) : previewMode === 'drive' && driveFolderId ? (
+                      <iframe
+                        src={`https://drive.google.com/embeddedfolderview?id=${driveFolderId}#grid`}
+                        className="w-full h-full bg-white"
+                        title="Carpeta de tomas en Drive"
+                      />
+                    ) : (
+                      <div className="text-white/60 text-sm text-center px-4">
+                        Sin video ni portada
+                        <div className="text-[10px] mt-1 text-white/40">
+                          Pegá URL en Videos, Portada o Tomas
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                )
+              })()}
               {form.copy && (
                 <div className="p-3 text-xs whitespace-pre-wrap line-clamp-6">
                   <span className="font-semibold">{brandHandle}</span> {form.copy}
