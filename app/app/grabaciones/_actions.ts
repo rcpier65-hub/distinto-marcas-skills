@@ -17,6 +17,7 @@ export type GrabacionWithMarca = {
   estado: GrabacionEstado
   videos_grabados: number | null
   notas: string | null
+  google_event_id: string | null   // ID del evento en Google Calendar (sync)
   created_at: string
   updated_at: string
 }
@@ -33,6 +34,7 @@ export type MarcaKPI = {
   canceladas: number    // count estado='cancelada' en el rango
   total: number         // planeadas + cumplidas + canceladas
   cumplimiento_pct: number  // cumplidas / objetivo (0-100+)
+  grabaciones: GrabacionWithMarca[]   // fechas de esta marca en el rango, ordenadas
 }
 
 /**
@@ -56,7 +58,7 @@ export async function listGrabaciones(
 
   const { data, error } = await service
     .from('grabaciones')
-    .select('id, marca_id, fecha_planeada, fecha_real, estado, videos_grabados, notas, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
+    .select('id, marca_id, fecha_planeada, fecha_real, estado, videos_grabados, notas, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
     .gte('fecha_planeada', d)
     .lte('fecha_planeada', h)
     .order('fecha_planeada', { ascending: false })
@@ -81,6 +83,7 @@ export async function listGrabaciones(
     estado: r.estado as GrabacionEstado,
     videos_grabados: r.videos_grabados,
     notas: r.notas,
+    google_event_id: r.google_event_id ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   }))
@@ -135,7 +138,10 @@ export async function getGrabacionesKPIs(
 
   // Agregar por marca
   const kpis: MarcaKPI[] = marcas.map((m) => {
-    const enMarca = rows.filter((r) => r.marca_id === m.id)
+    // Grabaciones de esta marca, ordenadas por fecha ascendente (próximas primero)
+    const enMarca = rows
+      .filter((r) => r.marca_id === m.id)
+      .sort((a, b) => a.fecha_planeada.localeCompare(b.fecha_planeada))
     const planeadas = enMarca.filter((r) => r.estado === 'planeada').length
     const cumplidas = enMarca.filter((r) => r.estado === 'cumplida').length
     const canceladas = enMarca.filter((r) => r.estado === 'cancelada').length
@@ -155,6 +161,7 @@ export async function getGrabacionesKPIs(
       canceladas,
       total,
       cumplimiento_pct,
+      grabaciones: enMarca,
     }
   })
 
@@ -239,6 +246,29 @@ export async function deleteGrabacion(id: string): Promise<{ ok: true } | { ok: 
   const service = createServiceClient() as any
 
   const { error } = await service.from('grabaciones').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/grabaciones')
+  return { ok: true }
+}
+
+/**
+ * Cambiar la fecha planeada de una grabación existente.
+ * Usado por el editor inline de fechas en cada card de marca.
+ */
+export async function updateGrabacionFecha(
+  id: string,
+  fecha_planeada: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  if (!fecha_planeada) return { ok: false, error: 'Fecha requerida' }
+
+  const { error } = await service
+    .from('grabaciones')
+    .update({ fecha_planeada })
+    .eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/grabaciones')
   return { ok: true }

@@ -3,14 +3,15 @@
 // Server component que orquesta: marcas, KPIs y lista de grabaciones del mes.
 
 import Link from 'next/link'
+import { Clapperboard, List, CalendarRange } from 'lucide-react'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { listGrabaciones, getGrabacionesKPIs } from './_actions'
 import { Card, CardContent } from '@/components/ui/card'
 import { GrabacionRow } from './_components/grabacion-row'
 import { NuevaGrabacionForm } from './_components/nueva-grabacion-form'
-import { ObjetivoInput } from './_components/objetivo-input'
 import { MesSelector } from './_components/mes-selector'
+import { MarcaGrabacionCard } from './_components/marca-grabacion-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,15 +51,24 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
   const totalCanceladas = kpis.reduce((s, k) => s + k.canceladas, 0)
   const cumplimientoGlobal = totalObjetivo > 0 ? Math.round((totalCumplidas / totalObjetivo) * 100) : 0
 
+  // Mes activo en formato YYYY-MM (para defaultear nuevas fechas en las cards).
+  // Deriva de `desde` o del mes actual.
+  const mesDefault = (desde ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
+
   return (
     <main className="container mx-auto p-6 max-w-7xl space-y-6">
       {/* HEADER */}
       <header className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">🎬 Control de grabaciones</h1>
-          <p className="text-sm text-muted-foreground">
-            Seguimiento mensual de sesiones de grabación por marca. Definí el objetivo, marcá cumplidas vs canceladas.
-          </p>
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-xl bg-[#ba41f7]/10 flex items-center justify-center shrink-0">
+            <Clapperboard className="w-6 h-6 text-[#ba41f7]" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold mb-1 tracking-tight">Control de grabaciones</h1>
+            <p className="text-sm text-muted-foreground">
+              Seguimiento mensual de sesiones de grabación por marca. Planificá fechas, marcá cumplidas y sincronizá con tu calendario.
+            </p>
+          </div>
         </div>
         <MesSelector />
       </header>
@@ -67,15 +77,15 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
       <nav className="flex items-center gap-1 border-b border-border">
         <Link
           href="/grabaciones"
-          className="px-3 py-2 text-sm font-medium border-b-2 border-primary text-foreground"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 border-[#ba41f7] text-foreground"
         >
-          📋 Lista
+          <List className="w-4 h-4" /> Lista
         </Link>
         <Link
           href="/grabaciones/calendario"
-          className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
         >
-          📅 Calendario
+          <CalendarRange className="w-4 h-4" /> Calendario
         </Link>
       </nav>
 
@@ -124,58 +134,13 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
         </CardContent>
       </Card>
 
-      {/* KPIs POR MARCA */}
+      {/* KPIs POR MARCA — cada card muestra sus fechas + botón agregar */}
       <section>
         <h2 className="text-lg font-semibold mb-3">Por marca</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {kpis.map((k) => {
-            const pct = k.cumplimiento_pct
-            const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : pct > 0 ? 'bg-rose-400' : 'bg-muted'
-            return (
-              <Card key={k.marca_id} className="hover:shadow-md transition-shadow">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-2xl shrink-0">{k.marca_emoji ?? '📊'}</span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate">{k.marca_nombre}</p>
-                        <code className="text-[10px] text-muted-foreground font-mono">{k.marca_slug}</code>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Objetivo</p>
-                      <ObjetivoInput slug={k.marca_slug} initial={k.objetivo} />
-                    </div>
-                  </div>
-
-                  {/* Barra de cumplimiento */}
-                  <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
-                    <div
-                      className={`h-full ${barColor} transition-all`}
-                      style={{ width: `${Math.min(100, pct)}%` }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono">
-                      <strong className="text-emerald-600">{k.cumplidas}</strong>
-                      {' / '}
-                      <span className="text-muted-foreground">{k.objetivo}</span>
-                    </span>
-                    <span className={`font-semibold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                      {pct}%
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
-                    <span>🕒 {k.planeadas}</span>
-                    <span>·</span>
-                    <span>❌ {k.canceladas}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+          {kpis.map((k) => (
+            <MarcaGrabacionCard key={k.marca_id} kpi={k} mesDefault={mesDefault} />
+          ))}
           {kpis.length === 0 && !error && (
             <p className="text-sm text-muted-foreground col-span-3 italic">Sin marcas activas.</p>
           )}
