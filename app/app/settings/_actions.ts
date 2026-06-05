@@ -250,11 +250,12 @@ export async function getIntegracionesConfig(): Promise<{
 // ============================================================
 
 /**
- * Crea la columna integraciones.openai_api_key si no existe, con una conexión
- * pg directa usando SUPABASE_DB_URL (válida en el runtime de Vercel). Self-
- * healing: evita tener que aplicar la migración a mano.
+ * Escribe (o borra) la key DIRECTO por pg: crea la columna si falta, hace el
+ * UPDATE, y manda NOTIFY a PostgREST para que recargue su cache de schema (si
+ * no, PostgREST sigue sin "ver" la columna nueva). Usa SUPABASE_DB_URL, que es
+ * válida en el runtime de Vercel.
  */
-async function ensureOpenAIColumn(): Promise<void> {
+async function writeOpenAIKeyViaPg(value: string | null, userId: string): Promise<void> {
   const dbUrl = process.env.SUPABASE_DB_URL || process.env.SUPABASE_DB_URL_DIRECT
   if (!dbUrl) throw new Error('SUPABASE_DB_URL no disponible en el runtime')
   const { Client } = await import('pg')
@@ -270,14 +271,22 @@ async function ensureOpenAIColumn(): Promise<void> {
   await client.connect()
   try {
     await client.query('ALTER TABLE integraciones ADD COLUMN IF NOT EXISTS openai_api_key text')
+    await client.query(
+      'UPDATE integraciones SET openai_api_key = $1, updated_by_user_id = $2 WHERE id = 1',
+      [value, userId],
+    )
+    // Avisar a PostgREST que recargue su schema cache para que las próximas
+    // lecturas (vía el service client) "vean" la columna openai_api_key.
+    await client.query("NOTIFY pgrst, 'reload schema'")
   } finally {
     await client.end()
   }
 }
 
 /**
- * Guarda (o borra) la API key de OpenAI en integraciones. Si la columna no
- * existe todavía, la crea al vuelo y reintenta. La key NUNCA vuelve al cliente.
+ * Guarda (o borra) la API key de OpenAI en integraciones. Intenta vía PostgREST;
+ * si la columna no existe o su cache de schema está viejo, escribe DIRECTO por
+ * pg (crea columna + UPDATE + NOTIFY reload). La key NUNCA vuelve al cliente.
  *
  * @param key  la key (sk-...). Vacío = borrar la key guardada.
  */
@@ -293,18 +302,24 @@ export async function updateOpenAIKey(
     return { ok: false, error: 'La key de OpenAI debe empezar con "sk-". Revisa que la copiaste completa.' }
   }
 
-  const doUpdate = () =>
-    service.from('integraciones').update({ openai_api_key: value, updated_by_user_id: user.id }).eq('id', 1)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await service
+    .from('integraciones')
+    .update({ openai_api_key: value, updated_by_user_id: user.id })
+    .eq('id', 1)
 
-  let { error } = await doUpdate()
-  // Columna inexistente (42703 / mensaje "column") → crearla y reintentar.
-  if (error && (error.code === '42703' || /openai_api_key|column/i.test(error.message ?? ''))) {
+  // Columna inexistente (42703) o PostgREST con cache viejo (PGRST204 /
+  // "schema cache") → escribir directo por pg + recargar PostgREST.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = error as any
+  if (e && (e.code === '42703' || e.code === 'PGRST204' || /openai_api_key|column|schema cache/i.test(e.message ?? ''))) {
     try {
-      await ensureOpenAIColumn()
-    } catch (e) {
-      return { ok: false, error: `No pude crear la columna openai_api_key: ${(e as Error).message}` }
+      await writeOpenAIKeyViaPg(value, user.id)
+    } catch (err) {
+      return { ok: false, error: `No pude guardar la key vía conexión directa: ${(err as Error).message}` }
     }
-    ;({ error } = await doUpdate())
+    revalidatePath('/settings')
+    return { ok: true }
   }
   if (error) return { ok: false, error: error.message }
 

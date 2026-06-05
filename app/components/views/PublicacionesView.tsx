@@ -48,6 +48,9 @@ type Props = {
 }
 
 export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK }: Props) {
+  /* router para que el botón "Nueva publicación" navegue a
+     /publicaciones/nueva. Antes el botón era fantasma (sin onClick). */
+  const router = useRouter()
   const [view, setView] = useState<ViewMode>('semana')  /* default: semana — más útil día a día */
   const [filters, setFilters] = useState<Filters>({
     marcaSlug: 'todas',
@@ -92,7 +95,16 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK }: Props)
         {/* View toggle */}
         <ViewToggle current={view} onChange={setView} />
 
-        <button className="mk-focusable" style={btnPrimaryStyle}>
+        {/* "Nueva publicación" → navega a /publicaciones/nueva.
+            Antes era un <button> sin onClick (botón fantasma) — Pedro
+            clickeaba y no pasaba nada. La página /publicaciones/nueva
+            ya existía (form de 3 campos + submit), solo faltaba
+            conectar el botón. */}
+        <button
+          className="mk-focusable"
+          style={btnPrimaryStyle}
+          onClick={() => router.push('/publicaciones/nueva')}
+        >
           <IconPlus /> Nueva publicación
           <span className="mk-kbd" style={{ marginLeft: 4 }}>C</span>
         </button>
