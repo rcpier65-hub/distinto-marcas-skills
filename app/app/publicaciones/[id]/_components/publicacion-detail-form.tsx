@@ -14,7 +14,7 @@ import {
   Target, ImageIcon, Music2, FolderOpen, Smile, Film,
   CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
-  Download, Video as VideoIcon,
+  Download, Video as VideoIcon, Check, Pencil,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -531,13 +531,17 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   badge={form.tipo_contenido[0]}
                 >
                   <div className="font-semibold text-xs mb-2 text-muted-foreground">Tipo de contenido</div>
-                  <div className="flex flex-wrap gap-1.5 max-w-[280px]">
+                  {/* Antes flex-wrap con max-w 280px provocaba que
+                      "REEL FRASE" y "VIDEO REEL TIKTOK" se cortaran en
+                      varias líneas dentro del chip. Ahora: lista vertical
+                      con whitespace-nowrap así cada chip queda en 1 línea. */}
+                  <div className="flex flex-col gap-1.5 w-[200px]">
                     {TIPO_OPTS.map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => toggleArrayItem('tipo_contenido', t)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors whitespace-nowrap text-center ${
                           form.tipo_contenido.includes(t)
                             ? 'bg-secondary text-secondary-foreground border-secondary'
                             : 'bg-background hover:bg-muted border-border'
@@ -584,26 +588,26 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 >
                   <div className="space-y-2 w-[280px]">
                     <div className="font-semibold text-xs text-muted-foreground">Portada</div>
-                    <label className="block text-xs">
-                      <span className="text-muted-foreground">🖼️ Cruda (sin editar)</span>
-                      <input
-                        type="url"
-                        value={form.portada_cruda_url}
-                        onChange={(e) => setForm((s) => ({ ...s, portada_cruda_url: e.target.value }))}
-                        placeholder="https://drive.google.com/…"
-                        className="w-full h-8 px-2 rounded border bg-background text-xs mt-1"
-                      />
-                    </label>
-                    <label className="block text-xs">
-                      <span className="text-muted-foreground">🎨 Editada (final)</span>
-                      <input
-                        type="url"
-                        value={form.portada_editada_url}
-                        onChange={(e) => setForm((s) => ({ ...s, portada_editada_url: e.target.value }))}
-                        placeholder="https://drive.google.com/…"
-                        className="w-full h-8 px-2 rounded border bg-background text-xs mt-1"
-                      />
-                    </label>
+                    <div className="block text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1.5"><ImageIcon className="w-3 h-3" /> Cruda (sin editar)</span>
+                      <div className="mt-1">
+                        <LinkInput
+                          value={form.portada_cruda_url}
+                          onChange={(v) => setForm((s) => ({ ...s, portada_cruda_url: v }))}
+                          placeholder="https://drive.google.com/…"
+                        />
+                      </div>
+                    </div>
+                    <div className="block text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1.5"><Palette className="w-3 h-3" /> Editada (final)</span>
+                      <div className="mt-1">
+                        <LinkInput
+                          value={form.portada_editada_url}
+                          onChange={(v) => setForm((s) => ({ ...s, portada_editada_url: v }))}
+                          placeholder="https://drive.google.com/…"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </ToolbarBtnPopover>
 
@@ -618,19 +622,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 >
                   <div className="space-y-2 w-[280px]">
                     <div className="font-semibold text-xs text-muted-foreground">Música</div>
-                    <input
-                      type="url"
+                    <LinkInput
                       value={form.enlace_musica}
-                      onChange={(e) => setForm((s) => ({ ...s, enlace_musica: e.target.value }))}
+                      onChange={(v) => setForm((s) => ({ ...s, enlace_musica: v }))}
                       placeholder="https://vt.tiktok.com/… o Spotify"
-                      className="w-full h-9 px-2 rounded border bg-background text-xs"
-                      autoFocus
                     />
-                    {form.enlace_musica && (
-                      <a href={form.enlace_musica} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
-                        ↗ Abrir música
-                      </a>
-                    )}
                   </div>
                 </ToolbarBtnPopover>
 
@@ -651,30 +647,30 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 >
                   <div className="space-y-3 w-[320px]">
                     <div className="font-semibold text-xs text-muted-foreground">Videos editados (Drive)</div>
-                    <label className="block text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
+                    <div className="block text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
                         <VideoIcon className="w-3 h-3" /> Sin música
                       </span>
-                      <input
-                        type="url"
-                        value={form.video_sin_musica_url}
-                        onChange={(e) => setForm((s) => ({ ...s, video_sin_musica_url: e.target.value }))}
-                        placeholder="https://drive.google.com/file/d/…"
-                        className="w-full h-9 px-2 rounded border bg-background text-xs mt-1"
-                      />
-                    </label>
-                    <label className="block text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1">
+                      <div className="mt-1">
+                        <LinkInput
+                          value={form.video_sin_musica_url}
+                          onChange={(v) => setForm((s) => ({ ...s, video_sin_musica_url: v }))}
+                          placeholder="https://drive.google.com/file/d/…"
+                        />
+                      </div>
+                    </div>
+                    <div className="block text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
                         <Music2 className="w-3 h-3" /> Con música
                       </span>
-                      <input
-                        type="url"
-                        value={form.video_con_musica_url}
-                        onChange={(e) => setForm((s) => ({ ...s, video_con_musica_url: e.target.value }))}
-                        placeholder="https://drive.google.com/file/d/…"
-                        className="w-full h-9 px-2 rounded border bg-background text-xs mt-1"
-                      />
-                    </label>
+                      <div className="mt-1">
+                        <LinkInput
+                          value={form.video_con_musica_url}
+                          onChange={(v) => setForm((s) => ({ ...s, video_con_musica_url: v }))}
+                          placeholder="https://drive.google.com/file/d/…"
+                        />
+                      </div>
+                    </div>
                     <p className="text-[10px] text-muted-foreground">
                       Los botones de descarga aparecen debajo del preview cuando hay URL.
                     </p>
@@ -692,13 +688,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 >
                   <div className="space-y-2 w-[280px]">
                     <div className="font-semibold text-xs text-muted-foreground">Carpeta de tomas</div>
-                    <input
-                      type="url"
+                    <LinkInput
                       value={form.enlace_tomas}
-                      onChange={(e) => setForm((s) => ({ ...s, enlace_tomas: e.target.value }))}
+                      onChange={(v) => setForm((s) => ({ ...s, enlace_tomas: v }))}
                       placeholder="https://drive.google.com/drive/folders/…"
-                      className="w-full h-9 px-2 rounded border bg-background text-xs"
-                      autoFocus
                     />
                     <p className="text-[10px] text-muted-foreground">
                       Si compartís el folder como público, vas a ver las tomas en el preview →
@@ -1076,5 +1069,120 @@ function ChecklistRowCompact({ label, icon, value, onToggle }: { label: string; 
       <span className="leading-none shrink-0 text-muted-foreground">{icon}</span>
       <span className={`flex-1 leading-tight ${value ? 'line-through opacity-60' : ''}`}>{label}</span>
     </button>
+  )
+}
+
+/**
+ * Input para URLs con 3 zonas de interacción cuando hay valor:
+ *   [📋 Copy] [centro = link openable que truncate] [✏️ Edit]
+ *
+ * Estados:
+ *   - Sin valor o `editing=true` → input editable normal
+ *   - Con valor → vista compacta de 3 zonas (sin botón editar permite
+ *     editar = botón ✏️ a la derecha)
+ *
+ * Interacción:
+ *   - Click 📋   → copia al clipboard + feedback ✓ por 1.5s
+ *   - Click centro → abre en nueva pestaña (target=_blank)
+ *   - Click ✏️   → entra en modo edit (input con autoFocus)
+ *   - En edit: Enter / blur guarda, Escape cancela
+ *
+ * Usado para portada cruda/editada, música, videos editados, tomas.
+ * Si el equipo necesita cambiar el link, click en ✏️ y nuevo URL.
+ */
+function LinkInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [copied, setCopied] = useState(false)
+
+  // Sincronizar draft si el valor cambia desde afuera (ej. sync Notion)
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  function commitEdit() {
+    const next = draft.trim()
+    if (next !== value) onChange(next)
+    setEditing(false)
+  }
+  function cancelEdit() {
+    setDraft(value)
+    setEditing(false)
+  }
+  async function handleCopy(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Silenciar — algunos browsers bloquean clipboard en non-https
+    }
+  }
+
+  // Sin valor o editando → input normal editable
+  if (editing || !value) {
+    return (
+      <input
+        type="url"
+        value={draft}
+        autoFocus={editing}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitEdit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            ;(e.target as HTMLInputElement).blur()
+          } else if (e.key === 'Escape') {
+            cancelEdit()
+          }
+        }}
+        placeholder={placeholder}
+        className="w-full h-8 px-2 rounded border bg-background text-xs"
+      />
+    )
+  }
+
+  // Con valor → vista 3 zonas
+  return (
+    <div className="flex items-stretch h-8 rounded border border-input bg-background overflow-hidden">
+      <button
+        type="button"
+        onClick={handleCopy}
+        title={copied ? '¡Copiado!' : 'Copiar link'}
+        className="px-2 flex items-center justify-center border-r border-input hover:bg-muted shrink-0 transition-colors"
+      >
+        {copied
+          ? <Check className="w-3.5 h-3.5 text-green-600" />
+          : <CopyIcon className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Abrir en nueva pestaña"
+        className="flex-1 min-w-0 px-2 flex items-center text-xs text-blue-600 hover:underline truncate"
+      >
+        {value}
+      </a>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="Editar / cambiar link"
+        className="px-2 flex items-center justify-center border-l border-input hover:bg-muted shrink-0 transition-colors"
+      >
+        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+      </button>
+    </div>
   )
 }
