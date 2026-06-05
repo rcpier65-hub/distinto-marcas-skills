@@ -18,7 +18,14 @@
 import {
   queryGrillaForBrandExtended,
   fetchPageContent,
+  type EscenaParsed,
 } from '@/lib/integrations/notion'
+
+type PageContent = {
+  copy: string | null
+  guion: string | null
+  escenas: EscenaParsed[]
+}
 
 // ──────────────────────────────────────────────────────────────────────
 // Mapeo estado Notion → ENUM Postgres estado_publicacion
@@ -72,10 +79,10 @@ function mapEstado(notionEstado: string | null): string | null {
 
 async function fetchContentsWithLimit<T>(
   items: T[],
-  fn: (item: T) => Promise<{ copy: string | null; guion: string | null }>,
+  fn: (item: T) => Promise<PageContent>,
   concurrency: number,
-): Promise<Map<T, { copy: string | null; guion: string | null }>> {
-  const results = new Map<T, { copy: string | null; guion: string | null }>()
+): Promise<Map<T, PageContent>> {
+  const results = new Map<T, PageContent>()
   let cursor = 0
 
   async function worker() {
@@ -86,7 +93,7 @@ async function fetchContentsWithLimit<T>(
         const content = await fn(item)
         results.set(item, content)
       } catch {
-        results.set(item, { copy: null, guion: null })
+        results.set(item, { copy: null, guion: null, escenas: [] })
       }
     }
   }
@@ -128,12 +135,17 @@ export async function syncMarcaPublicaciones(args: {
     semanaFin: args.to,
   })
 
-  // 2. Fetch body content (copy + guion) en paralelo
+  // 2. Fetch body content (copy + guion + escenas) en paralelo
   const contents = await fetchContentsWithLimit(
     pubs,
     (pub) => fetchPageContent(pub.notion_id.replace(/-/g, '')),
     concurrency,
   )
+
+  // Guardamos las escenas extraídas para procesar después del upsert de pubs
+  // (necesitamos el id de la publicacion para FK escenas.publicacion_id).
+  // Usamos notion_original_id (sin dashes) como bridge entre las 2 tablas.
+  const escenasPorNotionId = new Map<string, { dialogo: string | null; notas: string | null }[]>()
 
   // 3. Upsert por notion_original_id
   let inserted = 0
@@ -146,7 +158,11 @@ export async function syncMarcaPublicaciones(args: {
     const notionId = pub.notion_id.replace(/-/g, '')
     const estadoMapeado = mapEstado(pub.estado)
     if (pub.estado && !estadoMapeado) estadosNoMapeados.add(pub.estado)
-    const { copy, guion } = contents.get(pub) ?? { copy: null, guion: null }
+    const fetched = contents.get(pub) ?? { copy: null, guion: null, escenas: [] }
+    const { copy, guion } = fetched
+    if (fetched.escenas.length > 0) {
+      escenasPorNotionId.set(notionId, fetched.escenas)
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const patch: any = {
@@ -200,6 +216,53 @@ export async function syncMarcaPublicaciones(args: {
         errors.push(`insert ${pub.notion_id}: ${error.message}`)
       } else {
         inserted++
+      }
+    }
+  }
+
+  // 4. Sincronizar escenas (guión técnico estructurado)
+  // Estrategia: por cada pub con escenas extraídas de Notion, borrar las
+  // escenas locales y reinsertarlas. Esto es idempotente y simple. La
+  // contra es que pierde ediciones manuales del guión hechas en la app,
+  // pero coincide con la decisión de "Notion gana siempre" que aplicamos
+  // al resto del sync. Si el equipo necesita preservar ediciones, hay
+  // que mover esto a un merge más fino (ej. matching por escena_num + hash).
+  if (escenasPorNotionId.size > 0) {
+    // Necesitamos los uuids reales de las publicaciones para FK
+    const notionIds = [...escenasPorNotionId.keys()]
+    const { data: pubRows } = await args.service
+      .from('publicaciones')
+      .select('id, notion_original_id')
+      .in('notion_original_id', notionIds)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idByNotion = new Map<string, string>(
+      ((pubRows ?? []) as any[]).map((r) => [r.notion_original_id, r.id]),
+    )
+
+    for (const [notionId, escenasParsed] of escenasPorNotionId) {
+      const pubId = idByNotion.get(notionId)
+      if (!pubId) continue
+
+      // Borrar escenas viejas de esta publicación
+      const { error: delErr } = await args.service
+        .from('escenas')
+        .delete()
+        .eq('publicacion_id', pubId)
+      if (delErr) {
+        errors.push(`escenas delete ${notionId}: ${delErr.message}`)
+        continue
+      }
+
+      // Insertar las nuevas. escena_num empieza en 1.
+      const rows = escenasParsed.map((e, idx) => ({
+        publicacion_id: pubId,
+        escena_num: idx + 1,
+        dialogo: e.dialogo,
+        notas: e.notas,
+      }))
+      const { error: insErr } = await args.service.from('escenas').insert(rows)
+      if (insErr) {
+        errors.push(`escenas insert ${notionId}: ${insErr.message}`)
       }
     }
   }

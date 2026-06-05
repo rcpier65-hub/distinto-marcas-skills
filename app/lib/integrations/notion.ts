@@ -470,18 +470,31 @@ function detectCopyMarker(b: NotionBlock): { isMarker: boolean; inline: string }
 }
 
 /**
+ * Escena parseada del guión técnico de Notion.
+ * Mapea a la tabla SQL `escenas`:
+ *   - dialogo ← columna 0 de Notion (Voz en off / Diálogo)
+ *   - notas   ← columna 1+ de Notion (Toma/visual o Acciones, joined si >2 cols)
+ */
+export type EscenaParsed = {
+  dialogo: string | null
+  notas: string | null
+}
+
+/**
  * Trae el body de una página y extrae:
- *   - copy:  texto bajo el heading "💬 COPY" (o variantes).
- *   - guion: tabla de 2 columnas (voz en off | toma/visual) si existe.
+ *   - copy:    texto bajo el heading "💬 COPY" (o variantes).
+ *   - guion:   tabla de N columnas concatenada como texto plano (legacy).
+ *   - escenas: la MISMA tabla pero en formato estructurado, una entrada
+ *              por fila no-header, lista para upsert en tabla SQL escenas.
  *
- * Si el fetch falla, devuelve { copy: null, guion: null } sin lanzar.
- * Esto evita romper el sync entero por una página con permisos raros.
+ * Si el fetch falla, devuelve { copy: null, guion: null, escenas: [] }
+ * sin lanzar — evita romper el sync por una página con permisos raros.
  */
 export async function fetchPageContent(
   pageIdWithoutDashes: string,
-): Promise<{ copy: string | null; guion: string | null }> {
+): Promise<{ copy: string | null; guion: string | null; escenas: EscenaParsed[] }> {
   const token = process.env.NOTION_TOKEN
-  if (!token) return { copy: null, guion: null }
+  if (!token) return { copy: null, guion: null, escenas: [] }
 
   try {
     const blocks = await fetchChildren(pageIdWithoutDashes, token)
@@ -522,22 +535,83 @@ export async function fetchPageContent(
 
     // 3. El guión: buscamos column_lists y/o tables. Tomamos el primer
     //    column_list (que tiene 2 columnas: nota+tabla) o la primera table.
+    //    Extraemos a la vez el texto plano (guion) y la versión estructurada
+    //    en array de escenas (para tabla SQL escenas).
     let guion: string | null = null
+    let escenas: EscenaParsed[] = []
     for (const b of blocks) {
       if (b.type === 'column_list' && b.has_children) {
         guion = await extractGuionFromColumnList(b.id, token)
-        if (guion) break
+        escenas = await extractEscenasFromColumnList(b.id, token)
+        if (guion || escenas.length > 0) break
       }
       if (b.type === 'table' && b.has_children) {
         guion = await extractGuionFromTable(b.id, token)
-        if (guion) break
+        escenas = await extractEscenasFromTable(b.id, token)
+        if (guion || escenas.length > 0) break
       }
     }
 
-    return { copy, guion }
+    return { copy, guion, escenas }
   } catch {
-    return { copy: null, guion: null }
+    return { copy: null, guion: null, escenas: [] }
   }
+}
+
+/**
+ * Heurística: ¿es esta fila un header (no data real)?
+ * Notion no marca el `has_header_row` accesible vía API en cada row, así
+ * que detectamos por keywords típicos de columnas de guión.
+ */
+function isLikelyHeaderRow(cells: string[]): boolean {
+  // Si alguna celda es muy larga, es contenido real, no header
+  if (cells.some((c) => c.length > 50)) return false
+  const all = cells.map((c) => c.toLowerCase()).join(' ')
+  return /\b(voz\s*en\s*off|di[áa]logo|toma|visual|escena|acci[óo]n|plano)\b/.test(
+    all,
+  )
+}
+
+async function extractEscenasFromTable(
+  tableId: string,
+  token: string,
+): Promise<EscenaParsed[]> {
+  const rows = await fetchChildren(tableId, token)
+  const escenas: EscenaParsed[] = []
+  for (const r of rows) {
+    if (r.type !== 'table_row' || !r.table_row) continue
+    const cells = r.table_row.cells.map((c) => richTextToString(c).trim())
+    if (cells.every((c) => !c)) continue
+    if (isLikelyHeaderRow(cells)) continue
+    // Mapping defensivo:
+    //   col[0] → dialogo (voz en off / diálogo / escena descripción)
+    //   col[1..N] → notas (toma/visual, plus acciones extra si hay >2 cols)
+    const dialogo = cells[0] || null
+    const notasJoined = cells.slice(1).filter(Boolean).join(' · ').trim()
+    escenas.push({
+      dialogo,
+      notas: notasJoined || null,
+    })
+  }
+  return escenas
+}
+
+async function extractEscenasFromColumnList(
+  columnListId: string,
+  token: string,
+): Promise<EscenaParsed[]> {
+  const columns = await fetchChildren(columnListId, token)
+  for (const col of columns) {
+    if (col.type !== 'column' || !col.has_children) continue
+    const children = await fetchChildren(col.id, token)
+    for (const c of children) {
+      if (c.type === 'table' && c.has_children) {
+        const escenas = await extractEscenasFromTable(c.id, token)
+        if (escenas.length > 0) return escenas
+      }
+    }
+  }
+  return []
 }
 
 async function extractGuionFromColumnList(
