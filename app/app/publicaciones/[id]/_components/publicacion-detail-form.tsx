@@ -1082,7 +1082,7 @@ function ToolbarBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      aria-label={title}
       className={`flex flex-col items-center justify-center gap-1 min-w-[64px] px-2.5 py-2 rounded-md transition-colors ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
@@ -1120,7 +1120,7 @@ function ToolbarBtnPopover({
       <button
         type="button"
         onClick={onClick}
-        title={title}
+        aria-label={title}
         className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] px-2.5 py-2 rounded-md transition-colors ${
           active
             ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
