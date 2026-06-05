@@ -14,7 +14,7 @@ import {
   Target, ImageIcon, Music2, FolderOpen, Smile, Film,
   CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
-  Download, Video as VideoIcon, Check, Pencil,
+  Download, Video as VideoIcon, Check, Pencil, ChevronDown,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -469,76 +469,100 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               </div>
 
               {/* Propiedades (Estado, Editor, Publicación, Edición, Sub-estado).
-                  Antes vivía en una Card aparte debajo del copy. Movido acá
-                  por pedido de Pedro para tenerlo siempre visible al costado. */}
-              <div className="space-y-2 border-t border-border pt-3">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Estética moderna 2024-25:
+                  - Inputs con bg tintado sutil (no blanco puro)
+                  - Border casi invisible idle, focus ring accent violeta
+                  - Chevron custom para selects (no el feo del browser)
+                  - Icono inline en cada label
+                  - Sub-estado tarea = segmented control estilo iOS */}
+              <div className="space-y-2.5 border-t border-border/60 pt-3">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   Propiedades
                 </h3>
-                <div className="space-y-2">
-                  <label className="block text-[11px]">
-                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                      <Target className="w-3 h-3" /> Estado
-                    </span>
+
+                {/* Estado */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                    <Target className="w-3 h-3" /> Estado
+                  </label>
+                  <div className="relative">
                     <select
                       value={form.estado}
                       onChange={(e) => setForm((s) => ({ ...s, estado: e.target.value as EstadoPublicacion }))}
-                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
+                      className="w-full h-9 pl-3 pr-8 rounded-lg bg-background/70 border border-border/40 text-[12px] font-medium appearance-none cursor-pointer transition-all hover:bg-background hover:border-border focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30 focus:border-[#ba41f7]/50 focus:bg-background"
                     >
                       {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_PUBLICACION_LABEL[e]}</option>)}
                     </select>
+                    <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Editor */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                    <UserIcon className="w-3 h-3" /> Editor
                   </label>
-                  <label className="block text-[11px]">
-                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                      <UserIcon className="w-3 h-3" /> Editor
-                    </span>
+                  <div className="relative">
                     <select
                       value={form.editor_id}
                       onChange={(e) => setForm((s) => ({ ...s, editor_id: e.target.value }))}
-                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
+                      className="w-full h-9 pl-3 pr-8 rounded-lg bg-background/70 border border-border/40 text-[12px] font-medium appearance-none cursor-pointer transition-all hover:bg-background hover:border-border focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30 focus:border-[#ba41f7]/50 focus:bg-background"
                     >
                       <option value="">— Sin asignar —</option>
                       {editores.map((ed) => <option key={ed.id} value={ed.id}>{ed.nombre}</option>)}
                     </select>
+                    <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Publicación */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                    <CalendarDays className="w-3 h-3" /> Publicación
                   </label>
-                  <label className="block text-[11px]">
-                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                      <CalendarDays className="w-3 h-3" /> Publicación
-                    </span>
-                    <input
-                      type="date"
-                      value={form.fecha_publicacion}
-                      onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))}
-                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
-                    />
+                  <input
+                    type="date"
+                    value={form.fecha_publicacion}
+                    onChange={(e) => setForm((s) => ({ ...s, fecha_publicacion: e.target.value }))}
+                    className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] font-medium transition-all hover:bg-background hover:border-border focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30 focus:border-[#ba41f7]/50 focus:bg-background"
+                  />
+                </div>
+
+                {/* Edición */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                    <Scissors className="w-3 h-3" /> Edición
                   </label>
-                  <label className="block text-[11px]">
-                    <span className="text-muted-foreground text-[10px] flex items-center gap-1.5">
-                      <Scissors className="w-3 h-3" /> Edición
-                    </span>
-                    <input
-                      type="date"
-                      value={form.fecha_edicion}
-                      onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
-                      className="w-full h-7 px-1.5 rounded border border-input bg-background mt-0.5 text-[11px]"
-                    />
+                  <input
+                    type="date"
+                    value={form.fecha_edicion}
+                    onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
+                    className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] font-medium transition-all hover:bg-background hover:border-border focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30 focus:border-[#ba41f7]/50 focus:bg-background"
+                  />
+                </div>
+
+                {/* Sub-estado tarea — segmented control estilo iOS.
+                    Track sutil, pill activo blanco con sombra muy ligera. */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider block">
+                    Sub-estado
                   </label>
-                  <div className="text-[11px]">
-                    <span className="text-muted-foreground text-[10px] block mb-1">Sub-estado tarea</span>
-                    <div className="flex gap-1">
-                      {ESTADOS_TAREA.map((e) => (
+                  <div className="flex gap-0.5 p-0.5 bg-muted/50 rounded-lg">
+                    {ESTADOS_TAREA.map((e) => {
+                      const active = form.estado_tarea === e
+                      return (
                         <button
                           key={e}
                           type="button"
                           onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
-                          className={`flex-1 h-6 px-0.5 rounded text-[9px] border transition-colors leading-none ${
-                            form.estado_tarea === e
-                              ? 'bg-[#ba41f7] text-white border-[#ba41f7]'
-                              : 'bg-background hover:bg-muted border-border'
+                          className={`flex-1 h-7 px-1 rounded-md text-[10px] font-medium transition-all leading-none ${
+                            active
+                              ? 'bg-background text-foreground shadow-sm ring-1 ring-black/[0.04]'
+                              : 'text-muted-foreground hover:text-foreground'
                           }`}
                         >{ESTADO_TAREA_LABEL[e]}</button>
-                      ))}
-                    </div>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
