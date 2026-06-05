@@ -7,7 +7,13 @@ import { NuevaMarcaForm } from './_components/nueva-marca-form'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ nueva?: string }>
+}) {
+  const sp = await searchParams
+  const abrirForm = sp?.nueva === '1'   // viene del enlace "+ Agregar marca" del menú
   const user = await requireUser()
   const supabase = await createClient()
 
@@ -58,7 +64,7 @@ export default async function DashboardPage() {
 
       {/* Botón "+ Nueva marca" (se expande a formulario al abrir) */}
       <div className="mb-6">
-        <NuevaMarcaForm />
+        <NuevaMarcaForm defaultOpen={abrirForm} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -135,6 +135,20 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
               badge={m.pendientes > 0 ? m.pendientes : undefined}
             />
           ))}
+          {/* Acción: crear una marca nueva. Lleva al Dashboard con el form ya abierto. */}
+          <NavItem
+            href="/dashboard?nueva=1"
+            icon={
+              <span
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 16, height: 16, color: '#ba41f7', fontSize: 16, fontWeight: 600, lineHeight: 1,
+                }}
+              >+</span>
+            }
+            label="Agregar marca"
+            active={false}
+          />
         </Section>
 
         <Section

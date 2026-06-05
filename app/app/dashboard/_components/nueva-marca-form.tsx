@@ -26,9 +26,9 @@ function previewSlug(s: string): string {
 const INPUT_CLS =
   'mt-1 h-10 px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40'
 
-export function NuevaMarcaForm() {
+export function NuevaMarcaForm({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [saving, setSaving] = useState(false)
   const [nombre, setNombre] = useState('')
   const [emoji, setEmoji] = useState('🏷️')
