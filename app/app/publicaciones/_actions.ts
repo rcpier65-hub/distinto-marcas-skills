@@ -227,12 +227,22 @@ export async function sincronizarTodoNotion(opts?: {
       cache: 'no-store',
     })
     const json = await res.json()
-    if (!res.ok || !json.ok) {
+    /* Error duro: HTTP no-2xx O el endpoint no devolvió `totals`
+       (algo realmente roto). En ese caso solo tenemos el error
+       message del endpoint o el HTTP status como fallback. */
+    if (!res.ok || !json.totals) {
       return {
         ok: false,
         error: json.error ?? `HTTP ${res.status}`,
       }
     }
+    /* Si tenemos `totals` pero `ok=false`, son errores PARCIALES:
+       algunas marcas fallaron pero otras se sincronizaron. Devolvemos
+       ok:true al cliente pero con los counters reales — el cliente ya
+       muestra "❌X fallos" en el resumen así que la info no se pierde,
+       y NO mostramos un toast rojo genérico que oculta el éxito de las
+       demás marcas. El endpoint ahora también incluye `error` legible
+       con qué marca falló. */
     revalidatePath('/publicaciones')
     revalidatePath('/publicaciones/tabla')
     revalidatePath('/publicaciones/calendario')

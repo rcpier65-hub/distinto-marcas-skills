@@ -74,21 +74,25 @@ export async function generarRespuestaComentario(
   const apiKey = await getOpenAIApiKey()
   if (!apiKey) return null
 
+  const tono = (input.tonoVoz && typeof input.tonoVoz === 'object') ? (input.tonoVoz as Record<string, unknown>) : {}
+  const instrucciones = typeof tono.instrucciones === 'string' ? tono.instrucciones.trim() : ''
   const voz = vozATexto(input.tonoVoz)
 
   const system = [
     `Eres community manager de la agencia Distinto y respondes comentarios públicos de la marca "${input.marcaNombre}" en redes sociales.`,
     voz ? `Voz de la marca: ${voz}.` : '',
-    'REGLAS DE RESPUESTA:',
+    instrucciones
+      ? `\n⚡ INSTRUCCIONES ESPECÍFICAS DE ESTA MARCA (MÁXIMA PRIORIDAD — mandan sobre las reglas generales de abajo):\n${instrucciones}\n`
+      : '',
+    'REGLAS GENERALES (aplican salvo que las instrucciones de la marca digan otra cosa):',
     '- Español peruano natural, tuteo ("tú tienes", "escríbenos"). NUNCA voseo ("tenés", "escribime") ni "che/boludo".',
-    '- Respuestas CORTAS (1 o 2 frases). Cálidas, humanas, que suenen a persona y no a bot.',
-    '- Emojis con moderación (0 a 2).',
-    '- Si preguntan por precios, stock, pedidos, delivery o un dato que no aparece en el contexto: invita amablemente a escribir por mensaje directo (DM) o WhatsApp. NUNCA inventes precios, cifras ni datos.',
+    '- Por defecto, respuestas cortas (1-2 frases), cálidas y humanas. PERO si la marca pide responder solo con un emoji, devuelve SOLO ese emoji (sin texto).',
+    '- Si el comentario NO debe responderse (según las instrucciones de la marca, o si es spam/irrelevante/no aporta), devuelve "respuesta" como cadena VACÍA "".',
+    '- Precios, stock, pedidos o datos que no están en el contexto: invita a DM/WhatsApp. NUNCA inventes precios, cifras ni datos.',
     '- No prometas resultados (salud, suplementos, fitness). No inventes certificaciones, ingredientes ni promociones.',
-    '- Comentarios sensibles (salud mental, quejas serias): responde con empatía y deriva a un canal privado.',
-    '- Spam o insulto puro: respuesta neutral y breve; clasifícalo como "spam".',
+    '- Comentarios sensibles (salud mental, quejas serias): empatía y deriva a un canal privado.',
     'Clasifica el comentario en UNA categoría: pregunta_info, testimonial, empatia, derivar, reaccion, queja, humor, sensible, spam, otro.',
-    'Responde SOLO en formato JSON: {"respuesta": "<texto>", "categoria": "<categoria>"}.',
+    'Responde SOLO en formato JSON: {"respuesta": "<texto, un emoji, o cadena vacía si no se responde>", "categoria": "<categoria>"}.',
   ].filter(Boolean).join('\n')
 
   const user = [

@@ -123,11 +123,28 @@ export async function POST(request: Request) {
     }
   }
 
+  /* Construir mensaje de error legible cuando hay marcas que fallaron.
+     Antes el endpoint devolvía `{ ok: false }` sin field `error` y el
+     cliente caía al fallback "HTTP 200" porque res.status era 200 pero
+     json.ok era false. Ahora damos un texto humano con qué marcas
+     fallaron y por qué — el cliente ya hace `json.error ?? "HTTP ..."`,
+     así que con esto desaparece el "HTTP 200" del toast. */
+  const erroredMarcas = allResults.filter((r) => r.status === 'error') as Array<
+    Extract<MarcaResult, { status: 'error' }>
+  >
+  const errorMsg =
+    erroredMarcas.length > 0
+      ? `${erroredMarcas.length} marca${erroredMarcas.length === 1 ? '' : 's'} falló: ${erroredMarcas
+          .map((r) => `${r.slug} (${r.error.slice(0, 80)})`)
+          .join(', ')}`
+      : undefined
+
   return NextResponse.json({
     ok: totals.errored === 0,
     duration_ms: Date.now() - startedAt,
     rango: { from, to },
     totals,
     por_marca: allResults,
+    ...(errorMsg ? { error: errorMsg } : {}),
   })
 }
