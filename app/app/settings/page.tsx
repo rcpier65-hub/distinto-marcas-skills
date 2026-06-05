@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { LogoUrlInput } from './_components/logo-url-input'
 import { WhatsappConfigInput } from './_components/whatsapp-config-input'
 import { MetricoolConfig } from './_components/metricool-config'
+import { OpenaiConfig } from './_components/openai-config'
 import { MarcaFactsCard } from './_components/marca-facts-card'
 import { listWhatsAppGroups } from '@/lib/integrations/rubi'
 import { getIntegracionesConfig } from './_actions'
@@ -28,7 +29,7 @@ export default async function SettingsPage() {
   const gruposError = gruposResult.ok ? null : gruposResult.error
   const integraciones = integracionesResult.ok
     ? integracionesResult.config
-    : { metricool_user_id: '', metricool_has_token: false, metricool_user_id_set: false, updated_at: null }
+    : { metricool_user_id: '', metricool_has_token: false, metricool_user_id_set: false, openai_has_key: false, updated_at: null }
 
   return (
     <main className="container mx-auto p-8 max-w-4xl space-y-6">
@@ -108,6 +109,22 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <MetricoolConfig initial={integraciones} />
+        </CardContent>
+      </Card>
+
+      {/* Integraciones — IA (OpenAI) para borradores de comentarios */}
+      <Card>
+        <CardHeader>
+          <CardTitle>✨ Integraciones — IA (OpenAI)</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Tu API key de OpenAI para que la app genere las <strong>respuestas sugeridas</strong> a los comentarios
+            (según el post + el comentario + la voz de cada marca). Modelo <code>gpt-4o-mini</code> · ~S/ 1/mes.
+            <br />
+            La key se guarda encriptada en tu base y <strong>nunca se muestra</strong> de vuelta.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <OpenaiConfig initial={integraciones} />
         </CardContent>
       </Card>
 
