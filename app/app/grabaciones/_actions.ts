@@ -4,7 +4,17 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import {
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+} from '@/lib/integrations/google-calendar'
 import type { GrabacionEstado } from '@/lib/types/database'
+
+/* Título del evento de grabación en Google Calendar. */
+function eventoTitulo(marcaNombre: string): string {
+  return `🎬 Grabación · ${marcaNombre}`
+}
 
 export type GrabacionWithMarca = {
   id: string
@@ -180,10 +190,10 @@ export async function createGrabacion(args: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // Resolver marca_id por slug
+  // Resolver marca_id + nombre por slug
   const { data: marca } = await service
     .from('marcas')
-    .select('id')
+    .select('id, nombre')
     .eq('slug', args.marca_slug)
     .maybeSingle()
   if (!marca) return { ok: false, error: `Marca '${args.marca_slug}' no encontrada` }
@@ -200,6 +210,19 @@ export async function createGrabacion(args: {
     .single()
 
   if (error) return { ok: false, error: error.message }
+
+  // Sync con Google Calendar (best-effort — no bloquea si no está conectado)
+  try {
+    const ev = await createCalendarEvent({
+      summary: eventoTitulo(marca.nombre),
+      description: args.notas?.trim() || `Sesión de grabación planificada para ${marca.nombre}.`,
+      date: args.fecha_planeada,
+    })
+    if (ev.ok) {
+      await service.from('grabaciones').update({ google_event_id: ev.eventId }).eq('id', data.id)
+    }
+  } catch { /* GCal no conectado o falló — la grabación ya se guardó igual */ }
+
   revalidatePath('/grabaciones')
   return { ok: true, id: data.id }
 }
@@ -245,6 +268,18 @@ export async function deleteGrabacion(id: string): Promise<{ ok: true } | { ok: 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
+  // Borrar el evento de GCal ANTES de borrar la row (best-effort)
+  try {
+    const { data: g } = await service
+      .from('grabaciones')
+      .select('google_event_id')
+      .eq('id', id)
+      .maybeSingle()
+    if (g?.google_event_id) {
+      await deleteCalendarEvent(g.google_event_id)
+    }
+  } catch { /* best-effort */ }
+
   const { error } = await service.from('grabaciones').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/grabaciones')
@@ -270,6 +305,22 @@ export async function updateGrabacionFecha(
     .update({ fecha_planeada })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
+
+  // Sync GCal: mover el evento a la nueva fecha (best-effort)
+  try {
+    const { data: g } = await service
+      .from('grabaciones')
+      .select('google_event_id, marcas:marca_id (nombre)')
+      .eq('id', id)
+      .maybeSingle()
+    if (g?.google_event_id) {
+      await updateCalendarEvent(g.google_event_id, {
+        summary: eventoTitulo(g.marcas?.nombre ?? 'Marca'),
+        date: fecha_planeada,
+      })
+    }
+  } catch { /* best-effort */ }
+
   revalidatePath('/grabaciones')
   return { ok: true }
 }

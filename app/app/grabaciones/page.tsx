@@ -12,6 +12,8 @@ import { GrabacionRow } from './_components/grabacion-row'
 import { NuevaGrabacionForm } from './_components/nueva-grabacion-form'
 import { MesSelector } from './_components/mes-selector'
 import { MarcaGrabacionCard } from './_components/marca-grabacion-card'
+import { GoogleCalendarConnect } from './_components/gcal-connect'
+import { getGoogleCalendarStatus } from '@/lib/integrations/google-calendar'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +57,11 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
   // Deriva de `desde` o del mes actual.
   const mesDefault = (desde ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
 
+  // Estado de conexión con Google Calendar (best-effort — si la tabla no
+  // existe o falla, asumimos no conectado)
+  let gcal = { connected: false, email: null as string | null }
+  try { gcal = await getGoogleCalendarStatus() } catch { /* no conectado */ }
+
   return (
     <main className="container mx-auto p-6 max-w-7xl space-y-6">
       {/* HEADER */}
@@ -70,7 +77,10 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
             </p>
           </div>
         </div>
-        <MesSelector />
+        <div className="flex items-center gap-3 flex-wrap">
+          <GoogleCalendarConnect connected={gcal.connected} email={gcal.email} />
+          <MesSelector />
+        </div>
       </header>
 
       {/* TABS */}

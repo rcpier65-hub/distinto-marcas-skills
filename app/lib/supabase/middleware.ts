@@ -44,6 +44,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api/auth') ||      // OAuth Google callback (viene de Google sin sesión)
     request.nextUrl.pathname.startsWith('/api/cron') ||
     request.nextUrl.pathname.startsWith('/api/v1') ||
     request.nextUrl.pathname.startsWith('/api/render-grilla') ||
