@@ -112,6 +112,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
           <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
           {/* Editor es sub-item de Publicaciones (workflow: lista pubs → editar una) */}
           <NavItem href="/editor"        icon={<EditIcon />}     label="Editor"         active={isActive('/editor')}        indent />
+          {/* Diseño: gemelo del Editor, foco en piezas que Ailyn diseña */}
+          <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent />
           <NavItem href="/grabaciones"   icon={<VideoIcon />}    label="Grabaciones"    active={isActive('/grabaciones')}   shortcut="4" />
         </Section>
 
@@ -354,6 +356,10 @@ function InboxIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fi
 function CalendarIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="3" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M2 6H12M5 2V4M9 2V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function VideoIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="4" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M9 6L12 4.5V9.5L9 8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
 function EditIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 1.5L10.5 4L4.5 10H2V7.5L8 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M7 2.5L9.5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+/* PaintIcon: balde de pintura para el módulo de Diseño. Mismo
+   viewBox y stroke que los otros sub-items (12x12, 1.2) para que
+   visualmente alinee con EditIcon en la lista. */
+function PaintIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 1.5L10 5.5L7 8.5L3 4.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M3 4.5L1.5 8C1.5 9 2.5 9.5 3 9.5C3.5 9.5 4 9 4 8.5C4 8 3.5 7.5 3 7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function CheckIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 7L6.2 8.7L9.5 5.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function NoteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2.5H9L11 4.5V11.5C11 11.78 10.78 12 10.5 12H3.5C3.22 12 3 11.78 3 11.5V3C3 2.72 3.22 2.5 3.5 2.5Z" stroke="currentColor" strokeWidth="1.2" /><path d="M9 2.5V4.5H11M5 7H9M5 9H8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
