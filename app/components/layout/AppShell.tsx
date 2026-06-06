@@ -21,6 +21,7 @@ export type PermisosSimple = {
   nombre: string
   rol: string
   email: string
+  avatarUrl: string | null
 } | null
 
 type Props = {

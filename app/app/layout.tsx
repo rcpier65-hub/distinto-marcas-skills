@@ -63,6 +63,7 @@ export default async function RootLayout({
         nombre: permisos.member.nombre,
         rol: permisos.rol.nombre,
         email: emailActivo ?? permisos.member.email,
+        avatarUrl: permisos.member.avatar_url,
       }
     : null
 

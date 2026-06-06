@@ -15,6 +15,7 @@ type PermisosSimple = {
   nombre: string
   rol: string
   email: string
+  avatarUrl: string | null
 } | null
 
 type Props = {
@@ -254,8 +255,19 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
         >
-          <span style={avatarStyle}>
-            {permisos ? permisos.nombre.charAt(0).toUpperCase() : (emailActivo?.charAt(0).toUpperCase() ?? 'P')}
+          {/* Si el usuario subió una foto de perfil (permisos.avatarUrl),
+              la mostramos como background-image circular. Si no, mostramos
+              la inicial del nombre con el color del avatar default.
+              Foto en el bottom del sidebar SIEMPRE sincronizada con /perfil. */}
+          <span
+            style={{
+              ...avatarStyle,
+              background: permisos?.avatarUrl
+                ? `url(${permisos.avatarUrl}) center/cover`
+                : avatarStyle.background,
+            }}
+          >
+            {!permisos?.avatarUrl && (permisos ? permisos.nombre.charAt(0).toUpperCase() : (emailActivo?.charAt(0).toUpperCase() ?? 'P'))}
           </span>
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <div style={{ fontWeight: 'var(--mk-weight-medium)', fontSize: 'var(--mk-text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

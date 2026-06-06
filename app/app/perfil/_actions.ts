@@ -59,8 +59,9 @@ export async function actualizarMiPerfil(patch: {
     return { ok: false, error: error.message }
   }
 
-  revalidatePath('/perfil')
-  revalidatePath('/equipo')
+  /* Revalidar el layout entero — el sidebar lee avatar_url, nombre, etc.
+     del usuario logueado y necesita refrescar en todas las páginas. */
+  revalidatePath('/', 'layout')
   return { ok: true }
 }
 
