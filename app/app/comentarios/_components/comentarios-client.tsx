@@ -12,6 +12,7 @@
 import { useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { RefreshCw, Sparkles, Send, FlaskConical, CheckCircle2, Loader2 } from 'lucide-react'
 import {
   fetchComentariosFromMetricool,
   actualizarComentarioBorrador,
@@ -342,52 +343,61 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
               </option>
             ))}
           </select>
+          {/* Refrescar desde Metricool */}
           <button
             onClick={() => handleFetchInbox()}
             disabled={isFetching || !marcaInfo?.metricool_blog_id}
-            className="h-10 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+            className="inline-flex items-center gap-2 h-10 px-3.5 rounded-lg border border-border bg-background text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
             title="Forzar refresh manual desde Metricool"
           >
-            {isFetching ? '⏳ Sincronizando…' : '🔄 Refrescar'}
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Sincronizando…' : 'Refrescar'}
           </button>
 
-          {/* Generar borradores con IA (OpenAI gpt-4o-mini) — dentro de la app */}
+          {/* Generar borradores con IA (OpenAI gpt-4o-mini) */}
           <button
             onClick={handleGenerarIA}
             disabled={isGenerating}
-            title="Genera respuestas sugeridas con IA (según post + comentario + voz de la marca) para los pendientes sin borrador"
-            className="h-10 px-3 rounded-md text-sm font-medium text-white bg-[#ba41f7] hover:bg-[#9f37db] disabled:opacity-50 transition-colors shadow-sm"
+            title="Genera respuestas sugeridas con IA (post + comentario + voz de la marca) para los pendientes sin borrador"
+            className="inline-flex items-center gap-2 h-10 px-3.5 rounded-lg text-sm font-medium text-white hover:brightness-95 disabled:opacity-50 transition-all shadow-sm"
+            style={{ background: '#ba41f7' }}
           >
-            {isGenerating ? '⏳ Generando…' : '✨ Generar borradores'}
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isGenerating ? 'Generando…' : 'Generar borradores'}
           </button>
 
-          {/* Informe de lo respondido HOY — no necesita comentarios seleccionados */}
+          {/* Informe a WhatsApp del cliente (de lo respondido hoy) */}
           <button
             onClick={() => handleInforme('cliente')}
             disabled={informando}
-            title="Envía el informe de los comentarios respondidos hoy al grupo de WhatsApp configurado de la marca."
-            className="h-10 px-3 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            title="Envía el informe de los comentarios respondidos hoy al grupo de WhatsApp del cliente."
+            className="inline-flex items-center gap-2 h-10 px-3.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
-            {informando ? '⏳…' : '📲 Informe a WhatsApp'}
+            {informando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Informe a WhatsApp
           </button>
+
+          {/* Informe de prueba a New team (grupo interno) */}
           <button
             onClick={() => handleInforme('newteam')}
             disabled={informando}
-            title="Envía el informe de los comentarios respondidos hoy al grupo interno 'New team' (prueba)."
-            className="h-10 px-3 rounded-md border border-amber-400 bg-amber-50 text-amber-900 text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
+            title="Envía el informe de hoy al grupo interno 'New team' (prueba, sin riesgo)."
+            className="inline-flex items-center gap-2 h-10 px-3.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm font-medium hover:bg-amber-100 disabled:opacity-50 transition-colors"
           >
-            {informando ? '⏳…' : '🧪 Informe de prueba a New team'}
+            {informando ? <Loader2 className="w-4 h-4 animate-spin" /> : <FlaskConical className="w-4 h-4" />}
+            Informe de prueba
           </button>
 
-          {/* Postear aprobados — directo a Metricool, sin rutina de Claude */}
+          {/* Postear aprobados — directo a Metricool */}
           {resumen.approved > 0 && (
             <button
               onClick={handlePostearAprobados}
               disabled={isPosting}
               title={`Postea los ${resumen.approved} aprobados directo a Metricool`}
-              className="h-10 px-3 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 h-10 px-3.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
-              {isPosting ? '⏳ Posteando…' : `✅ Postear ${resumen.approved} aprobados`}
+              {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {isPosting ? 'Posteando…' : `Postear ${resumen.approved}`}
             </button>
           )}
         </div>

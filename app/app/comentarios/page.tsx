@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { listInbox, getResumenInbox } from './_actions'
 import { ComentariosClient } from './_components/comentarios-client'
+import { MessagesSquare } from 'lucide-react'
 import { getCurrentMemberPermisos, getLandingRoute } from '@/lib/team/permisos-helper'
 import { tieneAcceso } from '@/lib/team/types'
 
@@ -83,12 +84,17 @@ export default async function ComentariosPage({ searchParams }: { searchParams: 
 
   return (
     <main className="container mx-auto p-6 max-w-6xl space-y-4">
-      <header>
-        <h1 className="text-3xl font-bold mb-1">💬 Comentarios</h1>
-        <p className="text-sm text-muted-foreground">
-          Inbox unificado de comentarios públicos en Instagram / Facebook / TikTok.
-          Cargá desde Metricool, aprobá respuestas y respondé en batch.
-        </p>
+      <header className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-xl bg-[#ba41f7]/10 flex items-center justify-center shrink-0">
+          <MessagesSquare className="w-6 h-6 text-[#ba41f7]" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold mb-1 tracking-tight">Comentarios</h1>
+          <p className="text-sm text-muted-foreground">
+            Inbox unificado de comentarios públicos en Instagram / Facebook / TikTok.
+            Carga desde Metricool, genera borradores con IA y responde en lote.
+          </p>
+        </div>
       </header>
 
       {error && (
