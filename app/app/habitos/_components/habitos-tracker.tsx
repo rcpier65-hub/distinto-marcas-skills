@@ -35,6 +35,41 @@ function addDays(d: Date, n: number): Date { const x = new Date(d); x.setDate(x.
 const LETRA = ['D', 'L', 'M', 'M', 'J', 'V', 'S']            // getDay() 0=Dom..6=Sáb
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
+/** Donut de progreso tipo métrica: % al centro + leyenda cumplido / no cumplido. */
+function DonutMetrica({ pct, cumplidos, noCumplidos }: { pct: number; cumplidos: number; noCumplidos: number }) {
+  const r = 54
+  const c = 2 * Math.PI * r
+  const filled = (Math.max(0, Math.min(100, pct)) / 100) * c
+  return (
+    <div className="flex flex-col items-center gap-3 shrink-0">
+      <div className="relative w-[148px] h-[148px]">
+        <svg width="148" height="148" viewBox="0 0 148 148">
+          <circle cx="74" cy="74" r={r} fill="none" stroke="#ececf1" strokeWidth="16" />
+          <circle
+            cx="74" cy="74" r={r} fill="none" stroke={VIOLETA} strokeWidth="16" strokeLinecap="round"
+            strokeDasharray={`${filled} ${c}`} transform="rotate(-90 74 74)"
+            style={{ transition: 'stroke-dasharray 0.4s ease' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-bold tabular-nums leading-none">{pct}%</span>
+          <span className="text-[10px] tracking-widest text-muted-foreground mt-1">CUMPLIDO</span>
+        </div>
+      </div>
+      <div className="w-full max-w-[190px] space-y-1.5 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm" style={{ background: VIOLETA }} /> Cumplido</span>
+          <span className="tabular-nums"><strong>{cumplidos}</strong> <span className="text-muted-foreground text-xs">{pct}%</span></span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm" style={{ background: '#e4e4e7' }} /> No cumplido</span>
+          <span className="tabular-nums"><strong>{noCumplidos}</strong> <span className="text-muted-foreground text-xs">{100 - pct}%</span></span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function HabitosTracker({ habitos, today }: Props) {
   const [vista, setVista] = useState<'semana' | 'mes'>('semana')
   const [, startTransition] = useTransition()
@@ -160,66 +195,57 @@ export function HabitosTracker({ habitos, today }: Props) {
         const cumplidosMes = delMes.filter((d) => done.has(`${h.id}|${d.ymd}`)).length
         const pasados = delMes.filter((d) => !d.futuro).length
         const pct = pasados > 0 ? Math.round((cumplidosMes / pasados) * 100) : 0
-        const hoyOk = done.has(`${h.id}|${today}`)
         return (
-          <div key={h.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="min-w-0">
+          <div key={h.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+              {/* IZQUIERDA: info + calendario */}
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{h.icono}</span>
                   <h3 className="font-semibold text-base truncate">{h.nombre}</h3>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5 ml-9">
+                <p className="text-xs text-muted-foreground mt-0.5 ml-9 mb-3">
                   {cumplidosMes} días este mes · <span style={{ color: VIOLETA }}>{pct}%</span>
                 </p>
+                {/* Calendario del mes — 7 columnas (Lun→Dom) */}
+                <div className="max-w-md">
+                  <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => (
+                      <span key={i} className="text-[10px] text-center text-muted-foreground">{l}</span>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {mes.dias.map((d, idx) => {
+                      if (!d.inMonth) return <span key={idx} aria-hidden />   // relleno fuera del mes
+                      const ok = done.has(`${h.id}|${d.ymd}`)
+                      const clickable = !d.futuro
+                      return (
+                        <button
+                          key={idx}
+                          disabled={!clickable}
+                          onClick={() => clickable && toggle(h.id, d.ymd)}
+                          title={d.ymd}
+                          className="aspect-square rounded-md flex items-center justify-center text-[11px] tabular-nums transition-all disabled:cursor-default hover:opacity-90"
+                          style={
+                            ok
+                              ? { background: VIOLETA, color: '#fff', fontWeight: 600 }
+                              : d.esHoy
+                              ? { border: `2px solid ${VIOLETA}`, background: `${VIOLETA}12`, color: VIOLETA, fontWeight: 700 }
+                              : d.futuro
+                              ? { background: 'var(--muted, #f4f4f5)', color: '#c4c4cc' }
+                              : { background: 'var(--border, #e4e4e7)', color: '#71717a' }
+                          }
+                        >
+                          {d.dia}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
-              {/* Estado de HOY — clickeable */}
-              <button
-                onClick={() => toggle(h.id, today)}
-                title="Marcar hoy"
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
-                style={hoyOk
-                  ? { background: VIOLETA, color: '#fff', boxShadow: `0 2px 10px ${VIOLETA}55` }
-                  : { border: `2px solid ${VIOLETA}`, background: `${VIOLETA}10`, color: VIOLETA }}
-              >
-                {hoyOk ? <Check className="w-5 h-5" strokeWidth={3} /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: VIOLETA }} />}
-              </button>
-            </div>
 
-            {/* Calendario del mes — 7 columnas (Lun→Dom) */}
-            <div className="max-w-md">
-              <div className="grid grid-cols-7 gap-1.5 mb-1.5">
-                {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => (
-                  <span key={i} className="text-[10px] text-center text-muted-foreground">{l}</span>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1.5">
-                {mes.dias.map((d, idx) => {
-                  if (!d.inMonth) return <span key={idx} aria-hidden />   // relleno fuera del mes
-                  const ok = done.has(`${h.id}|${d.ymd}`)
-                  const clickable = !d.futuro
-                  return (
-                    <button
-                      key={idx}
-                      disabled={!clickable}
-                      onClick={() => clickable && toggle(h.id, d.ymd)}
-                      title={d.ymd}
-                      className="aspect-square rounded-md flex items-center justify-center text-[11px] tabular-nums transition-all disabled:cursor-default hover:opacity-90"
-                      style={
-                        ok
-                          ? { background: VIOLETA, color: '#fff', fontWeight: 600 }
-                          : d.esHoy
-                          ? { border: `2px solid ${VIOLETA}`, background: `${VIOLETA}12`, color: VIOLETA, fontWeight: 700 }
-                          : d.futuro
-                          ? { background: 'var(--muted, #f4f4f5)', color: '#c4c4cc' }
-                          : { background: 'var(--border, #e4e4e7)', color: '#71717a' }
-                      }
-                    >
-                      {d.dia}
-                    </button>
-                  )
-                })}
-              </div>
+              {/* DERECHA: donut de métrica (cumplido vs no cumplido del mes) */}
+              <DonutMetrica pct={pct} cumplidos={cumplidosMes} noCumplidos={pasados - cumplidosMes} />
             </div>
           </div>
         )
