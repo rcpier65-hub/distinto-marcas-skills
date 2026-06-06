@@ -852,9 +852,10 @@ function TabSeguridad({
   const [pending, startTransition] = useTransition()
   const dirty = password !== (member.password_inicial ?? '')
   const tieneAcceso = !!member.auth_user_id && !!member.password_inicial
-  /* Origen de la URL para el link de login — usa window en cliente */
-  const [origin, setOrigin] = useState('')
-  useEffect(() => { setOrigin(window.location.origin) }, [])
+
+  /* URL canónica de la app — hardcoded para que el link siempre apunte
+     a producción y no a un deploy preview con hash. */
+  const APP_URL = 'https://distinto-app.vercel.app'
 
   function generarRandom() {
     /* Mismo charset pronunciable que el server. 12 chars. */
@@ -895,20 +896,43 @@ function TabSeguridad({
     })
   }
 
-  function copiarCredenciales() {
+  /* Detecta primer nombre para personalizar y el género del saludo.
+     Nombres terminados en a/á se tratan como femenino, el resto
+     masculino. Para casos raros (Joshua, José) usa neutro. */
+  function generarMensaje(): string {
+    const primerNombre = member.nombre.split(/[\s\-]/)[0]
+    const capitalizado = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase()
+    const ultimo = capitalizado.slice(-1).toLowerCase()
+    let bienvenida = 'Bienvenid@'
+    if (ultimo === 'a' || ultimo === 'á') bienvenida = 'Bienvenida'
+    else if (ultimo === 'o' || ultimo === 'ó' || /[bcdfghjklmnprstvxyz]/i.test(ultimo)) bienvenida = 'Bienvenido'
+
+    return `¡Hola ${capitalizado}! 👋
+
+${bienvenida} a tu nueva casa de trabajo en Distinto Agencia. 🎉
+Acabo de crear tu acceso al sistema, te dejo los datos abajo:
+
+🔗 Entra acá:
+${APP_URL}/login
+
+📧 Email:
+${member.email}
+
+🔑 Contraseña:
+${password}
+
+Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
+
+— Pedro`
+  }
+
+  function copiarInvitacion() {
     if (!password) {
       toast.error('Primero asigná y guardá una contraseña')
       return
     }
-    const loginUrl = `${origin || 'https://distinto.app'}/login`
-    const texto = `🔐 Acceso a Distinto
-
-👤 Usuario: ${member.email}
-🔑 Contraseña: ${password}
-
-🔗 Login: ${loginUrl}`
-    navigator.clipboard.writeText(texto)
-    toast.success('Credenciales copiadas — pegalas en WhatsApp')
+    navigator.clipboard.writeText(generarMensaje())
+    toast.success('Mensaje de invitación copiado — pegalo en WhatsApp')
   }
 
   function copiarSoloPassword() {
@@ -979,41 +1003,68 @@ function TabSeguridad({
         </div>
       </section>
 
-      {tieneAcceso && password && (
-        <section>
-          <h3 style={sectionTitleStyle}>Compartir acceso</h3>
-          <p style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', margin: '0 0 10px' }}>
-            Generá un mensaje listo con usuario + contraseña + link de login.
+      {password && (
+        <section style={{
+          padding: 16,
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+        }}>
+          <h3 style={{ ...sectionTitleStyle, margin: '0 0 4px' }}>📨 Invitación lista para enviar</h3>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 14px', lineHeight: 1.5 }}>
+            Mensaje de bienvenida personalizado con el link, email y contraseña. Tocá copiar y pegá en WhatsApp.
           </p>
+
+          {/* Preview del mensaje siempre visible — Pedro quiere ver
+              cómo queda antes de copiar. */}
+          <pre style={{
+            margin: '0 0 12px', padding: 14,
+            background: '#fafafa',
+            border: '1px solid #f1f1f3',
+            borderRadius: 10,
+            fontSize: 12.5, fontFamily: 'inherit',
+            color: '#374151', lineHeight: 1.55,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            maxHeight: 260, overflow: 'auto',
+          }}>{generarMensaje()}</pre>
+
           <button
-            onClick={copiarCredenciales}
-            style={{ ...btnPrimaryStyle, width: '100%' }}
+            onClick={copiarInvitacion}
+            disabled={!tieneAcceso}
+            style={{
+              width: '100%', height: 44,
+              background: tieneAcceso ? '#7170ff' : '#e5e7eb',
+              border: `1px solid ${tieneAcceso ? '#7170ff' : '#e5e7eb'}`,
+              borderRadius: 10,
+              color: tieneAcceso ? '#fff' : '#9ca3af',
+              fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+              cursor: tieneAcceso ? 'pointer' : 'not-allowed',
+              boxShadow: tieneAcceso ? '0 1px 3px rgba(113, 112, 255, 0.30)' : 'none',
+              transition: 'all 150ms ease-out',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
             type="button"
+            onMouseEnter={(e) => { if (tieneAcceso) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(113, 112, 255, 0.35)' } }}
+            onMouseLeave={(e) => { if (tieneAcceso) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(113, 112, 255, 0.30)' } }}
           >
-            📨 Copiar credenciales completas
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="4" y="4" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M3 10V3.5a.5.5 0 01.5-.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            {tieneAcceso ? 'Copiar mensaje de invitación' : 'Primero creá la cuenta para copiar'}
           </button>
-          <details style={{ marginTop: 10 }}>
-            <summary style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', cursor: 'pointer' }}>Ver preview del mensaje</summary>
-            <pre style={{
-              marginTop: 8, padding: 12,
-              background: 'var(--mk-bg-base)',
-              border: '1px solid var(--mk-border-subtle)',
-              borderRadius: 'var(--mk-radius-md)',
-              fontSize: 11, fontFamily: 'monospace', color: 'var(--mk-text-secondary)',
-              whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-            }}>{`🔐 Acceso a Distinto
 
-👤 Usuario: ${member.email}
-🔑 Contraseña: ${password}
-
-🔗 Login: ${origin || 'https://distinto.app'}/login`}</pre>
-          </details>
+          {!tieneAcceso && (
+            <p style={{ fontSize: 11, color: '#9ca3af', margin: '8px 0 0', textAlign: 'center', fontStyle: 'italic' }}>
+              Tocá "Crear cuenta y activar" arriba antes de copiar.
+            </p>
+          )}
         </section>
       )}
 
-      <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', lineHeight: 1.6, marginTop: 8, paddingTop: 12, borderTop: '1px solid var(--mk-border-subtle)' }}>
-        <strong style={{ color: 'var(--mk-text-tertiary)' }}>Cómo funciona:</strong><br />
-        Al guardar, se crea (o actualiza) la cuenta en Supabase Auth con email + contraseña. El miembro entra a <code>/login</code>, escribe esas credenciales y queda dentro. La contraseña queda visible acá para vos hasta que el miembro la cambie por su cuenta.
+      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 4 }}>
+        El miembro entra a <code style={{ background: '#f3f4f6', padding: '1px 5px', borderRadius: 4, fontSize: 10.5 }}>{APP_URL}/login</code>, escribe email + contraseña y queda dentro. Podés volver acá cuando necesites copiar el mensaje otra vez.
       </div>
     </div>
   )

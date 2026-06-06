@@ -1105,17 +1105,31 @@ function NuevaTareaModal({
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
+        /* Modal con 3 zonas: header arriba (fijo), body en el medio
+           (scrolleable cuando el contenido crece), footer abajo (fijo
+           con los botones). Sin esto, cuando Pedro activaba ambos
+           toggles (publicar + reunión), el modal crecía más allá del
+           viewport y los botones quedaban cortados.
+           maxHeight: 90vh deja un margen de 10vh para que se vea el
+           backdrop oscuro alrededor del modal. */
         style={{
           width: '100%', maxWidth: 540,
+          maxHeight: '90vh',
           background: 'var(--mk-bg-overlay)',
           border: '1px solid var(--mk-border-default)',
           borderRadius: 'var(--mk-radius-lg)',
           boxShadow: 'var(--mk-shadow-lg)',
-          padding: 24,
-          display: 'flex', flexDirection: 'column', gap: 14,
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',  /* clip al border-radius */
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        {/* HEADER fijo */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 24px 14px',
+          borderBottom: '1px solid var(--mk-border-subtle)',
+          flexShrink: 0,
+        }}>
           <h2 style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0 }}>
             Nueva tarea de diseño
           </h2>
@@ -1123,6 +1137,14 @@ function NuevaTareaModal({
             ✕
           </button>
         </div>
+
+        {/* BODY scrolleable — TODO el contenido del form va acá */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px 24px',
+          display: 'flex', flexDirection: 'column', gap: 14,
+        }}>
 
         <Field label="Nombre de la tarea*">
           <input
