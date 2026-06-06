@@ -31,6 +31,15 @@ export type DisenoEntry = {
   plataformas: string[]
   tipoContenido: string[]
   fechaMarcadaParaDisenar: string | null  // YYYY-MM-DD del "hoy"
+  /* Timeline tracking — para que Pedro vea cuánto duró la tarea
+     "en progreso" antes de archivarse o completarse.
+     - startedAt: cuándo pasó a 'en_progreso' (la primera vez).
+       Si vuelve a 'sin_empezar' y luego a 'en_progreso' otra vez,
+       NO lo reseteamos — el primer arranque es el que cuenta.
+     - archivedAt: cuándo pasó a 'archivado'. Se limpia (null) si
+       se reactiva la tarea. */
+  startedAt: string | null    // ISO timestamp
+  archivedAt: string | null   // ISO timestamp
 }
 
 export type DisenadorOption = {
@@ -77,4 +86,43 @@ export function normalizeSubEstado(estadoTarea: string | null | undefined): SubE
   if (s === 'listo' || s === 'completado') return 'listo'
   if (s === 'en_progreso' || s === 'en progreso' || s.includes('progreso')) return 'en_progreso'
   return 'sin_empezar'
+}
+
+/**
+ * Formatea fecha+hora ISO como "5 jun · 14:32" — usado en la card del
+ * Kanban para mostrar cuándo se archivó la tarea.
+ */
+export function formatDateTimeES(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  const dd = d.getDate()
+  const mes = meses[d.getMonth()]
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${dd} ${mes} · ${hh}:${mm}`
+}
+
+/**
+ * Devuelve duración legible entre 2 timestamps ("3 días 2h", "4h 30min",
+ * "12 min"). Si falta alguno, devuelve null.
+ */
+export function formatDuracion(startedAt: string | null, endedAt: string | null): string | null {
+  if (!startedAt || !endedAt) return null
+  const start = new Date(startedAt).getTime()
+  const end = new Date(endedAt).getTime()
+  if (isNaN(start) || isNaN(end) || end < start) return null
+  const ms = end - start
+  const minutos = Math.floor(ms / 60_000)
+  if (minutos < 1) return 'menos de 1 min'
+  if (minutos < 60) return `${minutos} min`
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) {
+    const m = minutos % 60
+    return m === 0 ? `${horas}h` : `${horas}h ${m}min`
+  }
+  const dias = Math.floor(horas / 24)
+  const h = horas % 24
+  return h === 0 ? `${dias} día${dias === 1 ? '' : 's'}` : `${dias} día${dias === 1 ? '' : 's'} ${h}h`
 }

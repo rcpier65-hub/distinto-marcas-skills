@@ -30,6 +30,8 @@ import {
   type SubEstadoDiseno,
   type AlertaFecha,
   calcularAlertaFecha,
+  formatDateTimeES,
+  formatDuracion,
 } from '@/lib/diseno/types'
 
 /* ============================================================
@@ -704,6 +706,10 @@ function KanbanVista({
                    bordes "duros" — sensación de surface flotante.
                    Cuando dragOver, ring del color + bg ligeramente
                    más fuerte para indicar drop zone. */
+                /* Columna Archivado: opacity bajada a 0.55 (antes 0.85)
+                   + filter saturate(0.6) que apaga los colores —
+                   pedido de Pedro: "que se vea con opacidad no tan
+                   claro todo". El resto de columnas a 100%. */
                 position: 'relative',
                 background: isOver ? `${cfg.color}10` : 'rgba(255, 255, 255, 0.018)',
                 border: `1px solid ${isOver ? cfg.color : 'rgba(255, 255, 255, 0.06)'}`,
@@ -712,7 +718,8 @@ function KanbanVista({
                 display: 'flex', flexDirection: 'column', gap: 8,
                 minHeight: 'calc(100vh - 280px)',
                 transition: 'all 120ms ease',
-                opacity: isArchived ? 0.85 : 1,
+                opacity: isArchived ? 0.55 : 1,
+                filter: isArchived ? 'saturate(0.6)' : 'none',
                 boxShadow: isOver ? `0 0 0 3px ${cfg.color}20, 0 8px 24px ${cfg.color}15` : 'none',
               }}
             >
@@ -886,35 +893,83 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
         </div>
       )}
 
-      {/* Footer: pills de fechas. Si hay alerta de urgencia, el pill
-          del color de alerta. Los pills son más sutiles que en v1. */}
-      {(entry.fechaEntrega || entry.fechaDiseno) && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {entry.fechaEntrega && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 10, fontWeight: 500,
-              padding: '3px 7px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: 'var(--mk-text-tertiary)',
-              borderRadius: 5,
+      {/* Footer adapta su contenido según el estado:
+          - Si está archivada: timeline "Archivada: X · Duró: Y"
+          - Si no: pills de fecha entrega + fecha diseño con alerta */}
+      {entry.subEstado === 'archivado' ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 4,
+          padding: '8px 10px',
+          background: 'rgba(167, 139, 250, 0.06)',
+          border: '1px solid rgba(167, 139, 250, 0.15)',
+          borderRadius: 6,
+          marginTop: 2,
+        }}>
+          {entry.archivedAt && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: 10.5, color: 'var(--mk-text-tertiary)',
             }}>
-              <IconCalendar /> {formatDateES(entry.fechaEntrega).replace(' 2026', '')}
-            </span>
+              <IconArchive />
+              <span style={{ fontWeight: 500 }}>Archivada:</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {formatDateTimeES(entry.archivedAt)}
+              </span>
+            </div>
           )}
-          {entry.fechaDiseno && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 10, fontWeight: 500,
-              padding: '3px 7px',
-              background: `${ALERTA_COLOR[alerta].fg}15`,
-              color: ALERTA_COLOR[alerta].fg,
-              borderRadius: 5,
+          {/* Duración: si tenemos started_at + archived_at calculamos
+              el tiempo "en progreso". Si no, mostramos placeholder
+              "—" para que el diseño sea consistente. */}
+          {entry.startedAt && entry.archivedAt && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: 10.5, color: 'var(--mk-text-tertiary)',
             }}>
-              <IconPalette /> {formatDateES(entry.fechaDiseno).replace(' 2026', '')}
-            </span>
+              <IconHourglass />
+              <span style={{ fontWeight: 500 }}>Duró:</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums', color: '#a78bfa' }}>
+                {formatDuracion(entry.startedAt, entry.archivedAt) ?? '—'}
+              </span>
+            </div>
+          )}
+          {!entry.startedAt && entry.archivedAt && (
+            <div style={{
+              fontSize: 10, fontStyle: 'italic',
+              color: 'var(--mk-text-quaternary)',
+            }}>
+              Sin trackeo (archivada directamente)
+            </div>
           )}
         </div>
+      ) : (
+        (entry.fechaEntrega || entry.fechaDiseno) && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {entry.fechaEntrega && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 10, fontWeight: 500,
+                padding: '3px 7px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                color: 'var(--mk-text-tertiary)',
+                borderRadius: 5,
+              }}>
+                <IconCalendar /> {formatDateES(entry.fechaEntrega).replace(' 2026', '')}
+              </span>
+            )}
+            {entry.fechaDiseno && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 10, fontWeight: 500,
+                padding: '3px 7px',
+                background: `${ALERTA_COLOR[alerta].fg}15`,
+                color: ALERTA_COLOR[alerta].fg,
+                borderRadius: 5,
+              }}>
+                <IconPalette /> {formatDateES(entry.fechaDiseno).replace(' 2026', '')}
+              </span>
+            )}
+          </div>
+        )
       )}
     </div>
   )
@@ -978,6 +1033,10 @@ function NuevaTareaModal({
       plataformas: [],
       tipoContenido: [],
       fechaMarcadaParaDisenar: null,
+      /* Nueva tarea arranca sin timeline — los timestamps se setean
+         automáticamente cuando avanza el sub-estado. */
+      startedAt: null,
+      archivedAt: null,
     })
   }
 
@@ -1568,3 +1627,6 @@ function IconOpenInPage(){ return <svg width="11" height="11" viewBox="0 0 11 11
 /* Icons compactos usados en los footer pills de KanbanCard */
 function IconCalendar()  { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M3 1V3M7 1V3M1 4.5H9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg> }
 function IconPalette()   { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1C2.79 1 1 2.79 1 5C1 6.5 2 7 3 7C3.5 7 3.5 6.5 3.5 6.2C3.5 5.6 4 5.5 4.5 5.5C5.5 5.5 6 6 6 6.5C6 7.5 5.5 8 5 8.5C4.7 8.8 5 9 5 9C7.21 9 9 7.21 9 5C9 2.79 7.21 1 5 1Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg> }
+/* IconHourglass: usado en el footer de archivadas para indicar
+   "duración" (tiempo que estuvo en progreso). */
+function IconHourglass() { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 1H8M2 9H8M2.5 1V3L5 5L7.5 3V1M2.5 9V7L5 5L7.5 7V9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg> }

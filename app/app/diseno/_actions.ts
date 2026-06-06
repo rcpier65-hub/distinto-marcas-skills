@@ -81,7 +81,29 @@ export async function updateDisenoEntry(
   const update: Record<string, unknown> = { updated_by: user.id }
   if (patch.nombre !== undefined) update.nombre = patch.nombre
   if (patch.descripcion !== undefined) update.descripcion = patch.descripcion
-  if (patch.subEstado !== undefined) update.estado_tarea = patch.subEstado
+  if (patch.subEstado !== undefined) {
+    update.estado_tarea = patch.subEstado
+    /* Timeline auto-tracking:
+       - Si pasa a 'en_progreso' y nunca tuvo started_at, set ahora.
+       - Si pasa a 'archivado', set archived_at = now().
+       - Si se reactiva (sale de archivado), null el archived_at.
+       Lectura previa de la fila para preservar started_at si ya existe. */
+    if (patch.subEstado === 'en_progreso') {
+      const { data: prev } = await service
+        .from('publicaciones')
+        .select('started_at')
+        .eq('id', id)
+        .maybeSingle()
+      if (!prev?.started_at) update.started_at = new Date().toISOString()
+    }
+    if (patch.subEstado === 'archivado') {
+      update.archived_at = new Date().toISOString()
+    } else {
+      /* Cualquier otro subEstado (sin_empezar / en_progreso / listo)
+         significa "no archivada" → limpiar archived_at. */
+      update.archived_at = null
+    }
+  }
   if (patch.fechaDiseno !== undefined) update.fecha_diseno = patch.fechaDiseno
   if (patch.fechaEntrega !== undefined) update.fecha_entrega = patch.fechaEntrega
   if (patch.fechaPublicacion !== undefined) update.fecha_publicacion = patch.fechaPublicacion
@@ -117,10 +139,15 @@ export async function archivarTarea(id: string, archivar: boolean): Promise<Acti
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const nuevo: SubEstadoDiseno = archivar ? 'archivado' : 'sin_empezar'
-  const { error } = await service
-    .from('publicaciones')
-    .update({ estado_tarea: nuevo, updated_by: user.id })
-    .eq('id', id)
+  /* Timeline tracking en archivar quick-action:
+     - Archivar → set archived_at = now()
+     - Reactivar → null el archived_at */
+  const update: Record<string, unknown> = {
+    estado_tarea: nuevo,
+    updated_by: user.id,
+    archived_at: archivar ? new Date().toISOString() : null,
+  }
+  const { error } = await service.from('publicaciones').update(update).eq('id', id)
   if (error) {
     if (error.code === '22P02' || /archivado/i.test(error.message ?? '')) {
       return { ok: false, error: 'Migration de archivado pendiente: ALTER TYPE estado_tarea ADD VALUE archivado.' }
@@ -191,6 +218,10 @@ export async function crearDisenoTask(args: {
     nombre,
     estado: args.esParaPublicar ? 'disenar' : 'borrador',
     estado_tarea: 'sin_empezar',
+    /* Nueva tarea: sin started_at ni archived_at. Se setean
+       automáticamente cuando el sub-estado avance. */
+    started_at: null,
+    archived_at: null,
     plataformas: [],
     tipo_contenido: [],
     objetivos: [],

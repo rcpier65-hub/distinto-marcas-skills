@@ -59,6 +59,7 @@ export default async function DisenoPage() {
     estado, estado_tarea,
     plataformas, tipo_contenido,
     fecha_marcada_para_disenar,
+    started_at, archived_at,
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
   const FALLBACK_SELECT = `
@@ -194,6 +195,8 @@ export default async function DisenoPage() {
       plataformas: (r.plataformas ?? []).map(abbreviatePlataforma),
       tipoContenido: r.tipo_contenido ?? [],
       fechaMarcadaParaDisenar: r.fecha_marcada_para_disenar ?? null,
+      startedAt: r.started_at ?? null,
+      archivedAt: r.archived_at ?? null,
     }
   })
 
