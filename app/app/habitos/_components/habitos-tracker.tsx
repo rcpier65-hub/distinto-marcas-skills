@@ -197,18 +197,19 @@ export function HabitosTracker({ habitos, today }: Props) {
         const pct = pasados > 0 ? Math.round((cumplidosMes / pasados) * 100) : 0
         return (
           <div key={h.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-              {/* IZQUIERDA: info + calendario */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{h.icono}</span>
-                  <h3 className="font-semibold text-base truncate">{h.nombre}</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 ml-9 mb-3">
-                  {cumplidosMes} días este mes · <span style={{ color: VIOLETA }}>{pct}%</span>
-                </p>
-                {/* Calendario del mes — 7 columnas (Lun→Dom) */}
-                <div className="max-w-md">
+            {/* Título a todo el ancho */}
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{h.icono}</span>
+              <h3 className="font-semibold text-base truncate">{h.nombre}</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-9">
+              {cumplidosMes} días este mes · <span style={{ color: VIOLETA }}>{pct}%</span>
+            </p>
+
+            {/* Calendario + donut, centrados juntos */}
+            <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16 mt-4">
+              {/* Calendario del mes — 7 columnas (Lun→Dom) */}
+              <div className="max-w-md w-full shrink-0">
                   <div className="grid grid-cols-7 gap-1.5 mb-1.5">
                     {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => (
                       <span key={i} className="text-[10px] text-center text-muted-foreground">{l}</span>
@@ -242,9 +243,8 @@ export function HabitosTracker({ habitos, today }: Props) {
                     })}
                   </div>
                 </div>
-              </div>
 
-              {/* DERECHA: donut de métrica (cumplido vs no cumplido del mes) */}
+              {/* Donut de métrica a la derecha */}
               <DonutMetrica pct={pct} cumplidos={cumplidosMes} noCumplidos={pasados - cumplidosMes} />
             </div>
           </div>
