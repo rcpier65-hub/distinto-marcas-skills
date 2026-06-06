@@ -1071,7 +1071,8 @@ function NuevaTareaModal({
       fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
       fechaDiseno: fechaDiseno || null,
       fechaEntrega: fechaEntrega || null,
-      estado: esParaPublicar ? 'disenar' : 'borrador',
+      /* Mismo estado que usamos en el insert del server action */
+      estado: 'disenar',
       subEstado: 'sin_empezar',
       plataformas: [],
       tipoContenido: [],

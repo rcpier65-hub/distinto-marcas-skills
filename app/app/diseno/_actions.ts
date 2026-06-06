@@ -252,7 +252,13 @@ export async function crearDisenoTask(args: {
   const insert: Record<string, unknown> = {
     marca_id: marca.id,
     nombre,
-    estado: args.esParaPublicar ? 'disenar' : 'borrador',
+    /* Estado SIEMPRE 'disenar' — el ENUM estado_publicacion no tiene
+       'borrador'. Tanto las tareas "para publicar" como las standalone
+       arrancan en estado 'disenar' del pipeline (etapa de diseño).
+       Las tareas para publicar siguen su flujo normal hacia editar →
+       aprobar → publicar; las standalone se quedan en 'disenar' hasta
+       que el sub-estado las marca como 'listo' o 'archivado'. */
+    estado: 'disenar',
     estado_tarea: 'sin_empezar',
     /* Nueva tarea: sin started_at ni archived_at. Se setean
        automáticamente cuando el sub-estado avance. */
@@ -305,7 +311,17 @@ export async function crearDisenoTask(args: {
     return { ok: false, error: error.message }
   }
 
+  /* Refresco TODAS las vistas afectadas. Si es para publicar, la
+     tarea aparecerá en el calendario principal y la tabla — pedro
+     pidió "que se conecte a la grilla principal para que también
+     pueda verse en el calendario principal". */
   revalidatePath('/diseno')
-  if (args.esParaPublicar) revalidatePath('/publicaciones')
+  if (args.esParaPublicar) {
+    revalidatePath('/publicaciones')
+    revalidatePath('/publicaciones/calendario')
+    revalidatePath('/publicaciones/tabla')
+    revalidatePath('/publicaciones/kanban')
+    revalidatePath('/editor')  /* el editor también filtra por estado */
+  }
   return { ok: true, data: { id: data.id } }
 }
