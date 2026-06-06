@@ -162,6 +162,47 @@ export async function toggleHabitoHoy(habitoId: string): Promise<{ ok: true; com
 }
 
 /**
+ * Marca/desmarca un hábito en CUALQUIER fecha (no solo hoy) — para la grilla
+ * semanal/mensual clickeable. No permite fechas futuras.
+ */
+export async function toggleHabitoFecha(
+  habitoId: string,
+  fecha: string,
+): Promise<{ ok: true; completado: boolean } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Fecha inválida' }
+  if (fecha > todayStr()) return { ok: false, error: 'No puedes marcar días futuros' }
+
+  const existing = await service
+    .from('habitos_completados')
+    .select('id')
+    .eq('habito_id', habitoId)
+    .eq('fecha', fecha)
+    .maybeSingle()
+
+  if (existing.data) {
+    const { error } = await service.from('habitos_completados').delete().eq('id', existing.data.id)
+    if (error) return { ok: false, error: error.message }
+    revalidatePath('/habitos')
+    return { ok: true, completado: false }
+  }
+
+  const { error } = await service.from('habitos_completados').insert({ habito_id: habitoId, fecha })
+  if (error) {
+    if ((error.message ?? '').includes('duplicate') || (error.message ?? '').includes('unique')) {
+      revalidatePath('/habitos')
+      return { ok: true, completado: true }
+    }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/habitos')
+  return { ok: true, completado: true }
+}
+
+/**
  * Crear un hábito nuevo.
  */
 export async function createHabito(args: {

@@ -4,7 +4,7 @@
 
 import { requireUser } from '@/lib/auth/get-user'
 import { listHabitosConEstado } from './_actions'
-import { HabitoCard } from './_components/habito-card'
+import { HabitosTracker } from './_components/habitos-tracker'
 import { NuevoHabitoForm } from './_components/nuevo-habito-form'
 
 export const dynamic = 'force-dynamic'
@@ -57,30 +57,17 @@ export default async function HabitosPage() {
       )}
 
       {/* GRID DE CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {habitos.map((h) => (
-          <HabitoCard
-            key={h.id}
-            id={h.id}
-            nombre={h.nombre}
-            icono={h.icono}
-            color={h.color}
-            dias_activos={h.dias_activos}
-            completado_hoy={h.completado_hoy}
-            completado_at={h.completado_at}
-            historial={h.historial}
-            today={today}
-            pct_cumplimiento={h.pct_cumplimiento}
-            dias_esperados={h.dias_esperados}
-            dias_cumplidos={h.dias_cumplidos}
-          />
-        ))}
-        {habitos.length === 0 && !error && (
-          <div className="col-span-full bg-slate-900/40 border border-slate-800 rounded-2xl p-8 text-center text-sm text-muted-foreground">
-            Sin hábitos todavía. Apretá <strong>+ Nuevo hábito</strong> abajo para empezar.
-          </div>
-        )}
-      </div>
+      {/* TRACKER — vista semana / mes */}
+      <HabitosTracker
+        habitos={habitos.map((h) => ({
+          id: h.id,
+          nombre: h.nombre,
+          icono: h.icono,
+          color: h.color,
+          historial: h.historial,
+        }))}
+        today={today}
+      />
 
       {/* FORM NUEVO */}
       <section className="pt-2">
@@ -89,7 +76,7 @@ export default async function HabitosPage() {
 
       {/* HINT */}
       <p className="text-xs text-muted-foreground">
-        💡 El heatmap muestra los últimos 49 días. Los días no-activos (ej. fin de semana si es hábito laboral) aparecen más opacos. El cuadrito con anillo azul es <strong>hoy</strong>.
+        💡 Cambia entre <strong>Semana</strong> y <strong>Mes</strong> arriba. Toca cualquier día para marcarlo/desmarcarlo — el círculo violeta es cumplido, el anillo es <strong>hoy</strong>.
       </p>
     </main>
   )
