@@ -5,6 +5,7 @@
    Usa MARCAS_NAV centralizado + mock data inline (mientras migramos
    a Supabase). */
 
+import { useState } from 'react'
 import { MARCAS_NAV } from '@/lib/mock-marcas'
 
 // ============================================================
@@ -57,12 +58,18 @@ const METRICAS = {
 // COMPONENT
 // ============================================================
 
-/* Acepta un nombre opcional para personalizar el saludo. Si no se
-   pasa, usa "amigo" como fallback genérico. Pedro pidió que cuando
-   Lorena entra a su sesión vea "Buen día, Lorena", no "Pedro". */
-type CockpitViewProps = { nombreUsuario?: string }
+/* Props:
+   - nombreUsuario: para personalizar el saludo
+   - puedeVerFinanzas: si false, NO se renderiza la card "Ingresos del mes"
+     (Pedro pidió que solo él pueda verla — privacidad cuando comparte
+     pantalla con el equipo). Por defecto false, así que cualquier
+     llamada sin pasar el flag NO muestra ingresos. */
+type CockpitViewProps = {
+  nombreUsuario?: string
+  puedeVerFinanzas?: boolean
+}
 
-export function CockpitView({ nombreUsuario = 'amigo' }: CockpitViewProps = {}) {
+export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false }: CockpitViewProps = {}) {
   const marcaMap = Object.fromEntries(MARCAS_NAV.map((m) => [m.slug, m]))
   const ingresoDelta = METRICAS.ingresoMes - METRICAS.ingresoMesPasado
   const ingresoPct = ((ingresoDelta / METRICAS.ingresoMesPasado) * 100).toFixed(1)
@@ -129,12 +136,14 @@ export function CockpitView({ nombreUsuario = 'amigo' }: CockpitViewProps = {}) 
           </p>
         </div>
 
-        {/* KPI grid */}
+        {/* KPI grid. 3 columnas para users sin permiso finanzas (la card
+            Ingresos no se muestra). 4 columnas para Pedro/admin con la
+            card de Ingresos secreta (oculta por default, toggle con ojo). */}
         <div
           className="mk-stagger"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateColumns: puedeVerFinanzas ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
             gap: 1,
             marginBottom: 32,
             background: 'var(--mk-border-subtle)',
@@ -146,7 +155,14 @@ export function CockpitView({ nombreUsuario = 'amigo' }: CockpitViewProps = {}) 
           <Kpi label="Publicaciones esta semana" value={METRICAS.publicacionesEstaSemana.toString()} delta="+12%" deltaPositive />
           <Kpi label="Comentarios respondidos"   value={METRICAS.comentariosRespondidos.toString()} delta={`${METRICAS.comentariosPendientes} pendientes`} deltaPositive={null} />
           <Kpi label="Grillas enviadas"          value={`${METRICAS.grillasEnviadas} / 9`} delta="67%" deltaPositive />
-          <Kpi label="Ingresos del mes"          value={`S/ ${(METRICAS.ingresoMes / 1000).toFixed(1)}k`} delta={`+${ingresoPct}% vs mes pasado`} deltaPositive />
+          {puedeVerFinanzas && (
+            <KpiSecreto
+              label="Ingresos del mes"
+              value={`S/ ${(METRICAS.ingresoMes / 1000).toFixed(1)}k`}
+              delta={`+${ingresoPct}% vs mes pasado`}
+              deltaPositive
+            />
+          )}
         </div>
 
         {/* 2-col */}
@@ -298,6 +314,99 @@ export function CockpitView({ nombreUsuario = 'amigo' }: CockpitViewProps = {}) 
 /* ============================================================
    Sub-components
    ============================================================ */
+
+/* KpiSecreto: card de ingresos con valor oculto por default. Pedro
+   pidió que cuando comparte pantalla con el equipo, los ingresos NO
+   sean visibles a primera vista. Por defecto muestra ••••••; al
+   hacer clic en el ojo se revela. El toggle es state local (no se
+   persiste) — al recargar vuelve a estar oculto. */
+function KpiSecreto({ label, value, delta, deltaPositive }: { label: string; value: string; delta: string; deltaPositive: boolean | null }) {
+  const [revealed, setRevealed] = useState(false)
+  const deltaColor = deltaPositive === true ? 'var(--mk-success)' : deltaPositive === false ? 'var(--mk-danger)' : 'var(--mk-text-tertiary)'
+  return (
+    <div
+      style={{
+        background: 'var(--mk-bg-elevated)',
+        padding: '16px 18px',
+        display: 'flex', flexDirection: 'column', gap: 6,
+        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+        position: 'relative',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--mk-bg-elevated)' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="mk-label" style={{ flex: 1 }}>{label}</div>
+        <button
+          onClick={(e) => { e.stopPropagation(); setRevealed((v) => !v) }}
+          title={revealed ? 'Ocultar' : 'Revelar — solo tú lo ves'}
+          aria-label={revealed ? 'Ocultar ingresos' : 'Mostrar ingresos'}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+            display: 'inline-flex',
+            alignItems: 'center',
+            color: revealed ? 'var(--mk-accent)' : 'var(--mk-text-tertiary)',
+            borderRadius: 'var(--mk-radius-sm)',
+            transition: 'color var(--mk-dur-fast) var(--mk-ease-out)',
+          }}
+        >
+          {revealed ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
+      </div>
+      <div
+        style={{
+          fontSize: 24, fontWeight: 600,
+          letterSpacing: 'var(--mk-tracking-tight)',
+          color: 'var(--mk-text-primary)',
+          fontVariantNumeric: 'tabular-nums', lineHeight: 1.1,
+          filter: revealed ? 'none' : 'blur(0px)',
+          /* Sin blur — mostramos directamente texto censurado para que
+             la sensación sea explícita: nadie debe asumir que detrás hay
+             un dato. */
+        }}
+      >
+        {revealed ? value : '••••••'}
+      </div>
+      <div style={{
+        fontSize: 'var(--mk-text-xs)',
+        color: revealed ? deltaColor : 'var(--mk-text-quaternary)',
+        fontWeight: 500,
+      }}>
+        {revealed
+          ? (
+            <>
+              {deltaPositive === true && '↑ '}
+              {deltaPositive === false && '↓ '}
+              {delta}
+            </>
+          )
+          : 'Privado · solo el admin'}
+      </div>
+    </div>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M1 7C2.5 4 4.5 2.5 7 2.5C9.5 2.5 11.5 4 13 7C11.5 10 9.5 11.5 7 11.5C4.5 11.5 2.5 10 1 7Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M2.5 2.5L11.5 11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M5 4.2C5.6 4 6.3 3.8 7 3.8C9.5 3.8 11.5 5.3 13 7C12.4 8 11.6 8.9 10.7 9.5M8.9 10.6C8.3 10.8 7.7 10.9 7 10.9C4.5 10.9 2.5 9.4 1 7C1.7 5.9 2.6 4.9 3.7 4.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M5.5 7C5.5 6.2 6.2 5.5 7 5.5M8.5 7C8.5 7.8 7.8 8.5 7 8.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 function Kpi({ label, value, delta, deltaPositive }: { label: string; value: string; delta: string; deltaPositive: boolean | null }) {
   const deltaColor = deltaPositive === true ? 'var(--mk-success)' : deltaPositive === false ? 'var(--mk-danger)' : 'var(--mk-text-tertiary)'

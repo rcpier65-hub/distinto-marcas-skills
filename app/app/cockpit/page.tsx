@@ -10,7 +10,7 @@ import { redirect } from 'next/navigation'
 import { CockpitView } from '@/components/views/CockpitView'
 import { getCurrentMemberPermisos, getLandingRoute } from '@/lib/team/permisos-helper'
 import { getUser } from '@/lib/auth/get-user'
-import { tieneAcceso } from '@/lib/team/types'
+import { tieneAcceso, type ModuloPermiso } from '@/lib/team/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,5 +43,12 @@ export default async function CockpitPage() {
   /* Capitalizar primera letra */
   nombreUsuario = nombreUsuario.charAt(0).toUpperCase() + nombreUsuario.slice(1).toLowerCase()
 
-  return <CockpitView nombreUsuario={nombreUsuario} />
+  /* Permiso "finanzas" → Pedro (admin/owner) lo tiene true.
+     Lorena/Pieer/etc → false. Si no hay team_member (Pedro entrando
+     con Google sin perfil) → asumir admin = true. */
+  const puedeVerFinanzas = p
+    ? tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso)
+    : true  /* admin/owner sin team_member ve todo */
+
+  return <CockpitView nombreUsuario={nombreUsuario} puedeVerFinanzas={puedeVerFinanzas} />
 }
