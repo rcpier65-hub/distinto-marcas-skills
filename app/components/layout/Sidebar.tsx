@@ -243,11 +243,11 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos }: Props)
       </nav>
 
       {/* ============== Bottom (user) ============== */}
-      <div style={{ padding: 8, borderTop: '1px solid var(--mk-border-subtle)' }}>
+      <div style={{ padding: 8, borderTop: '1px solid var(--mk-border-subtle)', display: 'flex', gap: 4, alignItems: 'stretch' }}>
         <Link
           href="/settings"
           className="mk-focusable"
-          style={userBtnStyle}
+          style={{ ...userBtnStyle, flex: 1 }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
         >
@@ -262,8 +262,22 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos }: Props)
               {permisos ? permisos.rol : 'Agencia Distinto'}
             </div>
           </div>
-          <SettingsIcon />
         </Link>
+        {/* Botón cerrar sesión — form con server action signOut. Siempre
+            visible para todos los usuarios (Pedro, Lorena, etc.) porque
+            es la única forma de cambiar de cuenta. */}
+        <form action="/api/auth/logout" method="post" style={{ display: 'flex' }}>
+          <button
+            type="submit"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            style={logoutBtnStyle}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)'; e.currentTarget.style.color = '#dc2626' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--mk-text-tertiary)' }}
+          >
+            <LogoutIcon />
+          </button>
+        </form>
       </div>
     </aside>
   )
@@ -407,6 +421,16 @@ const userBtnStyle: React.CSSProperties = {
   textDecoration: 'none', cursor: 'pointer',
   transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
 }
+const logoutBtnStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 32, padding: '6px 8px',
+  background: 'transparent', border: 'none',
+  borderRadius: 'var(--mk-radius-md)',
+  color: 'var(--mk-text-tertiary)',
+  cursor: 'pointer',
+  transition: 'background var(--mk-dur-fast) var(--mk-ease-out), color var(--mk-dur-fast) var(--mk-ease-out)',
+  fontFamily: 'inherit',
+}
 
 const avatarStyle: React.CSSProperties = {
   width: 22, height: 22, borderRadius: '50%',
@@ -430,3 +454,4 @@ function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" f
 function ChevronUpDown() { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><path d="M3 4L5 2L7 4M3 6L5 8L7 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function SettingsIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><circle cx="7" cy="7" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M7 1.5V3M7 11V12.5M2.55 3.55L3.5 4.5M10.5 9.5L11.45 10.45M1.5 7H3M11 7H12.5M2.55 10.45L3.5 9.5M10.5 4.5L11.45 3.55" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function TeamIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M1.5 11.5C1.5 9.5 3 8.5 5 8.5C7 8.5 8.5 9.5 8.5 11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /><circle cx="10" cy="5.5" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M9 8.5C11 8.5 12.5 9.3 12.5 10.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+function LogoutIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 2H3a1 1 0 00-1 1v8a1 1 0 001 1h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><path d="M9 4l3 3-3 3M5 7h7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg> }
