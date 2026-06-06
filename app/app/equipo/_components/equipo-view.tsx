@@ -256,12 +256,13 @@ function MemberCard({
   const rolColor = rol ? ROL_COLOR[rol.id] : '#737373'
   const cargo = member.cargo_personalizado || rol?.nombre || '—'
 
-  /* Estado del miembro — pill con dot tipo Linear/Notion. Colores
-     pasteles suaves (no chillones) para look moderno y respirado. */
+  /* Estado del miembro — pill con dot tipo Linear/Notion. Pendiente
+     usa morado pastel (#ede9fe / #6d28d9) en línea con el branding
+     Distinto en lugar del amarillo/naranja anterior. */
   const estado: { label: string; color: string; bg: string; dot: string } = !member.activo
     ? { label: 'Inactivo', color: '#6b7280', bg: '#f3f4f6', dot: '#9ca3af' }
     : !member.auth_user_id
-      ? { label: 'Pendiente', color: '#a16207', bg: '#fef9c3', dot: '#eab308' }
+      ? { label: 'Pendiente', color: '#6d28d9', bg: '#ede9fe', dot: '#8b5cf6' }
       : { label: 'Activo', color: '#15803d', bg: '#dcfce7', dot: '#22c55e' }
 
   const fechaIngreso = new Date(member.created_at).toLocaleDateString('es-PE', {
@@ -946,10 +947,15 @@ Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {emailPlaceholder && (
-        <div style={{ padding: 14, background: 'rgba(251, 191, 36, 0.12)', border: '1px solid rgba(251, 191, 36, 0.4)', borderRadius: 'var(--mk-radius-md)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>⚠ Email placeholder</div>
-          <div style={{ fontSize: 11, color: '#92400e' }}>
-            Antes de asignar contraseña cambiá el email <code>{member.email}</code> al real en la tab Información.
+        <div style={{
+          padding: 14,
+          background: '#f5f3ff',
+          border: '1px solid #ddd6fe',
+          borderRadius: 10,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6d28d9', marginBottom: 4 }}>⚠ Email placeholder</div>
+          <div style={{ fontSize: 11.5, color: '#5b21b6', lineHeight: 1.5 }}>
+            Antes de asignar contraseña cambiá el email <code style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '1px 5px', borderRadius: 4 }}>{member.email}</code> al real en la tab Información.
           </div>
         </div>
       )}

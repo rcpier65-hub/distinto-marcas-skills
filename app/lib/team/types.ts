@@ -147,12 +147,14 @@ export const MODULO_LABEL: Record<ModuloPermiso, string> = {
   finanzas: 'Finanzas',
 }
 
-/* Color de chip por rol para visual quick-scan */
+/* Color de chip por rol — alineado con el branding morado/violeta
+   de Distinto. Editor (rol más numeroso del equipo) usa el lavanda
+   #8b5cf6 que pertenece a la familia morada. */
 export const ROL_COLOR: Record<RolPredefinidoId, string> = {
-  admin: '#dc2626',                 // rojo
-  director: '#7c3aed',              // morado intenso
-  social_media_manager: '#3b82f6',  // azul
-  community_manager: '#06b6d4',     // cyan
-  editor: '#f59e0b',                // ámbar
-  disenador: '#ec4899',             // rosa
+  admin: '#dc2626',                 // rojo (alerta admin)
+  director: '#7c3aed',              // morado intenso (jerarquía alta)
+  social_media_manager: '#3b82f6',  // azul (contenido planificación)
+  community_manager: '#06b6d4',     // cyan (atención clientes)
+  editor: '#8b5cf6',                // violeta-lavanda (familia morada Distinto)
+  disenador: '#ec4899',             // rosa (creativo)
 }
