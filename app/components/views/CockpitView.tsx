@@ -109,6 +109,27 @@ export type CockpitData = {
     grillasEnviadasMes: number
     publicacionesEditadasMes: number
   }
+  /* Marcas sin grabación coordinada en próximos 30 días — alerta. */
+  marcasSinGrabacion?: Array<{ slug: string; nombre: string; color: string }>
+  /* Publicaciones en diseño (estado='disenar', portada_lista=false). */
+  tareasDiseno?: Array<{
+    id: string
+    nombre: string
+    marcaSlug: string
+    marcaNombre: string
+    marcaColor: string
+    estadoTarea: string
+    fechaDiseno: string | null
+  }>
+  /* Videos marcados para editar hoy desde el módulo editor. */
+  videosEditandoHoy?: Array<{
+    id: string
+    nombre: string
+    editorNombre: string | null
+    marcaSlug: string
+    marcaNombre: string
+    marcaColor: string
+  }>
 }
 
 /* Props:
@@ -251,39 +272,130 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
           )}
         </div>
 
-        {/* 2-col */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
-          <section>
-            <SectionHeader
-              title="Comentarios por responder"
-              count={comentariosList?.length ?? COMENTARIOS_PENDIENTES.length}
-              actionLabel="Ver todos"
-            />
-            <div
-              style={{
-                border: '1px solid var(--mk-border-subtle)',
-                borderRadius: 'var(--mk-radius-lg)',
-                overflow: 'hidden',
-                background: 'var(--mk-bg-elevated)',
-              }}
-            >
-              {comentariosList ? (
-                comentariosList.length === 0 ? (
-                  <div style={{ padding: 32, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 14 }}>
-                    No tienes comentarios pendientes 🎉
-                  </div>
-                ) : (
-                  <ComentariosAgrupados comentarios={comentariosList} />
-                )
-              ) : (
-                COMENTARIOS_PENDIENTES.map((c) => (
-                  <CommentRow key={c.id} comment={c} marca={marcaMap[c.marcaSlug]} />
-                ))
-              )}
-            </div>
-          </section>
+        {/* === ALERTA: COORDINACIÓN DE GRABACIÓN PENDIENTE === */}
+        {data?.marcasSinGrabacion && data.marcasSinGrabacion.length > 0 && (
+          <AlertaCoordinacionGrabacion marcas={data.marcasSinGrabacion} />
+        )}
 
-          <aside style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* === CARRUSEL: COMENTARIOS POR MARCA === */}
+        <section style={{ marginBottom: 24 }}>
+          <SectionHeader
+            title="Comentarios por responder"
+            count={comentariosList?.length ?? COMENTARIOS_PENDIENTES.length}
+            actionLabel="Ver todos"
+          />
+          {comentariosList && comentariosList.length === 0 ? (
+            <div style={{
+              padding: 32, textAlign: 'center', color: 'var(--mk-text-quaternary)',
+              fontSize: 14, background: 'var(--mk-bg-elevated)',
+              border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)',
+            }}>
+              No tienes comentarios pendientes 🎉
+            </div>
+          ) : comentariosList ? (
+            <CarruselComentarios comentarios={comentariosList} />
+          ) : (
+            <div style={{ background: 'var(--mk-bg-elevated)', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)' }}>
+              {COMENTARIOS_PENDIENTES.map((c) => (
+                <CommentRow key={c.id} comment={c} marca={marcaMap[c.marcaSlug]} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* === BLOQUES INFERIORES: Diseño + Editando hoy + Grabaciones === */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+          {/* Tareas en diseño */}
+          <BloqueTrabajo
+            title="Tareas en diseño"
+            count={data?.tareasDiseno?.length ?? 0}
+            actionHref="/diseno"
+            actionLabel="Ver todo"
+            color="#ec4899"
+          >
+            {(!data?.tareasDiseno || data.tareasDiseno.length === 0) ? (
+              <EmptyMini text="Sin tareas en diseño" />
+            ) : (
+              data.tareasDiseno.slice(0, 5).map((t) => (
+                <ItemTrabajo
+                  key={t.id}
+                  href={`/publicaciones/${t.id}`}
+                  marcaColor={t.marcaColor}
+                  marcaNombre={t.marcaNombre}
+                  nombre={t.nombre}
+                  meta={subEstadoLabel(t.estadoTarea)}
+                />
+              ))
+            )}
+          </BloqueTrabajo>
+
+          {/* Videos editando hoy */}
+          <BloqueTrabajo
+            title="Editando hoy"
+            count={data?.videosEditandoHoy?.length ?? 0}
+            actionHref="/editor"
+            actionLabel="Ver editor"
+            color="#8b5cf6"
+          >
+            {(!data?.videosEditandoHoy || data.videosEditandoHoy.length === 0) ? (
+              <EmptyMini text="Nadie marcó videos para editar hoy" />
+            ) : (
+              data.videosEditandoHoy.slice(0, 5).map((v) => (
+                <ItemTrabajo
+                  key={v.id}
+                  href={`/publicaciones/${v.id}`}
+                  marcaColor={v.marcaColor}
+                  marcaNombre={v.marcaNombre}
+                  nombre={v.nombre}
+                  meta={v.editorNombre ? `Editor: ${v.editorNombre}` : 'Sin editor asignado'}
+                />
+              ))
+            )}
+          </BloqueTrabajo>
+
+          {/* Grabaciones pendientes */}
+          <BloqueTrabajo
+            title="Grabaciones próximas"
+            count={grabacionesList?.length ?? GRABACIONES_PROXIMAS.length}
+            actionHref="/grabaciones"
+            actionLabel="Calendario"
+            color="#06b6d4"
+          >
+            {grabacionesList ? (
+              grabacionesList.length === 0 ? (
+                <EmptyMini text="Sin grabaciones próximas" />
+              ) : (
+                grabacionesList.slice(0, 5).map((g, i) => (
+                  <ItemTrabajo
+                    key={i}
+                    href="/grabaciones"
+                    marcaColor={g.marcaColor}
+                    marcaNombre={g.marcaNombre}
+                    nombre={g.tipo}
+                    meta={`${g.fechaCorta} · ${g.hora}`}
+                  />
+                ))
+              )
+            ) : (
+              GRABACIONES_PROXIMAS.slice(0, 5).map((g, i) => {
+                const m = marcaMap[g.marca]
+                return (
+                  <ItemTrabajo
+                    key={i}
+                    href="/grabaciones"
+                    marcaColor={m?.color ?? '#737373'}
+                    marcaNombre={m?.nombreCorto ?? g.marca}
+                    nombre={g.tipo}
+                    meta={`${g.fecha} · ${g.hora}`}
+                  />
+                )
+              })
+            )}
+          </BloqueTrabajo>
+        </div>
+
+        {/* === GRILLAS A ENVIAR + HÁBITOS DEL DÍA === */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             <section>
               <SectionHeader title="Grillas a enviar" count={grillasList ? grillasList.filter((g) => g.estado === 'aprobada').length : GRILLAS_SEMANA.filter((g) => g.estado === 'aprobada').length} />
               <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', overflow: 'hidden' }}>
@@ -398,65 +510,6 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
               </div>
             </section>
 
-            <section>
-              <SectionHeader title="Próximas grabaciones" count={grabacionesList?.length ?? GRABACIONES_PROXIMAS.length} />
-              <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', overflow: 'hidden' }}>
-                {grabacionesList ? (
-                  grabacionesList.length === 0 ? (
-                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 12 }}>
-                      No hay grabaciones próximas
-                    </div>
-                  ) : (
-                    grabacionesList.map((g, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '10px 12px',
-                          borderBottom: i < grabacionesList.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
-                        }}
-                      >
-                        <div style={{ flexShrink: 0, width: 36, textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)' }}>
-                            {g.fechaCorta.split(' ')[0]}
-                          </div>
-                          <div style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', lineHeight: 1 }}>
-                            {g.fechaCorta.split(' ')[1]}
-                          </div>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {g.tipo}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
-                            <span className="mk-dot" style={{ background: g.marcaColor, width: 5, height: 5 }} />
-                            {g.marcaNombre} · {g.hora}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )
-                ) : (
-                  GRABACIONES_PROXIMAS.map((g, i) => {
-                    const m = marcaMap[g.marca]
-                    if (!m) return null
-                    return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
-                        <div style={{ flexShrink: 0, width: 36, textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: 'var(--mk-text-tertiary)' }}>{g.fecha.split(' ')[0]}</div>
-                          <div style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600 }}>{g.fecha.split(' ')[1]}</div>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 'var(--mk-text-sm)' }}>{g.tipo}</div>
-                          <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>{m.nombreCorto} · {g.hora}</div>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </section>
-          </aside>
         </div>
       </div>
     </div>
@@ -466,6 +519,336 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
 /* ============================================================
    Sub-components
    ============================================================ */
+
+/* AlertaCoordinacionGrabacion: banner amarillo arriba del cockpit
+   cuando hay marcas activas sin grabaciones agendadas. Pedro pidió
+   que esto sea LA primera cosa que vea para coordinar. */
+function AlertaCoordinacionGrabacion({ marcas }: { marcas: NonNullable<CockpitData['marcasSinGrabacion']> }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+      padding: '14px 18px',
+      background: '#fffbeb',
+      border: '1px solid #fde68a',
+      borderRadius: 12,
+      marginBottom: 24,
+      boxShadow: '0 1px 2px rgba(245, 158, 11, 0.08)',
+    }}>
+      <span style={{
+        fontSize: 20, lineHeight: 1, flexShrink: 0,
+        marginTop: 1,
+      }}>⚠️</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>
+          Coordinación de grabación pendiente
+        </div>
+        <div style={{ fontSize: 12.5, color: '#78350f', lineHeight: 1.5 }}>
+          Faltan agendar grabaciones para:{' '}
+          {marcas.map((m, i) => (
+            <span key={m.slug}>
+              <a
+                href={`/grabaciones?marca=${m.slug}`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  color: '#92400e', textDecoration: 'none', fontWeight: 600,
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.color, display: 'inline-block' }} />
+                {m.nombre}
+              </a>
+              {i < marcas.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+        </div>
+      </div>
+      <a
+        href="/grabaciones"
+        style={{
+          padding: '6px 12px',
+          background: '#92400e',
+          color: '#fff',
+          fontSize: 12, fontWeight: 500,
+          borderRadius: 8,
+          textDecoration: 'none',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Agendar →
+      </a>
+    </div>
+  )
+}
+
+/* CarruselComentarios: cards horizontales por marca con scroll
+   horizontal. Cada card muestra preview de 3 comentarios + "+X más".
+   Pedro pidió esto en lugar del stack vertical porque ocupaba mucho
+   espacio. */
+function CarruselComentarios({ comentarios }: { comentarios: NonNullable<CockpitData['comentariosVisibles']> }) {
+  const grupos = new Map<string, { marcaSlug: string; marcaNombre: string; marcaColor: string; items: typeof comentarios }>()
+  for (const c of comentarios) {
+    const existing = grupos.get(c.marcaSlug) ?? {
+      marcaSlug: c.marcaSlug,
+      marcaNombre: c.marcaNombre,
+      marcaColor: c.marcaColor,
+      items: [],
+    }
+    existing.items.push(c)
+    grupos.set(c.marcaSlug, existing)
+  }
+  const ordenados = Array.from(grupos.values()).sort((a, b) => b.items.length - a.items.length)
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 14,
+        overflowX: 'auto',
+        paddingBottom: 8,
+        scrollSnapType: 'x mandatory',
+        scrollbarWidth: 'thin',
+      }}
+    >
+      {ordenados.map((grupo) => {
+        const preview = grupo.items.slice(0, 3)
+        const restantes = grupo.items.length - preview.length
+        return (
+          <a
+            key={grupo.marcaSlug}
+            href={`/comentarios?marca=${grupo.marcaSlug}`}
+            style={{
+              flexShrink: 0,
+              width: 300,
+              scrollSnapAlign: 'start',
+              background: 'var(--mk-bg-elevated)',
+              border: '1px solid var(--mk-border-subtle)',
+              borderRadius: 14,
+              overflow: 'hidden',
+              textDecoration: 'none',
+              transition: 'border-color 150ms ease-out, box-shadow 150ms ease-out',
+              display: 'flex', flexDirection: 'column',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = grupo.marcaColor
+              e.currentTarget.style.boxShadow = `0 8px 20px -8px ${grupo.marcaColor}33`
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            {/* Header de la card */}
+            <div style={{
+              padding: '12px 14px',
+              borderBottom: '1px solid var(--mk-border-subtle)',
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: `linear-gradient(180deg, ${grupo.marcaColor}10, transparent)`,
+            }}>
+              <span style={{
+                width: 10, height: 10, borderRadius: '50%',
+                background: grupo.marcaColor,
+                boxShadow: `0 0 8px ${grupo.marcaColor}66`,
+                flexShrink: 0,
+              }} />
+              <span style={{
+                flex: 1,
+                fontSize: 14, fontWeight: 600,
+                color: '#111827',
+                letterSpacing: '-0.01em',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {grupo.marcaNombre}
+              </span>
+              <span style={{
+                fontSize: 12, fontWeight: 600,
+                color: grupo.marcaColor,
+                fontVariantNumeric: 'tabular-nums',
+                background: `${grupo.marcaColor}1a`,
+                padding: '2px 8px',
+                borderRadius: 999,
+              }}>
+                {grupo.items.length}
+              </span>
+            </div>
+
+            {/* Preview de 3 */}
+            <div style={{ flex: 1, padding: 4 }}>
+              {preview.map((c, i) => (
+                <div
+                  key={c.id}
+                  style={{
+                    padding: '8px 10px',
+                    borderBottom: i < preview.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div style={{ fontSize: 10.5, color: 'var(--mk-text-tertiary)', marginBottom: 2 }}>
+                    @{c.autor} · {c.hace}
+                  </div>
+                  <div style={{
+                    color: '#111827',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    lineHeight: 1.4,
+                  }}>
+                    {c.texto}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer: + X más */}
+            {restantes > 0 && (
+              <div style={{
+                padding: '8px 14px',
+                borderTop: '1px solid var(--mk-border-subtle)',
+                background: 'rgba(0, 0, 0, 0.015)',
+                fontSize: 11.5, fontWeight: 500,
+                color: grupo.marcaColor,
+                textAlign: 'center',
+              }}>
+                + {restantes} más →
+              </div>
+            )}
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+/* BloqueTrabajo: card de un bloque inferior del cockpit (Diseño,
+   Editando hoy, Grabaciones). Header con title, count y link a la
+   sección completa; body con los items. */
+function BloqueTrabajo({
+  title, count, actionHref, actionLabel, color, children,
+}: {
+  title: string
+  count: number
+  actionHref: string
+  actionLabel: string
+  color: string
+  children: React.ReactNode
+}) {
+  return (
+    <section style={{
+      background: 'var(--mk-bg-elevated)',
+      border: '1px solid var(--mk-border-subtle)',
+      borderRadius: 14,
+      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{
+        padding: '12px 14px',
+        borderBottom: '1px solid var(--mk-border-subtle)',
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: `linear-gradient(180deg, ${color}10, transparent)`,
+      }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: color, flexShrink: 0,
+        }} />
+        <h3 style={{
+          flex: 1, margin: 0,
+          fontSize: 13, fontWeight: 600,
+          color: '#111827', letterSpacing: '-0.005em',
+        }}>
+          {title}
+        </h3>
+        <span style={{
+          fontSize: 11, fontWeight: 600,
+          color, fontVariantNumeric: 'tabular-nums',
+          background: `${color}1a`,
+          padding: '2px 7px',
+          borderRadius: 999,
+        }}>
+          {count}
+        </span>
+      </div>
+      <div style={{ flex: 1 }}>
+        {children}
+      </div>
+      <a
+        href={actionHref}
+        style={{
+          padding: '8px 14px',
+          borderTop: '1px solid var(--mk-border-subtle)',
+          fontSize: 11.5, fontWeight: 500,
+          color, textDecoration: 'none',
+          background: 'rgba(0, 0, 0, 0.015)',
+          textAlign: 'center',
+        }}
+      >
+        {actionLabel} →
+      </a>
+    </section>
+  )
+}
+
+function ItemTrabajo({
+  href, marcaColor, marcaNombre, nombre, meta,
+}: {
+  href: string
+  marcaColor: string
+  marcaNombre: string
+  nombre: string
+  meta: string
+}) {
+  return (
+    <a
+      href={href}
+      style={{
+        display: 'block',
+        padding: '10px 14px',
+        borderBottom: '1px solid var(--mk-border-subtle)',
+        textDecoration: 'none',
+        fontSize: 12.5,
+        transition: 'background 100ms ease-out',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+    >
+      <div style={{
+        color: '#111827', fontWeight: 500,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        marginBottom: 2,
+      }}>
+        {nombre}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: marcaColor }} />
+        <span>{marcaNombre}</span>
+        <span>·</span>
+        <span>{meta}</span>
+      </div>
+    </a>
+  )
+}
+
+function EmptyMini({ text }: { text: string }) {
+  return (
+    <div style={{
+      padding: 20, textAlign: 'center',
+      color: 'var(--mk-text-quaternary)',
+      fontSize: 12, fontStyle: 'italic',
+    }}>
+      {text}
+    </div>
+  )
+}
+
+/* Helper para etiquetas de estado_tarea */
+function subEstadoLabel(estado: string): string {
+  const map: Record<string, string> = {
+    sin_empezar: 'Sin empezar',
+    en_progreso: 'En progreso',
+    listo: 'Listo',
+    revisar: 'A revisar',
+  }
+  return map[estado] ?? estado.replace(/_/g, ' ')
+}
 
 /* KpiSecreto: card de ingresos con valor oculto por default. Pedro
    pidió que cuando comparte pantalla con el equipo, los ingresos NO

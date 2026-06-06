@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 import { tieneAcceso, type Permisos, type ModuloPermiso } from '@/lib/team/types'
+import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 
 type PermisosSimple = {
   modulos: Permisos
@@ -95,7 +96,12 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
         >
-          <span style={logoStyle}>D</span>
+          <span style={logoStyle}>
+            {/* Isotipo oficial — reemplaza la "D" placeholder con
+                gradient que había antes. Pedro quería el icono real
+                del manual (mismo que en /login) acá también. */}
+            <IsotipoDistinto size={16} />
+          </span>
           <span style={{ flex: 1, textAlign: 'left' }}>Distinto</span>
           <ChevronUpDown />
         </button>
@@ -412,13 +418,16 @@ const topBtnStyle: React.CSSProperties = {
 }
 
 const logoStyle: React.CSSProperties = {
-  width: 20, height: 20,
+  /* Container del isotipo. Fondo blanco para que los colores brand
+     (amarillo + morado) se vean correctos. Antes era gradient
+     morado→lila con "D" en blanco como placeholder. */
+  width: 22, height: 22,
   borderRadius: 'var(--mk-radius-sm)',
-  background: 'linear-gradient(135deg, #7170ff 0%, #c87bff 100%)',
+  background: '#ffffff',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  color: 'white', fontWeight: 700, fontSize: 11,
-  letterSpacing: '-0.02em',
-  boxShadow: '0 0 8px rgba(113, 112, 255, 0.30)',
+  flexShrink: 0,
+  border: '1px solid var(--mk-border-subtle)',
+  boxShadow: '0 0 8px rgba(186, 65, 247, 0.18)',
 }
 
 const searchBtnStyle: React.CSSProperties = {

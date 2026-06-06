@@ -121,6 +121,8 @@ export default async function CockpitPage() {
     marcasResult,
     grillasEnviadasResult,
     comentariosRespondidosResult,
+    disenoResult,
+    videosEditandoHoyResult,
   ] = await Promise.all([
     /* Comentarios por responder — TODOS los pendientes (sin límite).
        Pedro pidió ver todos separados por marca, no solo los top 8.
@@ -172,8 +174,9 @@ export default async function CockpitPage() {
       .gte('fecha', hoy)
       .order('fecha', { ascending: true })
       .limit(5),
-    /* Marcas activas — para "9 marcas activas" del subtítulo */
-    service.from('marcas').select('id, slug').eq('activo', true),
+    /* Marcas activas con slug+nombre+color — sirve para subtítulo Y
+       para calcular las que faltan coordinar grabación. */
+    service.from('marcas').select('id, slug, nombre, color_primario_hex').eq('activa', true),
     /* Grillas enviadas este mes = publicaciones con estado 'programar' o 'publicado'.
        Aproximación razonable hasta que tengamos tabla grillas_enviadas. */
     service
@@ -189,6 +192,22 @@ export default async function CockpitPage() {
       .eq('status', 'responded')
       .gte('responded_at', `${inicioMes}T00:00:00Z`)
       .lte('responded_at', `${finMes}T23:59:59Z`),
+    /* Tareas en diseño: publicaciones con estado='disenar' y portada
+       no lista. Top 6, ordenadas por fecha de diseño ascendente. */
+    service
+      .from('publicaciones')
+      .select(`id, nombre, fecha_diseno, estado_tarea, marca:marcas(slug, nombre, color_primario_hex)`)
+      .eq('estado', 'disenar')
+      .eq('portada_lista', false)
+      .order('fecha_diseno', { ascending: true, nullsFirst: false })
+      .limit(6),
+    /* Videos marcados para editar HOY desde el módulo editor.
+       fecha_marcada_para_editar = hoy en BD. */
+    service
+      .from('publicaciones')
+      .select(`id, nombre, editor_nombre, marca:marcas(slug, nombre, color_primario_hex)`)
+      .eq('fecha_marcada_para_editar', hoy)
+      .limit(10),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -205,6 +224,10 @@ export default async function CockpitPage() {
   const grabaciones = (grabacionesResult.data ?? []) as any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const marcas = (marcasResult.data ?? []) as any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const diseno = (disenoResult.data ?? []) as any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const videosEditando = (videosEditandoHoyResult.data ?? []) as any[]
 
   const completadosSet = new Set(habitosCompletados.map((c) => c.habito_id as string))
 
@@ -291,6 +314,49 @@ export default async function CockpitPage() {
     ['aprobar', 'programar', 'enviado', 'programar_anuncios'].includes(p.estado as string)
   ).length
 
+  /* MARCAS SIN GRABACIÓN COORDINADA (próximos 30 días):
+     calculamos las que NO aparecen en `grabaciones` con fecha futura.
+     Es la alerta de coordinación que Pedro pidió arriba. */
+  const marcasConGrabacion = new Set<string>()
+  for (const g of grabaciones) {
+    const m = Array.isArray(g.marca) ? g.marca[0] : g.marca
+    if (m?.slug) marcasConGrabacion.add(m.slug as string)
+  }
+  const marcasSinGrabacion = marcas
+    .filter((m) => !marcasConGrabacion.has(m.slug))
+    .map((m) => ({
+      slug: m.slug as string,
+      nombre: (m.nombre ?? m.slug) as string,
+      color: (m.color_primario_hex ?? '#737373') as string,
+    }))
+
+  /* TAREAS EN DISEÑO (con marca + estado) */
+  const tareasDiseno = diseno.map((d) => {
+    const m = Array.isArray(d.marca) ? d.marca[0] : d.marca
+    return {
+      id: d.id as string,
+      nombre: (d.nombre ?? '—') as string,
+      marcaSlug: (m?.slug ?? 'unknown') as string,
+      marcaNombre: (m?.nombre ?? 'Marca') as string,
+      marcaColor: (m?.color_primario_hex ?? '#737373') as string,
+      estadoTarea: (d.estado_tarea ?? 'sin_empezar') as string,
+      fechaDiseno: (d.fecha_diseno ?? null) as string | null,
+    }
+  })
+
+  /* VIDEOS EDITANDO HOY (marcados con "+ Hoy" desde el editor) */
+  const videosEditandoHoy = videosEditando.map((v) => {
+    const m = Array.isArray(v.marca) ? v.marca[0] : v.marca
+    return {
+      id: v.id as string,
+      nombre: (v.nombre ?? '—') as string,
+      editorNombre: (v.editor_nombre ?? null) as string | null,
+      marcaSlug: (m?.slug ?? 'unknown') as string,
+      marcaNombre: (m?.nombre ?? 'Marca') as string,
+      marcaColor: (m?.color_primario_hex ?? '#737373') as string,
+    }
+  })
+
   const data: CockpitData = {
     nombreUsuario,
     puedeVerFinanzas,
@@ -302,6 +368,9 @@ export default async function CockpitPage() {
     habitos: habitosHoy,
     habitosCompletadosHoy: habitosCompletadosHoyCount,
     grabacionesProximas,
+    marcasSinGrabacion,
+    tareasDiseno,
+    videosEditandoHoy,
     metricas: {
       publicacionesEstaSemana: pubsSemana.length,
       comentariosRespondidosMes: (comentariosRespondidosResult.count ?? 0) as number,
