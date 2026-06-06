@@ -199,7 +199,7 @@ function FormBody({
           name="email"
           type="email"
           label="Email"
-          placeholder="vos@agenciadistinto.com"
+          placeholder="tu@agenciadistinto.com"
           autoComplete="email"
           required
           autoFocus
