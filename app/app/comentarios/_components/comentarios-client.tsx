@@ -164,22 +164,46 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
     router.push(`${pathname}?${params.toString()}`)
   }
 
-  function handleFetchInbox() {
+  function handleFetchInbox(opciones?: { silencioso?: boolean }) {
+    const silencioso = opciones?.silencioso ?? false
     startFetching(async () => {
-      toast.loading(`Cargando comentarios de ${marcaInfo?.nombre}…`, { id: 'fetch' })
+      if (!silencioso) toast.loading(`Cargando comentarios de ${marcaInfo?.nombre}…`, { id: 'fetch' })
       const result = await fetchComentariosFromMetricool(marcaActual)
       if (result.ok) {
-        toast.success(
-          `✅ ${result.inserted} nuevos en inbox · ✨ ${result.generados} borradores IA listos` +
-            (result.errors.length > 0 ? ` · ${result.errors.length} errores` : ''),
-          { id: 'fetch', duration: 8000 },
-        )
+        if (!silencioso) {
+          toast.success(
+            `✅ ${result.inserted} nuevos en inbox · ✨ ${result.generados} borradores IA listos` +
+              (result.errors.length > 0 ? ` · ${result.errors.length} errores` : ''),
+            { id: 'fetch', duration: 8000 },
+          )
+        } else if (result.inserted > 0) {
+          /* Auto-fetch silencioso: solo notificar si encontró nuevos */
+          toast.success(`${result.inserted} nuevos comentarios sincronizados`, { duration: 3000 })
+        }
         router.refresh()
       } else {
-        toast.error(`Error: ${result.error}`, { id: 'fetch' })
+        if (!silencioso) toast.error(`Error: ${result.error}`, { id: 'fetch' })
+        else console.warn('[auto-fetch comentarios]', result.error)
       }
     })
   }
+
+  /* Auto-cargar comentarios al montar/cambiar marca.
+     Pedro pidió que no tenga que apretar "Cargar comentarios" cada vez.
+     Estrategia: silencioso (no toast spam), solo si pasaron >2 min desde
+     el último auto-fetch para esta marca (evita spamear Metricool). */
+  useEffect(() => {
+    if (!marcaInfo?.metricool_blog_id) return  /* sin Metricool configurado */
+    const cacheKey = `mk:autofetch:${marcaActual}`
+    const last = sessionStorage.getItem(cacheKey)
+    const lastTs = last ? parseInt(last, 10) : 0
+    const now = Date.now()
+    /* Si pasaron menos de 2 min, no re-cargar */
+    if (now - lastTs < 2 * 60 * 1000) return
+    sessionStorage.setItem(cacheKey, now.toString())
+    handleFetchInbox({ silencioso: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marcaActual])
 
   // Genera borradores con IA (OpenAI) para los pendientes sin respuesta.
   function handleGenerarIA() {
@@ -319,11 +343,12 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
             ))}
           </select>
           <button
-            onClick={handleFetchInbox}
+            onClick={() => handleFetchInbox()}
             disabled={isFetching || !marcaInfo?.metricool_blog_id}
             className="h-10 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+            title="Forzar refresh manual desde Metricool"
           >
-            {isFetching ? '⏳ Cargando…' : '🔄 Cargar comentarios'}
+            {isFetching ? '⏳ Sincronizando…' : '🔄 Refrescar'}
           </button>
 
           {/* Generar borradores con IA (OpenAI gpt-4o-mini) — dentro de la app */}
@@ -380,7 +405,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
         <div className="border border-dashed border-border rounded-lg p-10 text-center text-sm text-muted-foreground">
           {marcaInfo?.metricool_blog_id ? (
             <>
-              Sin comentarios pendientes. Apretá <strong>🔄 Cargar comentarios</strong> para sincronizar desde Metricool.
+              Sin comentarios pendientes 🎉 Los nuevos se sincronizan automáticamente al entrar a esta página.
             </>
           ) : (
             <>Esta marca no tiene <code>metricool_blog_id</code> configurado. Configurá en /settings.</>

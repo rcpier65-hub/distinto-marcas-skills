@@ -254,7 +254,11 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
         {/* 2-col */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
           <section>
-            <SectionHeader title="Atender hoy" count={comentariosList?.length ?? COMENTARIOS_PENDIENTES.length} actionLabel="Ver todos" />
+            <SectionHeader
+              title="Comentarios por responder"
+              count={comentariosList?.length ?? COMENTARIOS_PENDIENTES.length}
+              actionLabel="Ver todos"
+            />
             <div
               style={{
                 border: '1px solid var(--mk-border-subtle)',
@@ -263,32 +267,13 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
                 background: 'var(--mk-bg-elevated)',
               }}
             >
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '24px 1fr 140px 100px 80px 60px',
-                  gap: 12,
-                  padding: '8px 14px',
-                  borderBottom: '1px solid var(--mk-border-subtle)',
-                  fontSize: 'var(--mk-text-xs)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 'var(--mk-tracking-caps)',
-                  color: 'var(--mk-text-tertiary)',
-                  fontWeight: 500,
-                  background: 'rgba(255, 255, 255, 0.015)',
-                }}
-              >
-                <span></span><span>Comentario</span><span>Marca</span><span>Categoría</span><span>Hace</span><span style={{ textAlign: 'right' }}>·</span>
-              </div>
               {comentariosList ? (
                 comentariosList.length === 0 ? (
-                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 13 }}>
+                  <div style={{ padding: 32, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 14 }}>
                     No tienes comentarios pendientes 🎉
                   </div>
                 ) : (
-                  comentariosList.map((c) => (
-                    <CommentRowReal key={c.id} comment={c} />
-                  ))
+                  <ComentariosAgrupados comentarios={comentariosList} />
                 )
               ) : (
                 COMENTARIOS_PENDIENTES.map((c) => (
@@ -643,6 +628,102 @@ const CAT_LABELS: Record<Categoria, string> = {
   tag_amigo: 'Tag',
   spam: 'Spam',
   otro: 'Otro',
+}
+
+/* ComentariosAgrupados: agrupa los comentarios por marca y renderiza
+   cada grupo con un header (dot color marca + nombre + count) + lista
+   de comentarios. Pedro pidió esta vista en lugar de la tabla plana
+   porque así es más fácil escanear "cuántos pendientes tengo por
+   marca" de un vistazo. */
+function ComentariosAgrupados({ comentarios }: { comentarios: NonNullable<CockpitData['comentariosVisibles']> }) {
+  /* Agrupar manteniendo el orden por cantidad de comentarios (descendente).
+     Marca con más pendientes arriba. */
+  const grupos = new Map<string, { marcaSlug: string; marcaNombre: string; marcaColor: string; items: typeof comentarios }>()
+  for (const c of comentarios) {
+    const existing = grupos.get(c.marcaSlug) ?? {
+      marcaSlug: c.marcaSlug,
+      marcaNombre: c.marcaNombre,
+      marcaColor: c.marcaColor,
+      items: [],
+    }
+    existing.items.push(c)
+    grupos.set(c.marcaSlug, existing)
+  }
+  const ordenados = Array.from(grupos.values()).sort((a, b) => b.items.length - a.items.length)
+
+  return (
+    <div>
+      {ordenados.map((grupo, idx) => (
+        <div key={grupo.marcaSlug} style={{
+          borderBottom: idx < ordenados.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+        }}>
+          {/* Header de marca */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 14px',
+            background: 'rgba(0, 0, 0, 0.015)',
+            borderBottom: '1px solid var(--mk-border-subtle)',
+          }}>
+            <span className="mk-dot" style={{
+              background: grupo.marcaColor,
+              boxShadow: `0 0 6px ${grupo.marcaColor}`,
+              width: 8, height: 8,
+            }} />
+            <span style={{
+              fontSize: 'var(--mk-text-sm)',
+              fontWeight: 600,
+              color: 'var(--mk-text-primary)',
+              letterSpacing: '-0.005em',
+            }}>
+              {grupo.marcaNombre}
+            </span>
+            <span style={{
+              fontSize: 'var(--mk-text-xs)',
+              color: 'var(--mk-text-tertiary)',
+              fontVariantNumeric: 'tabular-nums',
+              background: 'rgba(0, 0, 0, 0.04)',
+              padding: '1px 7px',
+              borderRadius: 999,
+            }}>
+              {grupo.items.length}
+            </span>
+          </div>
+          {/* Comentarios del grupo */}
+          {grupo.items.map((c, i) => (
+            <div
+              key={c.id}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 100px 70px',
+                gap: 12,
+                padding: '10px 14px 10px 30px',
+                fontSize: 'var(--mk-text-sm)',
+                alignItems: 'center',
+                borderBottom: i < grupo.items.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                cursor: 'pointer',
+                transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>@{c.autor}</div>
+                <div style={{ color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.texto}
+                </div>
+              </div>
+              <span style={{ color: 'var(--mk-text-tertiary)', textTransform: 'capitalize', fontSize: 11 }}>
+                {c.categoria.replace(/_/g, ' ')}
+              </span>
+              <span style={{ color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums', fontSize: 11, textAlign: 'right' }}>
+                {c.hace}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /* CommentRowReal: variante que renderiza un comentario REAL de BD

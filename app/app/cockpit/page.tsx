@@ -122,7 +122,8 @@ export default async function CockpitPage() {
     grillasEnviadasResult,
     comentariosRespondidosResult,
   ] = await Promise.all([
-    /* Atender hoy: comentarios pendientes (top 8) */
+    /* Comentarios por responder — TODOS los pendientes (sin límite).
+       Pedro pidió ver todos separados por marca, no solo los top 8. */
     service
       .from('comentarios_inbox')
       .select(`
@@ -131,8 +132,7 @@ export default async function CockpitPage() {
         marca:marcas(slug, nombre, color_primario_hex)
       `)
       .eq('estado', 'pendiente')
-      .order('recibido_at', { ascending: false })
-      .limit(8),
+      .order('recibido_at', { ascending: false }),
     /* Publicaciones de esta semana */
     service
       .from('publicaciones')
@@ -207,7 +207,9 @@ export default async function CockpitPage() {
 
   const completadosSet = new Set(habitosCompletados.map((c) => c.habito_id as string))
 
-  /* Comentarios pendientes filtrados por marcas del usuario */
+  /* Comentarios pendientes filtrados por marcas del usuario.
+     Sin slice — mostramos todos los pendientes agrupados por marca
+     en el cockpit. */
   const comentariosVisibles = comentarios
     .filter((c) => {
       if (!p || p.marcasAcceso === null) return true
@@ -215,7 +217,6 @@ export default async function CockpitPage() {
       if (!marcaArr) return false
       return p.marcasAcceso.includes(marcaArr.id ?? marcaArr.slug)
     })
-    .slice(0, 5)
     .map((c) => {
       const marcaArr = Array.isArray(c.marca) ? c.marca[0] : c.marca
       return {
