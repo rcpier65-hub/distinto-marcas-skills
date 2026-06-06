@@ -300,106 +300,175 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
 
           <aside style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <section>
-              <SectionHeader title="Grillas a enviar" count={GRILLAS_SEMANA.filter((g) => g.estado === 'aprobada').length} />
+              <SectionHeader title="Grillas a enviar" count={grillasList ? grillasList.filter((g) => g.estado === 'aprobada').length : GRILLAS_SEMANA.filter((g) => g.estado === 'aprobada').length} />
               <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', overflow: 'hidden' }}>
-                {GRILLAS_SEMANA.map((g, i) => {
-                  const m = marcaMap[g.marcaSlug]
-                  if (!m) return null
-                  return (
-                    <div
-                      key={g.marcaSlug}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '8px 12px',
-                        borderBottom: i < GRILLAS_SEMANA.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
-                        cursor: 'pointer',
-                        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                    >
-                      <span className="mk-dot" style={{ background: m.color, boxShadow: `0 0 6px ${m.color}`, width: 6, height: 6 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {m.nombreCorto}
-                        </div>
-                        <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
-                          {g.publicaciones} pubs · {g.proximoEnvio}
-                        </div>
-                      </div>
-                      <StatusBadge estado={g.estado} />
+                {grillasList ? (
+                  grillasList.length === 0 ? (
+                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 12 }}>
+                      No hay publicaciones esta semana
                     </div>
+                  ) : (
+                    grillasList.map((g, i) => (
+                      <div
+                        key={g.marcaSlug}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '8px 12px',
+                          borderBottom: i < grillasList.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                          cursor: 'pointer',
+                          transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <span className="mk-dot" style={{ background: g.marcaColor, boxShadow: `0 0 6px ${g.marcaColor}`, width: 6, height: 6 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {g.marcaNombre}
+                          </div>
+                          <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
+                            {g.publicaciones} {g.publicaciones === 1 ? 'pub' : 'pubs'} esta semana
+                          </div>
+                        </div>
+                        <StatusBadge estado={g.estado as 'aprobada' | 'pendiente' | 'borrador'} />
+                      </div>
+                    ))
                   )
-                })}
+                ) : (
+                  GRILLAS_SEMANA.map((g, i) => {
+                    const m = marcaMap[g.marcaSlug]
+                    if (!m) return null
+                    return (
+                      <div
+                        key={g.marcaSlug}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '8px 12px',
+                          borderBottom: i < GRILLAS_SEMANA.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                        }}
+                      >
+                        <span className="mk-dot" style={{ background: m.color, width: 6, height: 6 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>{m.nombreCorto}</div>
+                          <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>{g.publicaciones} pubs · {g.proximoEnvio}</div>
+                        </div>
+                        <StatusBadge estado={g.estado} />
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </section>
 
             <section>
-              <SectionHeader title="Hábitos hoy" count={`${HABITOS_HOY.filter((h) => h.completado).length}/${HABITOS_HOY.length}`} />
+              <SectionHeader
+                title="Hábitos hoy"
+                count={habitosList
+                  ? `${habitosCompletadosHoyCount}/${habitosList.length}`
+                  : `${HABITOS_HOY.filter((h) => h.completado).length}/${HABITOS_HOY.length}`}
+              />
               <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', padding: 4 }}>
-                {HABITOS_HOY.map((h) => (
-                  <button
-                    key={h.id}
-                    className="mk-focusable"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      width: '100%', padding: '8px 10px',
-                      background: 'transparent', border: 'none',
-                      borderRadius: 'var(--mk-radius-md)',
-                      cursor: 'pointer', color: 'inherit',
-                      fontFamily: 'inherit', textAlign: 'left',
-                      transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                  >
-                    <Checkbox checked={h.completado} />
-                    <span style={{ flex: 1, fontSize: 'var(--mk-text-sm)', color: h.completado ? 'var(--mk-text-tertiary)' : 'var(--mk-text-primary)', textDecoration: h.completado ? 'line-through' : 'none' }}>
-                      {h.titulo}
-                    </span>
-                    <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
-                      {h.hora}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <SectionHeader title="Próximas grabaciones" count={GRABACIONES_PROXIMAS.length} />
-              <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', overflow: 'hidden' }}>
-                {GRABACIONES_PROXIMAS.map((g, i) => {
-                  const m = marcaMap[g.marca]
-                  if (!m) return null
-                  return (
+                {habitosList ? (
+                  habitosList.length === 0 ? (
+                    <div style={{ padding: 12, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 12 }}>
+                      No tienes hábitos configurados
+                    </div>
+                  ) : (
+                    habitosList.map((h) => (
+                      <div
+                        key={h.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          width: '100%', padding: '8px 10px',
+                          borderRadius: 'var(--mk-radius-md)',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <Checkbox checked={h.completado} />
+                        <span style={{ fontSize: 14, marginRight: 4 }}>{h.icono}</span>
+                        <span style={{ flex: 1, fontSize: 'var(--mk-text-sm)', color: h.completado ? 'var(--mk-text-tertiary)' : 'var(--mk-text-primary)', textDecoration: h.completado ? 'line-through' : 'none' }}>
+                          {h.titulo}
+                        </span>
+                      </div>
+                    ))
+                  )
+                ) : (
+                  HABITOS_HOY.map((h) => (
                     <div
-                      key={i}
+                      key={h.id}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 12px',
-                        borderBottom: i < GRABACIONES_PROXIMAS.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                        width: '100%', padding: '8px 10px',
+                        borderRadius: 'var(--mk-radius-md)',
                       }}
                     >
-                      <div style={{ flexShrink: 0, width: 36, textAlign: 'center' }}>
-                        <div style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)' }}>
-                          {g.fecha.split(' ')[0]}
-                        </div>
-                        <div style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', lineHeight: 1 }}>
-                          {g.fecha.split(' ')[1]}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {g.tipo}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
-                          <span className="mk-dot" style={{ background: m.color, width: 5, height: 5 }} />
-                          {m.nombreCorto} · {g.hora}
-                        </div>
-                      </div>
+                      <Checkbox checked={h.completado} />
+                      <span style={{ flex: 1, fontSize: 'var(--mk-text-sm)', color: h.completado ? 'var(--mk-text-tertiary)' : 'var(--mk-text-primary)', textDecoration: h.completado ? 'line-through' : 'none' }}>
+                        {h.titulo}
+                      </span>
+                      <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>{h.hora}</span>
                     </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section>
+              <SectionHeader title="Próximas grabaciones" count={grabacionesList?.length ?? GRABACIONES_PROXIMAS.length} />
+              <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', overflow: 'hidden' }}>
+                {grabacionesList ? (
+                  grabacionesList.length === 0 ? (
+                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 12 }}>
+                      No hay grabaciones próximas
+                    </div>
+                  ) : (
+                    grabacionesList.map((g, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px',
+                          borderBottom: i < grabacionesList.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                        }}
+                      >
+                        <div style={{ flexShrink: 0, width: 36, textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--mk-tracking-caps)' }}>
+                            {g.fechaCorta.split(' ')[0]}
+                          </div>
+                          <div style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', lineHeight: 1 }}>
+                            {g.fechaCorta.split(' ')[1]}
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {g.tipo}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
+                            <span className="mk-dot" style={{ background: g.marcaColor, width: 5, height: 5 }} />
+                            {g.marcaNombre} · {g.hora}
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )
-                })}
+                ) : (
+                  GRABACIONES_PROXIMAS.map((g, i) => {
+                    const m = marcaMap[g.marca]
+                    if (!m) return null
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
+                        <div style={{ flexShrink: 0, width: 36, textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: 'var(--mk-text-tertiary)' }}>{g.fecha.split(' ')[0]}</div>
+                          <div style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600 }}>{g.fecha.split(' ')[1]}</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 'var(--mk-text-sm)' }}>{g.tipo}</div>
+                          <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>{m.nombreCorto} · {g.hora}</div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </section>
           </aside>
@@ -574,6 +643,44 @@ const CAT_LABELS: Record<Categoria, string> = {
   tag_amigo: 'Tag',
   spam: 'Spam',
   otro: 'Otro',
+}
+
+/* CommentRowReal: variante que renderiza un comentario REAL de BD
+   (la prop ya viene con marcaNombre/marcaColor en lugar de tener que
+   resolver desde MARCAS_NAV). */
+function CommentRowReal({ comment: c }: { comment: NonNullable<CockpitData['comentariosVisibles']>[number] }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '24px 1fr 140px 100px 80px 60px',
+        gap: 12,
+        padding: '10px 14px',
+        borderBottom: '1px solid var(--mk-border-subtle)',
+        fontSize: 'var(--mk-text-sm)',
+        alignItems: 'center',
+        cursor: 'pointer',
+        transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+    >
+      <span className="mk-dot" style={{ background: c.marcaColor, width: 6, height: 6 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>@{c.autor}</div>
+        <div style={{ color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {c.texto}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--mk-text-secondary)' }}>
+        <span className="mk-dot" style={{ background: c.marcaColor, width: 5, height: 5 }} />
+        {c.marcaNombre}
+      </div>
+      <span style={{ color: 'var(--mk-text-tertiary)', textTransform: 'capitalize' }}>{c.categoria}</span>
+      <span style={{ color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{c.hace}</span>
+      <span style={{ color: 'var(--mk-text-quaternary)' }}>→</span>
+    </div>
+  )
 }
 
 function CommentRow({ comment, marca }: { comment: Comentario; marca: Marca | undefined }) {
