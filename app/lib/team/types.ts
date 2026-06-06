@@ -53,6 +53,7 @@ export type TeamMember = {
   rol_base: RolPredefinidoId
   cargo_personalizado: string | null
   fecha_cumpleanos: string | null  // ISO YYYY-MM-DD
+  fecha_pago: string | null        // ISO YYYY-MM-DD — día del mes en que se paga
   avatar_url: string | null
   permisos_override: Permisos
   marcas_acceso: string[] | null   // null = todas las marcas

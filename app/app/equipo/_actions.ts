@@ -23,6 +23,7 @@ export async function actualizarMiembro(
     rol_base?: RolPredefinidoId
     cargo_personalizado?: string | null
     fecha_cumpleanos?: string | null
+    fecha_pago?: string | null
     avatar_url?: string | null
     permisos_override?: Permisos
     marcas_acceso?: string[] | null
@@ -40,6 +41,7 @@ export async function actualizarMiembro(
   if (patch.rol_base !== undefined) update.rol_base = patch.rol_base
   if (patch.cargo_personalizado !== undefined) update.cargo_personalizado = patch.cargo_personalizado
   if (patch.fecha_cumpleanos !== undefined) update.fecha_cumpleanos = patch.fecha_cumpleanos
+  if (patch.fecha_pago !== undefined) update.fecha_pago = patch.fecha_pago
   if (patch.avatar_url !== undefined) update.avatar_url = patch.avatar_url
   if (patch.permisos_override !== undefined) update.permisos_override = patch.permisos_override
   if (patch.marcas_acceso !== undefined) update.marcas_acceso = patch.marcas_acceso

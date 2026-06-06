@@ -309,17 +309,22 @@ function MemberCard({
         </span>
       </div>
 
-      {/* AVATAR + Nombre + cargo — disposición horizontal centrada */}
+      {/* AVATAR + Nombre + cargo — disposición horizontal centrada.
+          Si el miembro subió una foto (member.avatar_url), la usamos.
+          Si no, mostramos las iniciales con el color del rol. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: -8 }}>
         <span style={{
           width: 56, height: 56, borderRadius: '50%',
-          background: rolColor, color: '#fff',
+          background: member.avatar_url
+            ? `url(${member.avatar_url}) center/cover`
+            : rolColor,
+          color: '#fff',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 18, fontWeight: 600,
           flexShrink: 0,
           letterSpacing: '-0.01em',
         }}>
-          {inicial}
+          {!member.avatar_url && inicial}
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{
@@ -518,6 +523,7 @@ function ModalEditarMiembro({
         rol_base: member.rol_base,
         cargo_personalizado: member.cargo_personalizado,
         fecha_cumpleanos: member.fecha_cumpleanos,
+        fecha_pago: member.fecha_pago,
         permisos_override: member.permisos_override,
         marcas_acceso: member.marcas_acceso,
         notas: member.notas,
@@ -635,15 +641,26 @@ function TabInfo({
           />
         </Campo>
       </div>
-      <Campo label="Fecha de cumpleaños">
-        <input
-          type="date"
-          value={member.fecha_cumpleanos ?? ''}
-          onChange={(e) => onPatch({ fecha_cumpleanos: e.target.value || null })}
-          onClick={(e) => { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {} }}
-          style={{ ...fieldStyle, cursor: 'pointer' }}
-        />
-      </Campo>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Campo label="Fecha de cumpleaños">
+          <input
+            type="date"
+            value={member.fecha_cumpleanos ?? ''}
+            onChange={(e) => onPatch({ fecha_cumpleanos: e.target.value || null })}
+            onClick={(e) => { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {} }}
+            style={{ ...fieldStyle, cursor: 'pointer' }}
+          />
+        </Campo>
+        <Campo label="Fecha de pago">
+          <input
+            type="date"
+            value={member.fecha_pago ?? ''}
+            onChange={(e) => onPatch({ fecha_pago: e.target.value || null })}
+            onClick={(e) => { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {} }}
+            style={{ ...fieldStyle, cursor: 'pointer' }}
+          />
+        </Campo>
+      </div>
       <Campo label="Notas internas">
         <textarea
           value={member.notas ?? ''}
@@ -1166,6 +1183,7 @@ function ModalNuevoMiembro({
           rol_base: rolBase,
           cargo_personalizado: cargo.trim() || null,
           fecha_cumpleanos: null,
+          fecha_pago: null,
           avatar_url: null,
           permisos_override: {},
           marcas_acceso: marcasIds,

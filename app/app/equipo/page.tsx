@@ -26,7 +26,12 @@ export default async function EquipoPage() {
   const [membersResult, rolesResult, marcasResult, pubsByEditorResult] = await Promise.all([
     service
       .from('team_members')
-      .select('*')
+      .select(`
+        id, auth_user_id, email, nombre, rol_base, cargo_personalizado,
+        fecha_cumpleanos, fecha_pago, avatar_url, permisos_override,
+        marcas_acceso, editor_legacy_id, activo, notas, password_inicial,
+        created_at, updated_at
+      `)
       .order('activo', { ascending: false })
       .order('nombre'),
     service

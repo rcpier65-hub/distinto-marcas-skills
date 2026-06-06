@@ -248,7 +248,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
       {/* ============== Bottom (user) ============== */}
       <div style={{ padding: 8, borderTop: '1px solid var(--mk-border-subtle)', display: 'flex', gap: 4, alignItems: 'stretch' }}>
         <Link
-          href="/settings"
+          href="/perfil"
           className="mk-focusable"
           style={{ ...userBtnStyle, flex: 1 }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}

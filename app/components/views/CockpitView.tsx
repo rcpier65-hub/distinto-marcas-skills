@@ -419,7 +419,7 @@ function Kpi({ label, value, delta, deltaPositive }: { label: string; value: str
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         cursor: 'pointer',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = '#15161a' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--mk-bg-elevated)' }}
     >
       <div className="mk-label">{label}</div>
