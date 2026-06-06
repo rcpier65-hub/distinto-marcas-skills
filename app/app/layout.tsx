@@ -40,6 +40,19 @@ export default async function RootLayout({
     getCurrentMemberPermisos(),
   ])
 
+  /* Email del usuario logueado para mostrar en el sidebar — sirve como
+     "indicador de sesión activa" para que Pedro pueda confirmar
+     fácilmente si está como admin o como Lorena/etc. */
+  let emailActivo: string | null = null
+  try {
+    const { getUser } = await import('@/lib/auth/get-user')
+    const user = await getUser()
+    emailActivo = user?.email ?? null
+  } catch {
+    /* ignore — usuario no logueado no debería renderizar layout pero
+       por si acaso, no rompemos */
+  }
+
   /* Reducimos los permisos a un objeto simple serializable para pasarlo
      al client component AppShell. Si no hay miembro asociado (admin/
      owner), pasamos null y el sidebar muestra todo. */
@@ -49,6 +62,7 @@ export default async function RootLayout({
         marcasAcceso: permisos.marcasAcceso,
         nombre: permisos.member.nombre,
         rol: permisos.rol.nombre,
+        email: emailActivo ?? permisos.member.email,
       }
     : null
 
@@ -63,7 +77,7 @@ export default async function RootLayout({
       className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppShell marcas={marcas} permisos={permisosSimple}>{children}</AppShell>
+        <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo}>{children}</AppShell>
         <Toaster />
       </body>
     </html>

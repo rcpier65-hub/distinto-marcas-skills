@@ -14,6 +14,7 @@ type PermisosSimple = {
   marcasAcceso: string[] | null
   nombre: string
   rol: string
+  email: string
 } | null
 
 type Props = {
@@ -24,11 +25,13 @@ type Props = {
   /* Permisos del usuario logueado. null = admin/owner, muestra todo.
      Cualquier otro valor → filtramos los items según los permisos. */
   permisos?: PermisosSimple
+  /* Email del user logueado en Supabase Auth — visible siempre */
+  emailActivo?: string | null
 }
 
 const STORAGE_KEY = 'mk:sidebar:sections'
 
-export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos }: Props) {
+export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailActivo }: Props) {
   /* Helper para mostrar/ocultar items según permisos. Si no hay
      permisos (= admin/owner), retorna true para todo. */
   const puede = (modulo: ModuloPermiso): boolean => {
@@ -252,14 +255,21 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos }: Props)
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
         >
           <span style={avatarStyle}>
-            {permisos ? permisos.nombre.charAt(0).toUpperCase() : 'P'}
+            {permisos ? permisos.nombre.charAt(0).toUpperCase() : (emailActivo?.charAt(0).toUpperCase() ?? 'P')}
           </span>
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <div style={{ fontWeight: 'var(--mk-weight-medium)', fontSize: 'var(--mk-text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {permisos ? permisos.nombre : 'Pedro Reyes'}
+              {permisos ? permisos.nombre : (emailActivo?.split('@')[0] ?? 'Admin')}
             </div>
-            <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
-              {permisos ? permisos.rol : 'Agencia Distinto'}
+            {/* Segunda línea: email del usuario logueado (siempre).
+                Pedro lo necesita para distinguir si está como admin o
+                como miembro al cambiar entre cuentas. */}
+            <div style={{
+              fontSize: 'var(--mk-text-xs)',
+              color: 'var(--mk-text-tertiary)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {emailActivo ?? (permisos?.email) ?? 'sin sesión'}
             </div>
           </div>
         </Link>

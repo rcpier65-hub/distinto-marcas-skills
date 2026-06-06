@@ -57,7 +57,12 @@ const METRICAS = {
 // COMPONENT
 // ============================================================
 
-export function CockpitView() {
+/* Acepta un nombre opcional para personalizar el saludo. Si no se
+   pasa, usa "amigo" como fallback genérico. Pedro pidió que cuando
+   Lorena entra a su sesión vea "Buen día, Lorena", no "Pedro". */
+type CockpitViewProps = { nombreUsuario?: string }
+
+export function CockpitView({ nombreUsuario = 'amigo' }: CockpitViewProps = {}) {
   const marcaMap = Object.fromEntries(MARCAS_NAV.map((m) => [m.slug, m]))
   const ingresoDelta = METRICAS.ingresoMes - METRICAS.ingresoMesPasado
   const ingresoPct = ((ingresoDelta / METRICAS.ingresoMesPasado) * 100).toFixed(1)
@@ -117,7 +122,7 @@ export function CockpitView() {
               marginBottom: 4,
             }}
           >
-            Buen día, Pedro
+            Buen día, {nombreUsuario}
           </h1>
           <p style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)', margin: 0 }}>
             9 marcas activas · 73 comentarios pendientes · 6 grillas a enviar hoy

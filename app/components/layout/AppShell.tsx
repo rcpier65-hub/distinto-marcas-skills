@@ -20,6 +20,7 @@ export type PermisosSimple = {
   marcasAcceso: string[] | null
   nombre: string
   rol: string
+  email: string
 } | null
 
 type Props = {
@@ -30,9 +31,13 @@ type Props = {
   /* Permisos del usuario logueado. null = admin/owner sin team_member
      asociado (Pedro original) → sidebar muestra todo. */
   permisos?: PermisosSimple
+  /* Email del usuario logueado para mostrar SIEMPRE en el sidebar.
+     Sirve como indicador visual claro de qué sesión está activa
+     (admin vs Lorena vs Pieer, etc.) */
+  emailActivo?: string | null
 }
 
-export function AppShell({ children, marcas, permisos }: Props) {
+export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
   const pathname = usePathname()
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -56,7 +61,7 @@ export function AppShell({ children, marcas, permisos }: Props) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--mk-bg-base)' }}>
-      <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} permisos={permisos} />
+      <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
       <main style={{ flex: 1, minWidth: 0 }}>
         {children}
       </main>
