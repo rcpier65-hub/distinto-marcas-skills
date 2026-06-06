@@ -942,7 +942,9 @@ Cuando entres puedes cambiarla por una tuya. Cualquier cosa, escríbeme por aqu�
     toast.success('Contraseña copiada')
   }
 
-  const emailPlaceholder = member.email.endsWith('@pendiente.local')
+  /* Solo bloqueamos casos extremos: email vacío o malformado.
+     @pendiente.local ya no existe en BD (lo limpié en mantenimiento). */
+  const emailPlaceholder = !member.email || !member.email.includes('@')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>

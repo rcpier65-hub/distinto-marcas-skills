@@ -203,8 +203,8 @@ export async function setPasswordMiembro(
 
   if (e1 || !member) return { ok: false, error: 'Miembro no encontrado' }
   if (!member.activo) return { ok: false, error: 'El miembro está desactivado' }
-  if (!member.email || member.email.endsWith('@pendiente.local')) {
-    return { ok: false, error: 'Primero asigna un email real al miembro (tab Información)' }
+  if (!member.email || !member.email.includes('@')) {
+    return { ok: false, error: 'El miembro necesita un email válido (tab Información)' }
   }
 
   let authUserId = member.auth_user_id
