@@ -70,28 +70,25 @@ export default async function DisenoPage() {
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
 
-  /* QUERY UNIFICADA — Pedro reportó que tareas creadas con marca
-     cliente (Kintu) pero SIN "para publicar" desaparecían al recargar.
-     El problema: tenía 2 queries separadas (A: con fecha_diseno en
-     rango; B: marca='interno' sin fecha). Las tareas con marca cliente
-     real PERO sin fecha_diseno caían en ningún lado.
-
-     Solución: una sola query basada en el PIPELINE de diseño.
+  /* QUERY UNIFICADA basada en el PIPELINE de diseño.
      Una tarea entra a /diseno si:
-       - estado_publicacion = 'disenar' (está en etapa diseño del pipeline)
-       - estado_tarea != 'archivado'
-       - portada_lista = false (sigue el patrón "Diseño Ailyn" de Notion)
-     Sin importar marca ni fecha — captura tareas standalone Y para
-     publicar mientras estén en pipeline diseño. */
+       - estado_publicacion = 'disenar' (etapa diseño)
+       - portada_lista = false (filtro Notion-style "Diseño Ailyn")
+
+     IMPORTANTE: NO filtramos las archivadas a nivel servidor.
+     Pedro pidió que el Kanban tenga columna "Archivado" como 4ta
+     bucket; si las filtráramos acá, esa columna quedaría vacía y
+     las tareas "desaparecerían" al archivarlas.
+     La tabla las oculta cliente-side con filters.mostrarArchivadas
+     (default false); el Kanban las muestra siempre. */
   let res = await service
     .from('publicaciones')
     .select(SELECT)
     .eq('estado', 'disenar')
     .eq('portada_lista', false)
-    .neq('estado_tarea', 'archivado')
     .order('fecha_diseno', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(1000)
 
   let migrationPendiente = false
   /* Defensive: si descripcion/fecha_entrega no existen, reintentamos */
@@ -105,10 +102,9 @@ export default async function DisenoPage() {
       .select(FALLBACK_SELECT)
       .eq('estado', 'disenar')
       .eq('portada_lista', false)
-      .neq('estado_tarea', 'archivado')
       .order('fecha_diseno', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
-      .limit(500)
+      .limit(1000)
   }
   const resA = res
   const resB = { data: [] as unknown[], error: null as null }
