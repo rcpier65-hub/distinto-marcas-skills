@@ -70,90 +70,48 @@ export default async function DisenoPage() {
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
 
-  /* Antes el query B usaba `.eq('marca.slug', 'interno')` con dot-notation
-     sobre la tabla relacionada. PostgREST NO interpreta eso como filter
-     INNER — termina trayendo TODAS las pubs sin fecha_diseno (~65) que
-     no son internas. Pedro las vió todas en el Kanban (POST DIA DE LA
-     MADRE, 6. EDAD DIAGNOSTICO, etc.) como "unknown" porque el JOIN
-     fallaba con el filter mal aplicado.
-     Fix: resolver el id de la marca 'interno' como UUID primero y
-     usar `.eq('marca_id', internoId)` que SÍ filtra correctamente. */
-  const { data: internoRow } = await service
-    .from('marcas')
-    .select('id')
-    .eq('slug', 'interno')
-    .maybeSingle()
-  const internoId = internoRow?.id ?? null
+  /* QUERY UNIFICADA — Pedro reportó que tareas creadas con marca
+     cliente (Kintu) pero SIN "para publicar" desaparecían al recargar.
+     El problema: tenía 2 queries separadas (A: con fecha_diseno en
+     rango; B: marca='interno' sin fecha). Las tareas con marca cliente
+     real PERO sin fecha_diseno caían en ningún lado.
 
-  /* Query A: con fecha_diseno en rango Y portada NO lista Y no archivada.
-     Replica el filtro de la vista "Diseño Ailyn" de Notion + excluye
-     archivadas (el campo estado_tarea sólo tiene 'sin_empezar' |
-     'en_progreso' | 'listo' | 'archivado'). */
-  let queryA = service
+     Solución: una sola query basada en el PIPELINE de diseño.
+     Una tarea entra a /diseno si:
+       - estado_publicacion = 'disenar' (está en etapa diseño del pipeline)
+       - estado_tarea != 'archivado'
+       - portada_lista = false (sigue el patrón "Diseño Ailyn" de Notion)
+     Sin importar marca ni fecha — captura tareas standalone Y para
+     publicar mientras estén en pipeline diseño. */
+  let res = await service
     .from('publicaciones')
     .select(SELECT)
-    .not('fecha_diseno', 'is', null)
-    .gte('fecha_diseno', DESDE)
-    .lte('fecha_diseno', HASTA)
+    .eq('estado', 'disenar')
     .eq('portada_lista', false)
     .neq('estado_tarea', 'archivado')
-    .order('fecha_diseno', { ascending: true })
+    .order('fecha_diseno', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false })
     .limit(500)
-  let resA = await queryA
-
-  /* Query B: tareas internas SIN fecha_diseno (recién creadas desde el
-     modal "+ Nueva tarea" antes de asignarles fecha). Filtramos por
-     marca_id (uuid) — NO por marca.slug — y excluimos archivadas. Si
-     internoId es null (marca no creada aún → migration 21 pendiente),
-     omitimos la query B. */
-  let resB: { data: unknown[] | null; error: { code?: string; message?: string } | null } =
-    { data: [], error: null }
-  if (internoId) {
-    const queryB = service
-      .from('publicaciones')
-      .select(SELECT)
-      .is('fecha_diseno', null)
-      .eq('marca_id', internoId)
-      .eq('portada_lista', false)
-      .neq('estado_tarea', 'archivado')
-      .order('created_at', { ascending: false })
-      .limit(100)
-    resB = await queryB
-  }
 
   let migrationPendiente = false
   /* Defensive: si descripcion/fecha_entrega no existen, reintentamos */
   if (
-    resA.error?.code === '42703' ||
-    /descripcion|fecha_entrega|fecha_marcada_para_disenar/i.test(resA.error?.message ?? '')
+    res.error?.code === '42703' ||
+    /descripcion|fecha_entrega|fecha_marcada_para_disenar/i.test(res.error?.message ?? '')
   ) {
     migrationPendiente = true
-    queryA = service
+    res = await service
       .from('publicaciones')
       .select(FALLBACK_SELECT)
-      .not('fecha_diseno', 'is', null)
-      .gte('fecha_diseno', DESDE)
-      .lte('fecha_diseno', HASTA)
+      .eq('estado', 'disenar')
       .eq('portada_lista', false)
       .neq('estado_tarea', 'archivado')
-      .order('fecha_diseno', { ascending: true })
+      .order('fecha_diseno', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
       .limit(500)
-    resA = await queryA
-    if (internoId) {
-      const queryB2 = service
-        .from('publicaciones')
-        .select(FALLBACK_SELECT)
-        .is('fecha_diseno', null)
-        .eq('marca_id', internoId)
-        .eq('portada_lista', false)
-        .neq('estado_tarea', 'archivado')
-        .order('id', { ascending: false })
-        .limit(100)
-      resB = await queryB2
-    } else {
-      resB = { data: [], error: null }
-    }
   }
+  const resA = res
+  const resB = { data: [] as unknown[], error: null as null }
 
   /* Marcas para el modal de nueva tarea — excluye la "interno" del
      dropdown porque ese es el bucket default cuando NO eligen marca. */
