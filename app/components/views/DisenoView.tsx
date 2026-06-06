@@ -1343,7 +1343,17 @@ function NuevaTareaModal({
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        </div>{/* fin BODY scrolleable */}
+
+        {/* FOOTER fijo con los botones — siempre visible incluso
+            cuando el body tiene mucho contenido. */}
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', gap: 8,
+          padding: '14px 24px 18px',
+          borderTop: '1px solid var(--mk-border-subtle)',
+          background: 'var(--mk-bg-overlay)',
+          flexShrink: 0,
+        }}>
           <button
             type="button" onClick={onClose}
             style={{
