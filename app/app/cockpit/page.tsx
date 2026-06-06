@@ -123,16 +123,17 @@ export default async function CockpitPage() {
     comentariosRespondidosResult,
   ] = await Promise.all([
     /* Comentarios por responder — TODOS los pendientes (sin límite).
-       Pedro pidió ver todos separados por marca, no solo los top 8. */
+       Pedro pidió ver todos separados por marca, no solo los top 8.
+       Columnas REALES: status (no estado), comment_text, author_*, network */
     service
       .from('comentarios_inbox')
       .select(`
-        id, autor_username, autor_nombre, comentario_texto,
-        recibido_at, categoria, red_social,
+        id, author_username, author_name, author_display_name, comment_text,
+        comment_created_at, categoria_sugerida, network,
         marca:marcas(slug, nombre, color_primario_hex)
       `)
-      .eq('estado', 'pendiente')
-      .order('recibido_at', { ascending: false }),
+      .eq('status', 'pending')
+      .order('comment_created_at', { ascending: false }),
     /* Publicaciones de esta semana */
     service
       .from('publicaciones')
@@ -185,9 +186,9 @@ export default async function CockpitPage() {
     service
       .from('comentarios_inbox')
       .select('id', { count: 'exact', head: true })
-      .eq('estado', 'respondido')
-      .gte('recibido_at', `${inicioMes}T00:00:00Z`)
-      .lte('recibido_at', `${finMes}T23:59:59Z`),
+      .eq('status', 'responded')
+      .gte('responded_at', `${inicioMes}T00:00:00Z`)
+      .lte('responded_at', `${finMes}T23:59:59Z`),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,11 +225,11 @@ export default async function CockpitPage() {
         marcaSlug: (marcaArr?.slug ?? 'unknown') as string,
         marcaNombre: (marcaArr?.nombre ?? marcaArr?.slug ?? 'Marca') as string,
         marcaColor: (marcaArr?.color_primario_hex ?? '#737373') as string,
-        autor: (c.autor_username || c.autor_nombre || 'Anónimo') as string,
-        texto: (c.comentario_texto ?? '') as string,
-        hace: hace(c.recibido_at as string),
-        categoria: (c.categoria ?? 'consulta') as string,
-        red: (c.red_social ?? 'instagram') as string,
+        autor: (c.author_display_name || c.author_username || c.author_name || 'Anónimo') as string,
+        texto: (c.comment_text ?? '') as string,
+        hace: hace(c.comment_created_at as string),
+        categoria: (c.categoria_sugerida ?? 'consulta') as string,
+        red: (c.network ?? 'instagram') as string,
       }
     })
 
