@@ -58,21 +58,90 @@ const METRICAS = {
 // COMPONENT
 // ============================================================
 
+/* Tipo de los datos REALES que vienen del page.tsx (server). Antes
+   todo era mock; ahora cada bloque del cockpit puede recibir su data
+   o caer al mock si no se pasa. */
+export type CockpitData = {
+  nombreUsuario: string
+  puedeVerFinanzas: boolean
+  marcasActivasCount: number
+  comentariosPendientesTotal: number
+  grillasParaEnviarHoy: number
+  comentariosVisibles: Array<{
+    id: string
+    marcaSlug: string
+    marcaNombre: string
+    marcaColor: string
+    autor: string
+    texto: string
+    hace: string
+    categoria: string
+    red: string
+  }>
+  grillas: Array<{
+    marcaSlug: string
+    marcaNombre: string
+    marcaColor: string
+    publicaciones: number
+    estado: string  // 'aprobada' | 'pendiente' | 'borrador'
+  }>
+  habitos: Array<{
+    id: string
+    titulo: string
+    icono: string
+    color: string
+    completado: boolean
+  }>
+  habitosCompletadosHoy: number
+  grabacionesProximas: Array<{
+    fechaCorta: string  // "MAR 27"
+    fechaCompleta: string  // "27 jun"
+    hora: string
+    tipo: string
+    marcaSlug: string
+    marcaNombre: string
+    marcaColor: string
+  }>
+  metricas: {
+    publicacionesEstaSemana: number
+    comentariosRespondidosMes: number
+    comentariosPendientes: number
+    grillasEnviadasMes: number
+    publicacionesEditadasMes: number
+  }
+}
+
 /* Props:
-   - nombreUsuario: para personalizar el saludo
-   - puedeVerFinanzas: si false, NO se renderiza la card "Ingresos del mes"
-     (Pedro pidió que solo él pueda verla — privacidad cuando comparte
-     pantalla con el equipo). Por defecto false, así que cualquier
-     llamada sin pasar el flag NO muestra ingresos. */
+   - data: datos reales del page server. Si no se pasa, fallback a mock
+     legacy para no romper /mockup.
+   - nombreUsuario: para personalizar el saludo (legacy)
+   - puedeVerFinanzas: legacy
+*/
 type CockpitViewProps = {
+  data?: CockpitData
   nombreUsuario?: string
   puedeVerFinanzas?: boolean
 }
 
-export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false }: CockpitViewProps = {}) {
+export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false }: CockpitViewProps = {}) {
+  /* Si recibimos data del page server, usamos esos valores. Si no, mock. */
+  const nombreFinal = data?.nombreUsuario ?? nombreUsuario
+  const puedeVerFinanzasFinal = data?.puedeVerFinanzas ?? puedeVerFinanzas
+
   const marcaMap = Object.fromEntries(MARCAS_NAV.map((m) => [m.slug, m]))
   const ingresoDelta = METRICAS.ingresoMes - METRICAS.ingresoMesPasado
   const ingresoPct = ((ingresoDelta / METRICAS.ingresoMesPasado) * 100).toFixed(1)
+
+  /* Datos efectivos: reales si vienen, mock si no */
+  const marcasActivasCount = data?.marcasActivasCount ?? MARCAS_NAV.length
+  const comentariosPendientesTotal = data?.comentariosPendientesTotal ?? METRICAS.comentariosPendientes
+  const grillasParaEnviarHoy = data?.grillasParaEnviarHoy ?? 6
+  const comentariosList = data?.comentariosVisibles
+  const grillasList = data?.grillas
+  const habitosList = data?.habitos
+  const habitosCompletadosHoyCount = data?.habitosCompletadosHoy ?? HABITOS_HOY.filter(h => h.completado).length
+  const grabacionesList = data?.grabacionesProximas
+  const metricasReales = data?.metricas
 
   return (
     <div
@@ -129,10 +198,12 @@ export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false 
               marginBottom: 4,
             }}
           >
-            Buen día, {nombreUsuario}
+            Buen día, {nombreFinal}
           </h1>
           <p style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)', margin: 0 }}>
-            9 marcas activas · 73 comentarios pendientes · 6 grillas a enviar hoy
+            {marcasActivasCount} {marcasActivasCount === 1 ? 'marca activa' : 'marcas activas'}
+            {' · '}{comentariosPendientesTotal} {comentariosPendientesTotal === 1 ? 'comentario pendiente' : 'comentarios pendientes'}
+            {' · '}{grillasParaEnviarHoy} {grillasParaEnviarHoy === 1 ? 'grilla a enviar hoy' : 'grillas a enviar hoy'}
           </p>
         </div>
 
@@ -143,7 +214,7 @@ export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false 
           className="mk-stagger"
           style={{
             display: 'grid',
-            gridTemplateColumns: puedeVerFinanzas ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
+            gridTemplateColumns: puedeVerFinanzasFinal ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
             gap: 1,
             marginBottom: 32,
             background: 'var(--mk-border-subtle)',
@@ -152,10 +223,25 @@ export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false 
             overflow: 'hidden',
           }}
         >
-          <Kpi label="Publicaciones esta semana" value={METRICAS.publicacionesEstaSemana.toString()} delta="+12%" deltaPositive />
-          <Kpi label="Comentarios respondidos"   value={METRICAS.comentariosRespondidos.toString()} delta={`${METRICAS.comentariosPendientes} pendientes`} deltaPositive={null} />
-          <Kpi label="Grillas enviadas"          value={`${METRICAS.grillasEnviadas} / 9`} delta="67%" deltaPositive />
-          {puedeVerFinanzas && (
+          <Kpi
+            label="Publicaciones esta semana"
+            value={(metricasReales?.publicacionesEstaSemana ?? METRICAS.publicacionesEstaSemana).toString()}
+            delta={`${metricasReales?.publicacionesEditadasMes ?? 0} editadas este mes`}
+            deltaPositive={null}
+          />
+          <Kpi
+            label="Comentarios respondidos"
+            value={(metricasReales?.comentariosRespondidosMes ?? METRICAS.comentariosRespondidos).toString()}
+            delta={`${metricasReales?.comentariosPendientes ?? METRICAS.comentariosPendientes} pendientes`}
+            deltaPositive={null}
+          />
+          <Kpi
+            label="Grillas enviadas"
+            value={(metricasReales?.grillasEnviadasMes ?? METRICAS.grillasEnviadas).toString()}
+            delta="este mes"
+            deltaPositive={null}
+          />
+          {puedeVerFinanzasFinal && (
             <KpiSecreto
               label="Ingresos del mes"
               value={`S/ ${(METRICAS.ingresoMes / 1000).toFixed(1)}k`}
@@ -168,7 +254,7 @@ export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false 
         {/* 2-col */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
           <section>
-            <SectionHeader title="Atender hoy" count={COMENTARIOS_PENDIENTES.length} actionLabel="Ver todos" />
+            <SectionHeader title="Atender hoy" count={comentariosList?.length ?? COMENTARIOS_PENDIENTES.length} actionLabel="Ver todos" />
             <div
               style={{
                 border: '1px solid var(--mk-border-subtle)',
@@ -194,9 +280,21 @@ export function CockpitView({ nombreUsuario = 'amigo', puedeVerFinanzas = false 
               >
                 <span></span><span>Comentario</span><span>Marca</span><span>Categoría</span><span>Hace</span><span style={{ textAlign: 'right' }}>·</span>
               </div>
-              {COMENTARIOS_PENDIENTES.map((c) => (
-                <CommentRow key={c.id} comment={c} marca={marcaMap[c.marcaSlug]} />
-              ))}
+              {comentariosList ? (
+                comentariosList.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--mk-text-quaternary)', fontSize: 13 }}>
+                    No tienes comentarios pendientes 🎉
+                  </div>
+                ) : (
+                  comentariosList.map((c) => (
+                    <CommentRowReal key={c.id} comment={c} />
+                  ))
+                )
+              ) : (
+                COMENTARIOS_PENDIENTES.map((c) => (
+                  <CommentRow key={c.id} comment={c} marca={marcaMap[c.marcaSlug]} />
+                ))
+              )}
             </div>
           </section>
 

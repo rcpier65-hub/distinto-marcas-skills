@@ -35,7 +35,7 @@ export type HabitoConEstado = HabitoRow & {
 export async function listHabitosConEstado(): Promise<
   { ok: true; habitos: HabitoConEstado[]; today: string } | { ok: false; error: string }
 > {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const today = todayStr()
@@ -45,12 +45,30 @@ export async function listHabitosConEstado(): Promise<
   desde.setDate(desde.getDate() - 48)  // 49 días contando hoy
   const desdeStr = desde.toISOString().slice(0, 10)
 
-  // 1. Hábitos activos
-  const habsResult = await service
+  /* Resolver team_member_id del usuario logueado para filtrar habitos.
+     Pedro pidió que cada miembro tenga sus propios hábitos.
+     - Si hay team_member → filtrar por team_member_id = X
+     - Si NO hay (admin/owner) → filtrar por team_member_id IS NULL
+       (los hábitos "default" del owner) */
+  const { data: tm } = await service
+    .from('team_members')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+  const teamMemberId = tm?.id ?? null
+
+  // 1. Hábitos activos del usuario actual
+  let habsQuery = service
     .from('habitos')
-    .select('id, nombre, icono, color, dias_activos, orden, activo, created_at, updated_at')
+    .select('id, nombre, icono, color, dias_activos, orden, activo, created_at, updated_at, team_member_id')
     .eq('activo', true)
     .order('orden', { ascending: true })
+  if (teamMemberId) {
+    habsQuery = habsQuery.eq('team_member_id', teamMemberId)
+  } else {
+    habsQuery = habsQuery.is('team_member_id', null)
+  }
+  const habsResult = await habsQuery
 
   if (habsResult.error) {
     if ((habsResult.error.message ?? '').includes('does not exist')) {
@@ -211,20 +229,34 @@ export async function createHabito(args: {
   color?: string
   dias_activos?: number[]
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
   const nombre = args.nombre.trim()
   if (!nombre) return { ok: false, error: 'Nombre obligatorio' }
 
-  // Calcular siguiente orden (max + 10)
-  const maxOrden = await service
+  /* Resolver team_member_id del usuario actual. El nuevo hábito queda
+     asociado a él (su lista privada). Admin/owner → team_member_id null. */
+  const { data: tm } = await service
+    .from('team_members')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+  const teamMemberId = tm?.id ?? null
+
+  // Calcular siguiente orden (max + 10) — solo dentro de los hábitos del MISMO dueño
+  let maxOrdenQuery = service
     .from('habitos')
     .select('orden')
     .order('orden', { ascending: false })
     .limit(1)
-    .maybeSingle()
+  if (teamMemberId) {
+    maxOrdenQuery = maxOrdenQuery.eq('team_member_id', teamMemberId)
+  } else {
+    maxOrdenQuery = maxOrdenQuery.is('team_member_id', null)
+  }
+  const maxOrden = await maxOrdenQuery.maybeSingle()
   const nextOrden = (maxOrden.data?.orden ?? 0) + 10
 
   const { data, error } = await service
@@ -236,6 +268,7 @@ export async function createHabito(args: {
       dias_activos: args.dias_activos ?? [1, 2, 3, 4, 5],
       orden: nextOrden,
       activo: true,
+      team_member_id: teamMemberId,
     })
     .select('id')
     .single()
