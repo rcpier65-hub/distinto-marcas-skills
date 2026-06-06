@@ -80,7 +80,13 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       .order('fecha_publicacion', { ascending: false, nullsFirst: false })
       .limit(200)
     if (error || !data) return null
-    return (data as RawRow[]).map((r) => {
+    return (data as RawRow[])
+      // Excluir tareas de diseño "standalone": las que están en estado 'disenar'
+      // SIN fecha de publicación NO son "para publicar" → no deben aparecer en el
+      // calendario/lista de publicaciones (solo viven en el módulo /diseno).
+      // Las tareas de diseño "para publicar" SÍ tienen fecha_publicacion → se quedan.
+      .filter((r) => !(r.estado === 'disenar' && !r.fecha_publicacion))
+      .map((r) => {
       const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
       const editor = Array.isArray(r.editor) ? r.editor[0] : r.editor
       const redes = (r.plataformas ?? []).map(normalizeRed).filter(Boolean) as Red[]
