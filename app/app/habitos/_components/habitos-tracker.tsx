@@ -78,13 +78,12 @@ export function HabitosTracker({ habitos, today }: Props) {
     const offFin = (ultimo.getDay() + 6) % 7
     const start = addDays(primero, -offIni)
     const end = addDays(ultimo, 6 - offFin)
-    const dias: { ymd: string; inMonth: boolean; esHoy: boolean; futuro: boolean }[] = []
+    const dias: { ymd: string; dia: number; inMonth: boolean; esHoy: boolean; futuro: boolean }[] = []
     for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
       const ymd = toYMD(d)
-      dias.push({ ymd, inMonth: d.getMonth() === m, esHoy: ymd === today, futuro: ymd > today })
+      dias.push({ ymd, dia: d.getDate(), inMonth: d.getMonth() === m, esHoy: ymd === today, futuro: ymd > today })
     }
-    const cols = dias.length / 7
-    return { dias, cols, label: `${MESES[m]} ${año}` }
+    return { dias, label: `${MESES[m]} ${año}` }
   }, [today])
 
   return (
@@ -187,34 +186,37 @@ export function HabitosTracker({ habitos, today }: Props) {
               </button>
             </div>
 
-            {/* Grilla de puntos del mes */}
-            <div className="flex gap-2">
-              <div className="flex flex-col justify-between py-0.5 text-[9px] text-muted-foreground">
-                {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => <span key={i} className="leading-none h-3.5 flex items-center">{l}</span>)}
+            {/* Calendario del mes — 7 columnas (Lun→Dom) */}
+            <div className="max-w-md">
+              <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+                {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => (
+                  <span key={i} className="text-[10px] text-center text-muted-foreground">{l}</span>
+                ))}
               </div>
-              <div className="grid grid-flow-col gap-1" style={{ gridTemplateRows: 'repeat(7, minmax(0, 1fr))' }}>
+              <div className="grid grid-cols-7 gap-1.5">
                 {mes.dias.map((d, idx) => {
+                  if (!d.inMonth) return <span key={idx} aria-hidden />   // relleno fuera del mes
                   const ok = done.has(`${h.id}|${d.ymd}`)
-                  const clickable = d.inMonth && !d.futuro
+                  const clickable = !d.futuro
                   return (
                     <button
                       key={idx}
                       disabled={!clickable}
                       onClick={() => clickable && toggle(h.id, d.ymd)}
-                      title={d.inMonth ? d.ymd : ''}
-                      className="w-3.5 h-3.5 rounded-[3px] transition-all disabled:cursor-default"
+                      title={d.ymd}
+                      className="aspect-square rounded-md flex items-center justify-center text-[11px] tabular-nums transition-all disabled:cursor-default hover:opacity-90"
                       style={
-                        !d.inMonth
-                          ? { background: 'transparent' }
-                          : ok
-                          ? { background: VIOLETA }
+                        ok
+                          ? { background: VIOLETA, color: '#fff', fontWeight: 600 }
                           : d.esHoy
-                          ? { background: `${VIOLETA}22`, outline: `1.5px solid ${VIOLETA}`, outlineOffset: '-1.5px' }
+                          ? { border: `2px solid ${VIOLETA}`, background: `${VIOLETA}12`, color: VIOLETA, fontWeight: 700 }
                           : d.futuro
-                          ? { background: 'var(--muted, #f4f4f5)' }
-                          : { background: 'var(--border, #e4e4e7)' }
+                          ? { background: 'var(--muted, #f4f4f5)', color: '#c4c4cc' }
+                          : { background: 'var(--border, #e4e4e7)', color: '#71717a' }
                       }
-                    />
+                    >
+                      {d.dia}
+                    </button>
                   )
                 })}
               </div>
