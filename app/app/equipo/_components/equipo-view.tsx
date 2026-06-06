@@ -73,48 +73,73 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
   }
 
   return (
-    <div style={{ minHeight: '100vh', padding: '24px 32px', background: 'var(--mk-bg-base)' }}>
-      {/* HEADER con título + búsqueda + filtros + acciones.
-          Inspirado en la referencia de dashboard de empleados que mostró
-          Pedro, pero usando tokens --mk-* del sistema Distinto. */}
-      <header style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 16 }}>
+    <div style={{
+      minHeight: '100vh',
+      padding: '32px 40px',
+      background: '#fafafa',  /* fondo súper claro fuera de blanco puro para que las cards "floten" */
+    }}>
+      {/* HEADER */}
+      <header style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+            <h1 style={{
+              fontSize: 26, fontWeight: 600, color: '#111827',
+              margin: 0, letterSpacing: '-0.02em',
+            }}>
               Mi equipo
             </h1>
-            <p style={{ fontSize: 13, color: 'var(--mk-text-tertiary)', margin: '4px 0 0' }}>
+            <p style={{ fontSize: 13.5, color: '#6b7280', margin: '4px 0 0', fontWeight: 400 }}>
               {visibles.length} {visibles.length === 1 ? 'miembro' : 'miembros'}
-              {showInactivos && ' (incluye inactivos)'}
+              {showInactivos && ' · incluye inactivos'}
               {(rolFiltro !== 'todos' || search) && ' · filtrados'}
             </p>
           </div>
           <div style={{ flex: 1 }} />
-          <button onClick={() => setNuevoOpen(true)} style={btnPrimaryStyle}>
-            + Nuevo miembro
+          <button
+            onClick={() => setNuevoOpen(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              height: 40, padding: '0 16px',
+              background: 'var(--mk-accent, #7170ff)',
+              border: '1px solid var(--mk-accent, #7170ff)',
+              borderRadius: 10,
+              color: '#fff',
+              fontFamily: 'inherit', fontSize: 13.5, fontWeight: 500,
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(113, 112, 255, 0.30), 0 0 0 1px rgba(113, 112, 255, 0.10)',
+              transition: 'all 150ms ease-out',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(113, 112, 255, 0.35)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(113, 112, 255, 0.30), 0 0 0 1px rgba(113, 112, 255, 0.10)' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 2V11M2 6.5H11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            Nuevo miembro
           </button>
         </div>
 
-        {/* Toolbar de filtros */}
+        {/* Toolbar moderna: bordes muy suaves, fondo blanco puro */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          padding: 12, background: 'var(--mk-bg-elevated)',
-          border: '1px solid var(--mk-border-subtle)',
-          borderRadius: 'var(--mk-radius-md)',
+          padding: 8, background: '#fff',
+          border: '1px solid #f1f1f3',
+          borderRadius: 12,
+          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
         }}>
           {/* Search */}
           <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--mk-text-tertiary)', pointerEvents: 'none' }}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="6.5" cy="6.5" r="4" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
             </span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por nombre, email o cargo…"
-              style={{ ...fieldStyle, paddingLeft: 32 }}
+              style={{ ...fieldStyleModern, paddingLeft: 36 }}
             />
           </div>
 
@@ -122,7 +147,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
           <select
             value={rolFiltro}
             onChange={(e) => setRolFiltro(e.target.value as RolPredefinidoId | 'todos')}
-            style={{ ...fieldStyle, width: 'auto', minWidth: 160 }}
+            style={{ ...fieldStyleModern, width: 'auto', minWidth: 170, cursor: 'pointer' }}
           >
             <option value="todos">Todos los roles</option>
             {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
@@ -132,23 +157,27 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
           <button
             onClick={() => setShowInactivos((v) => !v)}
             style={{
-              ...btnSecondaryStyle,
-              background: showInactivos ? 'var(--mk-accent-bg)' : 'transparent',
-              borderColor: showInactivos ? 'var(--mk-border-accent)' : 'var(--mk-border-subtle)',
-              color: showInactivos ? 'var(--mk-accent)' : 'var(--mk-text-secondary)',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              height: 36, padding: '0 12px',
+              background: showInactivos ? '#eef2ff' : '#fff',
+              border: `1px solid ${showInactivos ? '#c7d2fe' : '#e5e7eb'}`,
+              borderRadius: 8,
+              color: showInactivos ? '#4338ca' : '#374151',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 150ms ease-out',
             }}
-            title="Mostrar también miembros desactivados"
           >
-            {showInactivos ? '✓ Inactivos' : 'Ver inactivos'}
+            {showInactivos ? '✓ ' : ''}Inactivos
           </button>
         </div>
       </header>
 
-      {/* GRID DE CARDS */}
+      {/* GRID DE CARDS — cards más anchas (320px min) para que respiren */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: 16,
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: 20,
       }}>
         {visibles.map((m) => {
           const rol = rolesById.get(m.rol_base)
@@ -227,15 +256,13 @@ function MemberCard({
   const rolColor = rol ? ROL_COLOR[rol.id] : '#737373'
   const cargo = member.cargo_personalizado || rol?.nombre || '—'
 
-  /* Estado del miembro — 3 estados visibles para quick-scan:
-     ACTIVO (auth + activo): verde
-     PENDIENTE (sin auth): amber
-     INACTIVO: gris */
-  const estado: { label: string; color: string; bg: string } = !member.activo
-    ? { label: 'INACTIVO', color: '#737373', bg: 'rgba(115, 115, 115, 0.12)' }
+  /* Estado del miembro — pill con dot tipo Linear/Notion. Colores
+     pasteles suaves (no chillones) para look moderno y respirado. */
+  const estado: { label: string; color: string; bg: string; dot: string } = !member.activo
+    ? { label: 'Inactivo', color: '#6b7280', bg: '#f3f4f6', dot: '#9ca3af' }
     : !member.auth_user_id
-      ? { label: 'PENDIENTE', color: '#b45309', bg: 'rgba(251, 191, 36, 0.18)' }
-      : { label: 'ACTIVO', color: '#15803d', bg: 'rgba(34, 197, 94, 0.12)' }
+      ? { label: 'Pendiente', color: '#a16207', bg: '#fef9c3', dot: '#eab308' }
+      : { label: 'Activo', color: '#15803d', bg: '#dcfce7', dot: '#22c55e' }
 
   const fechaIngreso = new Date(member.created_at).toLocaleDateString('es-PE', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -247,120 +274,159 @@ function MemberCard({
   return (
     <div
       style={{
-        padding: 16,
-        background: 'var(--mk-bg-elevated)',
-        border: '1px solid var(--mk-border-subtle)',
-        borderRadius: 'var(--mk-radius-lg)',
-        opacity: member.activo ? 1 : 0.7,
-        transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
-        display: 'flex', flexDirection: 'column', gap: 12,
-        position: 'relative', overflow: 'hidden',
+        padding: 24,
+        background: '#fff',
+        border: '1px solid #f1f1f3',
+        borderRadius: 16,
+        opacity: member.activo ? 1 : 0.65,
+        transition: 'all 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+        display: 'flex', flexDirection: 'column', gap: 18,
+        boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = rolColor; e.currentTarget.style.boxShadow = `0 4px 16px ${rolColor}1a` }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'; e.currentTarget.style.boxShadow = 'none' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = '#e5e7eb'
+        e.currentTarget.style.boxShadow = '0 8px 24px -8px rgba(16, 24, 40, 0.08), 0 4px 8px -4px rgba(16, 24, 40, 0.04)'
+        e.currentTarget.style.transform = 'translateY(-1px)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = '#f1f1f3'
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(16, 24, 40, 0.04)'
+        e.currentTarget.style.transform = 'none'
+      }}
     >
-      {/* Banda superior con color del rol — toque sutil de identidad visual */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-        background: rolColor, opacity: 0.7,
-      }} />
-
-      {/* Cabecera: avatar grande + nombre/cargo + badge estado */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 4 }}>
+      {/* HEADER: estado pill arriba derecha. No banda colorida — más limpio. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: 22 }}>
         <span style={{
-          width: 52, height: 52, borderRadius: '50%',
-          background: `linear-gradient(135deg, ${rolColor}, ${rolColor}cc)`,
-          color: 'white',
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontSize: 11, fontWeight: 500,
+          padding: '3px 9px 3px 7px',
+          background: estado.bg, color: estado.color,
+          borderRadius: 999,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: estado.dot }} />
+          {estado.label}
+        </span>
+      </div>
+
+      {/* AVATAR + Nombre + cargo — disposición horizontal centrada */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: -8 }}>
+        <span style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: rolColor, color: '#fff',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 18, fontWeight: 600,
-          boxShadow: `0 0 0 3px ${rolColor}1a`,
           flexShrink: 0,
+          letterSpacing: '-0.01em',
         }}>
           {inicial}
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.005em' }}>
+          <div style={{
+            fontSize: 16, fontWeight: 600, color: '#111827',
+            letterSpacing: '-0.01em', lineHeight: 1.25,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
             {member.nombre}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--mk-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{
+            fontSize: 13, color: '#6b7280', marginTop: 2,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
             {cargo}
           </div>
         </div>
-        <span style={{
-          fontSize: 9.5, fontWeight: 700,
-          padding: '3px 8px',
-          background: estado.bg, color: estado.color,
-          borderRadius: 999, whiteSpace: 'nowrap',
-          letterSpacing: '0.04em',
-        }}>
-          ● {estado.label}
-        </span>
       </div>
 
-      {/* Grid de metadata: rol + fecha ingreso, email + cumpleaños */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 10,
-        padding: '10px 12px',
-        background: 'rgba(0, 0, 0, 0.02)',
-        borderRadius: 'var(--mk-radius-md)',
-      }}>
+      {/* Separador sutil — solo línea horizontal limpia */}
+      <div style={{ height: 1, background: '#f3f4f6' }} />
+
+      {/* Grid 2 columnas con labels uppercase pequeñas y valores normales.
+          Estilo "data label" típico de dashboards modernos. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Rol base" value={rol?.nombre ?? member.rol_base} />
         <Field label="Ingreso" value={fechaIngreso} />
       </div>
 
-      {/* Contacto */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11.5, color: 'var(--mk-text-secondary)' }}>
-        <ContactLine icon="✉" value={member.email} muted={member.email.endsWith('@pendiente.local')} />
-        {cumple && <ContactLine icon="🎂" value={`Cumple ${cumple}`} />}
+      {/* Contacto: email + (cumpleaños si hay). SVG icons consistentes,
+          sin emojis. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <ContactLine
+          icon={
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="1.5" y="3" width="11" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M2 4L7 7.5L12 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          }
+          value={member.email}
+          muted={member.email.endsWith('@pendiente.local')}
+        />
+        {cumple && (
+          <ContactLine
+            icon={
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1.5" y="5" width="11" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M4 3V5M10 3V5M1.5 7.5H12.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            }
+            value={`Cumple ${cumple}`}
+          />
+        )}
+        <ContactLine
+          icon={
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M3 6.5h2.5L7 4.5l1.5 2H11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="1.5" y="2.5" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+          }
+          value={`${modulosCount} módulos · ${marcasCount === totalMarcas ? 'todas las marcas' : `${marcasCount} marcas`}${pubsEnEdicion > 0 ? ` · ${pubsEnEdicion} por editar` : ''}`}
+        />
       </div>
 
-      {/* Stats mini en chips */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <Chip label={`${modulosCount} módulos`} />
-        <Chip label={marcasCount === totalMarcas ? 'Todas las marcas' : `${marcasCount} marcas`} />
-        {pubsEnEdicion > 0 && <Chip label={`${pubsEnEdicion} por editar`} highlight={rolColor} />}
-      </div>
-
-      {/* Botones inferiores: Editar + Acceso (acción principal: gestión de contraseña) */}
-      <div style={{
-        display: 'flex', gap: 6, marginTop: 4,
-        paddingTop: 10, borderTop: '1px solid var(--mk-border-subtle)',
-      }}>
+      {/* Botones inferiores: outline + filled. Más anchos, border-radius
+          mayor, estilo "pill button" moderno. */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         <button
           onClick={() => onOpen('info')}
           style={{
-            flex: 1, padding: '8px 12px',
-            background: 'transparent',
-            border: '1px solid var(--mk-border-subtle)',
-            borderRadius: 'var(--mk-radius-md)',
-            color: 'var(--mk-text-secondary)',
-            fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+            flex: 1, height: 38, padding: '0 14px',
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 10,
+            color: '#374151',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
             cursor: 'pointer',
-            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+            transition: 'all 150ms ease-out',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.borderColor = '#d1d5db' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e5e7eb' }}
         >
-          ✏ Editar
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2.5 10.5L9.5 3.5L11 5L4 12H2.5V10.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+          </svg>
+          Editar
         </button>
         <button
           onClick={() => onOpen('seguridad')}
           style={{
-            flex: 1, padding: '8px 12px',
+            flex: 1, height: 38, padding: '0 14px',
             background: rolColor,
             border: `1px solid ${rolColor}`,
-            borderRadius: 'var(--mk-radius-md)',
-            color: 'white',
-            fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+            borderRadius: 10,
+            color: '#fff',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
             cursor: 'pointer',
-            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+            transition: 'all 150ms ease-out',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92' }}
           onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
         >
-          🔐 Acceso
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="3" y="6" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M4.5 6V4.5C4.5 3 5.5 2 6.5 2C7.5 2 8.5 3 8.5 4.5V6" stroke="currentColor" strokeWidth="1.2" />
+          </svg>
+          Acceso
         </button>
       </div>
     </div>
@@ -370,43 +436,42 @@ function MemberCard({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--mk-text-quaternary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+      <div style={{
+        fontSize: 10.5, fontWeight: 600, color: '#9ca3af',
+        textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
+      }}>
         {label}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{
+        fontSize: 13.5, color: '#111827', fontWeight: 500,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        letterSpacing: '-0.005em',
+      }}>
         {value}
       </div>
     </div>
   )
 }
 
-function ContactLine({ icon, value, muted }: { icon: string; value: string; muted?: boolean }) {
+function ContactLine({ icon, value, muted }: { icon: React.ReactNode; value: string; muted?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-      <span style={{ fontSize: 11, opacity: 0.6, flexShrink: 0 }}>{icon}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+      <span style={{
+        color: muted ? '#d1d5db' : '#9ca3af',
+        flexShrink: 0,
+        display: 'inline-flex',
+      }}>
+        {icon}
+      </span>
       <span style={{
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        color: muted ? 'var(--mk-text-quaternary)' : 'var(--mk-text-secondary)',
+        color: muted ? '#9ca3af' : '#4b5563',
         fontStyle: muted ? 'italic' : 'normal',
+        fontSize: 13,
       }}>
         {value}
       </span>
     </div>
-  )
-}
-
-function Chip({ label, highlight }: { label: string; highlight?: string }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '2px 8px',
-      background: highlight ? `${highlight}1a` : 'rgba(0, 0, 0, 0.04)',
-      color: highlight ?? 'var(--mk-text-tertiary)',
-      borderRadius: 999,
-      fontSize: 10.5, fontWeight: 500,
-    }}>
-      {label}
-    </span>
   )
 }
 
@@ -1167,6 +1232,17 @@ const fieldStyle: React.CSSProperties = {
   border: '1px solid var(--mk-border-subtle)',
   borderRadius: 'var(--mk-radius-md)',
   color: 'var(--mk-text-primary)',
+  fontFamily: 'inherit', fontSize: 13,
+  outline: 'none', width: '100%',
+}
+/* Input style moderno para la toolbar — más limpio que fieldStyle del
+   sistema. Border más sutil, focus ring suave. */
+const fieldStyleModern: React.CSSProperties = {
+  height: 36, padding: '0 12px',
+  background: '#fff',
+  border: '1px solid #e5e7eb',
+  borderRadius: 8,
+  color: '#111827',
   fontFamily: 'inherit', fontSize: 13,
   outline: 'none', width: '100%',
 }
