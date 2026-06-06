@@ -630,14 +630,16 @@ const CAT_LABELS: Record<Categoria, string> = {
   otro: 'Otro',
 }
 
-/* ComentariosAgrupados: agrupa los comentarios por marca y renderiza
-   cada grupo con un header (dot color marca + nombre + count) + lista
-   de comentarios. Pedro pidió esta vista en lugar de la tabla plana
-   porque así es más fácil escanear "cuántos pendientes tengo por
-   marca" de un vistazo. */
+/* ComentariosAgrupados: vista resumen por marca.
+   - Header de cada marca con nombre + count GRANDE a la derecha
+   - Solo 3 comentarios de PREVIEW por marca (no todos)
+   - Si hay más, "+ X más →" link a /comentarios?marca=slug
+   - Marcas ordenadas por cantidad descendente (las que más necesitan
+     atención salen primero)
+   Pedro pidió esto porque mostrar todos hacía scroll infinito. */
+const PREVIEW_POR_MARCA = 3
+
 function ComentariosAgrupados({ comentarios }: { comentarios: NonNullable<CockpitData['comentariosVisibles']> }) {
-  /* Agrupar manteniendo el orden por cantidad de comentarios (descendente).
-     Marca con más pendientes arriba. */
   const grupos = new Map<string, { marcaSlug: string; marcaNombre: string; marcaColor: string; items: typeof comentarios }>()
   for (const c of comentarios) {
     const existing = grupos.get(c.marcaSlug) ?? {
@@ -653,75 +655,116 @@ function ComentariosAgrupados({ comentarios }: { comentarios: NonNullable<Cockpi
 
   return (
     <div>
-      {ordenados.map((grupo, idx) => (
-        <div key={grupo.marcaSlug} style={{
-          borderBottom: idx < ordenados.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
-        }}>
-          {/* Header de marca */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 14px',
-            background: 'rgba(0, 0, 0, 0.015)',
-            borderBottom: '1px solid var(--mk-border-subtle)',
+      {ordenados.map((grupo, idx) => {
+        const visibles = grupo.items.slice(0, PREVIEW_POR_MARCA)
+        const restantes = grupo.items.length - visibles.length
+        return (
+          <div key={grupo.marcaSlug} style={{
+            borderBottom: idx < ordenados.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
           }}>
-            <span className="mk-dot" style={{
-              background: grupo.marcaColor,
-              boxShadow: `0 0 6px ${grupo.marcaColor}`,
-              width: 8, height: 8,
-            }} />
-            <span style={{
-              fontSize: 'var(--mk-text-sm)',
-              fontWeight: 600,
-              color: 'var(--mk-text-primary)',
-              letterSpacing: '-0.005em',
-            }}>
-              {grupo.marcaNombre}
-            </span>
-            <span style={{
-              fontSize: 'var(--mk-text-xs)',
-              color: 'var(--mk-text-tertiary)',
-              fontVariantNumeric: 'tabular-nums',
-              background: 'rgba(0, 0, 0, 0.04)',
-              padding: '1px 7px',
-              borderRadius: 999,
-            }}>
-              {grupo.items.length}
-            </span>
-          </div>
-          {/* Comentarios del grupo */}
-          {grupo.items.map((c, i) => (
-            <div
-              key={c.id}
+            {/* Header de marca: nombre + dot a la izquierda, COUNT grande a la derecha */}
+            <a
+              href={`/comentarios?marca=${grupo.marcaSlug}`}
               style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 100px 70px',
-                gap: 12,
-                padding: '10px 14px 10px 30px',
-                fontSize: 'var(--mk-text-sm)',
-                alignItems: 'center',
-                borderBottom: i < grupo.items.length - 1 ? '1px solid var(--mk-border-subtle)' : 'none',
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 16px',
+                background: '#fafafa',
+                borderBottom: visibles.length > 0 ? '1px solid var(--mk-border-subtle)' : 'none',
+                textDecoration: 'none',
                 cursor: 'pointer',
-                transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+                transition: 'background 150ms ease-out',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#fafafa' }}
             >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>@{c.autor}</div>
-                <div style={{ color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.texto}
+              <span style={{
+                width: 10, height: 10, borderRadius: '50%',
+                background: grupo.marcaColor,
+                boxShadow: `0 0 8px ${grupo.marcaColor}66`,
+                flexShrink: 0,
+              }} />
+              <span style={{
+                flex: 1,
+                fontSize: 14, fontWeight: 600,
+                color: '#111827',
+                letterSpacing: '-0.01em',
+              }}>
+                {grupo.marcaNombre}
+              </span>
+              {/* Count grande a la derecha con pill */}
+              <span style={{
+                display: 'inline-flex', alignItems: 'baseline', gap: 4,
+                padding: '3px 10px',
+                background: `${grupo.marcaColor}1a`,
+                color: grupo.marcaColor,
+                borderRadius: 999,
+                fontSize: 13, fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {grupo.items.length}
+                <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.8 }}>
+                  {grupo.items.length === 1 ? 'pendiente' : 'pendientes'}
+                </span>
+              </span>
+            </a>
+
+            {/* Preview de hasta 3 comentarios */}
+            {visibles.map((c, i) => (
+              <a
+                key={c.id}
+                href={`/comentarios?marca=${grupo.marcaSlug}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 100px 70px',
+                  gap: 12,
+                  padding: '10px 16px 10px 32px',
+                  fontSize: 13.5,
+                  alignItems: 'center',
+                  borderBottom: i < visibles.length - 1 || restantes > 0 ? '1px solid var(--mk-border-subtle)' : 'none',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  transition: 'background 100ms ease-out',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', marginBottom: 1 }}>@{c.autor}</div>
+                  <div style={{ color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.texto}
+                  </div>
                 </div>
-              </div>
-              <span style={{ color: 'var(--mk-text-tertiary)', textTransform: 'capitalize', fontSize: 11 }}>
-                {c.categoria.replace(/_/g, ' ')}
-              </span>
-              <span style={{ color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums', fontSize: 11, textAlign: 'right' }}>
-                {c.hace}
-              </span>
-            </div>
-          ))}
-        </div>
-      ))}
+                <span style={{ color: 'var(--mk-text-tertiary)', textTransform: 'capitalize', fontSize: 11 }}>
+                  {c.categoria.replace(/_/g, ' ')}
+                </span>
+                <span style={{ color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums', fontSize: 11, textAlign: 'right' }}>
+                  {c.hace}
+                </span>
+              </a>
+            ))}
+
+            {/* "+ X más" si hay restantes */}
+            {restantes > 0 && (
+              <a
+                href={`/comentarios?marca=${grupo.marcaSlug}`}
+                style={{
+                  display: 'block',
+                  padding: '8px 16px 10px 32px',
+                  fontSize: 12, fontWeight: 500,
+                  color: grupo.marcaColor,
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  transition: 'background 100ms ease-out',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              >
+                + {restantes} más en {grupo.marcaNombre} →
+              </a>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
