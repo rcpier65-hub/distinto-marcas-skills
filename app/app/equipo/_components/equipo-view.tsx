@@ -201,7 +201,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
 
       {visibles.length === 0 && (
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--mk-text-quaternary)' }}>
-          No hay miembros para mostrar. Tocá "+ Nuevo miembro" para crear el primero.
+          No hay miembros para mostrar. Toca "+ Nuevo miembro" para crear el primero.
         </div>
       )}
 
@@ -913,7 +913,7 @@ function TabSeguridad({
 ${bienvenida} a tu nueva casa de trabajo en Distinto Agencia. 🎉
 Acabo de crear tu acceso al sistema, te dejo los datos abajo:
 
-🔗 Entra acá:
+🔗 Entra aquí:
 ${APP_URL}/login
 
 📧 Email:
@@ -922,14 +922,14 @@ ${member.email}
 🔑 Contraseña:
 ${password}
 
-Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
+Cuando entres puedes cambiarla por una tuya. Cualquier cosa, escríbeme por aquí.
 
 — Pedro`
   }
 
   function copiarInvitacion() {
     if (!password) {
-      toast.error('Primero asigná y guardá una contraseña')
+      toast.error('Primero asigna y guarda una contraseña')
       return
     }
     navigator.clipboard.writeText(generarMensaje())
@@ -955,7 +955,7 @@ Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#6d28d9', marginBottom: 4 }}>⚠ Email placeholder</div>
           <div style={{ fontSize: 11.5, color: '#5b21b6', lineHeight: 1.5 }}>
-            Antes de asignar contraseña cambiá el email <code style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '1px 5px', borderRadius: 4 }}>{member.email}</code> al real en la tab Información.
+            Antes de asignar contraseña cambia el email <code style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '1px 5px', borderRadius: 4 }}>{member.email}</code> al real en la tab Información.
           </div>
         </div>
       )}
@@ -963,7 +963,7 @@ Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
       <section>
         <h3 style={sectionTitleStyle}>Contraseña del miembro</h3>
         <p style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', margin: '0 0 12px' }}>
-          Vos asignás la contraseña y se la pasás al miembro por WhatsApp. Queda guardada acá para que la puedas copiar cuando necesites.
+          Tú asignas la contraseña y se la pasas al miembro por WhatsApp. Queda guardada aquí para que la puedas copiar cuando la necesites.
         </p>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -971,7 +971,7 @@ Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
             type={show ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Ej. CasaAzul2026 — o tocá Generar"
+            placeholder="Ej. CasaAzul2026 — o toca Generar"
             style={{ ...fieldStyle, fontFamily: show ? 'monospace' : 'inherit', flex: 1 }}
             disabled={pending}
           />
@@ -1019,7 +1019,7 @@ Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
         }}>
           <h3 style={{ ...sectionTitleStyle, margin: '0 0 4px' }}>📨 Invitación lista para enviar</h3>
           <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 14px', lineHeight: 1.5 }}>
-            Mensaje de bienvenida personalizado con el link, email y contraseña. Tocá copiar y pegá en WhatsApp.
+            Mensaje de bienvenida personalizado con el link, email y contraseña. Toca copiar y pega en WhatsApp.
           </p>
 
           {/* Preview del mensaje siempre visible — Pedro quiere ver
@@ -1063,14 +1063,14 @@ Cuando entres podés cambiarla por una tuya. Cualquier cosa, escribime por acá.
 
           {!tieneAcceso && (
             <p style={{ fontSize: 11, color: '#9ca3af', margin: '8px 0 0', textAlign: 'center', fontStyle: 'italic' }}>
-              Tocá "Crear cuenta y activar" arriba antes de copiar.
+              Toca "Crear cuenta y activar" arriba antes de copiar.
             </p>
           )}
         </section>
       )}
 
       <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 4 }}>
-        El miembro entra a <code style={{ background: '#f3f4f6', padding: '1px 5px', borderRadius: 4, fontSize: 10.5 }}>{APP_URL}/login</code>, escribe email + contraseña y queda dentro. Podés volver acá cuando necesites copiar el mensaje otra vez.
+        El miembro entra a <code style={{ background: '#f3f4f6', padding: '1px 5px', borderRadius: 4, fontSize: 10.5 }}>{APP_URL}/login</code>, escribe email + contraseña y queda dentro. Puedes volver aquí cuando necesites copiar el mensaje otra vez.
       </div>
     </div>
   )
@@ -1163,7 +1163,7 @@ function ModalNuevoMiembro({
         <div style={modalHeaderStyle}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mk-text-primary)' }}>Nuevo miembro</div>
-            <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>Después podés generar un link de invitación</div>
+            <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>Después puedes generar un link de invitación</div>
           </div>
           <div style={{ flex: 1 }} />
           <button type="button" onClick={onClose} style={iconBtnStyle}>✕</button>

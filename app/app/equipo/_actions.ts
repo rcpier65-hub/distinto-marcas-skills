@@ -171,7 +171,7 @@ export async function generarLinkInvitacion(memberId: string): Promise<
 
 /**
  * Asigna o cambia la contraseña de un miembro. Pedro pidió tener
- * control total — vos asignás la contraseña, se guarda en
+ * control total — tú asignas la contraseña, se guarda en
  * `password_inicial` (visible solo en /equipo para que la puedas
  * copiar y pasar al miembro por WhatsApp), Y se sincroniza con
  * Supabase Auth para que el login funcione.
@@ -204,7 +204,7 @@ export async function setPasswordMiembro(
   if (e1 || !member) return { ok: false, error: 'Miembro no encontrado' }
   if (!member.activo) return { ok: false, error: 'El miembro está desactivado' }
   if (!member.email || member.email.endsWith('@pendiente.local')) {
-    return { ok: false, error: 'Primero asigná un email real al miembro (tab Información)' }
+    return { ok: false, error: 'Primero asigna un email real al miembro (tab Información)' }
   }
 
   let authUserId = member.auth_user_id

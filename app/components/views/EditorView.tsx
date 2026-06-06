@@ -542,7 +542,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
                   {filters.soloHoy ? 'Aún no marcaste tareas para hoy' : 'Sin tareas con esos filtros'}
                 </div>
                 <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
-                  {filters.soloHoy ? 'Tocá "Editar hoy" en alguna fila para agregarla' : 'Probá limpiar los filtros'}
+                  {filters.soloHoy ? 'Toca "Editar hoy" en alguna fila para agregarla' : 'Prueba limpiar los filtros'}
                 </div>
               </td></tr>
             )}
