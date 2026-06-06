@@ -72,6 +72,13 @@ export async function updateDisenoEntry(
     fechaDiseno?: string | null
     fechaEntrega?: string | null
     fechaPublicacion?: string | null
+    /* Enlaces específicos para tareas de diseño standalone:
+       - drive_material_url: link al material que Ailyn usa de base
+       - drive_resultado_url: link al diseño terminado para entregar */
+    driveMaterialUrl?: string | null
+    driveResultadoUrl?: string | null
+    horaReunion?: string | null
+    invitadosEmails?: string[] | null
   },
 ): Promise<ActionResult> {
   const user = await requireUser()
@@ -107,6 +114,10 @@ export async function updateDisenoEntry(
   if (patch.fechaDiseno !== undefined) update.fecha_diseno = patch.fechaDiseno
   if (patch.fechaEntrega !== undefined) update.fecha_entrega = patch.fechaEntrega
   if (patch.fechaPublicacion !== undefined) update.fecha_publicacion = patch.fechaPublicacion
+  if (patch.driveMaterialUrl !== undefined) update.drive_material_url = patch.driveMaterialUrl
+  if (patch.driveResultadoUrl !== undefined) update.drive_resultado_url = patch.driveResultadoUrl
+  if (patch.horaReunion !== undefined) update.reunion_hora = patch.horaReunion
+  if (patch.invitadosEmails !== undefined) update.invitados_emails = patch.invitadosEmails
 
   let { error } = await service.from('publicaciones').update(update).eq('id', id)
 

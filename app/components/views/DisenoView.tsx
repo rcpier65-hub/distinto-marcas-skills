@@ -241,8 +241,20 @@ export function DisenoView({
     setSort(null)
   }
 
+  /* Routing del detalle según el tipo de tarea:
+     - Tarea para publicar (marca cliente real): vista completa del
+       form de publicación con Copy/Música/Portada/Tomas/Guion.
+     - Tarea standalone (marca='interno', ej. Manual de marca): vista
+       simple con solo lo relevante para diseño puro.
+     Pedro pidió que las standalone no se "ensucien" con campos de
+     publicación que no aplican. */
   function openRow(id: string) {
-    router.push(`/publicaciones/${id}`)
+    const entry = entries.find((e) => e.id === id)
+    if (entry?.esInterno) {
+      router.push(`/diseno/${id}`)
+    } else {
+      router.push(`/publicaciones/${id}`)
+    }
   }
 
   /* Callback del modal cuando se crea una tarea — la agregamos al

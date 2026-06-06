@@ -1080,6 +1080,19 @@ Cuando entres puedes cambiarla por una tuya. Cualquier cosa, escríbeme por aqu�
    MODAL: Crear nuevo miembro (formulario simple)
    ============================================================ */
 
+/* Convierte un nombre en un email del dominio agencia.
+   Toma solo el primer nombre, quita tildes, espacios y caracteres
+   especiales. "José Luis" → "jose@agenciadistinto.com" */
+function nombreAEmail(nombre: string): string {
+  const primero = nombre.trim().split(/\s+/)[0] ?? ''
+  const normalizado = primero
+    .normalize('NFD')                  // separa diacríticos
+    .replace(/[̀-ͯ]/g, '')  // los quita
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')        // solo alfanumérico
+  return normalizado ? `${normalizado}@agenciadistinto.com` : ''
+}
+
 function ModalNuevoMiembro({
   roles, marcas, onClose, onCreated,
 }: {
@@ -1090,10 +1103,32 @@ function ModalNuevoMiembro({
 }) {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
+  /* El email se auto-completa según el nombre mientras Pedro no lo
+     haya editado manualmente. Si lo edita, el flag queda en true y
+     dejamos de auto-sincronizar para respetar su elección.
+     Si vacía el email, el flag se resetea y vuelve a auto-completar. */
+  const [emailEditadoManual, setEmailEditadoManual] = useState(false)
   const [rolBase, setRolBase] = useState<RolPredefinidoId>(roles[0]?.id ?? 'editor')
   const [cargo, setCargo] = useState('')
   const [marcasIds, setMarcasIds] = useState<string[] | null>(null)
   const [saving, startSaving] = useTransition()
+
+  /* Auto-sync nombre → email cuando aún no fue editado a mano */
+  function handleNombreChange(nuevo: string) {
+    setNombre(nuevo)
+    if (!emailEditadoManual) {
+      setEmail(nombreAEmail(nuevo))
+    }
+  }
+
+  function handleEmailChange(nuevo: string) {
+    setEmail(nuevo)
+    /* Si el campo queda vacío, vuelve a modo auto-sync. Si el usuario
+       lo borra todo y empieza a escribir el nombre de nuevo, el email
+       sigue al nombre. */
+    if (nuevo === '') setEmailEditadoManual(false)
+    else setEmailEditadoManual(true)
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose() }
@@ -1171,10 +1206,29 @@ function ModalNuevoMiembro({
 
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Campo label="Nombre *">
-            <input required autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. María García" style={fieldStyle} />
+            <input
+              required
+              autoFocus
+              value={nombre}
+              onChange={(e) => handleNombreChange(e.target.value)}
+              placeholder="Ej. María García"
+              style={fieldStyle}
+            />
           </Campo>
           <Campo label="Email *">
-            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@distinto.com" style={fieldStyle} />
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              placeholder="maria@agenciadistinto.com"
+              style={fieldStyle}
+            />
+            {nombre && !emailEditadoManual && (
+              <span style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>
+                Se auto-completa según el nombre. Edítalo si necesitas otro.
+              </span>
+            )}
           </Campo>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Campo label="Rol base">
