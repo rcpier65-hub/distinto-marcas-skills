@@ -128,55 +128,34 @@ function LeftPanel() {
         }}
       />
 
-      {/* TOP: Isotipo + wordmark "DISTINTO" — lockup custom inline.
-          Antes usaba logo-h-white-tight.png pero Pedro vió un
-          rectángulo negro feo (el PNG tenía fondo opaco). Ahora
-          renderizo el isotipo SVG con fills WHITE override + texto
-          "DISTINTO" en typography fuerte al costado. Sin fondos
-          parásitos y escalable infinito. */}
+      {/* TOP: Solo el isotipo blanco, centrado.
+          Pedro: "solo pon el icono nada mas y no pongas ese morado
+          ahi mejor todo que sea solo la parte blanquita pero centrado".
+          → Quitado: el texto "DISTINTO" + el pétalo amarillo del SVG.
+          → Queda: SOLO el path principal del isotipo (la "D"
+            estilizada del original) renderizado en blanco puro.
+          → Centrado horizontalmente con justify-center. */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: EASE, delay: 0.2 }}
-        className="relative z-10 flex items-center gap-3 mb-8"
+        initial={{ opacity: 0, y: 16, scale: 0.92 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.2 }}
+        className="relative z-10 flex justify-center mb-8"
         aria-label="Distinto · Agencia de Marketing"
       >
-        {/* Isotipo inline — viewBox del SVG original, fills override a blanco */}
         <svg
-          width="44"
-          height="44"
+          width="64"
+          height="64"
           viewBox="280 420 480 240"
           aria-hidden
-          style={{ flexShrink: 0 }}
         >
-          {/* Forma amarilla (pétalo derecho) → amarillo brand para mantener
-              el accent, queda lindo sobre el morado */}
-          <path
-            fill={YELLOW}
-            d="M639.28,439.86c15.32,0,30.24,3.33,43.14,9.62l3,1.45h.06c17.1,8.49,31.61,21.38,42.1,37.44,11.33,17.34,17.31,37.52,17.31,58.35,0,36.23-18.13,69.51-47.97,89.2-24.33-29.33-62.6-47.13-102.67-47.13-17.35,0-34.36,3.43-49.83,9.98-9.11-16.09-13.7-35.42-13.06-55.5.77-23.89,8.86-46.22,22.79-62.86l3.34-4.02v-.18c19.06-22.53,49.94-36.36,81.79-36.36M639.28,425.54c-37,0-74.18,16.76-96.11,45.66v.03c-32.99,39.42-35.14,103.19-4.56,144.92.29.39.74.6,1.19.6.25,0,.5-.06.73-.19,16.72-9.14,35.24-13.43,53.74-13.43,38.38,0,76.58,18.49,98.03,50.51.29.43.76.67,1.25.67.23,0,.46-.05.68-.17,38.64-20.27,65-60.75,65-107.41s-28.88-90.92-70.49-110.12h-.03c-15.44-7.53-32.41-11.08-49.42-11.08h0Z"
-          />
-          {/* Forma morada (pétalo izquierdo) → BLANCO para que contraste
-              sobre el panel morado del fondo. El brand morado del SVG
-              original desaparecería sobre morado, por eso lo invierto. */}
+          {/* Solo el path principal (originalmente morado en el SVG
+              de marca) renderizado en BLANCO. El pétalo amarillo se
+              eliminó por pedido directo de Pedro. */}
           <path
             fill="#ffffff"
             d="M531.55,458.27l-5.58,6.94v.2c-34.99,46.58-35,115.51-.25,162.28,0,.01,0,.03,0,.04-75.63,72.93-205.31,18.66-204.94-87.73.21-110.85,137.16-162.63,210.78-81.73Z"
           />
         </svg>
-        {/* Wordmark — typography fuerte tipo "DISTINTO" del logo original.
-            tracking apretado, weight 800, ligera condensación visual. */}
-        <span
-          style={{
-            color: '#ffffff',
-            fontFamily: 'var(--font-display, "Inter", "Helvetica Neue", sans-serif)',
-            fontWeight: 800,
-            fontSize: 28,
-            letterSpacing: '0.04em',
-            lineHeight: 1,
-          }}
-        >
-          DISTINTO
-        </span>
       </motion.div>
 
       {/* MIDDLE: Tagline */}
