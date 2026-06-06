@@ -40,11 +40,27 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
   const [members, setMembers] = useState(initial)
   const [showInactivos, setShowInactivos] = useState(false)
   const [editando, setEditando] = useState<TeamMember | null>(null)
+  const [tabInicial, setTabInicial] = useState<'info' | 'permisos' | 'seguridad'>('info')
   const [nuevoOpen, setNuevoOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [rolFiltro, setRolFiltro] = useState<RolPredefinidoId | 'todos'>('todos')
 
   const visibles = useMemo(() => {
-    return members.filter((m) => showInactivos || m.activo)
-  }, [members, showInactivos])
+    return members.filter((m) => {
+      if (!showInactivos && !m.activo) return false
+      if (rolFiltro !== 'todos' && m.rol_base !== rolFiltro) return false
+      if (search) {
+        const q = search.toLowerCase()
+        const cargo = (m.cargo_personalizado ?? '').toLowerCase()
+        if (
+          !m.nombre.toLowerCase().includes(q) &&
+          !m.email.toLowerCase().includes(q) &&
+          !cargo.includes(q)
+        ) return false
+      }
+      return true
+    })
+  }, [members, showInactivos, rolFiltro, search])
 
   const rolesById = useMemo(() => new Map(roles.map((r) => [r.id, r])), [roles])
 
@@ -58,28 +74,74 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
 
   return (
     <div style={{ minHeight: '100vh', padding: '24px 32px', background: 'var(--mk-bg-base)' }}>
-      {/* HEADER */}
-      <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0 }}>Mi equipo</h1>
-          <p style={{ fontSize: 13, color: 'var(--mk-text-tertiary)', margin: '4px 0 0' }}>
-            {visibles.length} {visibles.length === 1 ? 'miembro' : 'miembros'} {showInactivos ? '(incluye inactivos)' : 'activos'}
-          </p>
+      {/* HEADER con título + búsqueda + filtros + acciones.
+          Inspirado en la referencia de dashboard de empleados que mostró
+          Pedro, pero usando tokens --mk-* del sistema Distinto. */}
+      <header style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+              Mi equipo
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--mk-text-tertiary)', margin: '4px 0 0' }}>
+              {visibles.length} {visibles.length === 1 ? 'miembro' : 'miembros'}
+              {showInactivos && ' (incluye inactivos)'}
+              {(rolFiltro !== 'todos' || search) && ' · filtrados'}
+            </p>
+          </div>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setNuevoOpen(true)} style={btnPrimaryStyle}>
+            + Nuevo miembro
+          </button>
         </div>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={() => setShowInactivos((v) => !v)}
-          style={btnSecondaryStyle}
-          title="Mostrar también miembros desactivados"
-        >
-          {showInactivos ? 'Ocultar inactivos' : 'Mostrar inactivos'}
-        </button>
-        <button
-          onClick={() => setNuevoOpen(true)}
-          style={btnPrimaryStyle}
-        >
-          + Nuevo miembro
-        </button>
+
+        {/* Toolbar de filtros */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          padding: 12, background: 'var(--mk-bg-elevated)',
+          border: '1px solid var(--mk-border-subtle)',
+          borderRadius: 'var(--mk-radius-md)',
+        }}>
+          {/* Search */}
+          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--mk-text-tertiary)', pointerEvents: 'none' }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, email o cargo…"
+              style={{ ...fieldStyle, paddingLeft: 32 }}
+            />
+          </div>
+
+          {/* Filtro por rol */}
+          <select
+            value={rolFiltro}
+            onChange={(e) => setRolFiltro(e.target.value as RolPredefinidoId | 'todos')}
+            style={{ ...fieldStyle, width: 'auto', minWidth: 160 }}
+          >
+            <option value="todos">Todos los roles</option>
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+          </select>
+
+          {/* Toggle inactivos */}
+          <button
+            onClick={() => setShowInactivos((v) => !v)}
+            style={{
+              ...btnSecondaryStyle,
+              background: showInactivos ? 'var(--mk-accent-bg)' : 'transparent',
+              borderColor: showInactivos ? 'var(--mk-border-accent)' : 'var(--mk-border-subtle)',
+              color: showInactivos ? 'var(--mk-accent)' : 'var(--mk-text-secondary)',
+            }}
+            title="Mostrar también miembros desactivados"
+          >
+            {showInactivos ? '✓ Inactivos' : 'Ver inactivos'}
+          </button>
+        </div>
       </header>
 
       {/* GRID DE CARDS */}
@@ -102,7 +164,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
               marcasCount={m.marcas_acceso === null ? marcas.length : m.marcas_acceso.length}
               totalMarcas={marcas.length}
               pubsEnEdicion={pubsEnEdicion}
-              onClick={() => setEditando(m)}
+              onOpen={(tab) => { setTabInicial(tab); setEditando(m) }}
             />
           )
         })}
@@ -120,6 +182,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
           member={editando}
           roles={roles}
           marcas={marcas}
+          tabInicial={tabInicial}
           onClose={() => setEditando(null)}
           onSaved={(patch) => {
             handleUpdate(editando.id, patch)
@@ -150,7 +213,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
    ============================================================ */
 
 function MemberCard({
-  member, rol, modulosCount, marcasCount, totalMarcas, pubsEnEdicion, onClick,
+  member, rol, modulosCount, marcasCount, totalMarcas, pubsEnEdicion, onOpen,
 }: {
   member: TeamMember
   rol: RolPredefinido | undefined
@@ -158,82 +221,191 @@ function MemberCard({
   marcasCount: number
   totalMarcas: number
   pubsEnEdicion: number
-  onClick: () => void
+  onOpen: (tab: 'info' | 'permisos' | 'seguridad') => void
 }) {
   const inicial = member.nombre.slice(0, 2).toUpperCase()
   const rolColor = rol ? ROL_COLOR[rol.id] : '#737373'
   const cargo = member.cargo_personalizado || rol?.nombre || '—'
-  const pendiente = !member.auth_user_id
+
+  /* Estado del miembro — 3 estados visibles para quick-scan:
+     ACTIVO (auth + activo): verde
+     PENDIENTE (sin auth): amber
+     INACTIVO: gris */
+  const estado: { label: string; color: string; bg: string } = !member.activo
+    ? { label: 'INACTIVO', color: '#737373', bg: 'rgba(115, 115, 115, 0.12)' }
+    : !member.auth_user_id
+      ? { label: 'PENDIENTE', color: '#b45309', bg: 'rgba(251, 191, 36, 0.18)' }
+      : { label: 'ACTIVO', color: '#15803d', bg: 'rgba(34, 197, 94, 0.12)' }
+
+  const fechaIngreso = new Date(member.created_at).toLocaleDateString('es-PE', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  })
+  const cumple = member.fecha_cumpleanos
+    ? new Date(member.fecha_cumpleanos + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })
+    : null
 
   return (
-    <button
-      onClick={onClick}
+    <div
       style={{
-        textAlign: 'left',
-        padding: 18,
-        background: member.activo ? 'var(--mk-bg-elevated)' : 'rgba(0, 0, 0, 0.02)',
+        padding: 16,
+        background: 'var(--mk-bg-elevated)',
         border: '1px solid var(--mk-border-subtle)',
         borderRadius: 'var(--mk-radius-lg)',
-        cursor: 'pointer',
-        opacity: member.activo ? 1 : 0.6,
+        opacity: member.activo ? 1 : 0.7,
         transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
-        fontFamily: 'inherit',
         display: 'flex', flexDirection: 'column', gap: 12,
+        position: 'relative', overflow: 'hidden',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = rolColor; e.currentTarget.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'; e.currentTarget.style.transform = 'none' }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = rolColor; e.currentTarget.style.boxShadow = `0 4px 16px ${rolColor}1a` }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'; e.currentTarget.style.boxShadow = 'none' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Banda superior con color del rol — toque sutil de identidad visual */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        background: rolColor, opacity: 0.7,
+      }} />
+
+      {/* Cabecera: avatar grande + nombre/cargo + badge estado */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 4 }}>
         <span style={{
-          width: 44, height: 44, borderRadius: '50%',
-          background: rolColor, color: 'white',
+          width: 52, height: 52, borderRadius: '50%',
+          background: `linear-gradient(135deg, ${rolColor}, ${rolColor}cc)`,
+          color: 'white',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, fontWeight: 600,
-          boxShadow: `0 0 0 2px ${rolColor}33`,
+          fontSize: 18, fontWeight: 600,
+          boxShadow: `0 0 0 3px ${rolColor}1a`,
           flexShrink: 0,
         }}>
           {inicial}
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.005em' }}>
             {member.nombre}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 12, color: 'var(--mk-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {cargo}
           </div>
         </div>
-        {pendiente && (
-          <span style={{
-            fontSize: 9.5, fontWeight: 600,
-            padding: '2px 8px',
-            background: 'rgba(251, 191, 36, 0.18)', color: '#92400e',
-            borderRadius: 999,
-            whiteSpace: 'nowrap',
-          }} title="No aceptó la invitación todavía">
-            PENDIENTE
-          </span>
-        )}
+        <span style={{
+          fontSize: 9.5, fontWeight: 700,
+          padding: '3px 8px',
+          background: estado.bg, color: estado.color,
+          borderRadius: 999, whiteSpace: 'nowrap',
+          letterSpacing: '0.04em',
+        }}>
+          ● {estado.label}
+        </span>
       </div>
 
-      {/* Métricas mini */}
-      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--mk-text-secondary)' }}>
-        <Metric label="Módulos" value={modulosCount.toString()} />
-        <Metric label="Marcas" value={marcasCount === totalMarcas ? 'Todas' : marcasCount.toString()} />
-        {pubsEnEdicion > 0 && <Metric label="Por editar" value={pubsEnEdicion.toString()} highlight={rolColor} />}
+      {/* Grid de metadata: rol + fecha ingreso, email + cumpleaños */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 10,
+        padding: '10px 12px',
+        background: 'rgba(0, 0, 0, 0.02)',
+        borderRadius: 'var(--mk-radius-md)',
+      }}>
+        <Field label="Rol base" value={rol?.nombre ?? member.rol_base} />
+        <Field label="Ingreso" value={fechaIngreso} />
       </div>
 
-      <div style={{ fontSize: 10.5, color: 'var(--mk-text-quaternary)', borderTop: '1px solid var(--mk-border-subtle)', paddingTop: 8 }}>
-        {member.email}
+      {/* Contacto */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11.5, color: 'var(--mk-text-secondary)' }}>
+        <ContactLine icon="✉" value={member.email} muted={member.email.endsWith('@pendiente.local')} />
+        {cumple && <ContactLine icon="🎂" value={`Cumple ${cumple}`} />}
       </div>
-    </button>
+
+      {/* Stats mini en chips */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <Chip label={`${modulosCount} módulos`} />
+        <Chip label={marcasCount === totalMarcas ? 'Todas las marcas' : `${marcasCount} marcas`} />
+        {pubsEnEdicion > 0 && <Chip label={`${pubsEnEdicion} por editar`} highlight={rolColor} />}
+      </div>
+
+      {/* Botones inferiores: Editar + Acceso (acción principal: gestión de contraseña) */}
+      <div style={{
+        display: 'flex', gap: 6, marginTop: 4,
+        paddingTop: 10, borderTop: '1px solid var(--mk-border-subtle)',
+      }}>
+        <button
+          onClick={() => onOpen('info')}
+          style={{
+            flex: 1, padding: '8px 12px',
+            background: 'transparent',
+            border: '1px solid var(--mk-border-subtle)',
+            borderRadius: 'var(--mk-radius-md)',
+            color: 'var(--mk-text-secondary)',
+            fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          ✏ Editar
+        </button>
+        <button
+          onClick={() => onOpen('seguridad')}
+          style={{
+            flex: 1, padding: '8px 12px',
+            background: rolColor,
+            border: `1px solid ${rolColor}`,
+            borderRadius: 'var(--mk-radius-md)',
+            color: 'white',
+            fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
+        >
+          🔐 Acceso
+        </button>
+      </div>
+    </div>
   )
 }
 
-function Metric({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
+function Field({ label, value }: { label: string; value: string }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
-      <span style={{ fontWeight: 600, color: highlight ?? 'var(--mk-text-primary)' }}>{value}</span>
-      <span style={{ color: 'var(--mk-text-quaternary)', fontSize: 10 }}>{label}</span>
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--mk-text-quaternary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--mk-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function ContactLine({ icon, value, muted }: { icon: string; value: string; muted?: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+      <span style={{ fontSize: 11, opacity: 0.6, flexShrink: 0 }}>{icon}</span>
+      <span style={{
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        color: muted ? 'var(--mk-text-quaternary)' : 'var(--mk-text-secondary)',
+        fontStyle: muted ? 'italic' : 'normal',
+      }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function Chip({ label, highlight }: { label: string; highlight?: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '2px 8px',
+      background: highlight ? `${highlight}1a` : 'rgba(0, 0, 0, 0.04)',
+      color: highlight ?? 'var(--mk-text-tertiary)',
+      borderRadius: 999,
+      fontSize: 10.5, fontWeight: 500,
+    }}>
+      {label}
     </span>
   )
 }
@@ -244,15 +416,16 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
    ============================================================ */
 
 function ModalEditarMiembro({
-  member: original, roles, marcas, onClose, onSaved,
+  member: original, roles, marcas, tabInicial = 'info', onClose, onSaved,
 }: {
   member: TeamMember
   roles: RolPredefinido[]
   marcas: MarcaSimple[]
+  tabInicial?: 'info' | 'permisos' | 'seguridad'
   onClose: () => void
   onSaved: (patch: Partial<TeamMember>) => void
 }) {
-  const [tab, setTab] = useState<'info' | 'permisos' | 'seguridad'>('info')
+  const [tab, setTab] = useState<'info' | 'permisos' | 'seguridad'>(tabInicial)
   const [member, setMember] = useState<TeamMember>(original)
   const [saving, startSaving] = useTransition()
 
@@ -705,7 +878,7 @@ function TabSeguridad({
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Ej. CasaAzul2026 — o tocá Generar"
             style={{ ...fieldStyle, fontFamily: show ? 'monospace' : 'inherit', flex: 1 }}
-            disabled={pending || emailPlaceholder}
+            disabled={pending}
           />
           <button
             onClick={() => setShow((s) => !s)}
@@ -727,10 +900,10 @@ function TabSeguridad({
         </div>
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button onClick={generarRandom} style={btnSecondaryStyle} disabled={pending || emailPlaceholder} type="button">
+          <button onClick={generarRandom} style={btnSecondaryStyle} disabled={pending} type="button">
             🎲 Generar
           </button>
-          <button onClick={handleGuardar} style={btnPrimaryStyle} disabled={pending || !dirty || emailPlaceholder} type="button">
+          <button onClick={handleGuardar} style={btnPrimaryStyle} disabled={pending || !dirty} type="button">
             {pending ? 'Guardando…' : tieneAcceso ? 'Actualizar contraseña' : 'Crear cuenta y activar'}
           </button>
           {tieneAcceso && (
