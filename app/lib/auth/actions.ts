@@ -33,7 +33,10 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
     redirect('/login?error=' + encodeURIComponent('Email o contraseña incorrectos'))
   }
 
-  redirect('/cockpit')
+  /* Redirigir al landing dinámico según permisos del usuario.
+     Admin → /cockpit; Editor → /editor; CM → /comentarios; etc. */
+  const { getLandingRoute } = await import('@/lib/team/permisos-helper')
+  redirect(await getLandingRoute())
 }
 
 export async function sendMagicLink(formData: FormData): Promise<AuthActionResult> {

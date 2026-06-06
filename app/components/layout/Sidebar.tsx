@@ -7,17 +7,45 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
+import { tieneAcceso, type Permisos, type ModuloPermiso } from '@/lib/team/types'
+
+type PermisosSimple = {
+  modulos: Permisos
+  marcasAcceso: string[] | null
+  nombre: string
+  rol: string
+} | null
 
 type Props = {
   onOpenPalette: () => void
   /* Marcas a mostrar. Vienen de la base vía el layout raíz. Si no se pasan,
      cae a la lista fija para no dejar el menú vacío. */
   marcas?: MarcaNav[]
+  /* Permisos del usuario logueado. null = admin/owner, muestra todo.
+     Cualquier otro valor → filtramos los items según los permisos. */
+  permisos?: PermisosSimple
 }
 
 const STORAGE_KEY = 'mk:sidebar:sections'
 
-export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
+export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos }: Props) {
+  /* Helper para mostrar/ocultar items según permisos. Si no hay
+     permisos (= admin/owner), retorna true para todo. */
+  const puede = (modulo: ModuloPermiso): boolean => {
+    if (!permisos) return true
+    return tieneAcceso(permisos.modulos, modulo)
+  }
+
+  /* Filtro de marcas: si el miembro tiene marcasAcceso limitadas,
+     mostramos solo las suyas. null = todas. */
+  const marcasVisibles = permisos && permisos.marcasAcceso !== null
+    ? marcas.filter((m) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mAny = m as any
+        const id = mAny.id ?? mAny.marca_id
+        return id && permisos.marcasAcceso!.includes(id)
+      })
+    : marcas
   const pathname = usePathname()
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     workspace: true,
@@ -107,79 +135,110 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
           open={openSections.workspace}
           onToggle={() => setOpenSections((s) => ({ ...s, workspace: !s.workspace }))}
         >
-          <NavItem href="/cockpit"       icon={<HomeIcon />}     label="Cockpit"        active={isActive('/cockpit')}       shortcut="1" />
-          <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={73} />
-          <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
+          {/* Cockpit: solo si tiene métricas o es admin (sin team_member). */}
+          {puede('metricas') && (
+            <NavItem href="/cockpit"       icon={<HomeIcon />}     label="Cockpit"        active={isActive('/cockpit')}       shortcut="1" />
+          )}
+          {puede('inbox') && (
+            <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={73} />
+          )}
+          {puede('publicaciones') && (
+            <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
+          )}
           {/* Editor es sub-item de Publicaciones (workflow: lista pubs → editar una) */}
-          <NavItem href="/editor"        icon={<EditIcon />}     label="Editor"         active={isActive('/editor')}        indent />
+          {puede('editor') && (
+            <NavItem href="/editor"        icon={<EditIcon />}     label="Editor"         active={isActive('/editor')}        indent />
+          )}
           {/* Diseño: gemelo del Editor, foco en piezas que Ailyn diseña */}
-          <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent />
-          <NavItem href="/grabaciones"   icon={<VideoIcon />}    label="Grabaciones"    active={isActive('/grabaciones')}   shortcut="4" />
+          {puede('diseno') && (
+            <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent />
+          )}
+          {/* Grabaciones: parte de publicaciones — mismo permiso */}
+          {puede('publicaciones') && (
+            <NavItem href="/grabaciones"   icon={<VideoIcon />}    label="Grabaciones"    active={isActive('/grabaciones')}   shortcut="4" />
+          )}
         </Section>
 
-        <Section
-          label={`Marcas · ${marcas.length}`}
-          open={openSections.marcas}
-          onToggle={() => setOpenSections((s) => ({ ...s, marcas: !s.marcas }))}
-        >
-          {/* Acceso al panel con TODAS las marcas (dashboard de tarjetas + pedir grilla) */}
-          <NavItem
-            href="/dashboard"
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--mk-text-tertiary)' }}>
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-            }
-            label="Ver todas"
-            active={isActive('/dashboard')}
-          />
-          {marcas.map((m) => (
-            <NavItem
-              key={m.slug}
-              /* Clic en marca → grilla de la semana YA cargada (preview + mensaje
-                 + enviar al grupo), no la vista de aprobación vacía. */
-              href={`/grilla/${m.slug}`}
-              icon={
-                <span
-                  className="mk-dot"
-                  style={{ background: m.color, boxShadow: `0 0 6px ${m.color}`, width: 8, height: 8 }}
-                />
-              }
-              label={m.nombreCorto}
-              active={isActive(`/grilla/${m.slug}`)}
-              badge={m.pendientes > 0 ? m.pendientes : undefined}
-            />
-          ))}
-          {/* Acción: crear una marca nueva. Lleva al Dashboard con el form ya abierto. */}
-          <NavItem
-            href="/dashboard?nueva=1"
-            icon={
-              <span
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 16, height: 16, color: '#ba41f7', fontSize: 16, fontWeight: 600, lineHeight: 1,
-                }}
-              >+</span>
-            }
-            label="Agregar marca"
-            active={false}
-          />
-        </Section>
+        {/* Sección marcas: solo si tiene acceso a grilla o publicaciones.
+            La lista se filtra por marcasAcceso (los miembros restringidos
+            solo ven sus marcas). */}
+        {(puede('grilla') || puede('publicaciones')) && marcasVisibles.length > 0 && (
+          <Section
+            label={`Marcas · ${marcasVisibles.length}`}
+            open={openSections.marcas}
+            onToggle={() => setOpenSections((s) => ({ ...s, marcas: !s.marcas }))}
+          >
+            {/* "Ver todas": solo si tiene acceso a dashboard global */}
+            {!permisos && (
+              <NavItem
+                href="/dashboard"
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--mk-text-tertiary)' }}>
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                }
+                label="Ver todas"
+                active={isActive('/dashboard')}
+              />
+            )}
+            {marcasVisibles.map((m) => (
+              <NavItem
+                key={m.slug}
+                href={`/grilla/${m.slug}`}
+                icon={
+                  <span
+                    className="mk-dot"
+                    style={{ background: m.color, boxShadow: `0 0 6px ${m.color}`, width: 8, height: 8 }}
+                  />
+                }
+                label={m.nombreCorto}
+                active={isActive(`/grilla/${m.slug}`)}
+                badge={m.pendientes > 0 ? m.pendientes : undefined}
+              />
+            ))}
+            {/* "Agregar marca": solo admin */}
+            {!permisos && (
+              <NavItem
+                href="/dashboard?nueva=1"
+                icon={
+                  <span
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 16, height: 16, color: '#ba41f7', fontSize: 16, fontWeight: 600, lineHeight: 1,
+                    }}
+                  >+</span>
+                }
+                label="Agregar marca"
+                active={false}
+              />
+            )}
+          </Section>
+        )}
 
+        {/* Personal: Hábitos e Historial son del owner solo (Pedro).
+            Mi equipo / Settings tienen su permiso específico. */}
         <Section
           label="Personal"
           open={openSections.personal}
           onToggle={() => setOpenSections((s) => ({ ...s, personal: !s.personal }))}
         >
-          <NavItem href="/habitos"   icon={<CheckIcon />}  label="Hábitos"   active={isActive('/habitos')}   badge={2} />
-          <NavItem href="/historial" icon={<NoteIcon />}   label="Historial" active={isActive('/historial')} />
-          {/* Mi equipo: gestión de miembros + permisos + invitaciones.
-              Fase 1 read+edit lista; Fase 2 conecta login. */}
-          <NavItem href="/equipo"    icon={<TeamIcon />}   label="Mi equipo" active={isActive('/equipo')} />
-          <NavItem href="/settings"  icon={<SettingsIcon />} label="Settings" active={isActive('/settings')} />
+          {/* Hábitos e Historial son personales del owner. Solo se ven
+              cuando NO hay miembro asociado (= Pedro/admin). */}
+          {!permisos && (
+            <>
+              <NavItem href="/habitos"   icon={<CheckIcon />}  label="Hábitos"   active={isActive('/habitos')}   badge={2} />
+              <NavItem href="/historial" icon={<NoteIcon />}   label="Historial" active={isActive('/historial')} />
+            </>
+          )}
+          {puede('equipo') && (
+            <NavItem href="/equipo"    icon={<TeamIcon />}   label="Mi equipo" active={isActive('/equipo')} />
+          )}
+          {puede('settings') && (
+            <NavItem href="/settings"  icon={<SettingsIcon />} label="Settings" active={isActive('/settings')} />
+          )}
         </Section>
       </nav>
 
@@ -192,13 +251,15 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
         >
-          <span style={avatarStyle}>P</span>
+          <span style={avatarStyle}>
+            {permisos ? permisos.nombre.charAt(0).toUpperCase() : 'P'}
+          </span>
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <div style={{ fontWeight: 'var(--mk-weight-medium)', fontSize: 'var(--mk-text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Pedro Reyes
+              {permisos ? permisos.nombre : 'Pedro Reyes'}
             </div>
             <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)' }}>
-              Agencia Distinto
+              {permisos ? permisos.rol : 'Agencia Distinto'}
             </div>
           </div>
           <SettingsIcon />

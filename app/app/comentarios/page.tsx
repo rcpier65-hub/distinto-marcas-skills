@@ -2,10 +2,13 @@
 // Sistema de respuesta de comentarios (Metricool integration).
 // Server component que carga marcas + comentarios pendientes + KPIs y los pasa al client.
 
+import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { listInbox, getResumenInbox } from './_actions'
 import { ComentariosClient } from './_components/comentarios-client'
+import { getCurrentMemberPermisos, getLandingRoute } from '@/lib/team/permisos-helper'
+import { tieneAcceso } from '@/lib/team/types'
 
 export const dynamic = 'force-dynamic'
 // Las server actions de esta página (cargar comentarios + generar borradores IA)
@@ -16,6 +19,14 @@ type SP = { marca?: string }
 
 export default async function ComentariosPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
+
+  /* Route guard: si el usuario tiene team_member, chequear permiso
+     inbox o comentarios. Sin team_member (= admin) → pasa directo. */
+  const p = await getCurrentMemberPermisos()
+  if (p && !tieneAcceso(p.permisos, 'inbox') && !tieneAcceso(p.permisos, 'comentarios')) {
+    redirect(await getLandingRoute())
+  }
+
   const sp = await searchParams
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

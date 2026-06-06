@@ -3,6 +3,7 @@ import { Inter_Tight, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
+import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import './globals.css'
 
 /* Inter Tight — la fuente signature de Linear. Sustituye Geist Sans.
@@ -34,7 +35,22 @@ export default async function RootLayout({
   // sidebar y el command palette muestren SIEMPRE las marcas reales — incluidas
   // las que se crean desde el Dashboard. Defensivo: el helper ya cae a la lista
   // fija si la base falla.
-  const marcas = await getMarcasNav()
+  const [marcas, permisos] = await Promise.all([
+    getMarcasNav(),
+    getCurrentMemberPermisos(),
+  ])
+
+  /* Reducimos los permisos a un objeto simple serializable para pasarlo
+     al client component AppShell. Si no hay miembro asociado (admin/
+     owner), pasamos null y el sidebar muestra todo. */
+  const permisosSimple = permisos
+    ? {
+        modulos: permisos.permisos,
+        marcasAcceso: permisos.marcasAcceso,
+        nombre: permisos.member.nombre,
+        rol: permisos.rol.nombre,
+      }
+    : null
 
   return (
     <html
@@ -47,7 +63,7 @@ export default async function RootLayout({
       className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppShell marcas={marcas}>{children}</AppShell>
+        <AppShell marcas={marcas} permisos={permisosSimple}>{children}</AppShell>
         <Toaster />
       </body>
     </html>

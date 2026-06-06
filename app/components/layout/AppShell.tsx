@@ -11,17 +11,28 @@ import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
 import type { MarcaNav } from '@/lib/mock-marcas'
+import type { Permisos } from '@/lib/team/types'
 
 const NO_SHELL_ROUTES = ['/login', '/mockup', '/portal']
+
+export type PermisosSimple = {
+  modulos: Permisos
+  marcasAcceso: string[] | null
+  nombre: string
+  rol: string
+} | null
 
 type Props = {
   children: React.ReactNode
   /* Marcas desde la base, inyectadas por el layout raíz (server). Se reparten
      al sidebar y al command palette para que toda la nav esté sincronizada. */
   marcas?: MarcaNav[]
+  /* Permisos del usuario logueado. null = admin/owner sin team_member
+     asociado (Pedro original) → sidebar muestra todo. */
+  permisos?: PermisosSimple
 }
 
-export function AppShell({ children, marcas }: Props) {
+export function AppShell({ children, marcas, permisos }: Props) {
   const pathname = usePathname()
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -45,7 +56,7 @@ export function AppShell({ children, marcas }: Props) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--mk-bg-base)' }}>
-      <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} />
+      <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} permisos={permisos} />
       <main style={{ flex: 1, minWidth: 0 }}>
         {children}
       </main>
