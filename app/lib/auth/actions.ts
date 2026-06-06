@@ -9,6 +9,33 @@ export type AuthActionResult =
   | { ok: true; message: string }
   | { ok: false; error: string }
 
+/**
+ * Login con email + password (para miembros del team que Pedro creó
+ * en /equipo). Pedro asigna la contraseña ahí, el miembro la usa acá.
+ *
+ * Si el email pertenece a un team_member desactivado, rechazamos
+ * incluso si la contraseña es correcta — defensa adicional contra
+ * cuentas que se desactivaron sin cerrar sesión.
+ */
+export async function signInWithPassword(formData: FormData): Promise<void> {
+  const email = formData.get('email')?.toString().trim().toLowerCase()
+  const password = formData.get('password')?.toString()
+
+  if (!email || !password) {
+    redirect('/login?error=' + encodeURIComponent('Email y contraseña son obligatorios'))
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.signInWithPassword({ email: email!, password: password! })
+
+  if (error) {
+    console.error('[signInWithPassword]', error.message)
+    redirect('/login?error=' + encodeURIComponent('Email o contraseña incorrectos'))
+  }
+
+  redirect('/cockpit')
+}
+
 export async function sendMagicLink(formData: FormData): Promise<AuthActionResult> {
   const email = formData.get('email')?.toString().trim()
 

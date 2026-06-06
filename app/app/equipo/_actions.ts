@@ -170,33 +170,119 @@ export async function generarLinkInvitacion(memberId: string): Promise<
 }
 
 /**
- * Resetea la contraseña de un miembro logueado: Supabase Auth genera
- * un email con link de reset (gestionado por Supabase, no por nosotros).
+ * Asigna o cambia la contraseña de un miembro. Pedro pidió tener
+ * control total — vos asignás la contraseña, se guarda en
+ * `password_inicial` (visible solo en /equipo para que la puedas
+ * copiar y pasar al miembro por WhatsApp), Y se sincroniza con
+ * Supabase Auth para que el login funcione.
  *
- * Si el miembro aún no tiene auth_user_id (no aceptó invitación), no
- * podemos resetear nada — devolvemos error y sugerimos re-invitar.
+ * Flow:
+ *   1. Si el miembro NO tiene auth_user_id → crea cuenta en Supabase
+ *      Auth con email + password (email_confirm=true así no requiere
+ *      verificación) y setea auth_user_id en team_members.
+ *   2. Si YA tiene auth_user_id → updateUserById con la nueva pass.
+ *   3. Guarda la pass en `password_inicial` para que la veas.
  */
-export async function resetearPasswordMiembro(memberId: string): Promise<ActionResult> {
+export async function setPasswordMiembro(
+  memberId: string,
+  password: string,
+): Promise<ActionResult> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  const { data: member } = await service
+  if (!password || password.length < 6) {
+    return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres' }
+  }
+
+  const { data: member, error: e1 } = await service
     .from('team_members')
-    .select('email, auth_user_id')
+    .select('id, email, nombre, auth_user_id, activo')
     .eq('id', memberId)
     .maybeSingle()
 
-  if (!member) return { ok: false, error: 'Miembro no encontrado' }
-  if (!member.auth_user_id) {
-    return { ok: false, error: 'El miembro no aceptó la invitación todavía — genera un link de invitación en su lugar.' }
+  if (e1 || !member) return { ok: false, error: 'Miembro no encontrado' }
+  if (!member.activo) return { ok: false, error: 'El miembro está desactivado' }
+  if (!member.email || member.email.endsWith('@pendiente.local')) {
+    return { ok: false, error: 'Primero asigná un email real al miembro (tab Información)' }
   }
 
-  /* Esto requiere usar el Admin API de Supabase Auth (no el cliente
-     normal). En este turno lo dejo como TODO — Fase 2.
-     Por ahora devolvemos OK para que el botón funcione visualmente
-     mostrando un mensaje. */
-  return { ok: false, error: 'Funcionalidad disponible en Fase 2 (requiere setup de email service)' }
+  let authUserId = member.auth_user_id
+
+  if (!authUserId) {
+    /* CREAR cuenta nueva en Supabase Auth */
+    const { data: created, error: createErr } = await service.auth.admin.createUser({
+      email: member.email,
+      password,
+      email_confirm: true,  /* lo damos por verificado — Pedro controla */
+      user_metadata: { nombre: member.nombre, team_member_id: memberId },
+    })
+    if (createErr || !created?.user) {
+      /* Si el email ya existe en auth.users (por otro flow), tratamos
+         de updatear esa cuenta directamente. */
+      if (/already.*registered|already.*exists/i.test(createErr?.message ?? '')) {
+        const { data: list } = await service.auth.admin.listUsers()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existing = (list?.users ?? []).find((u: any) => u.email?.toLowerCase() === member.email.toLowerCase())
+        if (existing) {
+          authUserId = existing.id
+          await service.auth.admin.updateUserById(existing.id, { password })
+        } else {
+          return { ok: false, error: createErr?.message ?? 'No se pudo crear el usuario' }
+        }
+      } else {
+        return { ok: false, error: createErr?.message ?? 'No se pudo crear el usuario' }
+      }
+    } else {
+      authUserId = created.user.id
+    }
+  } else {
+    /* ACTUALIZAR password de cuenta existente */
+    const { error: updErr } = await service.auth.admin.updateUserById(authUserId, { password })
+    if (updErr) return { ok: false, error: updErr.message }
+  }
+
+  /* Persistir en team_members: auth_user_id (si era null) + password
+     inicial visible. */
+  const { error: e2 } = await service
+    .from('team_members')
+    .update({ auth_user_id: authUserId, password_inicial: password })
+    .eq('id', memberId)
+
+  if (e2) {
+    console.error('[setPasswordMiembro] persist:', e2)
+    return { ok: false, error: e2.message }
+  }
+
+  revalidatePath('/equipo')
+  return { ok: true }
+}
+
+/**
+ * Alias mantenido por compatibilidad con la UI existente (botón
+ * "Resetear password" en el tab Seguridad). Ahora simplemente delega
+ * a setPasswordMiembro con un password random generado.
+ */
+export async function resetearPasswordMiembro(memberId: string): Promise<
+  { ok: true; nuevaPassword: string } | { ok: false; error: string }
+> {
+  const nueva = generarPasswordSimple()
+  const r = await setPasswordMiembro(memberId, nueva)
+  if (!r.ok) return r
+  return { ok: true, nuevaPassword: nueva }
+}
+
+/**
+ * Genera una contraseña pronunciable de 12 chars — fácil de leer al
+ * teléfono pero con buena entropía. Alfanumérica con mayúsculas y
+ * minúsculas, sin símbolos raros.
+ */
+function generarPasswordSimple(): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  /* Quitamos l/I/1/0/O para evitar confusión al pronunciar. */
+  const arr = new Uint8Array(12)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map((b) => chars[b % chars.length]).join('')
 }
 
 /**

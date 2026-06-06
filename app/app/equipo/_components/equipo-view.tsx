@@ -13,6 +13,7 @@ import {
   crearMiembro,
   generarLinkInvitacion,
   resetearPasswordMiembro,
+  setPasswordMiembro,
 } from '@/app/equipo/_actions'
 import {
   type Permisos,
@@ -603,78 +604,178 @@ function TabSeguridad({
   member: TeamMember
   onPatch: (p: Partial<TeamMember>) => void
 }) {
-  const [linkData, setLinkData] = useState<{ url: string; expiraEn: string } | null>(null)
+  /* Pedro pidió tener control directo de la contraseña:
+     - Asignar / cambiar manualmente o generar random
+     - Ver la contraseña en plano (ojo show/hide) para copiarla
+     - Un botón "Copiar credenciales" que arma usuario + pass + link
+       de login listo para pegar en WhatsApp */
+  const [password, setPassword] = useState(member.password_inicial ?? '')
+  const [show, setShow] = useState(false)
   const [pending, startTransition] = useTransition()
+  const dirty = password !== (member.password_inicial ?? '')
+  const tieneAcceso = !!member.auth_user_id && !!member.password_inicial
+  /* Origen de la URL para el link de login — usa window en cliente */
+  const [origin, setOrigin] = useState('')
+  useEffect(() => { setOrigin(window.location.origin) }, [])
 
-  function handleInvite() {
+  function generarRandom() {
+    /* Mismo charset pronunciable que el server. 12 chars. */
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'
+    const arr = new Uint8Array(12)
+    crypto.getRandomValues(arr)
+    setPassword(Array.from(arr).map((b) => chars[b % chars.length]).join(''))
+    setShow(true)
+  }
+
+  function handleGuardar() {
+    if (!password || password.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
     startTransition(async () => {
-      const r = await generarLinkInvitacion(member.id)
+      const r = await setPasswordMiembro(member.id, password)
       if (r.ok) {
-        setLinkData({ url: r.url, expiraEn: r.expiraEn })
-        toast.success('Link de invitación generado — copialo y pasáselo a la persona')
+        onPatch({ password_inicial: password, auth_user_id: member.auth_user_id ?? 'pendiente-refresh' })
+        toast.success('Contraseña guardada — ya puede iniciar sesión')
       } else {
         toast.error(r.error)
       }
     })
   }
 
-  function handleReset() {
+  function handleResetRandom() {
     startTransition(async () => {
       const r = await resetearPasswordMiembro(member.id)
-      if (r.ok) toast.success('Email de reset enviado')
-      else toast.error(r.error)
+      if ('nuevaPassword' in r) {
+        setPassword(r.nuevaPassword)
+        setShow(true)
+        onPatch({ password_inicial: r.nuevaPassword })
+        toast.success('Contraseña reseteada')
+      } else {
+        toast.error(r.error)
+      }
     })
   }
 
-  const pendiente = !member.auth_user_id
+  function copiarCredenciales() {
+    if (!password) {
+      toast.error('Primero asigná y guardá una contraseña')
+      return
+    }
+    const loginUrl = `${origin || 'https://distinto.app'}/login`
+    const texto = `🔐 Acceso a Distinto
+
+👤 Usuario: ${member.email}
+🔑 Contraseña: ${password}
+
+🔗 Login: ${loginUrl}`
+    navigator.clipboard.writeText(texto)
+    toast.success('Credenciales copiadas — pegalas en WhatsApp')
+  }
+
+  function copiarSoloPassword() {
+    if (!password) return
+    navigator.clipboard.writeText(password)
+    toast.success('Contraseña copiada')
+  }
+
+  const emailPlaceholder = member.email.endsWith('@pendiente.local')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {pendiente && (
+      {emailPlaceholder && (
         <div style={{ padding: 14, background: 'rgba(251, 191, 36, 0.12)', border: '1px solid rgba(251, 191, 36, 0.4)', borderRadius: 'var(--mk-radius-md)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>Invitación pendiente</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>⚠ Email placeholder</div>
           <div style={{ fontSize: 11, color: '#92400e' }}>
-            Este miembro aún no aceptó la invitación. Generá un link y pasáselo por WhatsApp o email.
+            Antes de asignar contraseña cambiá el email <code>{member.email}</code> al real en la tab Información.
           </div>
         </div>
       )}
 
-      <button onClick={handleInvite} style={btnPrimaryStyle} disabled={pending || !member.activo}>
-        {pending ? 'Generando…' : pendiente ? 'Generar link de invitación' : 'Regenerar link de invitación'}
-      </button>
+      <section>
+        <h3 style={sectionTitleStyle}>Contraseña del miembro</h3>
+        <p style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', margin: '0 0 12px' }}>
+          Vos asignás la contraseña y se la pasás al miembro por WhatsApp. Queda guardada acá para que la puedas copiar cuando necesites.
+        </p>
 
-      {linkData && (
-        <div style={{ padding: 14, background: 'var(--mk-bg-elevated)', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-md)' }}>
-          <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', marginBottom: 6 }}>
-            Link único, expira el {new Date(linkData.expiraEn).toLocaleDateString('es-PE')}:
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              readOnly
-              value={linkData.url}
-              onFocus={(e) => e.currentTarget.select()}
-              style={{ ...fieldStyle, fontSize: 11, fontFamily: 'monospace' }}
-            />
-            <button
-              onClick={() => { navigator.clipboard.writeText(linkData.url); toast.success('Link copiado') }}
-              style={btnSecondaryStyle}
-            >
-              Copiar
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <input
+            type={show ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Ej. CasaAzul2026 — o tocá Generar"
+            style={{ ...fieldStyle, fontFamily: show ? 'monospace' : 'inherit', flex: 1 }}
+            disabled={pending || emailPlaceholder}
+          />
+          <button
+            onClick={() => setShow((s) => !s)}
+            style={btnSecondaryStyle}
+            title={show ? 'Ocultar' : 'Mostrar'}
+            type="button"
+          >
+            {show ? '🙈' : '👁'}
+          </button>
+          <button
+            onClick={copiarSoloPassword}
+            style={btnSecondaryStyle}
+            disabled={!password}
+            title="Copiar solo la contraseña"
+            type="button"
+          >
+            📋
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button onClick={generarRandom} style={btnSecondaryStyle} disabled={pending || emailPlaceholder} type="button">
+            🎲 Generar
+          </button>
+          <button onClick={handleGuardar} style={btnPrimaryStyle} disabled={pending || !dirty || emailPlaceholder} type="button">
+            {pending ? 'Guardando…' : tieneAcceso ? 'Actualizar contraseña' : 'Crear cuenta y activar'}
+          </button>
+          {tieneAcceso && (
+            <button onClick={handleResetRandom} style={btnSecondaryStyle} disabled={pending} type="button">
+              Resetear al azar
             </button>
-          </div>
+          )}
         </div>
+      </section>
+
+      {tieneAcceso && password && (
+        <section>
+          <h3 style={sectionTitleStyle}>Compartir acceso</h3>
+          <p style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', margin: '0 0 10px' }}>
+            Generá un mensaje listo con usuario + contraseña + link de login.
+          </p>
+          <button
+            onClick={copiarCredenciales}
+            style={{ ...btnPrimaryStyle, width: '100%' }}
+            type="button"
+          >
+            📨 Copiar credenciales completas
+          </button>
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', cursor: 'pointer' }}>Ver preview del mensaje</summary>
+            <pre style={{
+              marginTop: 8, padding: 12,
+              background: 'var(--mk-bg-base)',
+              border: '1px solid var(--mk-border-subtle)',
+              borderRadius: 'var(--mk-radius-md)',
+              fontSize: 11, fontFamily: 'monospace', color: 'var(--mk-text-secondary)',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+            }}>{`🔐 Acceso a Distinto
+
+👤 Usuario: ${member.email}
+🔑 Contraseña: ${password}
+
+🔗 Login: ${origin || 'https://distinto.app'}/login`}</pre>
+          </details>
+        </section>
       )}
 
-      {!pendiente && (
-        <button onClick={handleReset} style={btnSecondaryStyle} disabled={pending}>
-          Enviar email de reset de contraseña
-        </button>
-      )}
-
-      <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', lineHeight: 1.6, marginTop: 8 }}>
-        El reset de contraseña usa el sistema de Supabase Auth — Supabase envía un email con un link de 1 hora. Si el miembro perdió acceso al email, primero cambiá el email en la tab Información.
-        <br />
-        <em>Nota: el envío de email automático requiere setup en Fase 2.</em>
+      <div style={{ fontSize: 11, color: 'var(--mk-text-quaternary)', lineHeight: 1.6, marginTop: 8, paddingTop: 12, borderTop: '1px solid var(--mk-border-subtle)' }}>
+        <strong style={{ color: 'var(--mk-text-tertiary)' }}>Cómo funciona:</strong><br />
+        Al guardar, se crea (o actualiza) la cuenta en Supabase Auth con email + contraseña. El miembro entra a <code>/login</code>, escribe esas credenciales y queda dentro. La contraseña queda visible acá para vos hasta que el miembro la cambie por su cuenta.
       </div>
     </div>
   )
@@ -739,6 +840,7 @@ function ModalNuevoMiembro({
           editor_legacy_id: null,
           activo: true,
           notas: null,
+          password_inicial: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }

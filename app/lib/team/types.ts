@@ -59,6 +59,10 @@ export type TeamMember = {
   editor_legacy_id: string | null
   activo: boolean
   notas: string | null
+  /* Contraseña inicial asignada por Pedro. Visible en /equipo para
+     que pueda copiarla y pasarla manualmente al miembro. NO se usa
+     para validar login (eso vive hasheado en auth.users). */
+  password_inicial: string | null
   created_at: string
   updated_at: string
 }
