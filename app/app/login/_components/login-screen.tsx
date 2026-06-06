@@ -47,36 +47,33 @@ export function LoginScreen({ initialError, initialMessage }: Props) {
       {/* Fondo animado full-screen */}
       <AnimatedBackground />
 
-      {/* CARD CENTRADA */}
+      {/* CARD CENTRADA — single column.
+          Pedro pidió "solo deja esta mitad del diseño solo esta
+          parte blanca y centralo el logito ponlo en el centro el
+          logo oficial el icono solo el icono del logo".
+          → Eliminado el LeftPanel morado.
+          → Card ahora single column, max-w-md, glassmorphism.
+          → Isotipo OFICIAL del manual (amarillo + morado brand)
+            centrado arriba del form. */}
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.7, ease: EASE }}
-        className="relative z-10 w-full max-w-5xl"
+        className="relative z-10 w-full max-w-md"
         style={{
-          /* Sombra profunda + ring sutil — eleva la card sobre el fondo */
           filter: 'drop-shadow(0 24px 48px rgba(186, 65, 247, 0.18)) drop-shadow(0 4px 16px rgba(0, 0, 0, 0.08))',
         }}
       >
         <div
-          className="grid grid-cols-1 md:grid-cols-2 rounded-3xl overflow-hidden"
+          className="rounded-3xl overflow-hidden p-10 md:p-12"
           style={{
             background: 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.6)',
-            minHeight: 540,
           }}
         >
-          {/* ═══════════════════════════════════════════════════════
-              IZQUIERDA — Panel brand con degradado morado→amarillo
-              ═══════════════════════════════════════════════════════ */}
-          <LeftPanel />
-
-          {/* ═══════════════════════════════════════════════════════
-              DERECHA — Form de login
-              ═══════════════════════════════════════════════════════ */}
-          <RightPanel initialError={initialError} initialMessage={initialMessage} />
+          <FormBody initialError={initialError} initialMessage={initialMessage} />
         </div>
       </motion.div>
     </main>
@@ -84,257 +81,159 @@ export function LoginScreen({ initialError, initialMessage }: Props) {
 }
 
 /* ============================================================
-   Left Panel — gradient morado→amarillo + logo + tagline
+   IsotipoOficial — el isotipo del manual de marca, sin modificar.
+   Pétalo amarillo #F2CC2C + pétalo morado #BA41F7 — los 2 colores
+   brand directos del archivo isotipo.svg oficial. Sobre fondo
+   blanco se ven perfectos (es el contexto para el que el manual
+   los pensó).
    ============================================================ */
 
-function LeftPanel() {
+function IsotipoOficial({ size = 72 }: { size?: number }) {
   return (
-    <div
-      className="relative p-10 md:p-12 flex flex-col justify-between text-white overflow-hidden"
-      style={{
-        /* Gradient diagonal: morado predominante, amarillo en esquina */
-        background: `linear-gradient(135deg, ${PURPLE} 0%, ${PURPLE} 35%, #d966f7 65%, ${YELLOW} 100%)`,
-        minHeight: 320,
-      }}
+    <svg
+      width={size}
+      height={size}
+      viewBox="280 420 480 240"
+      role="img"
+      aria-label="Distinto"
     >
-      {/* Decoración: anillos concéntricos sutiles en esquina */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          top: '-20%',
-          right: '-15%',
-          width: 380,
-          height: 380,
-          background: `radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 60%)`,
-        }}
+      <path
+        fill={YELLOW}
+        d="M639.28,439.86c15.32,0,30.24,3.33,43.14,9.62l3,1.45h.06c17.1,8.49,31.61,21.38,42.1,37.44,11.33,17.34,17.31,37.52,17.31,58.35,0,36.23-18.13,69.51-47.97,89.2-24.33-29.33-62.6-47.13-102.67-47.13-17.35,0-34.36,3.43-49.83,9.98-9.11-16.09-13.7-35.42-13.06-55.5.77-23.89,8.86-46.22,22.79-62.86l3.34-4.02v-.18c19.06-22.53,49.94-36.36,81.79-36.36M639.28,425.54c-37,0-74.18,16.76-96.11,45.66v.03c-32.99,39.42-35.14,103.19-4.56,144.92.29.39.74.6,1.19.6.25,0,.5-.06.73-.19,16.72-9.14,35.24-13.43,53.74-13.43,38.38,0,76.58,18.49,98.03,50.51.29.43.76.67,1.25.67.23,0,.46-.05.68-.17,38.64-20.27,65-60.75,65-107.41s-28.88-90.92-70.49-110.12h-.03c-15.44-7.53-32.41-11.08-49.42-11.08h0Z"
       />
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          bottom: '-25%',
-          left: '-15%',
-          width: 320,
-          height: 320,
-          background: `radial-gradient(circle, ${YELLOW}33 0%, transparent 60%)`,
-        }}
+      <path
+        fill={PURPLE}
+        d="M531.55,458.27l-5.58,6.94v.2c-34.99,46.58-35,115.51-.25,162.28,0,.01,0,.03,0,.04-75.63,72.93-205.31,18.66-204.94-87.73.21-110.85,137.16-162.63,210.78-81.73Z"
       />
-
-      {/* Grain interno para textura editorial */}
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence baseFrequency='0.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")`,
-        }}
-      />
-
-      {/* TOP: Solo el isotipo blanco, centrado.
-          Pedro: "solo pon el icono nada mas y no pongas ese morado
-          ahi mejor todo que sea solo la parte blanquita pero centrado".
-          → Quitado: el texto "DISTINTO" + el pétalo amarillo del SVG.
-          → Queda: SOLO el path principal del isotipo (la "D"
-            estilizada del original) renderizado en blanco puro.
-          → Centrado horizontalmente con justify-center. */}
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.92 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.2 }}
-        className="relative z-10 flex justify-center mb-8"
-        aria-label="Distinto · Agencia de Marketing"
-      >
-        <svg
-          width="64"
-          height="64"
-          viewBox="280 420 480 240"
-          aria-hidden
-        >
-          {/* Solo el path principal (originalmente morado en el SVG
-              de marca) renderizado en BLANCO. El pétalo amarillo se
-              eliminó por pedido directo de Pedro. */}
-          <path
-            fill="#ffffff"
-            d="M531.55,458.27l-5.58,6.94v.2c-34.99,46.58-35,115.51-.25,162.28,0,.01,0,.03,0,.04-75.63,72.93-205.31,18.66-204.94-87.73.21-110.85,137.16-162.63,210.78-81.73Z"
-          />
-        </svg>
-      </motion.div>
-
-      {/* MIDDLE: Tagline */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: EASE, delay: 0.35 }}
-        className="relative z-10 my-auto"
-      >
-        <p
-          className="text-[10.5px] uppercase mb-3"
-          style={{
-            fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-            letterSpacing: '0.2em',
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontWeight: 500,
-          }}
-        >
-          Sistema interno · v1.0
-        </p>
-        <h1
-          className="text-3xl md:text-4xl font-bold tracking-tight"
-          style={{
-            letterSpacing: '-0.02em',
-            lineHeight: 1.1,
-            color: '#ffffff',
-          }}
-        >
-          Bienvenido<br />de vuelta.
-        </h1>
-        <p
-          className="mt-4 text-sm md:text-base max-w-xs"
-          style={{
-            color: 'rgba(255, 255, 255, 0.78)',
-            lineHeight: 1.55,
-          }}
-        >
-          Entrá con tu cuenta de equipo para acceder al panel de operaciones de Distinto.
-        </p>
-      </motion.div>
-
-      {/* BOTTOM: Footer del panel */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.5 }}
-        className="relative z-10 flex items-center gap-2 text-xs"
-        style={{ color: 'rgba(255, 255, 255, 0.6)' }}
-      >
-        <span
-          className="inline-block w-1.5 h-1.5 rounded-full"
-          style={{ background: YELLOW, boxShadow: `0 0 8px ${YELLOW}` }}
-        />
-        <span style={{ letterSpacing: '0.05em' }}>agenciadistinto.com</span>
-      </motion.div>
-    </div>
+    </svg>
   )
 }
 
 /* ============================================================
-   Right Panel — Form de login
+   FormBody — single column card. Isotipo arriba centrado + form.
    ============================================================ */
 
-function RightPanel({
+function FormBody({
   initialError, initialMessage,
 }: {
   initialError?: string
   initialMessage?: string
 }) {
   return (
-    <div className="p-10 md:p-12 flex flex-col justify-center">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
+      className="w-full"
+    >
+      {/* ISOTIPO OFICIAL — centrado arriba del form, colores brand del manual */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: EASE, delay: 0.25 }}
-        className="w-full max-w-sm mx-auto"
+        initial={{ opacity: 0, scale: 0.85, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 18, delay: 0.15 }}
+        className="flex justify-center mb-8"
       >
-        {/* Header del form */}
-        <div className="mb-8">
-          <p
-            className="text-[10.5px] uppercase mb-2"
-            style={{
-              fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-              letterSpacing: '0.2em',
-              color: PURPLE,
-              fontWeight: 600,
-            }}
-          >
-            Iniciar sesión
-          </p>
-          <h2
-            className="text-2xl font-bold tracking-tight"
-            style={{
-              letterSpacing: '-0.01em',
-              color: '#0a0a0a',
-            }}
-          >
-            Tu cuenta de equipo
-          </h2>
-          <p className="text-sm mt-2" style={{ color: '#737373' }}>
-            Solo email + contraseña. Sin Google ni magic link.
-          </p>
-        </div>
-
-        {/* Mensaje de éxito */}
-        {initialMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-4 rounded-xl border px-4 py-3 text-xs"
-            style={{
-              background: `${PURPLE}0d`,
-              borderColor: `${PURPLE}33`,
-              color: '#0a0a0a',
-            }}
-          >
-            {initialMessage}
-          </motion.div>
-        )}
-
-        {/* Error */}
-        {initialError && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-4 rounded-xl border px-4 py-3 text-xs"
-            style={{
-              background: 'rgba(239, 68, 68, 0.06)',
-              borderColor: 'rgba(239, 68, 68, 0.20)',
-              color: '#991b1b',
-            }}
-          >
-            {initialError}
-          </motion.div>
-        )}
-
-        {/* FORM */}
-        <form action={signInWithPassword} className="space-y-4">
-          <FormField
-            id="email"
-            name="email"
-            type="email"
-            label="Email"
-            placeholder="vos@agenciadistinto.com"
-            autoComplete="email"
-            required
-            autoFocus
-          />
-          <FormField
-            id="password"
-            name="password"
-            type="password"
-            label="Contraseña"
-            placeholder="••••••••"
-            autoComplete="current-password"
-            required
-          />
-
-          <SubmitButton />
-        </form>
-
-        {/* Footer */}
-        <div
-          className="mt-7 flex items-center justify-between text-xs"
-          style={{ color: '#a3a3a3' }}
-        >
-          <span aria-disabled className="cursor-not-allowed">
-            ¿Olvidaste tu contraseña?
-          </span>
-          <a
-            href="mailto:pedro@agenciadistinto.com"
-            className="transition-colors hover:underline"
-            style={{ color: PURPLE, textDecoration: 'none' }}
-          >
-            Soporte
-          </a>
-        </div>
+        <IsotipoOficial size={72} />
       </motion.div>
-    </div>
+
+      {/* Header del form — también centrado para coherencia visual */}
+      <div className="mb-8 text-center">
+        <p
+          className="text-[10.5px] uppercase mb-2"
+          style={{
+            fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+            letterSpacing: '0.2em',
+            color: PURPLE,
+            fontWeight: 600,
+          }}
+        >
+          Iniciar sesión
+        </p>
+        <h2
+          className="text-2xl font-bold tracking-tight"
+          style={{ letterSpacing: '-0.01em', color: '#0a0a0a' }}
+        >
+          Tu cuenta de equipo
+        </h2>
+        <p className="text-sm mt-2" style={{ color: '#737373' }}>
+          Solo email + contraseña. Sin Google ni magic link.
+        </p>
+      </div>
+
+      {/* Mensaje de éxito */}
+      {initialMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 rounded-xl border px-4 py-3 text-xs"
+          style={{
+            background: `${PURPLE}0d`,
+            borderColor: `${PURPLE}33`,
+            color: '#0a0a0a',
+          }}
+        >
+          {initialMessage}
+        </motion.div>
+      )}
+
+      {/* Error */}
+      {initialError && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 rounded-xl border px-4 py-3 text-xs"
+          style={{
+            background: 'rgba(239, 68, 68, 0.06)',
+            borderColor: 'rgba(239, 68, 68, 0.20)',
+            color: '#991b1b',
+          }}
+        >
+          {initialError}
+        </motion.div>
+      )}
+
+      {/* FORM */}
+      <form action={signInWithPassword} className="space-y-4">
+        <FormField
+          id="email"
+          name="email"
+          type="email"
+          label="Email"
+          placeholder="vos@agenciadistinto.com"
+          autoComplete="email"
+          required
+          autoFocus
+        />
+        <FormField
+          id="password"
+          name="password"
+          type="password"
+          label="Contraseña"
+          placeholder="••••••••"
+          autoComplete="current-password"
+          required
+        />
+
+        <SubmitButton />
+      </form>
+
+      {/* Footer */}
+      <div
+        className="mt-7 flex items-center justify-between text-xs"
+        style={{ color: '#a3a3a3' }}
+      >
+        <span aria-disabled className="cursor-not-allowed">
+          ¿Olvidaste tu contraseña?
+        </span>
+        <a
+          href="mailto:pedro@agenciadistinto.com"
+          className="transition-colors hover:underline"
+          style={{ color: PURPLE, textDecoration: 'none' }}
+        >
+          Soporte
+        </a>
+      </div>
+    </motion.div>
   )
 }
 
