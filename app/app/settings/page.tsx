@@ -9,6 +9,7 @@ import { MetricoolConfig } from './_components/metricool-config'
 import { OpenaiConfig } from './_components/openai-config'
 import { InstruccionesComentarios, type MarcaInstr } from './_components/instrucciones-comentarios'
 import { MarcaFactsCard } from './_components/marca-facts-card'
+import { CorreosClientesInput } from './_components/correos-clientes-input'
 import { listWhatsAppGroups } from '@/lib/integrations/rubi'
 import { getIntegracionesConfig } from './_actions'
 
@@ -201,6 +202,38 @@ export default async function SettingsPage() {
                     envio_real_habilitado: Boolean(m.envio_real_habilitado),
                   }}
                 />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Correos de cliente por marca — usados para auto-llenar invitados
+          al crear reuniones de revisión desde el módulo /diseno */}
+      <Card>
+        <CardHeader>
+          <CardTitle>📧 Correos de cliente por marca</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Estos correos se cargan automáticamente como invitados cuando agendas una <strong>reunión de revisión</strong> en el módulo Diseño. Edítalos por marca para tener siempre actualizado a quién enviar las invitaciones de Google Calendar.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {!marcas || marcas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin marcas.</p>
+          ) : (
+            <div className="space-y-4">
+              {marcas.map((m) => (
+                <div key={m.slug} className="border-b border-border pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">{m.emoji_marca}</span>
+                    <span className="font-medium">{m.nombre}</span>
+                    <Badge variant="outline" className="font-mono text-[10px]">{m.slug}</Badge>
+                  </div>
+                  <CorreosClientesInput
+                    slug={m.slug}
+                    initialCorreos={(m.correos_clientes ?? []) as string[]}
+                  />
+                </div>
               ))}
             </div>
           )}

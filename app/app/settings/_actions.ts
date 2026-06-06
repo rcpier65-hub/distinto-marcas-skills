@@ -141,6 +141,48 @@ export async function updateMarcaWhatsappConfig(
 }
 
 /**
+ * Actualiza los correos de cliente de una marca. Estos correos se usan
+ * para auto-llenar los invitados al crear una reunión de revisión desde
+ * el módulo /diseno.
+ *
+ * Valida cada email con regex básico y filtra duplicados (case-insensitive).
+ */
+export async function updateMarcaCorreosClientes(
+  slug: string,
+  correos: string[],
+): Promise<{ ok: true; correos: string[] } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  /* Validación + dedup. El regex es liberal a propósito: no queremos
+     rechazar correos válidos por edge cases (TLDs largos, +tags, etc).
+     Lo único que pedimos: tener @ y al menos un punto después. */
+  const seen = new Set<string>()
+  const limpios: string[] = []
+  for (const raw of correos) {
+    const t = raw.trim().toLowerCase()
+    if (!t) continue
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) continue
+    if (seen.has(t)) continue
+    seen.add(t)
+    limpios.push(t)
+  }
+
+  const { error } = await service
+    .from('marcas')
+    .update({ correos_clientes: limpios })
+    .eq('slug', slug)
+  if (error) {
+    console.error('[updateMarcaCorreosClientes] error:', error)
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/settings')
+  return { ok: true, correos: limpios }
+}
+
+/**
  * Envía un mensaje de prueba al grupo configurado de una marca, mencionando
  * al `mention_number` actual. Útil ANTES de habilitar envio_real_habilitado:
  * Pedro confirma que el chatId y la mención son correctos sin riesgo de

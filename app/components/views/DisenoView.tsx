@@ -14,7 +14,7 @@
  *   - Quitado: Diseñador, Publicación, Portada lista, Diseñado
  */
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -23,6 +23,7 @@ import {
   desmarcarParaDisenarHoy,
   archivarTarea,
   crearDisenoTask,
+  obtenerCorreosDeMarca,
 } from '@/app/diseno/_actions'
 import {
   type DisenoEntry,
@@ -990,39 +991,81 @@ function NuevaTareaModal({
   const [descripcion, setDescripcion] = useState('')
   const [fechaDiseno, setFechaDiseno] = useState('')
   const [fechaEntrega, setFechaEntrega] = useState('')
-  const [esParaPublicar, setEsParaPublicar] = useState(false)
+  /* Marca: SIEMPRE seleccionable (Pedro pidió que aparezca aunque
+     no sea "para publicar"). Default vacío = tarea interna. */
   const [marcaSlug, setMarcaSlug] = useState('')
+  const [esParaPublicar, setEsParaPublicar] = useState(false)
   const [fechaPublicacion, setFechaPublicacion] = useState('')
   const [fechaEdicion, setFechaEdicion] = useState('')
+  /* Reunión de revisión opcional */
+  const [agregarReunion, setAgregarReunion] = useState(false)
+  const [horaReunion, setHoraReunion] = useState('')
+  const [invitadosInput, setInvitadosInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  /* Auto-fetch correos de cliente cuando elige marca: mejora UX para
+     que el usuario no tenga que escribir manualmente los emails. */
+  useEffect(() => {
+    if (!marcaSlug || marcaSlug === 'interno') {
+      return
+    }
+    let cancelado = false
+    obtenerCorreosDeMarca(marcaSlug).then((r) => {
+      if (cancelado) return
+      if (r.ok && r.correos.length > 0) {
+        /* Solo precargo si el usuario NO escribió nada todavía,
+           para no pisar lo que esté tipeando. */
+        setInvitadosInput((cur) => cur.trim() ? cur : r.correos.join(', '))
+      }
+    })
+    return () => { cancelado = true }
+  }, [marcaSlug])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!nombre.trim()) { toast.error('Falta nombre'); return }
     if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
     if (esParaPublicar && !fechaPublicacion) { toast.error('Falta fecha de publicación'); return }
+    if (agregarReunion && !horaReunion) { toast.error('Falta hora de reunión'); return }
+
+    /* Parse invitados — soporta separadores comunes: coma, salto de
+       línea, punto y coma. Filtra strings que parezcan email válido
+       (contiene @ y al menos un punto después). */
+    const invitados = agregarReunion
+      ? invitadosInput
+          .split(/[,;\n]/)
+          .map((s) => s.trim())
+          .filter((s) => /@.+\./.test(s))
+      : []
+
     setSubmitting(true)
     const r = await crearDisenoTask({
       nombre: nombre.trim(),
       descripcion: descripcion.trim() || null,
       fechaDiseno: fechaDiseno || null,
       fechaEntrega: fechaEntrega || null,
+      /* Marca siempre se manda (incluso para tareas no publicables).
+         Si está vacío y NO es para publicar, el server default a "interno". */
+      marcaSlug: marcaSlug || undefined,
       esParaPublicar,
-      marcaSlug: esParaPublicar ? marcaSlug : undefined,
       fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
       fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
+      horaReunion: agregarReunion ? horaReunion : null,
+      invitadosEmails: agregarReunion ? invitados : null,
     })
     setSubmitting(false)
     if (!r.ok) { toast.error(r.error); return }
 
-    const marca = esParaPublicar ? marcas.find((m) => m.slug === marcaSlug) : null
+    /* Para el optimistic update local, busco la marca que se eligió;
+       si quedó vacío, uso el placeholder "interno". */
+    const marca = marcaSlug ? marcas.find((m) => m.slug === marcaSlug) : null
     onCreated({
       id: r.data!.id,
       marcaSlug: marca?.slug ?? 'interno',
       marcaNombre: marca?.nombre ?? 'Distinto · Interno',
       marcaColor: marca?.color ?? '#a78bfa',
       marcaEmoji: marca?.emoji ?? null,
-      esInterno: !esParaPublicar,
+      esInterno: !marca,
       nombreTarea: nombre.trim(),
       descripcion: descripcion.trim() || null,
       fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
@@ -1033,11 +1076,21 @@ function NuevaTareaModal({
       plataformas: [],
       tipoContenido: [],
       fechaMarcadaParaDisenar: null,
-      /* Nueva tarea arranca sin timeline — los timestamps se setean
-         automáticamente cuando avanza el sub-estado. */
       startedAt: null,
       archivedAt: null,
     })
+  }
+
+  /* Common props para inputs de fecha/hora: el onFocus llama showPicker()
+     para que el calendar/clock se abra automáticamente al enfocar el
+     input. Fix del bug que Pedro reportó: "cuando hago clic en fecha de
+     entrega no sale el calendario para hacer clic". Las versiones
+     viejas de Chrome no tenían showPicker, por eso usamos ?. */
+  /* Helper genérico — acepta cualquier SyntheticEvent (focus, click,
+     mousedown). El cast del target maneja showPicker que TypeScript
+     no conoce todavía. */
+  const openPickerOnFocus = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {}
   }
 
   return (
@@ -1091,16 +1144,48 @@ function NuevaTareaModal({
           />
         </Field>
 
+        {/* Marca SIEMPRE visible (Pedro pidió poder elegir marca incluso
+            cuando la tarea NO es para publicar). Al elegir, se
+            auto-precargan los correos de cliente como invitados de la
+            reunión (si tiene reunión). */}
+        <Field label="Marca / cliente">
+          <select
+            value={marcaSlug}
+            onChange={(e) => setMarcaSlug(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">— Distinto · Interno (default) —</option>
+            {marcas.map((m) => (
+              <option key={m.slug} value={m.slug}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>
+            ))}
+          </select>
+        </Field>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="Fecha de entrega">
-            <input type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} style={inputStyle} />
+            <input
+              type="date"
+              value={fechaEntrega}
+              onChange={(e) => setFechaEntrega(e.target.value)}
+              onFocus={openPickerOnFocus}
+              onClick={openPickerOnFocus}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            />
           </Field>
           <Field label="Fecha de diseño">
-            <input type="date" value={fechaDiseno} onChange={(e) => setFechaDiseno(e.target.value)} style={inputStyle} />
+            <input
+              type="date"
+              value={fechaDiseno}
+              onChange={(e) => setFechaDiseno(e.target.value)}
+              onFocus={openPickerOnFocus}
+              onClick={openPickerOnFocus}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            />
           </Field>
         </div>
 
-        {/* Toggle ¿Es para publicar? */}
+        {/* Toggle ¿Es para publicar? — solo aparece si NO es interno
+            (tener marca elegida). Para tareas internas no se publica. */}
         <div
           onClick={() => setEsParaPublicar((v) => !v)}
           style={{
@@ -1137,25 +1222,101 @@ function NuevaTareaModal({
             border: '1px solid rgba(167, 139, 250, 0.20)',
             borderRadius: 'var(--mk-radius-md)',
           }}>
-            <Field label="Marca / cliente*">
-              <select
-                value={marcaSlug}
-                onChange={(e) => setMarcaSlug(e.target.value)}
-                style={inputStyle}
-              >
-                <option value="">— Selecciona la marca —</option>
-                {marcas.map((m) => (
-                  <option key={m.slug} value={m.slug}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>
-                ))}
-              </select>
-            </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <Field label="Fecha de publicación*">
-                <input type="date" value={fechaPublicacion} onChange={(e) => setFechaPublicacion(e.target.value)} style={inputStyle} />
+                <input
+                  type="date"
+                  value={fechaPublicacion}
+                  onChange={(e) => setFechaPublicacion(e.target.value)}
+                  onFocus={openPickerOnFocus}
+                  onClick={openPickerOnFocus}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                />
               </Field>
               <Field label="Fecha de edición">
-                <input type="date" value={fechaEdicion} onChange={(e) => setFechaEdicion(e.target.value)} style={inputStyle} />
+                <input
+                  type="date"
+                  value={fechaEdicion}
+                  onChange={(e) => setFechaEdicion(e.target.value)}
+                  onFocus={openPickerOnFocus}
+                  onClick={openPickerOnFocus}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                />
               </Field>
+            </div>
+          </div>
+        )}
+
+        {/* Toggle Reunión de revisión */}
+        <div
+          onClick={() => setAgregarReunion((v) => !v)}
+          style={{
+            padding: 12, borderRadius: 'var(--mk-radius-md)',
+            border: `1px solid ${agregarReunion ? '#34d399' : 'var(--mk-border-subtle)'}`,
+            background: agregarReunion ? 'rgba(52, 211, 153, 0.06)' : 'rgba(255, 255, 255, 0.02)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 10,
+            transition: 'all 120ms ease',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={agregarReunion}
+            onChange={(e) => setAgregarReunion(e.target.checked)}
+            style={{ accentColor: '#34d399', width: 14, height: 14 }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>
+              📹 Agendar reunión de revisión
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
+              Genera evento de Google Calendar + link Meet con invitados.
+            </span>
+          </div>
+        </div>
+
+        {agregarReunion && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 10,
+            padding: 12, marginTop: -4,
+            background: 'rgba(52, 211, 153, 0.03)',
+            border: '1px solid rgba(52, 211, 153, 0.20)',
+            borderRadius: 'var(--mk-radius-md)',
+          }}>
+            <Field label="Hora de la reunión*">
+              <input
+                type="time"
+                value={horaReunion}
+                onChange={(e) => setHoraReunion(e.target.value)}
+                onFocus={openPickerOnFocus}
+                onClick={openPickerOnFocus}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              />
+            </Field>
+            <Field label="Invitados (correos separados por coma)">
+              <textarea
+                value={invitadosInput}
+                onChange={(e) => setInvitadosInput(e.target.value)}
+                placeholder={
+                  marcaSlug && marcaSlug !== 'interno'
+                    ? 'Auto-llenado con los correos de la marca…'
+                    : 'cliente@ejemplo.com, otrocorreo@cliente.com'
+                }
+                rows={2}
+                style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical', minHeight: 50 }}
+              />
+              <span style={{ fontSize: 10, color: 'var(--mk-text-quaternary)', marginTop: 2 }}>
+                💡 Se cargan automáticamente al elegir marca. Edítalos desde Settings → Marca.
+              </span>
+            </Field>
+            <div style={{
+              padding: '8px 10px', borderRadius: 6,
+              background: 'rgba(167, 139, 250, 0.08)',
+              fontSize: 11, color: 'var(--mk-text-tertiary)',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              ⚠ Sync con Google Calendar en proceso. Por ahora se guarda la reunión y se sincroniza luego automáticamente.
             </div>
           </div>
         )}

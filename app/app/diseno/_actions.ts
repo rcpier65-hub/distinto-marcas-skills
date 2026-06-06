@@ -159,6 +159,26 @@ export async function archivarTarea(id: string, archivar: boolean): Promise<Acti
 }
 
 /**
+ * Devuelve los correos de cliente configurados para una marca.
+ * Lo usa el modal de "Nueva tarea" para auto-llenar la lista de
+ * invitados al crear una reunión de revisión.
+ */
+export async function obtenerCorreosDeMarca(slug: string): Promise<{
+  ok: true; correos: string[]
+} | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data, error } = await service
+    .from('marcas')
+    .select('correos_clientes')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, correos: (data?.correos_clientes ?? []) as string[] }
+}
+
+/**
  * Crea una nueva tarea desde el modal de /diseno.
  *
  * Dos modos:
@@ -177,11 +197,24 @@ export async function crearDisenoTask(args: {
   descripcion?: string | null
   fechaDiseno?: string | null
   fechaEntrega?: string | null
-  // Modo A: para publicar
+  /* Marca SIEMPRE — Pedro pidió que se pueda elegir marca incluso
+     en tareas standalone (para que los correos de clientes
+     auto-llenen los invitados al crear la reunión de revisión).
+     Si no se elige marca, default 'interno'. */
+  marcaSlug?: string
+  // Modo "para publicar"
   esParaPublicar: boolean
-  marcaSlug?: string                // ej. 'kintu', 'manrique'
   fechaPublicacion?: string | null
   fechaEdicion?: string | null
+  /* Reunión de revisión (opcional). Si se llena hora_reunion, el
+     campo invitados_emails se guarda también; si no hay hora, se
+     ignora todo. La fecha de la reunión es fecha_diseno por default
+     (lo más razonable: la reunión coincide con el día del diseño).
+     Para crear el evento real en Google Calendar usar la action
+     `crearReunionEnMeet` aparte (lo agregamos cuando GCal OAuth esté
+     conectado). */
+  horaReunion?: string | null       // "HH:mm" — input type=time
+  invitadosEmails?: string[] | null
 }): Promise<ActionResult<{ id: string }>> {
   const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -191,9 +224,12 @@ export async function crearDisenoTask(args: {
   if (!nombre) return { ok: false, error: 'Falta nombre de la tarea' }
 
   /* Resolvemos marca_id:
-     - Si esParaPublicar=true → busca por marcaSlug (debe existir)
-     - Si no → usa 'interno' (precargada en la migration) */
-  const targetSlug = args.esParaPublicar ? args.marcaSlug : 'interno'
+     - Si esParaPublicar=true → requiere marcaSlug obligatorio
+     - Si NO esParaPublicar:
+       - Si pasa marcaSlug → la usamos (Pedro pidió poder elegir marca
+         para tareas standalone también, para tener correos clientes)
+       - Si no pasa marcaSlug → default 'interno' */
+  const targetSlug = args.marcaSlug ?? (args.esParaPublicar ? null : 'interno')
   if (args.esParaPublicar && !targetSlug) {
     return { ok: false, error: 'Falta seleccionar marca para tarea publicable' }
   }
@@ -240,6 +276,14 @@ export async function crearDisenoTask(args: {
      existen, defensive remove. */
   if (args.descripcion) insert.descripcion = args.descripcion.trim() || null
   if (args.fechaEntrega) insert.fecha_entrega = args.fechaEntrega
+  /* Reunión de revisión: solo se guarda si tiene hora. La lista de
+     invitados queda como snapshot del momento de creación; si el
+     cliente cambia los correos en Settings de marca, NO se actualiza
+     retroactivamente (preserva la invitación original). */
+  if (args.horaReunion) {
+    insert.reunion_hora = args.horaReunion
+    insert.invitados_emails = args.invitadosEmails ?? []
+  }
 
   let { data, error } = await service
     .from('publicaciones')
@@ -247,9 +291,11 @@ export async function crearDisenoTask(args: {
     .select('id')
     .single()
 
-  if (error && (error.code === '42703' || /descripcion|fecha_entrega/i.test(error.message ?? ''))) {
+  if (error && (error.code === '42703' || /descripcion|fecha_entrega|reunion_hora|invitados_emails/i.test(error.message ?? ''))) {
     delete insert.descripcion
     delete insert.fecha_entrega
+    delete insert.reunion_hora
+    delete insert.invitados_emails
     const retry = await service.from('publicaciones').insert(insert).select('id').single()
     data = retry.data; error = retry.error
   }
