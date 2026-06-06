@@ -176,6 +176,9 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV }: Props) {
         >
           <NavItem href="/habitos"   icon={<CheckIcon />}  label="Hábitos"   active={isActive('/habitos')}   badge={2} />
           <NavItem href="/historial" icon={<NoteIcon />}   label="Historial" active={isActive('/historial')} />
+          {/* Mi equipo: gestión de miembros + permisos + invitaciones.
+              Fase 1 read+edit lista; Fase 2 conecta login. */}
+          <NavItem href="/equipo"    icon={<TeamIcon />}   label="Mi equipo" active={isActive('/equipo')} />
           <NavItem href="/settings"  icon={<SettingsIcon />} label="Settings" active={isActive('/settings')} />
         </Section>
       </nav>
@@ -365,3 +368,4 @@ function NoteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fil
 function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function ChevronUpDown() { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><path d="M3 4L5 2L7 4M3 6L5 8L7 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function SettingsIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><circle cx="7" cy="7" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M7 1.5V3M7 11V12.5M2.55 3.55L3.5 4.5M10.5 9.5L11.45 10.45M1.5 7H3M11 7H12.5M2.55 10.45L3.5 9.5M10.5 4.5L11.45 3.55" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+function TeamIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M1.5 11.5C1.5 9.5 3 8.5 5 8.5C7 8.5 8.5 9.5 8.5 11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /><circle cx="10" cy="5.5" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M9 8.5C11 8.5 12.5 9.3 12.5 10.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
