@@ -108,6 +108,72 @@ export function GrillaWorkspace({
     }
   }
 
+  /* Estado del botón "Copiar imagen". Visualmente distinto del envío
+     porque acá no estamos enviando — solo generamos PNG + copiamos. */
+  const [isCopyingImage, setIsCopyingImage] = useState(false)
+
+  /* URL del PNG real (mismo endpoint que usa "Enviar"). Construimos
+     una vez con los mismos params del preview HTML. Si los datos
+     cambian (zoom/recargar), la URL se mantiene — solo cambia bust. */
+  const pngEndpointUrl = useMemo(() => {
+    const pubs = publicaciones.map((p) => ({
+      fecha: p.fecha,
+      titulo: p.titulo,
+      plataformas: p.plataformas.join(' · '),
+      tipo: p.tipo_contenido.join(' · '),
+    }))
+    const params = new URLSearchParams({
+      slug: marca.slug,
+      inicio: semanaInicio,
+      fin: semanaFin,
+      pubs: JSON.stringify(pubs),
+    })
+    return `/api/render-grilla?${params.toString()}`
+  }, [marca.slug, semanaInicio, semanaFin, publicaciones])
+
+  /* Copiar PNG al portapapeles.
+     CRITICAL: la Clipboard API requiere que ClipboardItem se cree DENTRO
+     del mismo user gesture. Si hago `const blob = await fetch(...)` y
+     LUEGO `clipboard.write([new ClipboardItem({...blob})])`, Safari falla
+     porque el user gesture se perdió en el await.
+     Solución: pasar la PROMESA del blob directo al ClipboardItem
+     (Safari 16+ y Chrome lo soportan). */
+  async function handleCopyImage() {
+    if (isCopyingImage) return
+    setIsCopyingImage(true)
+    toast.loading('Generando PNG (~10s)…', { id: 'copy-img' })
+    try {
+      const blobPromise = fetch(pngEndpointUrl).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.blob()
+      })
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blobPromise }),
+      ])
+      toast.success('Imagen copiada al portapapeles ✓ — ya podés pegarla', {
+        id: 'copy-img',
+      })
+    } catch (err) {
+      /* Fallback para Safari < 16 o cuando el navegador no soporta
+         pasar promesas: bajamos el blob primero y reintentamos. Si
+         este path corre fuera del user gesture, igual va a fallar en
+         Safari, pero al menos Chrome/Edge funcionan. */
+      try {
+        const res = await fetch(pngEndpointUrl)
+        const blob = await res.blob()
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ])
+        toast.success('Imagen copiada al portapapeles ✓', { id: 'copy-img' })
+      } catch (fallbackErr) {
+        const msg = fallbackErr instanceof Error ? fallbackErr.message : String(err)
+        toast.error(`No se pudo copiar: ${msg}`, { id: 'copy-img' })
+      }
+    } finally {
+      setIsCopyingImage(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* HEADER */}
@@ -172,8 +238,17 @@ export function GrillaWorkspace({
               ))}
               <button
                 type="button"
+                onClick={handleCopyImage}
+                disabled={isCopyingImage}
+                className="ml-auto px-2 py-0.5 rounded text-xs border hover:bg-muted disabled:opacity-60 disabled:cursor-wait"
+                title="Genera el PNG profesional 1080×1620 y lo copia al portapapeles — listo para pegar en WhatsApp, Drive, donde sea"
+              >
+                {isCopyingImage ? '⏳ Copiando…' : '📋 Copiar imagen'}
+              </button>
+              <button
+                type="button"
                 onClick={() => setBust(Date.now())}
-                className="ml-auto px-2 py-0.5 rounded text-xs border hover:bg-muted"
+                className="px-2 py-0.5 rounded text-xs border hover:bg-muted"
                 title="Forzar recarga del iframe (rompe el cache del navegador)"
               >
                 ↻ Recargar
