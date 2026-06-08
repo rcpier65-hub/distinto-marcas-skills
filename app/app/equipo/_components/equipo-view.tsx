@@ -229,7 +229,12 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
           onCreated={(m) => {
             handleCreate(m)
             setNuevoOpen(false)
-            setEditando(m)  /* abrir el editor inmediatamente */
+            /* Saltar directo a tab Seguridad: después de crear el
+               miembro, el siguiente paso natural es asignarle una
+               contraseña para que pueda iniciar sesión. Antes abría
+               en tab "Información" y Pedro tenía que cambiar manual. */
+            setTabInicial('seguridad')
+            setEditando(m)
           }}
         />
       )}
@@ -1194,6 +1199,7 @@ function ModalNuevoMiembro({
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }
+        toast.success('Miembro creado — ahora asígnale una contraseña para que pueda entrar', { duration: 5000 })
         onCreated(newMember)
       } else {
         toast.error(r.error)
