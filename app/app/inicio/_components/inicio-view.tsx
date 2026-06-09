@@ -7,10 +7,15 @@
    - Sidebar con hábitos del día (clickeables para marcar)
 */
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { toggleHabitoHoy } from '@/app/habitos/_actions'
+import {
+  crearPendienteRapido,
+  togglePendienteRapido,
+  eliminarPendienteRapido,
+} from '../_actions'
 
 export type InicioData = {
   nombre: string
@@ -43,15 +48,39 @@ export type InicioData = {
     marcadaHoy: boolean
     modulo: 'editor' | 'diseno' | 'comentarios'
   }>
-  /* Frase del día según rol. Primeros 60 días secuenciales,
-     después aleatoria determinista por miembro + día. */
+  /* Pendientes rápidos: lo que el user escribió en el chat de la home.
+     La IA (o heurística) ya parseó título + categoría + prioridad. */
+  pendientes: Array<{
+    id: string
+    titulo: string
+    descripcion: string | null
+    categoria: string
+    prioridad: 1 | 2 | 3
+    completado: boolean
+    created_at: string
+  }>
+  /* Frase del día según rol. */
   fraseDia: {
     texto: string
     autor: string
     contexto: string | null
-    numero: number
-    total: number
   }
+}
+
+/* Color por categoría — paleta consistente en toda la app */
+const COLOR_CATEGORIA: Record<string, { bg: string; text: string; border: string }> = {
+  'Diseño':         { bg: '#fdf2f8', text: '#9d174d', border: '#fbcfe8' },
+  'Edición':        { bg: '#f5f3ff', text: '#5b21b6', border: '#ddd6fe' },
+  'Comunicación':   { bg: '#f0fdf4', text: '#166534', border: '#bbf7d0' },
+  'Investigación':  { bg: '#eff6ff', text: '#1e40af', border: '#bfdbfe' },
+  'Personal':       { bg: '#fffbeb', text: '#92400e', border: '#fde68a' },
+  'Urgente':        { bg: '#fef2f2', text: '#991b1b', border: '#fecaca' },
+  'Administrativo': { bg: '#f0f9ff', text: '#075985', border: '#bae6fd' },
+  'Otro':           { bg: '#f9fafb', text: '#374151', border: '#e5e7eb' },
+}
+
+function getColorCategoria(cat: string) {
+  return COLOR_CATEGORIA[cat] ?? COLOR_CATEGORIA['Otro']
 }
 
 /* Pincel SVG animado para diseñadores: ondea suavemente como si
@@ -321,7 +350,7 @@ export function InicioView({ data }: { data: InicioData }) {
             “
           </span>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p
                 style={{
@@ -367,19 +396,6 @@ export function InicioView({ data }: { data: InicioData }) {
                 )}
               </div>
             </div>
-            <span
-              style={{
-                fontSize: 11,
-                color: '#9ca3af',
-                whiteSpace: 'nowrap',
-                fontWeight: 500,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-              title={`Día ${data.fraseDia.numero} de ${data.fraseDia.total} en tu biblioteca`}
-            >
-              Frase del día · {data.fraseDia.numero}/{data.fraseDia.total}
-            </span>
           </div>
         </section>
 
@@ -391,159 +407,13 @@ export function InicioView({ data }: { data: InicioData }) {
             gap: 24,
           }}
         >
-          {/* Columna principal */}
+          {/* Columna principal: Pendientes rápidos + chat */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* Cards de acceso rápido */}
-            <section>
-              <h2
-                style={{
-                  fontSize: 12, fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  color: '#9ca3af',
-                  margin: '0 0 12px',
-                }}
-              >
-                Acceso rápido
-              </h2>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {data.modulosAccesibles.map((m) => (
-                  <a
-                    key={m.key}
-                    href={m.href}
-                    style={{
-                      padding: '18px 16px',
-                      background: '#fff',
-                      border: '1px solid #f1f1f3',
-                      borderRadius: 14,
-                      textDecoration: 'none',
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                      transition: 'all 150ms ease-out',
-                      boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = m.color
-                      e.currentTarget.style.boxShadow = `0 8px 20px -8px ${m.color}33`
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#f1f1f3'
-                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(16, 24, 40, 0.04)'
-                      e.currentTarget.style.transform = 'none'
-                    }}
-                  >
-                    <span style={{ fontSize: 22 }}>{m.icon}</span>
-                    <span
-                      style={{
-                        fontSize: 13.5, fontWeight: 600,
-                        color: '#111827',
-                        letterSpacing: '-0.005em',
-                      }}
-                    >
-                      {m.label}
-                    </span>
-                    <span style={{ fontSize: 11, color: m.color, fontWeight: 500 }}>
-                      Entrar →
-                    </span>
-                  </a>
-                ))}
-              </div>
-            </section>
-
-            {/* Mi trabajo de hoy */}
-            <section>
-              <h2
-                style={{
-                  fontSize: 12, fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  color: '#9ca3af',
-                  margin: '0 0 12px',
-                }}
-              >
-                {tituloMisTareas}{' '}
-                <span style={{ color: '#d1d5db', fontWeight: 500 }}>·</span>{' '}
-                <span style={{ color: '#6b7280' }}>{data.tareasMias.length}</span>
-              </h2>
-              <div
-                style={{
-                  background: '#fff',
-                  border: '1px solid #f1f1f3',
-                  borderRadius: 14,
-                  overflow: 'hidden',
-                  boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-                }}
-              >
-                {data.tareasMias.length === 0 ? (
-                  <div
-                    style={{
-                      padding: 32,
-                      textAlign: 'center',
-                      color: '#9ca3af',
-                      fontSize: 13,
-                    }}
-                  >
-                    🎉 No tienes pendientes. ¡Buen trabajo!
-                  </div>
-                ) : (
-                  data.tareasMias.map((t, i) => (
-                    <a
-                      key={t.id}
-                      href={`/publicaciones/${t.id}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '12px 16px',
-                        borderBottom: i < data.tareasMias.length - 1 ? '1px solid #f3f4f6' : 'none',
-                        textDecoration: 'none',
-                        transition: 'background 100ms ease-out',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                    >
-                      <span
-                        style={{
-                          width: 8, height: 8, borderRadius: '50%',
-                          background: t.marcaColor,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: 14, fontWeight: 500,
-                            color: '#111827',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {t.nombre}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11.5,
-                            color: '#6b7280',
-                            marginTop: 2,
-                          }}
-                        >
-                          {t.marca} · {t.meta}
-                          {t.marcadaHoy && ' · 🔥 Hoy'}
-                        </div>
-                      </div>
-                      <span style={{ color: '#d1d5db' }}>→</span>
-                    </a>
-                  ))
-                )}
-              </div>
-            </section>
+            <PendientesPanel
+              pendientesIniciales={data.pendientes}
+              acento={acento}
+              rolBase={data.rolBase}
+            />
           </div>
 
           {/* Sidebar: hábitos del día */}
@@ -653,5 +523,450 @@ export function InicioView({ data }: { data: InicioData }) {
         </div>
       </div>
     </main>
+  )
+}
+
+/* ====================================================================
+   PendientesPanel
+   --------------------------------------------------------------------
+   Panel principal de la home: arriba lista de tareas pendientes
+   agrupadas por categoría (parseadas por IA), abajo barra de chat
+   tipo ChatGPT donde el user escribe en lenguaje natural.
+   ==================================================================== */
+
+type Pendiente = {
+  id: string
+  titulo: string
+  descripcion: string | null
+  categoria: string
+  prioridad: 1 | 2 | 3
+  completado: boolean
+  created_at: string
+}
+
+function PendientesPanel({
+  pendientesIniciales,
+  acento,
+  rolBase,
+}: {
+  pendientesIniciales: Pendiente[]
+  acento: string
+  rolBase: string
+}) {
+  const [items, setItems] = useState<Pendiente[]>(pendientesIniciales)
+  const [input, setInput] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [, startTransition] = useTransition()
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  /* Placeholder de ejemplo según rol — tip al user de qué tipo de
+     mensajes funcionan bien */
+  const ejemplos: Record<string, string> = {
+    disenador: 'Ej: "Tengo que mandar las portadas de Manrique a Lorena hoy mismo"',
+    editor: 'Ej: "Editar el reel de Kintu antes de las 6pm"',
+    community_manager: 'Ej: "Responder los DMs de Lozano y subir story de Fitness"',
+    social_media_manager: 'Ej: "Revisar grilla de la semana de Kintu"',
+    director: 'Ej: "Revisar caja chica del mes"',
+  }
+  const placeholder = ejemplos[rolBase] ?? 'Escribe lo que tienes que hacer y lo organizo por ti…'
+
+  async function enviar() {
+    const texto = input.trim()
+    if (!texto || enviando) return
+    setEnviando(true)
+    setInput('')
+    /* Placeholder optimista mientras la IA procesa */
+    const tempId = `temp-${Date.now()}`
+    const optimista: Pendiente = {
+      id: tempId,
+      titulo: texto.slice(0, 80),
+      descripcion: null,
+      categoria: 'Otro',
+      prioridad: 2,
+      completado: false,
+      created_at: new Date().toISOString(),
+    }
+    setItems((curr) => [optimista, ...curr])
+
+    try {
+      const r = await crearPendienteRapido(texto)
+      if (r.ok) {
+        /* Reemplazar el optimista con el real */
+        setItems((curr) => [r.pendiente, ...curr.filter((p) => p.id !== tempId)])
+      } else {
+        setItems((curr) => curr.filter((p) => p.id !== tempId))
+        toast.error(r.error)
+      }
+    } finally {
+      setEnviando(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  function toggleItem(id: string) {
+    /* No tocar optimistas (todavía no tienen id real) */
+    if (id.startsWith('temp-')) return
+    setItems((curr) => curr.map((p) => p.id === id ? { ...p, completado: !p.completado } : p))
+    startTransition(async () => {
+      const r = await togglePendienteRapido(id)
+      if (!r.ok) {
+        setItems((curr) => curr.map((p) => p.id === id ? { ...p, completado: !p.completado } : p))
+        toast.error(r.error)
+      } else if (r.completado) {
+        /* Al completar lo retiramos de la lista visible después de 1s */
+        setTimeout(() => {
+          setItems((curr) => curr.filter((p) => p.id !== id))
+        }, 1000)
+      }
+    })
+  }
+
+  function eliminarItem(id: string) {
+    if (id.startsWith('temp-')) return
+    if (!confirm('¿Eliminar este pendiente?')) return
+    const prev = items
+    setItems((curr) => curr.filter((p) => p.id !== id))
+    startTransition(async () => {
+      const r = await eliminarPendienteRapido(id)
+      if (!r.ok) {
+        setItems(prev)
+        toast.error(r.error)
+      }
+    })
+  }
+
+  /* Agrupar por categoría, ordenando por prioridad dentro de cada grupo */
+  const grupos = useMemo(() => {
+    const m = new Map<string, Pendiente[]>()
+    for (const p of items) {
+      if (p.completado) continue  /* Los completados se ocultan */
+      const arr = m.get(p.categoria) ?? []
+      arr.push(p)
+      m.set(p.categoria, arr)
+    }
+    /* Sort dentro de cada categoría: prioridad asc (1=alta primero), después fecha desc */
+    for (const arr of m.values()) {
+      arr.sort((a, b) => a.prioridad - b.prioridad || (b.created_at < a.created_at ? -1 : 1))
+    }
+    /* Sort de categorías: Urgente primero, después por nombre */
+    const ordenCat = (cat: string) => cat === 'Urgente' ? -1 : 0
+    return Array.from(m.entries()).sort(([a], [b]) => ordenCat(a) - ordenCat(b) || a.localeCompare(b))
+  }, [items])
+
+  const totalActivos = items.filter((p) => !p.completado).length
+
+  return (
+    <section
+      style={{
+        background: '#fff',
+        border: '1px solid #f1f1f3',
+        borderRadius: 16,
+        boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 480,
+      }}
+    >
+      {/* Header del panel */}
+      <header
+        style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid #f3f4f6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 14, fontWeight: 600,
+            color: '#111827',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span>✨</span>
+          <span>Pendientes rápidos de hoy</span>
+          {totalActivos > 0 && (
+            <span style={{
+              fontSize: 11, fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: `${acento}15`,
+              color: acento,
+              marginLeft: 4,
+            }}>
+              {totalActivos}
+            </span>
+          )}
+        </h2>
+        <span style={{ fontSize: 11, color: '#9ca3af' }}>
+          Te organizo todo con IA
+        </span>
+      </header>
+
+      {/* Lista agrupada por categoría */}
+      <div style={{ flex: 1, padding: '12px 16px', overflowY: 'auto', maxHeight: 520 }}>
+        {grupos.length === 0 ? (
+          <div style={{
+            padding: '48px 16px',
+            textAlign: 'center',
+            color: '#9ca3af',
+            fontSize: 13.5,
+            lineHeight: 1.6,
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
+            <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>
+              Sin pendientes
+            </div>
+            <div style={{ color: '#9ca3af' }}>
+              Escribe abajo lo que tienes que hacer.<br />
+              Yo lo organizo, categorizo y prioritizo por ti.
+            </div>
+          </div>
+        ) : (
+          grupos.map(([categoria, pendientes]) => {
+            const col = getColorCategoria(categoria)
+            return (
+              <div key={categoria} style={{ marginBottom: 16 }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 8,
+                  paddingLeft: 4,
+                }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    background: col.bg,
+                    color: col.text,
+                    border: `1px solid ${col.border}`,
+                  }}>
+                    {categoria}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                    {pendientes.length}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {pendientes.map((p) => (
+                    <PendienteItem
+                      key={p.id}
+                      p={p}
+                      acento={acento}
+                      onToggle={() => toggleItem(p.id)}
+                      onDelete={() => eliminarItem(p.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Barra de chat estilo ChatGPT */}
+      <div
+        style={{
+          borderTop: '1px solid #f3f4f6',
+          padding: 12,
+          background: '#fafafa',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 8,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 14,
+            padding: '8px 8px 8px 14px',
+            transition: 'border-color 150ms',
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = acento }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = '#e5e7eb' }}
+        >
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={placeholder}
+            disabled={enviando}
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                enviar()
+              }
+            }}
+            onInput={(e) => {
+              const ta = e.currentTarget
+              ta.style.height = 'auto'
+              ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
+            }}
+            style={{
+              flex: 1,
+              fontFamily: 'inherit',
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: '#111827',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              padding: '6px 0',
+              background: 'transparent',
+              maxHeight: 120,
+            }}
+          />
+          <button
+            onClick={enviar}
+            disabled={!input.trim() || enviando}
+            title="Enviar (Enter)"
+            style={{
+              width: 34, height: 34,
+              borderRadius: 10,
+              background: input.trim() ? acento : '#e5e7eb',
+              color: '#fff',
+              border: 'none',
+              cursor: input.trim() ? 'pointer' : 'not-allowed',
+              fontSize: 16,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 150ms',
+              flexShrink: 0,
+            }}
+          >
+            {enviando ? '…' : '↑'}
+          </button>
+        </div>
+        <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 6, paddingLeft: 4 }}>
+          Enter para enviar · Shift+Enter para nueva línea
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* Card individual de un pendiente con checkbox + título + descripción
+   opcional + dot de prioridad + botón eliminar al hover. */
+function PendienteItem({
+  p,
+  acento,
+  onToggle,
+  onDelete,
+}: {
+  p: Pendiente
+  acento: string
+  onToggle: () => void
+  onDelete: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const dotPri =
+    p.prioridad === 1 ? '#ef4444' :
+    p.prioridad === 2 ? '#f59e0b' :
+    '#d1d5db'
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        padding: '8px 10px',
+        borderRadius: 10,
+        background: hover ? '#fafafa' : 'transparent',
+        transition: 'background 100ms',
+        opacity: p.completado ? 0.5 : 1,
+      }}
+    >
+      <button
+        onClick={onToggle}
+        title={p.completado ? 'Desmarcar' : 'Marcar como hecho'}
+        style={{
+          width: 18, height: 18,
+          borderRadius: 6,
+          border: `2px solid ${p.completado ? acento : '#d1d5db'}`,
+          background: p.completado ? acento : 'transparent',
+          color: '#fff',
+          fontSize: 11, fontWeight: 700,
+          flexShrink: 0,
+          marginTop: 2,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'all 150ms',
+        }}
+      >
+        {p.completado && '✓'}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 13.5,
+          color: '#111827',
+          lineHeight: 1.45,
+          textDecoration: p.completado ? 'line-through' : 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: dotPri,
+            flexShrink: 0,
+            display: 'inline-block',
+          }} title={p.prioridad === 1 ? 'Alta prioridad' : p.prioridad === 2 ? 'Media' : 'Baja'} />
+          {p.titulo}
+        </div>
+        {p.descripcion && (
+          <div style={{
+            fontSize: 11.5,
+            color: '#9ca3af',
+            marginTop: 2,
+            lineHeight: 1.4,
+          }}>
+            {p.descripcion}
+          </div>
+        )}
+      </div>
+      {hover && !p.id.startsWith('temp-') && (
+        <button
+          onClick={onDelete}
+          title="Eliminar"
+          style={{
+            width: 24, height: 24,
+            borderRadius: 6,
+            background: 'transparent',
+            border: 'none',
+            color: '#9ca3af',
+            fontSize: 14,
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#fef2f2'
+            e.currentTarget.style.color = '#dc2626'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = '#9ca3af'
+          }}
+        >
+          ×
+        </button>
+      )}
+    </div>
   )
 }

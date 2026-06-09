@@ -176,10 +176,12 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           )}
         </Section>
 
-        {/* Sección marcas: solo si tiene acceso a grilla o publicaciones.
+        {/* Sección marcas: controlada por el permiso 'marcas' (nuevo).
+            Pedro pidió control independiente para poder dar/quitar
+            acceso a la sección "Marcas" sin tocar grilla/publicaciones.
             La lista se filtra por marcasAcceso (los miembros restringidos
             solo ven sus marcas). */}
-        {(puede('grilla') || puede('publicaciones')) && marcasVisibles.length > 0 && (
+        {puede('marcas') && marcasVisibles.length > 0 && (
           <Section
             label={`Marcas · ${marcasVisibles.length}`}
             open={openSections.marcas}

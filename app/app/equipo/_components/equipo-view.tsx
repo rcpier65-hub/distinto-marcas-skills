@@ -718,6 +718,7 @@ const MODULO_OPCIONES: Record<ModuloPermiso, { acceso: string; extras?: { key: s
                     { key: 'puede_resetear_passwords', label: 'Puede resetear contraseñas' },
                   ] },
   finanzas:     { acceso: 'Ver Finanzas' },
+  marcas:       { acceso: 'Ver Marcas' },
 }
 
 function TabPermisos({

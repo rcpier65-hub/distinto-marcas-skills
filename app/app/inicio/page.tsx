@@ -173,6 +173,26 @@ export default async function InicioPage() {
      después aleatoria determinista por (miembro, día). */
   const fraseDia = getFraseDelDia(p.member.rol_base, p.member.id)
 
+  /* Pendientes rápidos NO completados del miembro (chat-ChatGPT en home) */
+  const { data: pendientesRaw } = await service
+    .from('pendientes_rapidos')
+    .select('id, titulo, descripcion, categoria, prioridad, completado, created_at')
+    .eq('team_member_id', p.member.id)
+    .eq('completado', false)
+    .order('prioridad', { ascending: true })
+    .order('created_at', { ascending: false })
+    .limit(30)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pendientes = ((pendientesRaw ?? []) as any[]).map((row) => ({
+    id: row.id as string,
+    titulo: row.titulo as string,
+    descripcion: (row.descripcion ?? null) as string | null,
+    categoria: row.categoria as string,
+    prioridad: row.prioridad as 1 | 2 | 3,
+    completado: row.completado as boolean,
+    created_at: row.created_at as string,
+  }))
+
   const data: InicioData = {
     nombre: nombreCapitalizado,
     rol: p.rol.nombre,
@@ -183,12 +203,11 @@ export default async function InicioPage() {
     modulosAccesibles,
     habitosHoy,
     tareasMias,
+    pendientes,
     fraseDia: {
       texto: fraseDia.frase.texto,
       autor: fraseDia.frase.autor,
       contexto: fraseDia.frase.contexto ?? null,
-      numero: fraseDia.numero,
-      total: fraseDia.total,
     },
   }
 
