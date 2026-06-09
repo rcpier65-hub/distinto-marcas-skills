@@ -13,6 +13,7 @@ import { useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { RefreshCw, Sparkles, Send, FlaskConical, CheckCircle2, Loader2 } from 'lucide-react'
+import { MarcaLogo } from '@/components/marca-logo'
 import {
   fetchComentariosFromMetricool,
   actualizarComentarioBorrador,
@@ -331,6 +332,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
       {/* HEADER con selector marca + KPIs */}
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
+          <MarcaLogo slug={marcaActual} nombre={marcaInfo?.nombre} emoji={marcaInfo?.emoji_marca} size={36} />
           <select
             value={marcaActual}
             onChange={(e) => changeMarca(e.target.value)}
