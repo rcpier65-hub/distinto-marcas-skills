@@ -94,6 +94,9 @@ type Props = {
   migrationPendiente?: boolean
   rangoDesde: string
   rangoHasta: string
+  /* Si la URL viene con ?nuevo=1 (desde /grilla), abrimos el modal de
+     nueva tarea con la marca pre-cargada. */
+  initialNuevo?: { marcaSlug: string } | null
 }
 
 /* ============================================================
@@ -102,6 +105,7 @@ type Props = {
 
 export function DisenoView({
   entries: initialEntries, marcas, migrationPendiente, rangoDesde, rangoHasta,
+  initialNuevo,
 }: Props) {
   const router = useRouter()
   const [entries, setEntries] = useState(initialEntries)
@@ -118,6 +122,14 @@ export function DisenoView({
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+
+  /* Si la URL trajo ?nuevo=1 (desde el botón en /grilla), abrir el modal
+     de creación inmediatamente. Solo la primera vez (luego lo cierra
+     manual o tras crear). */
+  useEffect(() => {
+    if (initialNuevo) setModalOpen(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const marcaBySlug = useMemo(() => new Map(marcas.map((m) => [m.slug, m])), [marcas])
   const hoy = new Date().toISOString().slice(0, 10)
@@ -484,6 +496,7 @@ export function DisenoView({
           marcas={marcas}
           onClose={() => setModalOpen(false)}
           onCreated={onTareaCreada}
+          initialMarcaSlug={initialNuevo?.marcaSlug ?? ''}
         />
       )}
     </div>
@@ -999,19 +1012,26 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
    ============================================================ */
 
 function NuevaTareaModal({
-  marcas, onClose, onCreated,
+  marcas, onClose, onCreated, initialMarcaSlug,
 }: {
   marcas: MarcaOption[]
   onClose: () => void
   onCreated: (entry: DisenoEntry) => void
+  /* Pre-fill cuando se llega desde /grilla con ?marca=slug. */
+  initialMarcaSlug?: string
 }) {
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [fechaDiseno, setFechaDiseno] = useState('')
   const [fechaEntrega, setFechaEntrega] = useState('')
   /* Marca: SIEMPRE seleccionable (Pedro pidió que aparezca aunque
-     no sea "para publicar"). Default vacío = tarea interna. */
-  const [marcaSlug, setMarcaSlug] = useState('')
+     no sea "para publicar"). Default vacío = tarea interna.
+     Si llega initialMarcaSlug (botón en /grilla), se pre-carga. */
+  const [marcaSlug, setMarcaSlug] = useState(initialMarcaSlug ?? '')
+  /* Pedro: 'que se puedan seleccionar más de una marca cuando se hace
+     diseño'. Set de slugs ADICIONALES a la principal. Si Ailyn elige
+     marca=Kintu y extras={Manrique, Lozano}, se crean 3 tareas. */
+  const [marcasExtras, setMarcasExtras] = useState<Set<string>>(new Set())
   const [esParaPublicar, setEsParaPublicar] = useState(false)
   const [fechaPublicacion, setFechaPublicacion] = useState('')
   const [fechaEdicion, setFechaEdicion] = useState('')
@@ -1065,6 +1085,7 @@ function NuevaTareaModal({
       /* Marca siempre se manda (incluso para tareas no publicables).
          Si está vacío y NO es para publicar, el server default a "interno". */
       marcaSlug: marcaSlug || undefined,
+      marcasExtras: Array.from(marcasExtras),
       esParaPublicar,
       fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
       fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
@@ -1073,6 +1094,13 @@ function NuevaTareaModal({
     })
     setSubmitting(false)
     if (!r.ok) { toast.error(r.error); return }
+
+    /* Si Ailyn replicó en marcas extras, mostramos toast confirmando.
+       Las extras no van al optimistic update; aparecerán cuando recargue
+       o se haga revalidatePath (que ya pasa en server). */
+    if (r.data!.extrasCreadas > 0) {
+      toast.success(`Tarea creada en ${r.data!.extrasCreadas + 1} marcas (principal + ${r.data!.extrasCreadas} replicada${r.data!.extrasCreadas > 1 ? 's' : ''})`)
+    }
 
     /* Para el optimistic update local, busco la marca que se eligió;
        si quedó vacío, uso el placeholder "interno". */
@@ -1192,6 +1220,86 @@ function NuevaTareaModal({
         <Field label="Marca / cliente">
           <MarcaSelect marcas={marcas} value={marcaSlug} onChange={setMarcaSlug} />
         </Field>
+
+        {/* Pedro: 'que se puedan seleccionar más de una marca cuando se
+            hace diseño'. Si Ailyn elige una marca principal, debajo
+            aparece la opción de replicar en otras marcas (chips
+            toggleables). Se crea una tarea por cada marca seleccionada. */}
+        {marcaSlug && marcaSlug !== 'interno' && marcas.length > 1 && (
+          <div style={{ marginTop: 6 }}>
+            <div style={{
+              fontSize: 11, color: '#6b7280', marginBottom: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            }}>
+              <span>
+                ¿Replicar en más marcas? <span style={{ color: '#9ca3af' }}>(opcional)</span>
+              </span>
+              {marcasExtras.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setMarcasExtras(new Set())}
+                  style={{
+                    background: 'transparent', border: 'none',
+                    color: '#6b7280', fontSize: 11,
+                    cursor: 'pointer', padding: 0,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {marcas
+                .filter((m) => m.slug !== marcaSlug && m.slug !== 'interno')
+                .map((m) => {
+                  const checked = marcasExtras.has(m.slug)
+                  return (
+                    <button
+                      key={m.slug}
+                      type="button"
+                      onClick={() => {
+                        setMarcasExtras((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(m.slug)) next.delete(m.slug)
+                          else next.add(m.slug)
+                          return next
+                        })
+                      }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '5px 11px',
+                        borderRadius: 999,
+                        background: checked ? `${m.color}1a` : '#f9fafb',
+                        border: `1px solid ${checked ? m.color + '66' : '#e5e7eb'}`,
+                        color: checked ? m.color : '#374151',
+                        fontSize: 11.5, fontWeight: 500,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        transition: 'all 120ms',
+                      }}
+                    >
+                      {checked && <span>✓</span>}
+                      {m.emoji && <span style={{ fontSize: 12 }}>{m.emoji}</span>}
+                      <span>{m.nombre}</span>
+                    </button>
+                  )
+                })}
+            </div>
+            {marcasExtras.size > 0 && (
+              <div style={{
+                fontSize: 11, color: '#374151',
+                marginTop: 8, padding: '6px 10px',
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: 8,
+              }}>
+                ✓ Se crearán <strong>{marcasExtras.size + 1}</strong> tareas idénticas
+                (principal + {marcasExtras.size} replicada{marcasExtras.size > 1 ? 's' : ''})
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="Fecha de entrega">

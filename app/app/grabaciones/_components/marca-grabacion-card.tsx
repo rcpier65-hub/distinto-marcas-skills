@@ -13,16 +13,16 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatHora12, sufijoAmPm } from '@/lib/utils/format-hora'
-import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays } from 'lucide-react'
+import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ObjetivoInput } from './objetivo-input'
-import { NotasInput } from './notas-input'
 import {
   createGrabacion,
   updateGrabacionFecha,
   updateGrabacionEstado,
   deleteGrabacion,
+  toggleCoordinacionConfirmada,
   type MarcaKPI,
   type GrabacionWithMarca,
 } from '../_actions'
@@ -44,6 +44,27 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   const pct = kpi.cumplimiento_pct
   const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : pct > 0 ? 'bg-rose-400' : 'bg-muted'
 
+  /* Optimistic toggle del check 'coordinación confirmada con cliente' */
+  const [confirmada, setConfirmada] = useState<boolean>(kpi.coordinacionConfirmada)
+  function toggleConfirmada() {
+    const next = !confirmada
+    setConfirmada(next)
+    startTransition(async () => {
+      const r = await toggleCoordinacionConfirmada(kpi.marca_slug, next)
+      if (!r.ok) {
+        setConfirmada(!next)
+        toast.error(r.error)
+      } else {
+        toast.success(next ? 'Coordinación marcada como confirmada' : 'Coordinación pendiente')
+      }
+    })
+  }
+
+  /* Pedro: si las grabaciones planeadas/cumplidas NO alcanzan el objetivo
+     y la coordinación NO está confirmada → alerta arriba del card. */
+  const faltanGrabaciones = kpi.objetivo > 0 && (kpi.planeadas + kpi.cumplidas) < kpi.objetivo
+  const mostrarAlerta = faltanGrabaciones && !confirmada
+
   function handleAgregar() {
     // Default: día 15 del mes activo (mitad de mes, fácil de mover después)
     const fechaDefault = `${mesDefault}-15`
@@ -60,6 +81,20 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="pt-4 pb-4 space-y-3">
+        {/* Alerta: falta coordinación con cliente para alcanzar el objetivo */}
+        {mostrarAlerta && (
+          <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="text-[11.5px] leading-snug">
+              <strong className="block">Falta coordinación con el cliente</strong>
+              <span className="text-amber-700">
+                Faltan {kpi.objetivo - (kpi.planeadas + kpi.cumplidas)} grabaciones para llegar al objetivo del mes.
+                Confirma fechas con la marca antes de cerrar el calendario.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -105,7 +140,8 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
             ))
           )}
 
-          {/* Botón agregar fecha */}
+          {/* Botón añadir fecha (Pedro pidió cambiar el label
+              de 'Agregar fecha de grabación' a simplemente 'Añadir'). */}
           <button
             type="button"
             onClick={handleAgregar}
@@ -113,13 +149,43 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
             className="w-full flex items-center justify-center gap-1.5 h-8 mt-1 rounded-md border border-dashed border-[#ba41f7]/40 text-[#ba41f7] text-xs font-medium hover:bg-[#ba41f7]/8 disabled:opacity-50 transition-colors"
           >
             <CalendarPlus className="w-3.5 h-3.5" />
-            Agregar fecha de grabación
+            Añadir
           </button>
         </div>
 
-        {/* NOTAS — texto libre por marca. Pedro: "little joe tiene un
-            pendiente de confirmar con cristal y quiero anotarlo ahí". */}
-        <NotasInput slug={kpi.marca_slug} initial={kpi.notas} />
+        {/* Check 'Coordinación confirmada' — Pedro lo pidió debajo del
+            card. Cuando está marcado, las fechas planeadas son creíbles
+            (validadas con el cliente) y la alerta de coordinación
+            desaparece. */}
+        <label
+          className="flex items-start gap-2 pt-2 border-t border-border/60 cursor-pointer select-none"
+          title="Marcar cuando las fechas estén coordinadas y confirmadas con el cliente"
+        >
+          <input
+            type="checkbox"
+            checked={confirmada}
+            onChange={toggleConfirmada}
+            disabled={isPending}
+            className="mt-0.5 w-4 h-4 rounded border-input accent-emerald-500 cursor-pointer disabled:opacity-50"
+          />
+          <div className="text-[11.5px] leading-snug">
+            <span className={`font-semibold ${confirmada ? 'text-emerald-700' : 'text-foreground'}`}>
+              {confirmada ? (
+                <span className="inline-flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Coordinación confirmada
+                </span>
+              ) : (
+                'Marcar como confirmada y creíble'
+              )}
+            </span>
+            <span className="block text-muted-foreground text-[10.5px]">
+              {confirmada
+                ? 'Las fechas planeadas están validadas con el cliente.'
+                : 'Las fechas planeadas todavía no se confirmaron con el cliente.'}
+            </span>
+          </div>
+        </label>
       </CardContent>
     </Card>
   )

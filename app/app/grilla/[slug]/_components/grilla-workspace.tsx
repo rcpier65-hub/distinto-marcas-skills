@@ -322,9 +322,21 @@ export function GrillaWorkspace({
 
           <Card>
             <CardContent className="p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                📅 Publicaciones de la semana ({publicaciones.length})
-              </h3>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  📅 Publicaciones de la semana ({publicaciones.length})
+                </h3>
+                {/* Botón para crear tarea de diseño con esta marca
+                    pre-cargada — Pedro: 'diseño botón en grilla de
+                    publicación para Ailyn'. */}
+                <a
+                  href={`/diseno?marca=${marca.slug}&nuevo=1`}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[#ec4899]/10 border border-[#ec4899]/30 text-[#ec4899] hover:bg-[#ec4899]/15 transition-colors inline-flex items-center gap-1"
+                  title={`Crear nueva tarea de diseño para ${marca.nombre}`}
+                >
+                  ✨ Diseñar para esta marca
+                </a>
+              </div>
               {publicaciones.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">
                   No hay publicaciones programadas. Agregalas en{' '}

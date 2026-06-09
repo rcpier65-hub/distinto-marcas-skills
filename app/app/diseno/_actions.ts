@@ -208,11 +208,16 @@ export async function crearDisenoTask(args: {
   descripcion?: string | null
   fechaDiseno?: string | null
   fechaEntrega?: string | null
-  /* Marca SIEMPRE — Pedro pidió que se pueda elegir marca incluso
+  /* Marca PRINCIPAL — Pedro pidió que se pueda elegir marca incluso
      en tareas standalone (para que los correos de clientes
      auto-llenen los invitados al crear la reunión de revisión).
      Si no se elige marca, default 'interno'. */
   marcaSlug?: string
+  /* Pedro: 'que se puedan seleccionar más de una marca cuando se hace
+     diseño'. Si vienen N slugs adicionales, creamos N publicaciones
+     extra con la misma config pero distinta marca. Útil para la misma
+     pieza (ej. 'Saludo Día de la Madre') replicada en varias marcas. */
+  marcasExtras?: string[]
   // Modo "para publicar"
   esParaPublicar: boolean
   fechaPublicacion?: string | null
@@ -226,7 +231,7 @@ export async function crearDisenoTask(args: {
      conectado). */
   horaReunion?: string | null       // "HH:mm" — input type=time
   invitadosEmails?: string[] | null
-}): Promise<ActionResult<{ id: string }>> {
+}): Promise<ActionResult<{ id: string; extrasCreadas: number }>> {
   const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -322,6 +327,38 @@ export async function crearDisenoTask(args: {
     return { ok: false, error: error.message }
   }
 
+  /* MULTI-MARCA: si vienen marcas extras, replicamos la tarea con
+     misma config pero distinto marca_id. Pedro pidió poder marcar
+     N marcas en el mismo flujo de creación.
+     - Resolvemos los IDs de cada slug extra en paralelo
+     - Si alguna no existe, la salteamos (no bloquea creación)
+     - INSERT en bulk con array — más eficiente que N inserts */
+  let extrasCreadas = 0
+  const slugsExtras = (args.marcasExtras ?? [])
+    .map((s) => s.trim())
+    .filter((s) => s && s !== targetSlug)  /* dedup con la principal */
+  if (slugsExtras.length > 0) {
+    const { data: marcasExtras } = await service
+      .from('marcas')
+      .select('id, slug')
+      .in('slug', slugsExtras)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idsExtras = ((marcasExtras ?? []) as any[]).map((m) => m.id as string)
+    if (idsExtras.length > 0) {
+      const insertsExtras = idsExtras.map((marcaIdExtra) => ({
+        ...insert,
+        marca_id: marcaIdExtra,
+      }))
+      const { error: errExtras } = await service.from('publicaciones').insert(insertsExtras)
+      if (errExtras) {
+        /* No fatal — el principal ya se creó. Logueamos y seguimos. */
+        console.error('[crearDisenoTask] error extras:', errExtras)
+      } else {
+        extrasCreadas = idsExtras.length
+      }
+    }
+  }
+
   /* Refresco TODAS las vistas afectadas. Si es para publicar, la
      tarea aparecerá en el calendario principal y la tabla — pedro
      pidió "que se conecte a la grilla principal para que también
@@ -334,5 +371,5 @@ export async function crearDisenoTask(args: {
     revalidatePath('/publicaciones/kanban')
     revalidatePath('/editor')  /* el editor también filtra por estado */
   }
-  return { ok: true, data: { id: data.id } }
+  return { ok: true, data: { id: data.id, extrasCreadas } }
 }

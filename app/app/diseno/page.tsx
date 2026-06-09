@@ -40,11 +40,19 @@ function abbreviatePlataforma(p: string): string {
   return p.slice(0, 2).toUpperCase()
 }
 
-export default async function DisenoPage() {
+type SP = { nuevo?: string; marca?: string }
+
+export default async function DisenoPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
   /* Route guard: Pieer (editor) o Lorena (CM) sin acceso a diseño */
   const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
   await ensureAccesoModulo('diseno')
+
+  /* Pedro: el botón 'Diseñar para esta marca' en /grilla manda con
+     ?nuevo=1&marca=slug. Si llega así, abrimos el modal de nueva
+     tarea con la marca pre-seleccionada. */
+  const sp = await searchParams
+  const initialNuevo = sp.nuevo === '1' ? { marcaSlug: sp.marca ?? '' } : null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -173,6 +181,7 @@ export default async function DisenoPage() {
       migrationPendiente={migrationPendiente}
       rangoDesde={DESDE}
       rangoHasta={HASTA}
+      initialNuevo={initialNuevo}
     />
   )
 }

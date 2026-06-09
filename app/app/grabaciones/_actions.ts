@@ -42,6 +42,10 @@ export type MarcaKPI = {
   color_primario_hex: string | null
   objetivo: number      // grabaciones_objetivo_mensual de la marca
   notas: string | null  // notas_grabaciones — texto libre editable inline
+  /* Pedro: 'añade un check marcarle y creíble debajo del card'.
+     Si está en true → la coordinación con el cliente está confirmada y
+     las fechas son realistas. Si está en false → mostrar alerta. */
+  coordinacionConfirmada: boolean
   planeadas: number     // count estado='planeada' en el rango
   cumplidas: number     // count estado='cumplida' en el rango
   canceladas: number    // count estado='cancelada' en el rango
@@ -134,7 +138,7 @@ export async function getGrabacionesKPIs(
   {
     const r1 = await service
       .from('marcas')
-      .select('id, slug, nombre, emoji_marca, color_primario_hex, grabaciones_objetivo_mensual, notas_grabaciones')
+      .select('id, slug, nombre, emoji_marca, color_primario_hex, grabaciones_objetivo_mensual, notas_grabaciones, grabaciones_confirmadas_mes')
       .eq('activa', true)
       .order('slug')
     if (r1.error && (r1.error.message ?? '').includes('does not exist')) {
@@ -186,6 +190,7 @@ export async function getGrabacionesKPIs(
       color_primario_hex: m.color_primario_hex,
       objetivo,
       notas: (m.notas_grabaciones ?? null) as string | null,
+      coordinacionConfirmada: Boolean(m.grabaciones_confirmadas_mes),
       planeadas,
       cumplidas,
       canceladas,
@@ -413,6 +418,35 @@ export async function updateMarcaNotasGrabaciones(
   if (error) {
     if ((error.message ?? '').includes('does not exist')) {
       return { ok: false, error: 'Migración 024 pendiente — pide a Pedro aplicarla en Supabase' }
+    }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/grabaciones')
+  return { ok: true }
+}
+
+/**
+ * Toggle del flag 'coordinación con cliente confirmada' por marca.
+ * Pedro: 'añade un check marcarle y creíble debajo del card' → si está
+ * en true, las grabaciones planeadas del mes son realistas y confirmadas.
+ * Si false → mostramos alerta en el card sugiriendo coordinar con el cliente.
+ */
+export async function toggleCoordinacionConfirmada(
+  slug: string,
+  confirmada: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { error } = await service
+    .from('marcas')
+    .update({ grabaciones_confirmadas_mes: confirmada })
+    .eq('slug', slug)
+
+  if (error) {
+    if ((error.message ?? '').includes('does not exist')) {
+      return { ok: false, error: 'Falta migración: ALTER TABLE marcas ADD COLUMN grabaciones_confirmadas_mes boolean' }
     }
     return { ok: false, error: error.message }
   }
