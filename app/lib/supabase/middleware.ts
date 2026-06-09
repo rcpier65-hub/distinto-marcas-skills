@@ -41,6 +41,8 @@ export async function updateSession(request: NextRequest) {
 
   // Si NO hay user y la ruta NO es /login, /auth, /api/*, ni /, redirigir a /login.
   // /api/cron/* y /api/render-grilla hacen su propia auth con Bearer token (no requiere sesión user).
+  // Assets PWA (manifest, sw, icons) deben ser públicos para que browsers
+  // los descubran sin requerir sesión — sino el icono no aparece al instalar.
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
@@ -50,7 +52,15 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/render-grilla') ||
     request.nextUrl.pathname.startsWith('/api/render-grilla-html') ||
     request.nextUrl.pathname.startsWith('/api/debug') ||
-    request.nextUrl.pathname === '/'
+    request.nextUrl.pathname === '/' ||
+    /* PWA assets — deben servirse sin auth */
+    request.nextUrl.pathname === '/manifest.webmanifest' ||
+    request.nextUrl.pathname === '/manifest.json' ||
+    request.nextUrl.pathname === '/sw.js' ||
+    request.nextUrl.pathname.startsWith('/icons/') ||
+    request.nextUrl.pathname === '/apple-touch-icon.png' ||
+    request.nextUrl.pathname === '/favicon-32.png' ||
+    request.nextUrl.pathname === '/favicon.ico'
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
