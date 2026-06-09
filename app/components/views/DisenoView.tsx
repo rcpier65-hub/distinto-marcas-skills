@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { MarcaSelect } from '@/components/marca-select'
 import {
   updateDisenoEntry,
   marcarParaDisenarHoy,
@@ -1186,16 +1187,7 @@ function NuevaTareaModal({
             auto-precargan los correos de cliente como invitados de la
             reunión (si tiene reunión). */}
         <Field label="Marca / cliente">
-          <select
-            value={marcaSlug}
-            onChange={(e) => setMarcaSlug(e.target.value)}
-            style={inputStyle}
-          >
-            <option value="">— Distinto · Interno (default) —</option>
-            {marcas.map((m) => (
-              <option key={m.slug} value={m.slug}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>
-            ))}
-          </select>
+          <MarcaSelect marcas={marcas} value={marcaSlug} onChange={setMarcaSlug} />
         </Field>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
