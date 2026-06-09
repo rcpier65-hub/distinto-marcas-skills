@@ -51,7 +51,12 @@ function saludoSegunHora(): string {
   return 'Buenas noches'
 }
 
-export default async function InicioPage() {
+type SP = { welcome?: string }
+
+export default async function InicioPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams
+  const showWelcome = sp.welcome === '1'
+
   const user = await requireUser()
   const p = await getCurrentMemberPermisos()
 
@@ -362,6 +367,7 @@ export default async function InicioPage() {
       contexto: fraseDia.frase.contexto ?? null,
     },
     cockpitData,
+    showWelcome,
   }
 
   return <InicioView data={data} />

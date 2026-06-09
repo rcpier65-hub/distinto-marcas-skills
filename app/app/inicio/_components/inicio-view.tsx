@@ -24,6 +24,7 @@ import {
   convertirEnTarea,
 } from '../_actions'
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
+import { WelcomeAnimation } from './welcome-animation'
 
 export type InicioData = {
   nombre: string
@@ -98,6 +99,10 @@ export type InicioData = {
      alerta de coordinación, carrusel de comentarios y bloques de
      trabajo encima del bloque de pendientes/chat. */
   cockpitData: CockpitData | null
+  /* Si viene true, se muestra el overlay WelcomeAnimation que dura
+     ~6-7 seg con bienvenida personalizada por rol. Se setea cuando el
+     user acaba de hacer login (via ?welcome=1 en la URL). */
+  showWelcome?: boolean
 }
 
 /* Color por categoría — paleta consistente en toda la app */
@@ -301,6 +306,18 @@ export function InicioView({ data }: { data: InicioData }) {
         position: 'relative',
       }}
     >
+      {/* Overlay de bienvenida post-login. Se muestra ~6-7s con
+          presentación del rol y módulos. Se cierra solo o por click/esc.
+          Pedro: 'animación atractiva justo cuando hacen clic en iniciar
+          sesión... tour profesional destinado a creativos'. */}
+      {data.showWelcome && (
+        <WelcomeAnimation
+          nombre={data.nombre}
+          rolBase={data.rolBase}
+          acento={acento}
+        />
+      )}
+
       {/* Keyframes inline para no depender de framer-motion */}
       <style>{`
         @keyframes mk-letra-aparece {

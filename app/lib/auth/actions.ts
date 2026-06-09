@@ -34,9 +34,13 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
   }
 
   /* Redirigir al landing dinámico según permisos del usuario.
-     Admin → /cockpit; Editor → /editor; CM → /comentarios; etc. */
+     Agregamos ?welcome=1 para que la home dispare la animación de
+     bienvenida (intro al workspace según rol). El overlay se quita
+     solo después de mostrarse, así no aparece en cada navegación. */
   const { getLandingRoute } = await import('@/lib/team/permisos-helper')
-  redirect(await getLandingRoute())
+  const landing = await getLandingRoute()
+  const sep = landing.includes('?') ? '&' : '?'
+  redirect(`${landing}${sep}welcome=1`)
 }
 
 export async function sendMagicLink(formData: FormData): Promise<AuthActionResult> {
