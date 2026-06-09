@@ -127,9 +127,6 @@ function FormBody({
         >
           Tu cuenta de equipo
         </h2>
-        <p className="text-sm mt-2" style={{ color: '#737373' }}>
-          Solo email + contraseña. Sin Google ni magic link.
-        </p>
       </div>
 
       {/* Mensaje de éxito */}
@@ -189,14 +186,9 @@ function FormBody({
         <SubmitButton />
       </form>
 
-      {/* Footer */}
-      <div
-        className="mt-7 flex items-center justify-between text-xs"
-        style={{ color: '#a3a3a3' }}
-      >
-        <span aria-disabled className="cursor-not-allowed">
-          ¿Olvidaste tu contraseña?
-        </span>
+      {/* Footer — solo soporte. Pedro: borrar "¿Olvidaste tu contraseña?",
+          dejar únicamente el link a Soporte. */}
+      <div className="mt-7 flex items-center justify-center text-xs">
         <a
           href="mailto:pedro@agenciadistinto.com"
           className="transition-colors hover:underline"
