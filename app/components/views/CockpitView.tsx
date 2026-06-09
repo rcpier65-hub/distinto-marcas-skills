@@ -81,6 +81,9 @@ export type CockpitData = {
     marcaSlug: string
     marcaNombre: string
     marcaColor: string
+    /* Emoji de la marca (de marcas.emoji_marca). Sirve como logo en el
+       carrusel para que el header no muestre solo un dot. */
+    marcaEmoji: string | null
     autor: string
     texto: string
     hace: string
@@ -633,12 +636,13 @@ function AlertaCoordinacionGrabacion({ marcas }: { marcas: NonNullable<CockpitDa
    Pedro pidió esto en lugar del stack vertical porque ocupaba mucho
    espacio. */
 function CarruselComentarios({ comentarios }: { comentarios: NonNullable<CockpitData['comentariosVisibles']> }) {
-  const grupos = new Map<string, { marcaSlug: string; marcaNombre: string; marcaColor: string; items: typeof comentarios }>()
+  const grupos = new Map<string, { marcaSlug: string; marcaNombre: string; marcaColor: string; marcaEmoji: string | null; items: typeof comentarios }>()
   for (const c of comentarios) {
     const existing = grupos.get(c.marcaSlug) ?? {
       marcaSlug: c.marcaSlug,
       marcaNombre: c.marcaNombre,
       marcaColor: c.marcaColor,
+      marcaEmoji: c.marcaEmoji,
       items: [],
     }
     existing.items.push(c)
@@ -689,15 +693,33 @@ function CarruselComentarios({ comentarios }: { comentarios: NonNullable<Cockpit
             <div style={{
               padding: '12px 14px',
               borderBottom: '1px solid var(--mk-border-subtle)',
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'flex', alignItems: 'center', gap: 10,
               background: `linear-gradient(180deg, ${grupo.marcaColor}10, transparent)`,
             }}>
-              <span style={{
-                width: 10, height: 10, borderRadius: '50%',
-                background: grupo.marcaColor,
-                boxShadow: `0 0 8px ${grupo.marcaColor}66`,
-                flexShrink: 0,
-              }} />
+              {/* Logo de la marca: emoji_marca de BD en cuadro tinted.
+                  Fallback al dot si la marca no tiene emoji configurado. */}
+              {grupo.marcaEmoji ? (
+                <span style={{
+                  width: 32, height: 32,
+                  borderRadius: 9,
+                  background: `${grupo.marcaColor}18`,
+                  border: `1px solid ${grupo.marcaColor}33`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 17, lineHeight: 1,
+                  flexShrink: 0,
+                }}>
+                  {grupo.marcaEmoji}
+                </span>
+              ) : (
+                <span style={{
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: grupo.marcaColor,
+                  boxShadow: `0 0 8px ${grupo.marcaColor}66`,
+                  flexShrink: 0,
+                }} />
+              )}
               <span style={{
                 flex: 1,
                 fontSize: 14, fontWeight: 600,

@@ -92,7 +92,7 @@ export async function loadCockpitData(
       .select(`
         id, author_username, author_name, author_display_name, comment_text,
         comment_created_at, categoria_sugerida, network,
-        marca:marcas(slug, nombre, color_primario_hex)
+        marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
       `)
       .eq('status', 'pending')
       .order('comment_created_at', { ascending: false }),
@@ -202,6 +202,7 @@ export async function loadCockpitData(
         marcaSlug: (marcaArr?.slug ?? 'unknown') as string,
         marcaNombre: (marcaArr?.nombre ?? marcaArr?.slug ?? 'Marca') as string,
         marcaColor: (marcaArr?.color_primario_hex ?? '#737373') as string,
+        marcaEmoji: ((marcaArr?.emoji_marca ?? null) as string | null),
         autor: (c.author_display_name || c.author_username || c.author_name || 'Anónimo') as string,
         texto: (c.comment_text ?? '') as string,
         hace: hace(c.comment_created_at as string),
