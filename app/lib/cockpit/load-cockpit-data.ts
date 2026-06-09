@@ -10,6 +10,7 @@
 
 import type { CockpitData } from '@/components/views/CockpitView'
 import type { PermisosEfectivos } from '@/lib/team/permisos-helper'
+import { formatHora12 } from '@/lib/utils/format-hora'
 
 type AnyService = ReturnType<typeof import('@/lib/supabase/service').createServiceClient>
 
@@ -259,10 +260,10 @@ export async function loadCockpitData(
     const ymd = typeof rawFecha === 'string' ? rawFecha.slice(0, 10) : ''
     const f = new Date(ymd + 'T12:00:00')
     const marcaArr = Array.isArray(g.marca) ? g.marca[0] : g.marca
-    /* hora_planeada llega como 'HH:MM:SS'. Trimear a HH:MM. */
-    const horaStr = g.hora_planeada
-      ? String(g.hora_planeada).slice(0, 5)
-      : '—'
+    /* hora_planeada llega como 'HH:MM:SS'. Convertimos a 12h con AM/PM
+       (Pedro lo prefiere así para el equipo de campo). Si no hay hora,
+       mostramos '—' como antes. */
+    const horaStr = g.hora_planeada ? formatHora12(String(g.hora_planeada)) : '—'
     /* Si no hay notas, fallback a 'Grabación · MarcaNombre' para que
        no se vea 'Sin descripción' que era el comportamiento anterior. */
     const nombreMarca = (marcaArr?.nombre ?? marcaArr?.slug ?? 'Marca') as string

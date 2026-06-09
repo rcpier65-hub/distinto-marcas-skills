@@ -164,8 +164,16 @@ export function HabitosTracker({ habitos, today }: Props) {
     return s
   })
 
+  /* Pedro: 'NO dejar marcar vista diaria o semanal en el módulo de
+     hábitos, solo se puede marcar el día que estamos. Si pasa ese día
+     ya no se puede marcar, ni después ni antes.'
+     → Bloqueamos cualquier fecha distinta de HOY (ni futuros ni pasados). */
   function toggle(habitoId: string, fecha: string) {
-    if (fecha > today) return
+    if (fecha !== today) {
+      if (fecha > today) toast.error('No puedes marcar días futuros')
+      else toast.error('Solo puedes marcar el hábito el mismo día. Hoy ya pasó esa fecha.')
+      return
+    }
     const key = `${habitoId}|${fecha}`
     const was = done.has(key)
     setDone((prev) => { const n = new Set(prev); if (was) n.delete(key); else n.add(key); return n })

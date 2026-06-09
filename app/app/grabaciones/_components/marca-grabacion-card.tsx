@@ -12,6 +12,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { formatHora12, sufijoAmPm } from '@/lib/utils/format-hora'
 import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarcaLogo } from '@/components/marca-logo'
@@ -184,17 +185,23 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
         disabled={busy}
         className="h-7 px-1.5 rounded border border-input bg-background text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 flex-1 min-w-0"
       />
-      {/* Hora opcional. Empty value = sin hora. Placeholder discreto
-          en mismo size que la fecha. */}
+      {/* Hora opcional. Empty value = sin hora. Pedro pidió AM/PM —
+          mostramos sufijo al lado del input nativo (que en macOS muestra
+          24h). */}
       <input
         type="time"
         value={hora}
         onChange={(e) => setHora(e.target.value)}
         onBlur={saveFecha}
         disabled={busy}
-        title={hora ? `Hora: ${hora}` : 'Hora opcional — dejá vacío para solo día'}
+        title={hora ? `Hora: ${hora}` : 'Hora opcional — deja vacío para solo día'}
         className="h-7 px-1.5 rounded border border-input bg-background text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 w-[70px] shrink-0"
       />
+      {hora && (
+        <span className="text-[10px] font-semibold text-muted-foreground tabular-nums shrink-0" title={`${hora} = ${formatHora12(hora)}`}>
+          {sufijoAmPm(hora)}
+        </span>
+      )}
       {/* Chip estado clickeable — cicla planeada→cumplida→cancelada→planeada */}
       <button
         type="button"

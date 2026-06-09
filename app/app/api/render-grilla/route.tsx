@@ -96,10 +96,19 @@ type Publicacion = {
 export async function GET(request: Request) {
   const url = new URL(request.url)
 
-  // Auth Bearer
+  // Auth dual: aceptamos
+  //   1. Bearer ${CRON_SECRET} → llamadas server-to-server (cron, automatización)
+  //   2. Sesión Supabase válida → user logueado pulsando "Copiar imagen" en el browser
+  // Pedro reportó 401 al copiar imagen desde el workspace — antes solo había bearer.
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new NextResponse('Unauthorized', { status: 401 })
+  const hasBearer = authHeader === `Bearer ${process.env.CRON_SECRET}`
+  if (!hasBearer) {
+    /* Fallback a sesión Supabase */
+    const { getUser } = await import('@/lib/auth/get-user')
+    const user = await getUser()
+    if (!user) {
+      return new NextResponse('Unauthorized — necesitas estar logueado o un Bearer válido', { status: 401 })
+    }
   }
 
   const slug = url.searchParams.get('slug') ?? 'manrique'

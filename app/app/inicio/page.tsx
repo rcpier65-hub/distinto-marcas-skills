@@ -21,6 +21,7 @@ import { tieneAcceso, type ModuloPermiso } from '@/lib/team/types'
 import { InicioView, type InicioData } from './_components/inicio-view'
 import { getFraseDelDia } from '@/lib/inicio/get-frase-del-dia'
 import { loadCockpitData } from '@/lib/cockpit/load-cockpit-data'
+import { formatHora12 } from '@/lib/utils/format-hora'
 
 export const dynamic = 'force-dynamic'
 
@@ -276,8 +277,8 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       const cuando = esHoy
         ? 'Hoy'
         : fechaDate.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'short' })
-      /* Hora en HH:MM (la BD devuelve time as HH:MM:SS) */
-      const hora = (r.reunion_hora as string)?.slice(0, 5) ?? ''
+      /* Hora en 12h con AM/PM (Pedro lo prefiere así). */
+      const hora = formatHora12((r.reunion_hora as string) ?? '')
       return {
         id: r.id as string,
         titulo: (r.nombre ?? 'Reunión') as string,
@@ -286,6 +287,56 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
         cuando,
         hora,
         esHoy,
+      }
+    })
+  }
+
+  /* Grabaciones próximas — para roles que SÍ graban (editor, CM, SMM,
+     director, admin). Pedro: 'editor y Lorena deben ver aviso tienes
+     grabación el día X. Ailyn no porque ella no graba'. */
+  type GrabacionProxima = {
+    id: string
+    fechaCorta: string  // 'Mié 17 jun'
+    horaTexto: string   // '10:00 AM' o '—'
+    marca: string
+    marcaColor: string
+    marcaEmoji: string | null
+    esHoy: boolean
+    esManana: boolean
+  }
+  let grabacionesProximas: GrabacionProxima[] = []
+  const rolesQueGraban = ['editor', 'community_manager', 'social_media_manager', 'director']
+  const grabaAlgo = esCEO || rolesQueGraban.includes(memberData.rol_base)
+  if (grabaAlgo) {
+    const { data: grRaw } = await service
+      .from('grabaciones')
+      .select(`id, fecha_planeada, hora_planeada, estado, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)`)
+      .gte('fecha_planeada', hoy)
+      .neq('estado', 'completada')
+      .order('fecha_planeada', { ascending: true })
+      .order('hora_planeada', { ascending: true, nullsFirst: false })
+      .limit(4)
+    const diasSemanaCorto = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    const mesesCorto = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+    const hoyDate = new Date(hoy + 'T12:00:00')
+    const manana = new Date(hoyDate)
+    manana.setDate(manana.getDate() + 1)
+    const mananaStr = manana.toISOString().slice(0, 10)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    grabacionesProximas = ((grRaw ?? []) as any[]).map((g) => {
+      const m = Array.isArray(g.marca) ? g.marca[0] : g.marca
+      const rawFecha = g.fecha_planeada as string
+      const ymd = typeof rawFecha === 'string' ? rawFecha.slice(0, 10) : ''
+      const f = new Date(ymd + 'T12:00:00')
+      return {
+        id: g.id as string,
+        fechaCorta: `${diasSemanaCorto[f.getDay()]} ${f.getDate()} ${mesesCorto[f.getMonth()]}`,
+        horaTexto: g.hora_planeada ? formatHora12(String(g.hora_planeada)) : '—',
+        marca: (m?.nombre ?? m?.slug ?? 'Marca') as string,
+        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
+        marcaEmoji: (m?.emoji_marca ?? null) as string | null,
+        esHoy: ymd === hoy,
+        esManana: ymd === mananaStr,
       }
     })
   }
@@ -360,6 +411,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     habitosHoy,
     tareasMias,
     reuniones,
+    grabacionesProximas,
     pendientes,
     fraseDia: {
       texto: fraseDia.frase.texto,

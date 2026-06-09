@@ -231,7 +231,14 @@ export async function toggleHabitoFecha(
   const service = createServiceClient() as any
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Fecha inválida' }
-  if (fecha > todayStr()) return { ok: false, error: 'No puedes marcar días futuros' }
+  /* Pedro: 'no debe poder marcarse ni después ni antes' del día actual.
+     Bloqueamos también pasados aunque la prop original lo permitía.
+     Si en el futuro necesitamos editar histórico, hacer una action
+     separada con permiso admin (ej. para corregir un día que olvidó
+     marcar por estar enfermo). */
+  const hoy = todayStr()
+  if (fecha > hoy) return { ok: false, error: 'No puedes marcar días futuros' }
+  if (fecha < hoy) return { ok: false, error: 'Solo puedes marcar el hábito el mismo día' }
 
   /* Validar ownership */
   const own = await assertOwnership(service, user.id, habitoId)
