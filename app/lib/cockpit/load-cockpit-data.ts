@@ -128,12 +128,18 @@ export async function loadCockpitData(
       .from('habitos_completados')
       .select('habito_id')
       .eq('fecha', hoy),
+    /* Columnas REALES en tabla grabaciones: fecha_planeada, hora_planeada,
+       estado, notas, marca_id (NO 'fecha'/'hora'/'descripcion' como
+       creíamos). Filtramos por estado != 'completada' para no mostrar
+       grabaciones ya hechas. */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any)
       .from('grabaciones')
-      .select(`id, fecha, hora, descripcion, marca:marcas(slug, nombre, color_primario_hex)`)
-      .gte('fecha', hoy)
-      .order('fecha', { ascending: true })
+      .select(`id, fecha_planeada, hora_planeada, estado, notas, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)`)
+      .gte('fecha_planeada', hoy)
+      .neq('estado', 'completada')
+      .order('fecha_planeada', { ascending: true })
+      .order('hora_planeada', { ascending: true, nullsFirst: false })
       .limit(5),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).from('marcas').select('id, slug, nombre, color_primario_hex').eq('activa', true),
@@ -246,15 +252,30 @@ export async function loadCockpitData(
   const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
   const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
   const grabacionesProximas = grabaciones.map((g) => {
-    const f = new Date((g.fecha as string) + 'T00:00:00')
+    /* fecha_planeada llega como Date/timestamp ISO. Forzamos parse a
+       fecha LOCAL para evitar el bug típico de zona horaria que
+       desplaza un día. */
+    const rawFecha = g.fecha_planeada as string
+    const ymd = typeof rawFecha === 'string' ? rawFecha.slice(0, 10) : ''
+    const f = new Date(ymd + 'T12:00:00')
     const marcaArr = Array.isArray(g.marca) ? g.marca[0] : g.marca
+    /* hora_planeada llega como 'HH:MM:SS'. Trimear a HH:MM. */
+    const horaStr = g.hora_planeada
+      ? String(g.hora_planeada).slice(0, 5)
+      : '—'
+    /* Si no hay notas, fallback a 'Grabación · MarcaNombre' para que
+       no se vea 'Sin descripción' que era el comportamiento anterior. */
+    const nombreMarca = (marcaArr?.nombre ?? marcaArr?.slug ?? 'Marca') as string
+    const tipo = (g.notas as string | null) && (g.notas as string).trim().length > 0
+      ? (g.notas as string)
+      : `Grabación · ${nombreMarca}`
     return {
       fechaCorta: `${diasSemana[f.getDay()]} ${f.getDate()}`.toUpperCase(),
       fechaCompleta: `${f.getDate()} ${meses[f.getMonth()]}`,
-      hora: (g.hora ?? '—') as string,
-      tipo: (g.descripcion ?? 'Sin descripción') as string,
+      hora: horaStr,
+      tipo,
       marcaSlug: (marcaArr?.slug ?? 'unknown') as string,
-      marcaNombre: (marcaArr?.nombre ?? marcaArr?.slug ?? 'Marca') as string,
+      marcaNombre: nombreMarca,
       marcaColor: (marcaArr?.color_primario_hex ?? '#737373') as string,
     }
   })
