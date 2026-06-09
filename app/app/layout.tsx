@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter_Tight, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
+import { SwRegister } from '@/components/pwa/sw-register'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import './globals.css'
@@ -22,8 +23,43 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
+  /* Title/description los toma también el manifest (vía app/manifest.ts).
+     Aquí los duplicamos para SEO y para que SSR los inyecte en <head>. */
   title: 'Distinto',
   description: 'Sistema operativo de Agencia Distinto',
+  applicationName: 'Distinto',
+  /* PWA metadata para macOS/iOS Safari */
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Distinto',
+  },
+  /* Favicon + apple-touch-icon */
+  icons: {
+    icon: [
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  /* Format detection: evitamos que Safari/macOS subraye números como
+     teléfonos en los KPIs y métricas. */
+  formatDetection: {
+    telephone: false,
+  },
+}
+
+/* Viewport separado del metadata (Next 13+ lo prefiere así).
+   themeColor acá controla la barra de status del browser cuando la PWA
+   está instalada en standalone mode. */
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#ba41f7',
 }
 
 export default async function RootLayout({
@@ -80,6 +116,9 @@ export default async function RootLayout({
       <body className="min-h-full">
         <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo}>{children}</AppShell>
         <Toaster />
+        {/* SwRegister: instala /sw.js para hacer la app instalable
+            como PWA en macOS/iOS/Android con icono full color. */}
+        <SwRegister />
       </body>
     </html>
   )
