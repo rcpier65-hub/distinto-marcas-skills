@@ -39,6 +39,7 @@ export type MarcaKPI = {
   marca_emoji: string | null
   color_primario_hex: string | null
   objetivo: number      // grabaciones_objetivo_mensual de la marca
+  notas: string | null  // notas_grabaciones — texto libre editable inline
   planeadas: number     // count estado='planeada' en el rango
   cumplidas: number     // count estado='cumplida' en el rango
   canceladas: number    // count estado='cancelada' en el rango
@@ -122,20 +123,34 @@ export async function getGrabacionesKPIs(
   // Cargar todas las marcas activas (con grabaciones_objetivo_mensual o sin)
   // Tolerar columna no existente para pre-migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* SELECT con notas_grabaciones (columna nueva). Si la migration
+     aún no se aplicó (proyecto pausado, etc.), retrocedemos a un
+     SELECT sin esa columna — y `notas` queda como null en el KPI. */
   let marcas: any[] = []
   {
     const r1 = await service
       .from('marcas')
-      .select('id, slug, nombre, emoji_marca, color_primario_hex, grabaciones_objetivo_mensual')
+      .select('id, slug, nombre, emoji_marca, color_primario_hex, grabaciones_objetivo_mensual, notas_grabaciones')
       .eq('activa', true)
       .order('slug')
     if (r1.error && (r1.error.message ?? '').includes('does not exist')) {
+      // Fallback 1: sin notas_grabaciones
       const r2 = await service
         .from('marcas')
-        .select('id, slug, nombre, emoji_marca, color_primario_hex')
+        .select('id, slug, nombre, emoji_marca, color_primario_hex, grabaciones_objetivo_mensual')
         .eq('activa', true)
         .order('slug')
-      marcas = r2.data ?? []
+      if (r2.error && (r2.error.message ?? '').includes('does not exist')) {
+        // Fallback 2: sin grabaciones_objetivo_mensual tampoco
+        const r3 = await service
+          .from('marcas')
+          .select('id, slug, nombre, emoji_marca, color_primario_hex')
+          .eq('activa', true)
+          .order('slug')
+        marcas = r3.data ?? []
+      } else {
+        marcas = r2.data ?? []
+      }
     } else {
       marcas = r1.data ?? []
     }
@@ -166,6 +181,7 @@ export async function getGrabacionesKPIs(
       marca_emoji: m.emoji_marca,
       color_primario_hex: m.color_primario_hex,
       objetivo,
+      notas: (m.notas_grabaciones ?? null) as string | null,
       planeadas,
       cumplidas,
       canceladas,
@@ -344,6 +360,43 @@ export async function updateMarcaObjetivoMensual(
     .update({ grabaciones_objetivo_mensual: objetivo })
     .eq('slug', slug)
   if (error) return { ok: false, error: error.message }
+  revalidatePath('/grabaciones')
+  return { ok: true }
+}
+
+/**
+ * Actualiza las notas operativas de grabación de una marca (texto libre).
+ * Se guarda en marcas.notas_grabaciones (columna agregada en migración 024).
+ * Si la migración aún no se aplicó, retorna error legible.
+ */
+export async function updateMarcaNotasGrabaciones(
+  slug: string,
+  notas: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  /* Hard limit: 2000 chars. Suficiente para notas operativas y previene
+     payloads enormes accidentales. */
+  if (notas.length > 2000) {
+    return { ok: false, error: 'Las notas no pueden superar los 2000 caracteres' }
+  }
+
+  /* Empty string → null para limpieza visual en BD. */
+  const value = notas.trim().length === 0 ? null : notas
+
+  const { error } = await service
+    .from('marcas')
+    .update({ notas_grabaciones: value })
+    .eq('slug', slug)
+
+  if (error) {
+    if ((error.message ?? '').includes('does not exist')) {
+      return { ok: false, error: 'Migración 024 pendiente — pide a Pedro aplicarla en Supabase' }
+    }
+    return { ok: false, error: error.message }
+  }
   revalidatePath('/grabaciones')
   return { ok: true }
 }

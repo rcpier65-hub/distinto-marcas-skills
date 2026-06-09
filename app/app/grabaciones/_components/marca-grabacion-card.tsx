@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { ObjetivoInput } from './objetivo-input'
+import { NotasInput } from './notas-input'
 import {
   createGrabacion,
   updateGrabacionFecha,
@@ -113,6 +114,10 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
             Agregar fecha de grabación
           </button>
         </div>
+
+        {/* NOTAS — texto libre por marca. Pedro: "little joe tiene un
+            pendiente de confirmar con cristal y quiero anotarlo ahí". */}
+        <NotasInput slug={kpi.marca_slug} initial={kpi.notas} />
       </CardContent>
     </Card>
   )
