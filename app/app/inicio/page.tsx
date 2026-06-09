@@ -14,7 +14,6 @@
 //
 // Hábitos del día (los del user) siempre visibles en una columna lateral.
 
-import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
@@ -33,35 +32,41 @@ export default async function InicioPage() {
   const user = await requireUser()
   const p = await getCurrentMemberPermisos()
 
-  /* Si es admin/owner (sin team_member) → directo a /cockpit que tiene
-     todo el dashboard ejecutivo. /inicio es para miembros. */
-  if (!p) {
-    redirect('/cockpit')
-  }
+  /* Pedro pidió: admin (sin team_member) también debe tener su /inicio
+     bonito. Antes redirigíamos a /cockpit; ahora renderizamos /inicio
+     con datos del owner. /cockpit sigue accesible desde el sidebar. */
+  const esAdmin = !p
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const hoy = todayStr()
-  const primerNombre = p.member.nombre.split(/[\s\-]/)[0]
+
+  /* Datos del miembro: si es admin sintetizamos un perfil mínimo
+     usando el email/nombre del usuario de auth. */
+  const memberData = esAdmin ? {
+    id: null as string | null,
+    nombre: (user.user_metadata?.nombre as string | undefined) ?? user.email?.split('@')[0] ?? 'Pedro',
+    avatar_url: null as string | null,
+    cargo_personalizado: 'CEO · Distinto Agencia' as string | null,
+    rol_base: 'director' as string,  /* frases de director, ícono estrella */
+    fecha_cumpleanos: null as string | null,
+    rolNombre: 'Owner / Admin',
+  } : {
+    id: p!.member.id,
+    nombre: p!.member.nombre,
+    avatar_url: p!.member.avatar_url,
+    cargo_personalizado: p!.member.cargo_personalizado,
+    rol_base: p!.member.rol_base,
+    fecha_cumpleanos: p!.member.fecha_cumpleanos,
+    rolNombre: p!.rol.nombre,
+  }
+
+  const primerNombre = memberData.nombre.split(/[\s\-]/)[0]
   const nombreCapitalizado = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase()
 
-  /* Calcular qué módulos tiene accesibles (para las cards de acceso rápido) */
+  /* modulosAccesibles ya no se usa para renderizar (las cards las decide
+     el componente cliente por rol). Lo dejamos para no romper InicioData. */
   const modulosAccesibles: Array<{ key: string; label: string; href: string; color: string; icon: string }> = []
-  if (tieneAcceso(p.permisos, 'editor')) {
-    modulosAccesibles.push({ key: 'editor', label: 'Editor de video', href: '/editor', color: '#8b5cf6', icon: '✂️' })
-  }
-  if (tieneAcceso(p.permisos, 'diseno')) {
-    modulosAccesibles.push({ key: 'diseno', label: 'Diseño', href: '/diseno', color: '#ec4899', icon: '🎨' })
-  }
-  if (tieneAcceso(p.permisos, 'publicaciones')) {
-    modulosAccesibles.push({ key: 'publicaciones', label: 'Publicaciones', href: '/publicaciones', color: '#06b6d4', icon: '📅' })
-  }
-  if (tieneAcceso(p.permisos, 'comentarios') || tieneAcceso(p.permisos, 'inbox')) {
-    modulosAccesibles.push({ key: 'comentarios', label: 'Inbox / Comentarios', href: '/comentarios', color: '#22c55e', icon: '💬' })
-  }
-  if (tieneAcceso(p.permisos, 'grilla')) {
-    modulosAccesibles.push({ key: 'grilla', label: 'Grilla semanal', href: '/dashboard', color: '#7170ff', icon: '📊' })
-  }
 
   /* Hábitos del día (los del user actual) + historial de los últimos 7
      días para los círculos clickeables del tracker en la home.
@@ -71,12 +76,19 @@ export default async function InicioPage() {
   desde7.setDate(desde7.getDate() - 6)
   const desde7Str = desde7.toISOString().slice(0, 10)
 
-  const { data: habitos } = await service
+  /* Habitos del miembro o del admin (team_member_id NULL).
+     Para admin filtramos con .is() porque .eq(null) no funciona en pg. */
+  let habitosQuery = service
     .from('habitos')
     .select('id, nombre, icono, color, orden')
     .eq('activo', true)
-    .eq('team_member_id', p.member.id)
     .order('orden')
+  if (memberData.id) {
+    habitosQuery = habitosQuery.eq('team_member_id', memberData.id)
+  } else {
+    habitosQuery = habitosQuery.is('team_member_id', null)
+  }
+  const { data: habitos } = await habitosQuery
 
   const habitoIds = ((habitos ?? []) as Array<{ id: string }>).map((h) => h.id)
 
@@ -112,12 +124,36 @@ export default async function InicioPage() {
   /* Datos contextuales según el rol */
   let tareasMias: InicioData['tareasMias'] = []
 
-  if (tieneAcceso(p.permisos, 'editor')) {
+  if (esAdmin) {
+    /* Admin: mostrar las publicaciones más recientes pendientes de
+       cualquier estado activo (no archivado), para tener pulso del día. */
+    const { data } = await service
+      .from('publicaciones')
+      .select(`id, nombre, fecha_publicacion, estado, marca:marcas(slug, nombre, color_primario_hex)`)
+      .in('estado', ['tareas', 'idear', 'disenar', 'editar', 'aprobar', 'programar'])
+      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
+      .limit(3)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareasMias = ((data ?? []) as any[]).map((r) => {
+      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      return {
+        id: r.id as string,
+        nombre: (r.nombre ?? '—') as string,
+        marca: (m?.nombre ?? m?.slug ?? 'Marca') as string,
+        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
+        meta: r.fecha_publicacion
+          ? `${r.estado} · ${new Date(r.fecha_publicacion + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}`
+          : (r.estado as string),
+        marcadaHoy: false,
+        modulo: 'editor' as const, /* solo para tipear, el título no se usa */
+      }
+    })
+  } else if (tieneAcceso(p!.permisos, 'editor')) {
     /* Editor: videos asignados a su nombre con estado='editar' */
     const { data } = await service
       .from('publicaciones')
       .select(`id, nombre, fecha_publicacion, fecha_edicion, fecha_marcada_para_editar, editor_nombre, marca:marcas(slug, nombre, color_primario_hex)`)
-      .ilike('editor_nombre', p.member.nombre)
+      .ilike('editor_nombre', memberData.nombre)
       .eq('estado', 'editar')
       .order('fecha_publicacion', { ascending: true, nullsFirst: false })
       .limit(3)
@@ -136,7 +172,7 @@ export default async function InicioPage() {
         modulo: 'editor' as const,
       }
     })
-  } else if (tieneAcceso(p.permisos, 'diseno')) {
+  } else if (tieneAcceso(p!.permisos, 'diseno')) {
     /* Diseñadora: tareas en estado='disenar' */
     const { data } = await service
       .from('publicaciones')
@@ -160,7 +196,7 @@ export default async function InicioPage() {
         modulo: 'diseno' as const,
       }
     })
-  } else if (tieneAcceso(p.permisos, 'comentarios') || tieneAcceso(p.permisos, 'inbox')) {
+  } else if (tieneAcceso(p!.permisos, 'comentarios') || tieneAcceso(p!.permisos, 'inbox')) {
     /* Community Manager: comentarios pendientes */
     const { data } = await service
       .from('comentarios_inbox')
@@ -186,7 +222,7 @@ export default async function InicioPage() {
   /* Reuniones pendientes (publicaciones con reunion_hora seteada
      y fecha_publicacion futura o de hoy). */
   let reuniones: InicioData['reuniones'] = []
-  if (tieneAcceso(p.permisos, 'publicaciones') || tieneAcceso(p.permisos, 'editor') || tieneAcceso(p.permisos, 'diseno')) {
+  if (esAdmin || tieneAcceso(p!.permisos, 'publicaciones') || tieneAcceso(p!.permisos, 'editor') || tieneAcceso(p!.permisos, 'diseno')) {
     const { data: reuRaw } = await service
       .from('publicaciones')
       .select(`id, nombre, fecha_publicacion, reunion_hora, marca:marcas(slug, nombre, color_primario_hex)`)
@@ -219,25 +255,32 @@ export default async function InicioPage() {
 
   /* Cumple hoy? */
   let cumpleHoy = false
-  if (p.member.fecha_cumpleanos) {
-    const cumple = new Date(p.member.fecha_cumpleanos + 'T00:00:00')
+  if (memberData.fecha_cumpleanos) {
+    const cumple = new Date(memberData.fecha_cumpleanos + 'T00:00:00')
     const ahora = new Date()
     cumpleHoy = cumple.getMonth() === ahora.getMonth() && cumple.getDate() === ahora.getDate()
   }
 
   /* Frase del día según el rol. Primeros 60 días = secuencial,
-     después aleatoria determinista por (miembro, día). */
-  const fraseDia = getFraseDelDia(p.member.rol_base, p.member.id)
+     después aleatoria determinista por (miembro, día).
+     Para admin usamos el user.id como seed para que tenga su rotación. */
+  const seedId = memberData.id ?? user.id
+  const fraseDia = getFraseDelDia(memberData.rol_base, seedId)
 
-  /* Pendientes rápidos NO completados del miembro (chat-ChatGPT en home) */
-  const { data: pendientesRaw } = await service
+  /* Pendientes rápidos NO completados del miembro o del admin (team_member_id NULL) */
+  let pendientesQuery = service
     .from('pendientes_rapidos')
     .select('id, titulo, descripcion, categoria, prioridad, completado, created_at')
-    .eq('team_member_id', p.member.id)
     .eq('completado', false)
     .order('prioridad', { ascending: true })
     .order('created_at', { ascending: false })
     .limit(30)
+  if (memberData.id) {
+    pendientesQuery = pendientesQuery.eq('team_member_id', memberData.id)
+  } else {
+    pendientesQuery = pendientesQuery.is('team_member_id', null)
+  }
+  const { data: pendientesRaw } = await pendientesQuery
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pendientes = ((pendientesRaw ?? []) as any[]).map((row) => ({
     id: row.id as string,
@@ -251,10 +294,10 @@ export default async function InicioPage() {
 
   const data: InicioData = {
     nombre: nombreCapitalizado,
-    rol: p.rol.nombre,
-    rolBase: p.member.rol_base,
-    avatarUrl: p.member.avatar_url,
-    cargo: p.member.cargo_personalizado,
+    rol: memberData.rolNombre,
+    rolBase: memberData.rol_base,
+    avatarUrl: memberData.avatar_url,
+    cargo: memberData.cargo_personalizado,
     cumpleHoy,
     modulosAccesibles,
     habitosHoy,

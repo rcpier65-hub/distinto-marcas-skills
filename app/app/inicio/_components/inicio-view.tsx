@@ -1130,10 +1130,13 @@ function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }
         COMUNES.habitos,
       ]
     }
-    /* director / admin / default */
+    /* director / admin / default — Pedro como owner ve TODO,
+       elegimos los más usados día a día */
     return [
       { titulo: 'Cockpit ejecutivo', subtitulo: 'Métricas globales del día', href: '/cockpit', icon: '🎯', color: '#7170ff' },
-      { titulo: 'Mi equipo', subtitulo: 'Miembros, permisos, accesos', href: '/equipo', icon: '👥', color: '#22c55e' },
+      { titulo: 'Publicaciones', subtitulo: 'Grilla y estado de tareas', href: '/publicaciones', icon: '📅', color: '#06b6d4' },
+      { titulo: 'Finanzas', subtitulo: 'Ingresos, egresos y caja', href: '/finanzas', icon: '💰', color: '#22c55e' },
+      { titulo: 'Mi equipo', subtitulo: 'Miembros, permisos, accesos', href: '/equipo', icon: '👥', color: '#f59e0b' },
       COMUNES.habitos,
     ]
   }, [rolBase])
@@ -1224,18 +1227,27 @@ function HabitosTrackerHome({
   onToggleHoy: (id: string) => void
   onToggleFecha: (id: string, fecha: string) => void
 }) {
-  /* Últimos 7 días con hoy a la derecha */
+  /* Pedro pidió: mostrar HOY a la izquierda + los siguientes 6 días.
+     Solo HOY es clickeable. Días futuros son visibles para que el user
+     anticipe la semana, pero bloqueados.
+     Para marcar días anteriores → ir a /habitos (tracker completo). */
   const semana = useMemo(() => {
     const hoyDate = new Date(today + 'T12:00:00')
     const letras = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(hoyDate)
-      d.setDate(d.getDate() + i - 6)
+      d.setDate(d.getDate() + i)  /* HOY (i=0) y +6 días adelante */
       const y = d.getFullYear()
       const m = String(d.getMonth() + 1).padStart(2, '0')
       const day = String(d.getDate()).padStart(2, '0')
       const ymd = `${y}-${m}-${day}`
-      return { ymd, letra: letras[d.getDay()], num: d.getDate(), esHoy: ymd === today }
+      return {
+        ymd,
+        letra: letras[d.getDay()],
+        num: d.getDate(),
+        esHoy: ymd === today,
+        esFuturo: ymd > today,
+      }
     })
   }, [today])
 
@@ -1285,7 +1297,7 @@ function HabitosTrackerHome({
         margin: '0 0 12px',
         lineHeight: 1.4,
       }}>
-        Hoy no olvides marcarlos. Toca el día <strong style={{ color: VIOLETA_HABITOS }}>de hoy</strong> para registrarlo.
+        Marca el círculo <strong style={{ color: VIOLETA_HABITOS }}>de hoy</strong> apenas lo cumplas. Los días que vienen son tu vista a futuro.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1328,19 +1340,29 @@ function HabitosTrackerHome({
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'space-between' }}>
                 {semana.map((d) => {
                   const ok = h.historial.includes(d.ymd)
+                  /* Solo el día de HOY es clickeable. Días futuros
+                     visibles pero deshabilitados para que el user vea
+                     el plan de la semana sin poder marcar el futuro. */
+                  const clickable = d.esHoy
                   return (
                     <button
                       key={d.ymd}
-                      onClick={() => onToggleFecha(h.id, d.ymd)}
-                      title={d.ymd + (ok ? ' (cumplido)' : '')}
+                      onClick={() => clickable && onToggleFecha(h.id, d.ymd)}
+                      disabled={!clickable}
+                      title={
+                        clickable
+                          ? (ok ? 'Hoy — clic para desmarcar' : 'Hoy — clic para marcar')
+                          : `${d.ymd} (próximo, no se puede marcar todavía)`
+                      }
                       style={{
                         display: 'flex', flexDirection: 'column',
                         alignItems: 'center', gap: 3,
                         padding: 0,
                         background: 'transparent',
                         border: 'none',
-                        cursor: 'pointer',
+                        cursor: clickable ? 'pointer' : 'default',
                         fontFamily: 'inherit',
+                        opacity: d.esFuturo ? 0.55 : 1,
                       }}
                     >
                       <span style={{
@@ -1354,6 +1376,8 @@ function HabitosTrackerHome({
                           ? { background: VIOLETA_HABITOS, color: '#fff', boxShadow: `0 2px 6px ${VIOLETA_HABITOS}44` }
                           : d.esHoy
                           ? { border: `2px solid ${VIOLETA_HABITOS}`, background: `${VIOLETA_HABITOS}14`, color: VIOLETA_HABITOS }
+                          : d.esFuturo
+                          ? { border: '1.5px dashed #d1d5db', color: '#cbd5e1', background: '#fafafa' }
                           : { border: '1.5px solid #e4e4e7', color: '#a1a1aa' }
                         ),
                       }}>
