@@ -160,13 +160,15 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {puede('publicaciones') && (
             <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
           )}
-          {/* Editor es sub-item de Publicaciones (workflow: lista pubs → editar una) */}
+          {/* Editor: sub-item de Publicaciones SOLO si el user ve Publicaciones.
+              Si no (caso Pieer sin override de pubs), aparece como item principal. */}
           {puede('editor') && (
-            <NavItem href="/editor"        icon={<EditIcon />}     label="Editor"         active={isActive('/editor')}        indent />
+            <NavItem href="/editor"        icon={<EditIcon />}     label="Editor"         active={isActive('/editor')}        indent={puede('publicaciones')} />
           )}
-          {/* Diseño: gemelo del Editor, foco en piezas que Ailyn diseña */}
+          {/* Diseño: idem — si el user no ve Publicaciones (caso Ailyn),
+              Diseño aparece sin indent como módulo principal. */}
           {puede('diseno') && (
-            <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent />
+            <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent={puede('publicaciones')} />
           )}
           {/* Grabaciones: parte de publicaciones — mismo permiso */}
           {puede('publicaciones') && (
