@@ -1,11 +1,10 @@
-// Script de bootstrap del equipo para la reunión de inducción
-// Configura Pieer (Editor + grilla) y crea Ailyn (Diseñadora)
-import { createClient } from '@supabase/supabase-js'
+// Bootstrap Pieer + Ailyn para la reunión de inducción.
+// Crea cuentas en auth.users con bcrypt SQL nativo (pgcrypto), sin
+// depender del Supabase Auth SDK (las env vars de Vercel CLI vienen
+// vacías en pull con esta cuenta — bug conocido).
 import pg from 'pg'
 import { randomFillSync } from 'crypto'
 
-const SUPA_URL = process.env.SUPA_URL
-const SUPA_KEY = process.env.SUPA_KEY
 const APP_URL = 'https://distinto-app.vercel.app'
 
 function genPass() {
@@ -15,66 +14,62 @@ function genPass() {
   return Array.from(arr).map(b => chars[b % chars.length]).join('')
 }
 
-async function ensureAccount(supa, pgc, member, password, nombreUserMeta) {
-  let authId = member.auth_user_id
-  if (!authId) {
-    const r = await supa.auth.admin.createUser({
-      email: member.email,
-      password,
-      email_confirm: true,
-      user_metadata: { nombre: nombreUserMeta, team_member_id: member.id }
-    })
-    if (r.error) {
-      const { data: list } = await supa.auth.admin.listUsers()
-      const existing = list.users.find(u => u.email && u.email.toLowerCase() === member.email.toLowerCase())
-      if (existing) {
-        authId = existing.id
-        await supa.auth.admin.updateUserById(existing.id, { password })
-        console.log(`  ${member.email}: ya existía en Auth, password actualizada`)
-      } else {
-        throw new Error('Auth error: ' + r.error.message)
-      }
-    } else {
-      authId = r.data.user.id
-      console.log(`  ${member.email}: cuenta nueva creada (${authId})`)
-    }
-  } else {
-    await supa.auth.admin.updateUserById(authId, { password })
-    console.log(`  ${member.email}: password actualizada`)
-  }
-  return authId
-}
-
-const supa = createClient(SUPA_URL, SUPA_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false }
-})
-
-const pgc = new pg.Client({
+const c = new pg.Client({
   connectionString: 'postgresql://postgres.exhmimlehdisonjvedvx:NPdqIeqAujTFuv1D@aws-1-us-east-1.pooler.supabase.com:5432/postgres',
   ssl: { rejectUnauthorized: false }
 })
-await pgc.connect()
+await c.connect()
+
+async function ensureAuthUser(email, password) {
+  const ex = await c.query('SELECT id FROM auth.users WHERE LOWER(email) = LOWER($1) LIMIT 1', [email])
+  if (ex.rows[0]) {
+    await c.query(
+      `UPDATE auth.users
+       SET encrypted_password = crypt($1, gen_salt('bf')),
+           email_confirmed_at = COALESCE(email_confirmed_at, now()),
+           updated_at = now()
+       WHERE id = $2`,
+      [password, ex.rows[0].id]
+    )
+    return { id: ex.rows[0].id, existed: true }
+  }
+  const r = await c.query(
+    `INSERT INTO auth.users (
+       id, instance_id, aud, role, email, encrypted_password,
+       email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+       created_at, updated_at, is_sso_user, is_anonymous
+     ) VALUES (
+       gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+       'authenticated', 'authenticated',
+       $1, crypt($2, gen_salt('bf')),
+       now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+       now(), now(), false, false
+     ) RETURNING id`,
+    [email, password]
+  )
+  return { id: r.rows[0].id, existed: false }
+}
 
 // ===== PIEER (Editor + override grilla) =====
-console.log('=== PIEER (Editor) ===')
+console.log('=== PIEER (Editor + acceso a grilla) ===')
 const pieerPass = genPass()
-const { rows: pieerRows } = await pgc.query(
+const pieerQ = await c.query(
   "SELECT id, email, auth_user_id FROM team_members WHERE LOWER(nombre)='pieer' OR email='pieer@agenciadistinto.com' LIMIT 1"
 )
-if (!pieerRows[0]) throw new Error('Pieer no encontrado')
-const pieer = pieerRows[0]
+if (!pieerQ.rows[0]) { console.error('Pieer no existe en team_members'); process.exit(1) }
+const pieer = pieerQ.rows[0]
+const pieerAuth = await ensureAuthUser(pieer.email, pieerPass)
+console.log(`  auth.users.id: ${pieerAuth.id} (${pieerAuth.existed ? 'existía, password actualizada' : 'creado nuevo'})`)
 
-const pieerAuthId = await ensureAccount(supa, pgc, pieer, pieerPass, 'PIEER')
-
-await pgc.query(
+await c.query(
   `UPDATE team_members
    SET auth_user_id = $1,
        password_inicial = $2,
        permisos_override = jsonb_build_object('grilla', jsonb_build_object('acceso', true))
    WHERE id = $3`,
-  [pieerAuthId, pieerPass, pieer.id]
+  [pieerAuth.id, pieerPass, pieer.id]
 )
-console.log('  override de grilla aplicado + password_inicial guardada')
+console.log('  team_members: auth_user_id + password_inicial + override de grilla aplicado')
 
 // ===== AILYN (Diseñadora) =====
 console.log('')
@@ -82,41 +77,42 @@ console.log('=== AILYN (Diseñadora) ===')
 const ailynEmail = 'ailyn@agenciadistinto.com'
 const ailynPass = genPass()
 
-const { rows: ailynRows } = await pgc.query(
-  'SELECT id, email, auth_user_id FROM team_members WHERE email = $1',
+const aex = await c.query(
+  'SELECT id, email, auth_user_id FROM team_members WHERE LOWER(email) = LOWER($1) LIMIT 1',
   [ailynEmail]
 )
-
-let ailyn
-if (ailynRows[0]) {
-  ailyn = ailynRows[0]
-  console.log(`  miembro ya existía: ${ailyn.id}`)
+let ailynMember
+if (aex.rows[0]) {
+  ailynMember = aex.rows[0]
+  console.log(`  team_member ya existía: ${ailynMember.id}`)
 } else {
-  const ins = await pgc.query(
+  const r = await c.query(
     `INSERT INTO team_members (nombre, email, rol_base, cargo_personalizado, marcas_acceso, activo, permisos_override)
      VALUES ('Ailyn', $1, 'disenador', 'Diseñadora', null, true, '{}'::jsonb)
-     RETURNING id, email, auth_user_id`,
+     RETURNING id, email`,
     [ailynEmail]
   )
-  ailyn = ins.rows[0]
-  console.log(`  team_member nueva creada: ${ailyn.id}`)
+  ailynMember = r.rows[0]
+  console.log(`  team_member nueva creada: ${ailynMember.id}`)
 }
 
-const ailynAuthId = await ensureAccount(supa, pgc, ailyn, ailynPass, 'Ailyn')
+const ailynAuth = await ensureAuthUser(ailynEmail, ailynPass)
+console.log(`  auth.users.id: ${ailynAuth.id} (${ailynAuth.existed ? 'existía, password actualizada' : 'creado nuevo'})`)
 
-await pgc.query(
+await c.query(
   'UPDATE team_members SET auth_user_id = $1, password_inicial = $2 WHERE id = $3',
-  [ailynAuthId, ailynPass, ailyn.id]
+  [ailynAuth.id, ailynPass, ailynMember.id]
 )
-console.log('  password_inicial guardada (rol disenador, sin overrides)')
+console.log('  team_members: auth_user_id + password_inicial guardado (rol disenador, sin overrides)')
 
 // ===== Mensajes para WhatsApp =====
+const sep = '═'.repeat(64)
 console.log('')
-console.log('==================================================================')
-console.log(' MENSAJES LISTOS PARA WHATSAPP')
-console.log('==================================================================')
+console.log(sep)
+console.log(' MENSAJES LISTOS — COPIA Y PEGA EN WHATSAPP')
+console.log(sep)
 console.log('')
-console.log('────────  PIEER  ────────')
+console.log('───── PIEER ─────')
 console.log('')
 console.log('¡Hola Pieer! 👋')
 console.log('')
@@ -136,7 +132,7 @@ console.log('Cuando entres puedes cambiarla por una tuya. Cualquier cosa, escrí
 console.log('')
 console.log('— Pedro')
 console.log('')
-console.log('────────  AILYN  ────────')
+console.log('───── AILYN ─────')
 console.log('')
 console.log('¡Hola Ailyn! 👋')
 console.log('')
@@ -157,4 +153,4 @@ console.log('')
 console.log('— Pedro')
 console.log('')
 
-await pgc.end()
+await c.end()

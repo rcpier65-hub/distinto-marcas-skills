@@ -53,6 +53,14 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
   const totalCanceladas = kpis.reduce((s, k) => s + k.canceladas, 0)
   const cumplimientoGlobal = totalObjetivo > 0 ? Math.round((totalCumplidas / totalObjetivo) * 100) : 0
 
+  /* Marcas que hacen grabaciones = las que tienen objetivo mensual > 0
+     (Pedro les definió una política de grabaciones). Las que tienen
+     objetivo 0 son marcas activas pero que NO graban este mes.
+     El denominador es el total de marcas activas en BD — así se ve
+     "5 de 9 marcas activas hacen grabaciones" en un vistazo. */
+  const marcasConGrabaciones = kpis.filter((k) => k.objetivo > 0).length
+  const marcasActivasTotal = kpis.length
+
   // Mes activo en formato YYYY-MM (para defaultear nuevas fechas en las cards).
   // Deriva de `desde` o del mes actual.
   const mesDefault = (desde ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
@@ -117,7 +125,22 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
       {/* RESUMEN GLOBAL */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            {/* Marcas con grabaciones — primer KPI porque es el panorama
+                de la operación ("cuántas marcas mantengo activas con
+                política de grabaciones este mes"). Pedro lo pidió
+                explícito: "quiero saber cuántas marcas tengo activas
+                que se hagan grabaciones". */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Marcas activas</p>
+              <p className="text-3xl font-bold text-[#ba41f7]">
+                {marcasConGrabaciones}
+                <span className="text-base font-normal text-muted-foreground">
+                  {' / '}{marcasActivasTotal}
+                </span>
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">con grabaciones</p>
+            </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Objetivo del mes</p>
               <p className="text-3xl font-bold">{totalObjetivo}</p>
