@@ -4,9 +4,9 @@
 // Estilo dark mode similar al screenshot que mandó Pedro.
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { toggleHabitoHoy, archivarHabito } from '../_actions'
+import { toggleHabitoHoy, archivarHabito, eliminarHabito } from '../_actions'
 import { HabitoHeatmap } from './heatmap'
 
 type Props = {
@@ -27,6 +27,20 @@ type Props = {
 export function HabitoCard(props: Props) {
   const [completado, setCompletado] = useState(props.completado_hoy)
   const [isPending, startTransition] = useTransition()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  /* Cerrar el menú al hacer click fuera */
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menuOpen])
 
   function handleToggle() {
     startTransition(async () => {
@@ -41,10 +55,25 @@ export function HabitoCard(props: Props) {
   }
 
   function handleArchive() {
-    if (!confirm(`¿Archivar "${props.nombre}"?\n\nLa historia se conserva. Podés reactivarlo desde Settings.`)) return
+    setMenuOpen(false)
+    if (!confirm(`¿Archivar "${props.nombre}"?\n\nLa historia se conserva. Puedes reactivarlo desde Settings.`)) return
     startTransition(async () => {
       const result = await archivarHabito(props.id)
       if (result.ok) toast.success(`📦 ${props.nombre} archivado`)
+      else toast.error(`Error: ${result.error}`)
+    })
+  }
+
+  function handleDelete() {
+    setMenuOpen(false)
+    if (!confirm(
+      `¿Eliminar "${props.nombre}" definitivamente?\n\n` +
+      `Esto borra el hábito Y todo su historial de completados. ` +
+      `NO se puede recuperar. Si solo quieres pausarlo, mejor archívalo.`
+    )) return
+    startTransition(async () => {
+      const result = await eliminarHabito(props.id)
+      if (result.ok) toast.success(`🗑️ ${props.nombre} eliminado`)
       else toast.error(`Error: ${result.error}`)
     })
   }
@@ -57,14 +86,44 @@ export function HabitoCard(props: Props) {
           <span className="text-2xl shrink-0">{props.icono}</span>
           <h3 className="font-semibold text-slate-100 truncate">{props.nombre}</h3>
         </div>
-        <button
-          onClick={handleArchive}
-          disabled={isPending}
-          className="text-slate-500 hover:text-slate-300 text-xs h-6 w-6 rounded hover:bg-slate-800 disabled:opacity-50"
-          title="Archivar hábito"
-        >
-          ⋯
-        </button>
+        <div ref={menuRef} className="relative">
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            disabled={isPending}
+            className="text-slate-500 hover:text-slate-300 text-xs h-6 w-6 rounded hover:bg-slate-800 disabled:opacity-50"
+            title="Opciones"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            ⋯
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 z-20 min-w-[180px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl overflow-hidden"
+            >
+              <button
+                role="menuitem"
+                onClick={handleArchive}
+                className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 flex items-center gap-2"
+              >
+                <span>📦</span>
+                <span className="flex-1">Archivar</span>
+                <span className="text-xs text-slate-500">conserva historial</span>
+              </button>
+              <div className="border-t border-slate-800" />
+              <button
+                role="menuitem"
+                onClick={handleDelete}
+                className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-red-950/40 flex items-center gap-2"
+              >
+                <span>🗑️</span>
+                <span className="flex-1">Eliminar</span>
+                <span className="text-xs text-red-400/70">borra todo</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* BOTÓN ¡HECHO! */}

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { Permisos, RolPredefinidoId } from '@/lib/team/types'
+import { getHabitosParaRol } from '@/lib/team/habitos-por-rol'
 
 type ActionResult<T = void> =
   T extends void
@@ -104,7 +105,29 @@ export async function crearMiembro(args: {
     return { ok: false, error: error?.message ?? 'No se pudo crear' }
   }
 
+  /* Clonar hábitos default específicos del rol al miembro recién creado.
+     Cada rol tiene su set propio (diseñadora ve hábitos de diseño,
+     editor ve hábitos de edición, etc.). Si esto falla, NO bloqueamos
+     la creación — el miembro puede crear sus hábitos manualmente. */
+  const habitosTemplate = getHabitosParaRol(args.rol_base)
+  if (habitosTemplate.length > 0) {
+    const habitosInsert = habitosTemplate.map((h) => ({
+      nombre: h.nombre,
+      icono: h.icono,
+      color: h.color,
+      dias_activos: h.dias_activos,
+      orden: h.orden,
+      activo: true,
+      team_member_id: data.id,
+    }))
+    const { error: errHab } = await service.from('habitos').insert(habitosInsert)
+    if (errHab) {
+      console.error(`[crearMiembro] No se pudieron clonar hábitos de "${args.rol_base}":`, errHab.message)
+    }
+  }
+
   revalidatePath('/equipo')
+  revalidatePath('/habitos')
   return { ok: true, id: data.id }
 }
 

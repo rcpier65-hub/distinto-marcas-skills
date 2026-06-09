@@ -338,6 +338,39 @@ export async function archivarHabito(id: string): Promise<{ ok: true } | { ok: f
 }
 
 /**
+ * Hard-delete: borra el hábito Y todo su historial de completados.
+ * Pedro pidió permitir eliminar definitivamente (no solo archivar).
+ *
+ * Diferencia con archivarHabito:
+ *   - archivar: marca activo=false (recuperable, mantiene historial)
+ *   - eliminar: DELETE completo (no recuperable)
+ *
+ * Orden de borrado:
+ *   1. habitos_completados (FK → habitos.id) — sino el DELETE falla
+ *   2. habitos (la fila en sí)
+ */
+export async function eliminarHabito(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  /* Validar ownership igual que en archivar */
+  const own = await assertOwnership(service, user.id, id)
+  if (!own.ok) return own
+
+  /* 1. Borrar el historial de completados (FK constraint) */
+  const compRes = await service.from('habitos_completados').delete().eq('habito_id', id)
+  if (compRes.error) return { ok: false, error: compRes.error.message }
+
+  /* 2. Borrar el hábito */
+  const { error } = await service.from('habitos').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/habitos')
+  return { ok: true }
+}
+
+/**
  * Editar hábito (nombre/icono/color/dias_activos).
  */
 export async function updateHabito(
