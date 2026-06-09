@@ -20,6 +20,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { tieneAcceso } from '@/lib/team/types'
 import { InicioView, type InicioData } from './_components/inicio-view'
+import { getFraseDelDia } from '@/lib/inicio/get-frase-del-dia'
 
 export const dynamic = 'force-dynamic'
 
@@ -168,15 +169,27 @@ export default async function InicioPage() {
     cumpleHoy = cumple.getMonth() === ahora.getMonth() && cumple.getDate() === ahora.getDate()
   }
 
+  /* Frase del día según el rol. Primeros 60 días = secuencial,
+     después aleatoria determinista por (miembro, día). */
+  const fraseDia = getFraseDelDia(p.member.rol_base, p.member.id)
+
   const data: InicioData = {
     nombre: nombreCapitalizado,
     rol: p.rol.nombre,
+    rolBase: p.member.rol_base,
     avatarUrl: p.member.avatar_url,
     cargo: p.member.cargo_personalizado,
     cumpleHoy,
     modulosAccesibles,
     habitosHoy,
     tareasMias,
+    fraseDia: {
+      texto: fraseDia.frase.texto,
+      autor: fraseDia.frase.autor,
+      contexto: fraseDia.frase.contexto ?? null,
+      numero: fraseDia.numero,
+      total: fraseDia.total,
+    },
   }
 
   return <InicioView data={data} />

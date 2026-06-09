@@ -15,6 +15,8 @@ import { toggleHabitoHoy } from '@/app/habitos/_actions'
 export type InicioData = {
   nombre: string
   rol: string
+  /* rol_base de BD para elegir el ícono animado del rol */
+  rolBase: string
   avatarUrl: string | null
   cargo: string | null
   cumpleHoy: boolean
@@ -41,6 +43,108 @@ export type InicioData = {
     marcadaHoy: boolean
     modulo: 'editor' | 'diseno' | 'comentarios'
   }>
+  /* Frase del día según rol. Primeros 60 días secuenciales,
+     después aleatoria determinista por miembro + día. */
+  fraseDia: {
+    texto: string
+    autor: string
+    contexto: string | null
+    numero: number
+    total: number
+  }
+}
+
+/* Pincel SVG animado para diseñadores: ondea suavemente como si
+   estuviera pintando. Para editor: claqueta animada. Para CM: globo
+   de chat con pulse. Cada rol tiene su accesorio visual. */
+function IconoDelRol({ rolBase }: { rolBase: string }) {
+  const baseStyle: React.CSSProperties = {
+    display: 'inline-block',
+    width: 42, height: 42,
+    animation: 'mk-icono-rol 3s ease-in-out infinite',
+    transformOrigin: 'bottom left',
+  }
+  if (rolBase === 'disenador') {
+    /* Pincel con cerdas + mancha de pintura */
+    return (
+      <span style={baseStyle} aria-hidden>
+        <svg viewBox="0 0 64 64" width="42" height="42">
+          {/* Mancha de pintura */}
+          <ellipse cx="46" cy="50" rx="10" ry="4" fill="#ec4899" opacity="0.25" />
+          <ellipse cx="48" cy="49" rx="6" ry="2.5" fill="#ec4899" opacity="0.5" />
+          {/* Mango */}
+          <rect x="8" y="8" width="6" height="36" rx="2" transform="rotate(-30 11 26)" fill="#8b5cf6" />
+          {/* Virola metálica */}
+          <rect x="6" y="30" width="10" height="5" rx="1" transform="rotate(-30 11 32)" fill="#a78bfa" />
+          {/* Cerdas */}
+          <path d="M 4 36 Q 10 42 16 38 L 18 46 Q 12 50 6 44 Z" fill="#ec4899" />
+          <path d="M 6 38 L 8 44 M 9 39 L 11 45 M 12 40 L 14 46" stroke="#fff" strokeWidth="0.5" opacity="0.5" />
+        </svg>
+      </span>
+    )
+  }
+  if (rolBase === 'editor') {
+    /* Claqueta de cine */
+    return (
+      <span style={baseStyle} aria-hidden>
+        <svg viewBox="0 0 64 64" width="42" height="42">
+          <rect x="6" y="22" width="52" height="34" rx="3" fill="#1f2937" />
+          <rect x="6" y="14" width="52" height="12" rx="2" fill="#111827" transform="rotate(-8 32 20)" />
+          {/* Tiras blancas */}
+          <rect x="9" y="14" width="6" height="12" fill="#fff" transform="rotate(-8 12 20)" />
+          <rect x="19" y="14" width="6" height="12" fill="#fff" transform="rotate(-8 22 20)" />
+          <rect x="29" y="14" width="6" height="12" fill="#fff" transform="rotate(-8 32 20)" />
+          <rect x="39" y="14" width="6" height="12" fill="#fff" transform="rotate(-8 42 20)" />
+          <rect x="49" y="14" width="6" height="12" fill="#fff" transform="rotate(-8 52 20)" />
+          {/* Texto REC simulado */}
+          <circle cx="22" cy="42" r="4" fill="#ef4444" />
+          <text x="30" y="46" fill="#fff" fontSize="9" fontFamily="monospace" fontWeight="600">REC</text>
+        </svg>
+      </span>
+    )
+  }
+  if (rolBase === 'community_manager' || rolBase === 'social_media_manager') {
+    /* Globo de chat con corazón */
+    return (
+      <span style={baseStyle} aria-hidden>
+        <svg viewBox="0 0 64 64" width="42" height="42">
+          <path d="M 8 16 Q 8 8 16 8 L 48 8 Q 56 8 56 16 L 56 36 Q 56 44 48 44 L 24 44 L 14 52 L 16 44 Q 8 44 8 36 Z" fill="#22c55e" />
+          <path d="M 28 22 Q 24 18 20 22 Q 16 28 32 38 Q 48 28 44 22 Q 40 18 36 22 Z" fill="#fff" />
+        </svg>
+      </span>
+    )
+  }
+  /* Default — estrella */
+  return (
+    <span style={baseStyle} aria-hidden>
+      <svg viewBox="0 0 64 64" width="42" height="42">
+        <path d="M 32 6 L 38 24 L 58 24 L 42 36 L 48 56 L 32 44 L 16 56 L 22 36 L 6 24 L 26 24 Z" fill="#f59e0b" />
+      </svg>
+    </span>
+  )
+}
+
+/* Nombre con animación letra por letra (stagger fade-in + slide). */
+function NombreAnimado({ nombre, color }: { nombre: string; color: string }) {
+  return (
+    <span style={{ display: 'inline-flex' }}>
+      {Array.from(nombre).map((ch, i) => (
+        <span
+          key={i}
+          style={{
+            display: 'inline-block',
+            opacity: 0,
+            transform: 'translateY(8px)',
+            animation: `mk-letra-aparece 0.6s cubic-bezier(.22,1,.36,1) forwards`,
+            animationDelay: `${i * 60 + 200}ms`,
+            color,
+          }}
+        >
+          {ch === ' ' ? ' ' : ch}
+        </span>
+      ))}
+    </span>
+  )
 }
 
 export function InicioView({ data }: { data: InicioData }) {
@@ -79,26 +183,64 @@ export function InicioView({ data }: { data: InicioData }) {
     data.tareasMias[0]?.modulo === 'comentarios' ? 'Comentarios por responder' :
     'Tu trabajo de hoy'
 
+  /* Color de acento según rol — coordina con el ícono animado */
+  const acento =
+    data.rolBase === 'disenador' ? '#ec4899' :
+    data.rolBase === 'editor' ? '#8b5cf6' :
+    data.rolBase === 'community_manager' ? '#22c55e' :
+    '#7170ff'
+
   return (
     <main
       style={{
         minHeight: '100vh',
         padding: '40px 32px',
         background: '#fafafa',
+        position: 'relative',
       }}
     >
+      {/* Keyframes inline para no depender de framer-motion */}
+      <style>{`
+        @keyframes mk-letra-aparece {
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes mk-icono-rol {
+          0%, 100% { transform: rotate(-6deg) translateY(0); }
+          50%      { transform: rotate(6deg)  translateY(-4px); }
+        }
+        @keyframes mk-fade-up {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes mk-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .mk-frase-aparece {
+          opacity: 0;
+          animation: mk-fade-up 0.8s 0.6s cubic-bezier(.22,1,.36,1) forwards;
+        }
+        .mk-quote-mark {
+          font-family: Georgia, serif;
+          font-size: 64px;
+          line-height: 1;
+          color: var(--mk-quote-color);
+          opacity: 0.15;
+        }
+      `}</style>
+
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* Header con saludo */}
-        <header style={{ marginBottom: 32, display: 'flex', alignItems: 'center', gap: 18 }}>
+        <header style={{ marginBottom: 28, display: 'flex', alignItems: 'center', gap: 18 }}>
           <span
             style={{
               width: 64, height: 64, borderRadius: '50%',
-              background: data.avatarUrl ? `url(${data.avatarUrl}) center/cover` : '#7170ff',
+              background: data.avatarUrl ? `url(${data.avatarUrl}) center/cover` : acento,
               color: '#fff',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 22, fontWeight: 600,
               flexShrink: 0,
-              boxShadow: '0 0 0 4px #fff, 0 4px 16px rgba(16, 24, 40, 0.10)',
+              boxShadow: `0 0 0 4px #fff, 0 4px 16px ${acento}33`,
             }}
           >
             {!data.avatarUrl && data.nombre.charAt(0).toUpperCase()}
@@ -106,14 +248,20 @@ export function InicioView({ data }: { data: InicioData }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1
               style={{
-                fontSize: 28, fontWeight: 600,
+                fontSize: 30, fontWeight: 600,
                 color: '#111827',
                 letterSpacing: '-0.02em',
                 margin: 0,
                 lineHeight: 1.2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
               }}
             >
-              {saludo}, {data.nombre} 👋
+              <span>{saludo},</span>
+              <NombreAnimado nombre={data.nombre} color={acento} />
+              <IconoDelRol rolBase={data.rolBase} />
             </h1>
             <p
               style={{
@@ -124,7 +272,7 @@ export function InicioView({ data }: { data: InicioData }) {
               }}
             >
               {bienvenida} a tu espacio de trabajo en{' '}
-              <strong style={{ color: '#7170ff' }}>Distinto Agencia</strong>. Tu rol:{' '}
+              <strong style={{ color: acento }}>Distinto Agencia</strong>. Tu rol:{' '}
               <strong style={{ color: '#111827' }}>{data.cargo || data.rol}</strong>.
             </p>
             {data.cumpleHoy && (
@@ -142,6 +290,98 @@ export function InicioView({ data }: { data: InicioData }) {
             )}
           </div>
         </header>
+
+        {/* Frase del día — banner con cita elegante.
+            Color sutil acorde al rol, animada con fade-up retardado para
+            que entre después del nombre. Esquina superior izq. con comilla
+            grande tipo libro. */}
+        <section
+          className="mk-frase-aparece"
+          style={{
+            marginBottom: 28,
+            padding: '22px 28px 22px 32px',
+            background: `linear-gradient(135deg, ${acento}08 0%, ${acento}03 100%)`,
+            border: `1px solid ${acento}22`,
+            borderRadius: 16,
+            position: 'relative',
+            overflow: 'hidden',
+            ['--mk-quote-color' as string]: acento,
+          } as React.CSSProperties}
+        >
+          {/* Quote mark decorativa */}
+          <span
+            className="mk-quote-mark"
+            style={{
+              position: 'absolute',
+              top: -10,
+              left: 12,
+              pointerEvents: 'none',
+            }}
+          >
+            “
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  fontSize: 17,
+                  lineHeight: 1.5,
+                  fontWeight: 500,
+                  color: '#1f2937',
+                  margin: 0,
+                  fontStyle: 'italic',
+                  letterSpacing: '-0.005em',
+                }}
+              >
+                {data.fraseDia.texto}
+              </p>
+              <div
+                style={{
+                  marginTop: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    width: 22, height: 1.5, background: acento, opacity: 0.6,
+                    display: 'inline-block',
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 13.5, fontWeight: 600,
+                    color: acento,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  {data.fraseDia.autor}
+                </span>
+                {data.fraseDia.contexto && (
+                  <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                    · {data.fraseDia.contexto}
+                  </span>
+                )}
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                color: '#9ca3af',
+                whiteSpace: 'nowrap',
+                fontWeight: 500,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+              title={`Día ${data.fraseDia.numero} de ${data.fraseDia.total} en tu biblioteca`}
+            >
+              Frase del día · {data.fraseDia.numero}/{data.fraseDia.total}
+            </span>
+          </div>
+        </section>
 
         {/* Grid principal: 2/3 contenido + 1/3 sidebar de hábitos */}
         <div
