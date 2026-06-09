@@ -23,7 +23,9 @@ export type GrabacionWithMarca = {
   marca_nombre: string
   marca_emoji: string | null
   fecha_planeada: string
+  hora_planeada: string | null   // HH:MM o HH:MM:SS — opcional
   fecha_real: string | null
+  hora_real: string | null
   estado: GrabacionEstado
   videos_grabados: number | null
   notas: string | null
@@ -69,7 +71,7 @@ export async function listGrabaciones(
 
   const { data, error } = await service
     .from('grabaciones')
-    .select('id, marca_id, fecha_planeada, fecha_real, estado, videos_grabados, notas, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
+    .select('id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
     .gte('fecha_planeada', d)
     .lte('fecha_planeada', h)
     .order('fecha_planeada', { ascending: false })
@@ -90,7 +92,9 @@ export async function listGrabaciones(
     marca_nombre: r.marcas?.nombre ?? '?',
     marca_emoji: r.marcas?.emoji_marca ?? null,
     fecha_planeada: r.fecha_planeada,
+    hora_planeada: r.hora_planeada ?? null,
     fecha_real: r.fecha_real,
+    hora_real: r.hora_real ?? null,
     estado: r.estado as GrabacionEstado,
     videos_grabados: r.videos_grabados,
     notas: r.notas,
@@ -303,12 +307,17 @@ export async function deleteGrabacion(id: string): Promise<{ ok: true } | { ok: 
 }
 
 /**
- * Cambiar la fecha planeada de una grabación existente.
- * Usado por el editor inline de fechas en cada card de marca.
+ * Cambiar la fecha planeada (y opcionalmente la hora) de una grabación
+ * existente. Usado por el editor inline en cada card de marca.
+ *
+ * - fecha_planeada: YYYY-MM-DD (requerido)
+ * - hora_planeada:  HH:MM o HH:MM:SS (opcional). null/undefined = sin hora
+ *   específica (solo día).
  */
 export async function updateGrabacionFecha(
   id: string,
   fecha_planeada: string,
+  hora_planeada?: string | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -316,9 +325,19 @@ export async function updateGrabacionFecha(
 
   if (!fecha_planeada) return { ok: false, error: 'Fecha requerida' }
 
+  /* Normalize: empty string → null para que BD limpie correctamente */
+  const horaNormalizada =
+    hora_planeada === undefined ? undefined :
+    hora_planeada === null || hora_planeada.trim() === '' ? null :
+    hora_planeada
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: any = { fecha_planeada }
+  if (horaNormalizada !== undefined) patch.hora_planeada = horaNormalizada
+
   const { error } = await service
     .from('grabaciones')
-    .update({ fecha_planeada })
+    .update(patch)
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
 

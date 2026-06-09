@@ -123,19 +123,34 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   )
 }
 
-/* Fila de una fecha individual: fecha editable + chip estado + acciones. */
+/* Fila de una fecha individual: fecha + hora opcional editables + chip
+   estado + acciones. La hora se guarda en hora_planeada (time) y es
+   opcional — si Pedro deja vacío el input, la grabación queda como
+   "día sin hora específica". */
 function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disabled: boolean }) {
   const [isPending, startTransition] = useTransition()
   const [fecha, setFecha] = useState(grabacion.fecha_planeada)
+  /* hora_planeada viene de BD como "HH:MM:SS"; el input type=time
+     funciona con HH:MM (acepta también HH:MM:SS pero recorta segs). */
+  const [hora, setHora] = useState((grabacion.hora_planeada ?? '').slice(0, 5))
   const cfg = ESTADO_CFG[grabacion.estado] ?? ESTADO_CFG.planeada
   const busy = disabled || isPending
 
+  const fechaInicial = grabacion.fecha_planeada
+  const horaInicial = (grabacion.hora_planeada ?? '').slice(0, 5)
+
   function saveFecha() {
-    if (fecha === grabacion.fecha_planeada) return
+    if (fecha === fechaInicial && hora === horaInicial) return
     startTransition(async () => {
-      const r = await updateGrabacionFecha(grabacion.id, fecha)
-      if (r.ok) toast.success('Fecha actualizada')
-      else { setFecha(grabacion.fecha_planeada); toast.error(r.error) }
+      /* Mando hora aunque no haya cambiado, para que el server action
+         persista ambos campos en el mismo update. Empty string → null. */
+      const r = await updateGrabacionFecha(grabacion.id, fecha, hora || null)
+      if (r.ok) toast.success(hora ? 'Fecha y hora actualizadas' : 'Fecha actualizada')
+      else {
+        setFecha(fechaInicial)
+        setHora(horaInicial)
+        toast.error(r.error)
+      }
     })
   }
 
@@ -167,6 +182,17 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
         onBlur={saveFecha}
         disabled={busy}
         className="h-7 px-1.5 rounded border border-input bg-background text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 flex-1 min-w-0"
+      />
+      {/* Hora opcional. Empty value = sin hora. Placeholder discreto
+          en mismo size que la fecha. */}
+      <input
+        type="time"
+        value={hora}
+        onChange={(e) => setHora(e.target.value)}
+        onBlur={saveFecha}
+        disabled={busy}
+        title={hora ? `Hora: ${hora}` : 'Hora opcional — dejá vacío para solo día'}
+        className="h-7 px-1.5 rounded border border-input bg-background text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 w-[70px] shrink-0"
       />
       {/* Chip estado clickeable — cicla planeada→cumplida→cancelada→planeada */}
       <button
