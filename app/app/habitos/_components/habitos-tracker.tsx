@@ -6,10 +6,10 @@
 // Marcado optimista (cambia al instante, revierte si el server falla).
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Check } from 'lucide-react'
-import { toggleHabitoFecha } from '../_actions'
+import { Check, MoreVertical, Archive, Trash2 } from 'lucide-react'
+import { toggleHabitoFecha, archivarHabito, eliminarHabito } from '../_actions'
 
 const VIOLETA = '#ba41f7'
 
@@ -66,6 +66,89 @@ function DonutMetrica({ pct, cumplidos, noCumplidos }: { pct: number; cumplidos:
           <span className="tabular-nums"><strong>{noCumplidos}</strong> <span className="text-muted-foreground text-xs">{100 - pct}%</span></span>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Menú "⋯" por hábito con dos acciones:
+ *   📦 Archivar  → marca activo=false, conserva historial
+ *   🗑️ Eliminar  → DELETE completo del hábito + completados (irreversible)
+ *
+ * Pedro pidió poder eliminar. Diferenciamos Archivar (recuperable) de
+ * Eliminar (definitivo) con colores distintos para que no se confundan.
+ */
+function HabitoMenu({ habitoId, nombre }: { habitoId: string; nombre: string }) {
+  const [open, setOpen] = useState(false)
+  const [, startTransition] = useTransition()
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOut(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOut)
+    return () => document.removeEventListener('mousedown', onClickOut)
+  }, [open])
+
+  function handleArchivar() {
+    setOpen(false)
+    if (!confirm(`¿Archivar "${nombre}"?\n\nEl hábito se oculta de la vista pero conserva su historial. Puedes reactivarlo después desde Settings.`)) return
+    startTransition(async () => {
+      const r = await archivarHabito(habitoId)
+      if (r.ok) toast.success(`📦 ${nombre} archivado`)
+      else toast.error(r.error)
+    })
+  }
+
+  function handleEliminar() {
+    setOpen(false)
+    if (!confirm(`¿Eliminar "${nombre}" definitivamente?\n\nEsto borra el hábito Y todo su historial de días cumplidos. NO se puede recuperar. Si solo quieres pausarlo, mejor archívalo.`)) return
+    startTransition(async () => {
+      const r = await eliminarHabito(habitoId)
+      if (r.ok) toast.success(`🗑️ ${nombre} eliminado`)
+      else toast.error(r.error)
+    })
+  }
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="h-7 w-7 rounded-md inline-flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        title="Opciones"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 z-20 min-w-[200px] rounded-lg border border-border bg-card shadow-lg overflow-hidden"
+        >
+          <button
+            role="menuitem"
+            onClick={handleArchivar}
+            className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2"
+          >
+            <Archive className="w-4 h-4 text-muted-foreground" />
+            <span className="flex-1">Archivar</span>
+            <span className="text-[10px] text-muted-foreground">conserva historial</span>
+          </button>
+          <div className="border-t border-border" />
+          <button
+            role="menuitem"
+            onClick={handleEliminar}
+            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span className="flex-1">Eliminar</span>
+            <span className="text-[10px] text-red-500/80">borra todo</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -151,10 +234,12 @@ export function HabitosTracker({ habitos, today }: Props) {
         const cumplidosSemana = semana.filter((d) => done.has(`${h.id}|${d.ymd}`)).length
         return (
           <div key={h.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4 flex-wrap">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{h.icono}</span>
                 <h3 className="font-semibold text-base truncate">{h.nombre}</h3>
+                {/* Menú archivar/eliminar */}
+                <HabitoMenu habitoId={h.id} nombre={h.nombre} />
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 ml-9">{cumplidosSemana}/7 esta semana</p>
             </div>
@@ -197,10 +282,13 @@ export function HabitosTracker({ habitos, today }: Props) {
         const pct = pasados > 0 ? Math.round((cumplidosMes / pasados) * 100) : 0
         return (
           <div key={h.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            {/* Título a todo el ancho */}
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{h.icono}</span>
-              <h3 className="font-semibold text-base truncate">{h.nombre}</h3>
+            {/* Título + menú archivar/eliminar a la derecha */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-2xl">{h.icono}</span>
+                <h3 className="font-semibold text-base truncate">{h.nombre}</h3>
+              </div>
+              <HabitoMenu habitoId={h.id} nombre={h.nombre} />
             </div>
             <p className="text-xs text-muted-foreground mt-0.5 ml-9">
               {cumplidosMes} días este mes · <span style={{ color: VIOLETA }}>{pct}%</span>
