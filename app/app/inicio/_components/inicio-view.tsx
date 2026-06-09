@@ -10,6 +10,12 @@
 import { useState, useTransition, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import {
+  Palette, Flame, User, Scissors, Calendar, MessageCircle,
+  Target, Users, DollarSign, Zap, Sparkles, CalendarClock,
+  ClipboardList, Image as LucideImage, FolderOpen, Megaphone,
+  Search, Save, BarChart3, Lightbulb, Smile, type LucideIcon,
+} from 'lucide-react'
 import { toggleHabitoHoy, toggleHabitoFecha } from '@/app/habitos/_actions'
 import {
   crearPendienteRapido,
@@ -575,9 +581,18 @@ function TrabajoYReuniones({
                   }}>
                     {t.nombre}
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2 }}>
-                    {t.marca} · {t.meta}
-                    {t.marcadaHoy && ' · 🔥 Hoy'}
+                  <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span>{t.marca} · {t.meta}</span>
+                    {t.marcadaHoy && (
+                      <span style={{
+                        fontSize: 9.5, fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: '#fef2f2',
+                        color: '#dc2626',
+                        letterSpacing: '0.04em',
+                      }}>HOY</span>
+                    )}
                   </div>
                 </div>
                 <span style={{ color: '#d1d5db' }}>→</span>
@@ -594,7 +609,7 @@ function TrabajoYReuniones({
             label="Reuniones pendientes"
             count={reuniones.length}
             countColor={acento}
-            icon="📅"
+            IconComp={CalendarClock}
           />
           <div style={cardStyle}>
             {reuniones.map((r, i) => (
@@ -623,9 +638,19 @@ function TrabajoYReuniones({
                   }}>
                     {r.titulo}
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2, textTransform: 'capitalize' }}>
-                    {r.marca} · {r.cuando}{r.hora && ` · ${r.hora}`}
-                    {r.esHoy && ' · 🔥'}
+                  <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2, textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span>{r.marca} · {r.cuando}{r.hora && ` · ${r.hora}`}</span>
+                    {r.esHoy && (
+                      <span style={{
+                        fontSize: 9.5, fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: '#fef2f2',
+                        color: '#dc2626',
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                      }}>Hoy</span>
+                    )}
                   </div>
                 </div>
                 <span style={{ color: '#d1d5db' }}>→</span>
@@ -646,11 +671,11 @@ const cardStyle: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
 }
 
-function SectionTitle({ label, count, countColor, icon }: {
+function SectionTitle({ label, count, countColor, IconComp }: {
   label: string
   count: number
   countColor: string
-  icon?: string
+  IconComp?: LucideIcon
 }) {
   return (
     <h2 style={{
@@ -660,10 +685,18 @@ function SectionTitle({ label, count, countColor, icon }: {
       color: '#9ca3af',
       margin: '0 0 10px',
       display: 'flex',
-      alignItems: 'baseline',
+      alignItems: 'center',
       gap: 6,
     }}>
-      {icon && <span style={{ fontSize: 14 }}>{icon}</span>}
+      {IconComp && (
+        <span style={{
+          color: countColor,
+          display: 'inline-flex',
+          alignItems: 'center',
+        }}>
+          <IconComp size={14} strokeWidth={2} />
+        </span>
+      )}
       <span>{label}</span>
       <span style={{ color: '#d1d5db', fontWeight: 500 }}>·</span>
       <span style={{ color: countColor, fontWeight: 700 }}>{count}</span>
@@ -826,7 +859,7 @@ function PendientesPanel({
             label="Tareas rápidas"
             count={totalActivos}
             countColor={acento}
-            icon="✨"
+            IconComp={Sparkles}
           />
           <div style={{ ...cardStyle, padding: '8px 6px' }}>
             {grupos.map(([categoria, pendientes]) => {
@@ -1104,49 +1137,50 @@ function PendienteItem({
    color del rol como acento. 2-3 cards máximo para no saturar.
    ==================================================================== */
 function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }) {
-  const accesos = useMemo(() => {
+  const accesos = useMemo<Array<{ titulo: string; subtitulo: string; href: string; Icon: LucideIcon; color?: string }>>(() => {
     const COMUNES = {
-      perfil: { titulo: 'Mi perfil', subtitulo: 'Foto, datos, contraseña', href: '/perfil', icon: '👤' },
-      habitos: { titulo: 'Mis hábitos', subtitulo: 'Heatmap completo y rutinas', href: '/habitos', icon: '🔥' },
+      perfil: { titulo: 'Mi perfil', subtitulo: 'Foto, datos, contraseña', href: '/perfil', Icon: User },
+      habitos: { titulo: 'Mis hábitos', subtitulo: 'Heatmap completo y rutinas', href: '/habitos', Icon: Flame },
     }
     if (rolBase === 'disenador') {
       return [
-        { titulo: 'Mis diseños para hoy', subtitulo: 'Tareas pendientes en diseño', href: '/diseno', icon: '🎨', color: '#ec4899' },
+        { titulo: 'Mis diseños para hoy', subtitulo: 'Tareas pendientes en diseño', href: '/diseno', Icon: Palette, color: '#ec4899' },
         COMUNES.habitos,
         COMUNES.perfil,
       ]
     }
     if (rolBase === 'editor') {
       return [
-        { titulo: 'Editar hoy', subtitulo: 'Videos asignados a ti', href: '/editor', icon: '✂️', color: '#8b5cf6' },
-        { titulo: 'Publicaciones semanales', subtitulo: 'Toda la grilla de la semana', href: '/publicaciones', icon: '📅', color: '#06b6d4' },
+        { titulo: 'Editar hoy', subtitulo: 'Videos asignados a ti', href: '/editor', Icon: Scissors, color: '#8b5cf6' },
+        { titulo: 'Publicaciones semanales', subtitulo: 'Toda la grilla de la semana', href: '/publicaciones', Icon: Calendar, color: '#06b6d4' },
         COMUNES.habitos,
       ]
     }
     if (rolBase === 'community_manager' || rolBase === 'social_media_manager') {
       return [
-        { titulo: 'Atender comentarios', subtitulo: 'Inbox y respuestas pendientes', href: '/comentarios', icon: '💬', color: '#22c55e' },
-        { titulo: 'Publicaciones de la semana', subtitulo: 'Qué sale, cuándo y dónde', href: '/publicaciones', icon: '📅', color: '#06b6d4' },
+        { titulo: 'Atender comentarios', subtitulo: 'Inbox y respuestas pendientes', href: '/comentarios', Icon: MessageCircle, color: '#22c55e' },
+        { titulo: 'Publicaciones de la semana', subtitulo: 'Qué sale, cuándo y dónde', href: '/publicaciones', Icon: Calendar, color: '#06b6d4' },
         COMUNES.habitos,
       ]
     }
     /* director / admin / default — Pedro como owner ve TODO,
        elegimos los más usados día a día */
     return [
-      { titulo: 'Cockpit ejecutivo', subtitulo: 'Métricas globales del día', href: '/cockpit', icon: '🎯', color: '#7170ff' },
-      { titulo: 'Publicaciones', subtitulo: 'Grilla y estado de tareas', href: '/publicaciones', icon: '📅', color: '#06b6d4' },
-      { titulo: 'Finanzas', subtitulo: 'Ingresos, egresos y caja', href: '/finanzas', icon: '💰', color: '#22c55e' },
-      { titulo: 'Mi equipo', subtitulo: 'Miembros, permisos, accesos', href: '/equipo', icon: '👥', color: '#f59e0b' },
+      { titulo: 'Cockpit ejecutivo', subtitulo: 'Métricas globales del día', href: '/cockpit', Icon: Target, color: '#7170ff' },
+      { titulo: 'Publicaciones', subtitulo: 'Grilla y estado de tareas', href: '/publicaciones', Icon: Calendar, color: '#06b6d4' },
+      { titulo: 'Finanzas', subtitulo: 'Ingresos, egresos y caja', href: '/finanzas', Icon: DollarSign, color: '#22c55e' },
+      { titulo: 'Mi equipo', subtitulo: 'Miembros, permisos, accesos', href: '/equipo', Icon: Users, color: '#f59e0b' },
       COMUNES.habitos,
     ]
   }, [rolBase])
 
   return (
     <section>
-      <SectionTitle label="Accesos rápidos" count={accesos.length} countColor={acento} icon="⚡" />
+      <SectionTitle label="Accesos rápidos" count={accesos.length} countColor={acento} IconComp={Zap} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
         {accesos.map((a) => {
-          const accColor = ('color' in a ? a.color : acento) as string
+          const accColor = a.color ?? acento
+          const Icon = a.Icon
           return (
             <a
               key={a.href}
@@ -1182,7 +1216,19 @@ function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }
                 background: `radial-gradient(circle at top right, ${accColor}22, transparent 70%)`,
                 pointerEvents: 'none',
               }} />
-              <span style={{ fontSize: 22, lineHeight: 1 }}>{a.icon}</span>
+              {/* Ícono lucide en cuadro tinted con el color del acceso */}
+              <span style={{
+                width: 36, height: 36,
+                borderRadius: 10,
+                background: `${accColor}12`,
+                color: accColor,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 2,
+              }}>
+                <Icon size={18} strokeWidth={1.8} />
+              </span>
               <span style={{
                 fontSize: 13.5, fontWeight: 600,
                 color: '#111827',
@@ -1213,6 +1259,45 @@ function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }
    pero pensado para una columna angosta (≈360px).
    ==================================================================== */
 const VIOLETA_HABITOS = '#ba41f7'
+
+/* Mapeo de emoji (como están guardados en BD) → ícono lucide.
+   Los hábitos default por rol usan estos emojis. Para hábitos custom
+   con emojis no mapeados, caemos al emoji original (sigue funcionando). */
+const ICONO_HABITO_POR_EMOJI: Record<string, LucideIcon> = {
+  '🎨': Palette,
+  '🖼️': LucideImage,
+  '🖼': LucideImage,
+  '📁': FolderOpen,
+  '📢': Megaphone,
+  '💬': MessageCircle,
+  '📈': BarChart3,
+  '📊': BarChart3,
+  '📸': LucideImage,
+  '📋': ClipboardList,
+  '✂️': Scissors,
+  '✂': Scissors,
+  '💾': Save,
+  '📅': Calendar,
+  '🎯': Target,
+  '💰': DollarSign,
+  '🤝': Users,
+  '🧠': Lightbulb,
+  '✅': Smile,
+  '🔥': Flame,
+}
+
+function IconoHabito({ emoji, color, size = 18 }: { emoji: string; color: string; size?: number }) {
+  const LucideIco = ICONO_HABITO_POR_EMOJI[emoji]
+  if (LucideIco) {
+    return (
+      <span style={{ color, display: 'inline-flex' }}>
+        <LucideIco size={size} strokeWidth={1.8} />
+      </span>
+    )
+  }
+  /* Fallback emoji (hábito custom con emoji no mapeado) */
+  return <span style={{ fontSize: size, lineHeight: 1 }}>{emoji}</span>
+}
 
 function HabitosTrackerHome({
   habitos,
@@ -1255,7 +1340,9 @@ function HabitosTrackerHome({
     return (
       <section>
         <h2 style={tituloHabitosStyle}>
-          <span>🔥</span>
+          <span style={{ color: VIOLETA_HABITOS, display: 'inline-flex' }}>
+            <Flame size={14} strokeWidth={2} />
+          </span>
           <span>Tus hábitos del día</span>
         </h2>
         <div style={{
@@ -1277,7 +1364,9 @@ function HabitosTrackerHome({
   return (
     <section>
       <h2 style={tituloHabitosStyle}>
-        <span>🔥</span>
+        <span style={{ color: VIOLETA_HABITOS, display: 'inline-flex' }}>
+          <Flame size={14} strokeWidth={2} />
+        </span>
         <span style={{ flex: 1 }}>Tus hábitos del día</span>
         <span style={{
           fontSize: 11,
@@ -1317,10 +1406,21 @@ function HabitosTrackerHome({
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
+                gap: 10,
                 marginBottom: 10,
               }}>
-                <span style={{ fontSize: 18, lineHeight: 1 }}>{h.icono}</span>
+                {/* Cuadro con icono lucide tinted del color del hábito */}
+                <span style={{
+                  width: 30, height: 30,
+                  borderRadius: 8,
+                  background: `${h.color}14`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <IconoHabito emoji={h.icono} color={h.color} size={16} />
+                </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontSize: 13, fontWeight: 600,
