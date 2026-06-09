@@ -1,0 +1,27 @@
+{
+  "name": "@distinto/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server para que Claude (Desktop/Code) hable directo con el sistema Distinto Agencia.",
+  "type": "module",
+  "bin": {
+    "distinto-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
