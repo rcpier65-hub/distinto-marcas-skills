@@ -21,6 +21,8 @@ export type PermisosSimple = {
   marcasAcceso: string[] | null
   nombre: string
   rol: string
+  /* rolBase ('director' = CEO con team_member, tratado como admin) */
+  rolBase?: string
   email: string
   avatarUrl: string | null
 } | null

@@ -17,6 +17,8 @@ type PermisosSimple = {
   marcasAcceso: string[] | null
   nombre: string
   rol: string
+  /* rolBase ('director' tratado como admin para filtros) */
+  rolBase?: string
   email: string
   avatarUrl: string | null
 } | null
@@ -90,6 +92,8 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }:
        requiereModulo === 'xxx'      → visible solo si tieneAcceso(xxx) */
   const visibles = useMemo(() => {
     if (!permisos) return actions  /* admin/owner ve todo */
+    /* CEO (director) también ve todo — caso Pedro como team_member */
+    if (permisos.rolBase === 'director') return actions
     return actions.filter((a) => {
       if (a.requiereModulo === undefined) return true
       if (a.requiereModulo === null) return false

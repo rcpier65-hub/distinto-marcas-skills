@@ -16,6 +16,8 @@ type PermisosSimple = {
   marcasAcceso: string[] | null
   nombre: string
   rol: string
+  /* rolBase ('director' tratado como admin) */
+  rolBase?: string
   email: string
   avatarUrl: string | null
 } | null
@@ -35,6 +37,12 @@ type Props = {
 const STORAGE_KEY = 'mk:sidebar:sections'
 
 export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailActivo }: Props) {
+  /* esCEO = sin team_member (admin original) o team_member con rol
+     director (caso pedro@agenciadistinto.com). Para items que antes
+     eran 'solo admin sin team_member' (!permisos), ahora también
+     los ve el director. */
+  const esCEO = !permisos || permisos.rolBase === 'director'
+
   /* Helper para mostrar/ocultar items según permisos. Si no hay
      permisos (= admin/owner), retorna true para todo. */
   const puede = (modulo: ModuloPermiso): boolean => {
@@ -185,8 +193,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
             open={openSections.marcas}
             onToggle={() => setOpenSections((s) => ({ ...s, marcas: !s.marcas }))}
           >
-            {/* "Ver todas": solo si tiene acceso a dashboard global */}
-            {!permisos && (
+            {/* "Ver todas": admin/CEO */}
+            {esCEO && (
               <NavItem
                 href="/dashboard"
                 icon={
@@ -211,8 +219,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
                 badge={m.pendientes > 0 ? m.pendientes : undefined}
               />
             ))}
-            {/* "Agregar marca": solo admin */}
-            {!permisos && (
+            {/* "Agregar marca": admin/CEO */}
+            {esCEO && (
               <NavItem
                 href="/dashboard?nueva=1"
                 icon={
@@ -241,8 +249,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {/* Hábitos: cada user tiene los suyos (clonados al crear el
               team_member). Pedro pidió que aparezca para todos. */}
           <NavItem href="/habitos" icon={<CheckIcon />} label="Hábitos" active={isActive('/habitos')} />
-          {/* Historial: solo admin/owner por ahora */}
-          {!permisos && (
+          {/* Historial: admin/CEO (incluye Pedro como director) */}
+          {esCEO && (
             <NavItem href="/historial" icon={<NoteIcon />} label="Historial" active={isActive('/historial')} />
           )}
           {puede('equipo') && (

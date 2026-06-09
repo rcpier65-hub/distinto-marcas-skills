@@ -98,6 +98,10 @@ export default async function RootLayout({
         marcasAcceso: permisos.marcasAcceso,
         nombre: permisos.member.nombre,
         rol: permisos.rol.nombre,
+        /* rolBase de BD ('director' | 'editor' | etc.). Sidebar y
+           CommandPalette lo usan para tratar 'director' como vista
+           admin-equivalente (Pedro como CEO con team_member). */
+        rolBase: permisos.member.rol_base,
         email: emailActivo ?? permisos.member.email,
         avatarUrl: permisos.member.avatar_url,
       }

@@ -57,8 +57,13 @@ export default async function InicioPage() {
 
   /* Pedro pidió: admin (sin team_member) también debe tener su /inicio
      bonito. Antes redirigíamos a /cockpit; ahora renderizamos /inicio
-     con datos del owner. /cockpit sigue accesible desde el sidebar. */
+     con datos del owner. /cockpit sigue accesible desde el sidebar.
+     Además: pedro@agenciadistinto.com es team_member con rol_base
+     'director' pero debe verse EXACTAMENTE como la cuenta admin
+     (porque es el CEO). Tratamos rol director como vista "admin-like"
+     para que vea TODAS las publicaciones, no solo las asignadas. */
   const esAdmin = !p
+  const esCEO = esAdmin || (p?.member.rol_base === 'director')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -81,7 +86,9 @@ export default async function InicioPage() {
     cargo_personalizado: p!.member.cargo_personalizado,
     rol_base: p!.member.rol_base,
     fecha_cumpleanos: p!.member.fecha_cumpleanos,
-    rolNombre: p!.rol.nombre,
+    /* Si es director, mostramos 'Owner / Admin' como rolNombre para
+       que la UI lo trate igual que al admin sin team_member. */
+    rolNombre: p!.member.rol_base === 'director' ? 'Owner / Admin' : p!.rol.nombre,
   }
 
   const primerNombre = memberData.nombre.split(/[\s\-]/)[0]
@@ -147,9 +154,11 @@ export default async function InicioPage() {
   /* Datos contextuales según el rol */
   let tareasMias: InicioData['tareasMias'] = []
 
-  if (esAdmin) {
-    /* Admin: mostrar las publicaciones más recientes pendientes de
-       cualquier estado activo (no archivado), para tener pulso del día. */
+  if (esCEO) {
+    /* Admin/CEO: mostrar las publicaciones más recientes pendientes de
+       cualquier estado activo (no archivado), para tener pulso del día.
+       Aplica para Pedro como owner sin team_member Y también para
+       pedro@agenciadistinto.com con rol director. */
     const { data } = await service
       .from('publicaciones')
       .select(`id, nombre, fecha_publicacion, estado, marca:marcas(slug, nombre, color_primario_hex)`)
@@ -245,7 +254,7 @@ export default async function InicioPage() {
   /* Reuniones pendientes (publicaciones con reunion_hora seteada
      y fecha_publicacion futura o de hoy). */
   let reuniones: InicioData['reuniones'] = []
-  if (esAdmin || tieneAcceso(p!.permisos, 'publicaciones') || tieneAcceso(p!.permisos, 'editor') || tieneAcceso(p!.permisos, 'diseno')) {
+  if (esCEO || tieneAcceso(p!.permisos, 'publicaciones') || tieneAcceso(p!.permisos, 'editor') || tieneAcceso(p!.permisos, 'diseno')) {
     const { data: reuRaw } = await service
       .from('publicaciones')
       .select(`id, nombre, fecha_publicacion, reunion_hora, marca:marcas(slug, nombre, color_primario_hex)`)
@@ -319,8 +328,8 @@ export default async function InicioPage() {
      Solo lo cargamos si el user tiene permiso 'metricas' (admin/director/CM
      con permiso explícito). Si NO tiene, el bloque cockpit no aparece y
      la home queda en versión simple. */
-  const verCockpit = esAdmin || (p && tieneAcceso(p.permisos, 'metricas' as ModuloPermiso))
-  const puedeVerFinanzas = esAdmin || (p && tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso)) || false
+  const verCockpit = esCEO || (p && tieneAcceso(p.permisos, 'metricas' as ModuloPermiso))
+  const puedeVerFinanzas = esCEO || (p && tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso)) || false
 
   const cockpitData = verCockpit
     ? await loadCockpitData(service, {
