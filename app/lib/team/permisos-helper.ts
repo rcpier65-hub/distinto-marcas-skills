@@ -123,29 +123,20 @@ export async function requirePermisoModulo(
 }
 
 /**
- * Determina la ruta de "landing" para el usuario actual según sus
- * permisos. Si es admin/owner → /cockpit. Si tiene acceso a editor →
- * /editor. Y así. Usado por las route guards y por /login después de
- * iniciar sesión correctamente.
+ * Determina la ruta de "landing" para el usuario actual.
+ *
+ * Pedro pidió que CADA miembro tenga su dashboard personalizado de
+ * bienvenida. Decisión: TODOS los miembros van a /inicio (saludo + cards
+ * de acceso rápido + hábitos + sus tareas pendientes). Solo Pedro como
+ * admin/owner sigue yendo directo a /cockpit (que es el dashboard
+ * ejecutivo con métricas globales).
+ *
+ * Si un miembro pierde todos sus permisos, /inicio igual lo recibe con
+ * el saludo y mensaje de "todavía no tienes módulos asignados".
  */
 export async function getLandingRoute(): Promise<string> {
   const p = await getCurrentMemberPermisos()
-  if (!p) return '/cockpit'
-  /* Orden de prioridad para qué ver primero al loguearse según el rol */
-  const candidates: { mod: ModuloPermiso; route: string }[] = [
-    { mod: 'metricas',      route: '/cockpit' },
-    { mod: 'editor',        route: '/editor' },
-    { mod: 'diseno',        route: '/diseno' },
-    { mod: 'publicaciones', route: '/publicaciones' },
-    { mod: 'inbox',         route: '/comentarios' },
-    { mod: 'comentarios',   route: '/comentarios' },
-    { mod: 'grilla',        route: '/dashboard' },
-    { mod: 'equipo',        route: '/equipo' },
-    { mod: 'settings',      route: '/settings' },
-  ]
-  for (const c of candidates) {
-    if (tieneAcceso(p.permisos, c.mod)) return c.route
-  }
-  /* Si no tiene ningún permiso (raro), lo mandamos a login. */
-  return '/login'
+  if (!p) return '/cockpit'  /* admin/owner sin team_member */
+  /* Cualquier miembro entra primero por su dashboard de bienvenida */
+  return '/inicio'
 }

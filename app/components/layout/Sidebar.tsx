@@ -145,6 +145,11 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           open={openSections.workspace}
           onToggle={() => setOpenSections((s) => ({ ...s, workspace: !s.workspace }))}
         >
+          {/* Inicio: dashboard de bienvenida personalizado del miembro.
+              Solo aparece para miembros (Pedro como admin tiene cockpit). */}
+          {permisos && (
+            <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio')} />
+          )}
           {/* Cockpit: solo si tiene métricas o es admin (sin team_member). */}
           {puede('metricas') && (
             <NavItem href="/cockpit"       icon={<HomeIcon />}     label="Cockpit"        active={isActive('/cockpit')}       shortcut="1" />
