@@ -19,8 +19,8 @@ export default async function DashboardPage({
 
   const { data: marcas, error } = await supabase
     .from('marcas')
-    .select('slug, nombre, emoji_marca, color_primario_hex')
-    .eq('activa', true)
+    .select('slug, nombre, emoji_marca, color_primario_hex, activa')
+    .order('activa', { ascending: false })
     .order('slug')
 
   if (error) {
@@ -43,14 +43,16 @@ export default async function DashboardPage({
     nombre: m.nombre,
     emoji_marca: m.emoji_marca,
     color_primario_hex: m.color_primario_hex,
+    activa: m.activa ?? true,
   }))
+  const activasCount = cards.filter((c) => c.activa).length
 
   return (
     <main className="container mx-auto p-8 max-w-6xl">
       <header className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
         <p className="text-muted-foreground">
-          Hola {user.email}. {cards.length} marcas activas.
+          Hola {user.email}. {activasCount} marcas activas{cards.length > activasCount ? ` · ${cards.length - activasCount} inactivas` : ''}.
         </p>
       </header>
 
@@ -58,7 +60,7 @@ export default async function DashboardPage({
       <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
         <h2 className="text-xl font-semibold">
           Tus marcas{' '}
-          <span className="text-muted-foreground font-normal text-base">· {cards.length}</span>
+          <span className="text-muted-foreground font-normal text-base">· {activasCount} activas</span>
         </h2>
       </div>
 

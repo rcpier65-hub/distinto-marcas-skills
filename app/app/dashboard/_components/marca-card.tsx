@@ -1,28 +1,66 @@
 // app/app/dashboard/_components/marca-card.tsx
-// El botón "Pedir grilla" ahora navega directo a /grilla/[slug] donde se renderiza
-// la plantilla con datos reales de la BD (sin Chromium / sin Notion API).
+// Tarjeta de marca con toggle Activa/Inactiva. "Pedir grilla" navega a /grilla/[slug].
 'use client'
 
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
+import { Power } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { MarcaLogo } from '@/components/marca-logo'
+import { toggleMarcaActiva } from '../_actions'
 
 export type MarcaCardData = {
   slug: string
   nombre: string
   emoji_marca: string | null
   color_primario_hex: string | null
+  activa: boolean
 }
 
 export function MarcaCard({ marca }: { marca: MarcaCardData }) {
+  const [activa, setActiva] = useState(marca.activa)
+  const [pending, startTransition] = useTransition()
+
+  function toggle() {
+    const next = !activa
+    setActiva(next) // optimista
+    startTransition(async () => {
+      const r = await toggleMarcaActiva(marca.slug, next)
+      if (!r.ok) {
+        setActiva(!next) // revertir
+        toast.error(r.error)
+      } else {
+        toast.success(next ? `✅ ${marca.nombre} activada` : `${marca.nombre} desactivada (oculta del menú)`)
+      }
+    })
+  }
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className={`transition-all ${activa ? 'hover:shadow-md' : 'opacity-60'}`}>
       <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={44} />
-          <span className="text-base">{marca.nombre}</span>
-        </CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="flex items-center gap-3 min-w-0">
+            <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={44} />
+            <span className="text-base truncate">{marca.nombre}</span>
+          </CardTitle>
+          {/* Toggle activa / inactiva */}
+          <button
+            type="button"
+            onClick={toggle}
+            disabled={pending}
+            title={activa ? 'Desactivar marca (se oculta del menú y selectores)' : 'Activar marca'}
+            className={`shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
+              activa
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-muted text-muted-foreground border-border hover:bg-muted/70'
+            }`}
+          >
+            <Power className="w-3.5 h-3.5" />
+            {activa ? 'Activa' : 'Inactiva'}
+          </button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -37,9 +75,7 @@ export function MarcaCard({ marca }: { marca: MarcaCardData }) {
               className="w-5 h-5 rounded border border-border"
               style={{ backgroundColor: marca.color_primario_hex }}
             />
-            <code className="text-xs text-muted-foreground">
-              {marca.color_primario_hex}
-            </code>
+            <code className="text-xs text-muted-foreground">{marca.color_primario_hex}</code>
           </div>
         )}
 

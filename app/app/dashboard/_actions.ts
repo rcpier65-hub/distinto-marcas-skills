@@ -80,3 +80,23 @@ export async function createMarca(input: {
 
   return { ok: true, slug }
 }
+
+/**
+ * Activa/desactiva una marca. Una marca inactiva desaparece del sidebar,
+ * selectores, grabaciones, etc. (todo lee `activa = true`), pero se conserva
+ * su historial. Se puede reactivar cuando quieras.
+ */
+export async function toggleMarcaActiva(
+  slug: string,
+  activa: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { error } = await service.from('marcas').update({ activa }).eq('slug', slug)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')   // refresca el sidebar (que lista solo activas)
+  return { ok: true }
+}
