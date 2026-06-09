@@ -14,6 +14,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { MarcaLogo } from '@/components/marca-logo'
 import { ObjetivoInput } from './objetivo-input'
 import { NotasInput } from './notas-input'
 import {
@@ -61,7 +62,7 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-2xl shrink-0">{kpi.marca_emoji ?? '📊'}</span>
+            <MarcaLogo slug={kpi.marca_slug} nombre={kpi.marca_nombre} emoji={kpi.marca_emoji} size={32} />
             <div className="min-w-0">
               <p className="font-semibold text-sm truncate">{kpi.marca_nombre}</p>
               <code className="text-[10px] text-muted-foreground font-mono">{kpi.marca_slug}</code>

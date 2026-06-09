@@ -6,6 +6,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { MarcaLogo } from '@/components/marca-logo'
 
 export type MarcaCardData = {
   slug: string
@@ -19,7 +20,7 @@ export function MarcaCard({ marca }: { marca: MarcaCardData }) {
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <span className="text-3xl">{marca.emoji_marca}</span>
+          <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={44} />
           <span className="text-base">{marca.nombre}</span>
         </CardTitle>
       </CardHeader>

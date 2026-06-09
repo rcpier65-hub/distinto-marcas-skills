@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
+import { MarcaLogo } from '@/components/marca-logo'
 import { tieneAcceso, type Permisos, type ModuloPermiso } from '@/lib/team/types'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 
@@ -207,12 +208,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
               <NavItem
                 key={m.slug}
                 href={`/grilla/${m.slug}`}
-                icon={
-                  <span
-                    className="mk-dot"
-                    style={{ background: m.color, boxShadow: `0 0 6px ${m.color}`, width: 8, height: 8 }}
-                  />
-                }
+                icon={<MarcaLogo slug={m.slug} nombre={m.nombre} emoji={m.emoji} size={20} />}
                 label={m.nombreCorto}
                 active={isActive(`/grilla/${m.slug}`)}
                 badge={m.pendientes > 0 ? m.pendientes : undefined}

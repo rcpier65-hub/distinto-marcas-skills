@@ -28,6 +28,6 @@ export const MARCAS_NAV: MarcaNav[] = [
   { slug: 'novalamps',             nombre: 'Novalamps Perú',              nombreCorto: 'Novalamps',      emoji: '💡', color: 'var(--mk-brand-novalamps)',    industria: 'Iluminación LED',        pendientes: 10 },
   { slug: 'la-victoria',           nombre: 'La Victoria Maderera',        nombreCorto: 'La Victoria',    emoji: '🪚', color: 'var(--mk-brand-lavictoria)',   industria: 'Carpintería industrial', pendientes: 9 },
   { slug: 'distribuidora-fitness', nombre: 'Distribuidora Fitness',       nombreCorto: 'Distri Fitness', emoji: '💪', color: 'var(--mk-brand-distrifitness)', industria: 'Equipamiento gym',     pendientes: 27 },
-  { slug: 'little-joe',            nombre: 'Little Joe · Typhouse',       nombreCorto: 'Typhouse',       emoji: '🚗', color: 'var(--mk-brand-littlejoe)',    industria: 'Ambientadores auto',     pendientes: 8 },
+  { slug: 'little-joe',            nombre: 'TypHouse',                    nombreCorto: 'TypHouse',       emoji: '💙', color: 'var(--mk-brand-littlejoe)',    industria: 'Ambientadores auto',     pendientes: 8 },
   { slug: 'warrior-supps',         nombre: 'Warrior Supps',               nombreCorto: 'Warrior',        emoji: '⚡', color: 'var(--mk-brand-warriorsupps)', industria: 'Suplementos deportivos', pendientes: 13 },
 ]
