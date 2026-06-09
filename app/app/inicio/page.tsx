@@ -23,9 +23,31 @@ import { getFraseDelDia } from '@/lib/inicio/get-frase-del-dia'
 
 export const dynamic = 'force-dynamic'
 
+/* Fecha YMD en zona Lima (UTC-5). El server de Vercel corre en UTC, así
+   que sin esto el día cambia 5 horas antes de tiempo (Pedro 7pm = UTC
+   00:00 día siguiente). Forzamos zona Lima usando Intl. */
+const TZ_LIMA = 'America/Lima'
+
 function todayStr(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  /* Intl format en-CA da YYYY-MM-DD directo */
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_LIMA, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+}
+
+/* Hora 0-23 en zona Lima para decidir Buenos días / Tardes / Noches */
+function horaLima(): number {
+  const s = new Intl.DateTimeFormat('en-GB', {
+    timeZone: TZ_LIMA, hour: '2-digit', hour12: false,
+  }).format(new Date())
+  return parseInt(s, 10)
+}
+
+function saludoSegunHora(): string {
+  const h = horaLima()
+  if (h < 12) return 'Buenos días'
+  if (h < 19) return 'Buenas tardes'
+  return 'Buenas noches'
 }
 
 export default async function InicioPage() {
@@ -294,6 +316,10 @@ export default async function InicioPage() {
 
   const data: InicioData = {
     nombre: nombreCapitalizado,
+    /* Saludo calculado en server con timezone Lima — antes el cliente
+       calculaba con new Date().getHours() pero durante SSR el server
+       de Vercel está en UTC y daba 'Buenos días' a las 9pm Lima. */
+    saludo: saludoSegunHora(),
     rol: memberData.rolNombre,
     rolBase: memberData.rol_base,
     avatarUrl: memberData.avatar_url,

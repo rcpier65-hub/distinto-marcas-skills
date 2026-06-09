@@ -26,6 +26,11 @@ import {
 
 export type InicioData = {
   nombre: string
+  /* Saludo calculado en server (timezone Lima): 'Buenos días',
+     'Buenas tardes' o 'Buenas noches'. Antes el cliente lo calculaba
+     con new Date().getHours() pero durante SSR el server de Vercel
+     está en UTC y daba 'Buenos días' a las 9pm Lima. */
+  saludo: string
   rol: string
   /* rol_base de BD para elegir el ícono animado del rol */
   rolBase: string
@@ -202,12 +207,8 @@ export function InicioView({ data }: { data: InicioData }) {
   const router = useRouter()
   const [habitos, setHabitos] = useState(data.habitosHoy)
   const [, startTransition] = useTransition()
-  const ahora = new Date()
-  const horaActual = ahora.getHours()
-  const saludo =
-    horaActual < 12 ? 'Buenos días' :
-    horaActual < 19 ? 'Buenas tardes' :
-    'Buenas noches'
+  /* Saludo viene del server (timezone Lima) — ya no calculamos en cliente */
+  const saludo = data.saludo
   const bienvenida =
     /[aá]$/.test(data.nombre) ? 'Bienvenida' : 'Bienvenido'
   const completadosCount = habitos.filter((h) => h.completado).length
