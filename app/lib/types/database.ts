@@ -46,12 +46,13 @@ export type EstadoPublicacion =
   | 'programar_anuncios'
   | 'archivado'
 
-export type EstadoTarea = 'sin_empezar' | 'en_progreso' | 'listo'
+export type EstadoTarea = 'sin_empezar' | 'en_progreso' | 'listo' | 'pausada'
 
 export const ESTADO_TAREA_LABEL: Record<EstadoTarea, string> = {
   sin_empezar: 'Sin empezar',
   en_progreso: 'En progreso',
   listo: 'Listo',
+  pausada: 'Pausada',
 }
 
 // Labels en español para UI

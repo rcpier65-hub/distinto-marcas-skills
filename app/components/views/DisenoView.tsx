@@ -374,7 +374,10 @@ export function DisenoView({
           options={[
             { id: 'todas', label: 'Todas' },
             { id: 'interno', label: 'Internas (sin cliente)', color: '#a78bfa' },
-            ...marcas.map((m) => ({ id: m.slug, label: m.nombre, color: m.color })),
+            /* Emoji de la marca para mostrar logo en el dropdown.
+               m.emoji es string|null en BD; FilterOption espera string?,
+               por eso el ?? undefined. */
+            ...marcas.map((m) => ({ id: m.slug, label: m.nombre, color: m.color, emoji: m.emoji ?? undefined })),
           ]}
           onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
         />
@@ -1725,7 +1728,7 @@ function Td({ children, align }: { children: React.ReactNode; align?: 'left' | '
   )
 }
 
-type FilterOption = { id: string; label: string; color?: string }
+type FilterOption = { id: string; label: string; color?: string; emoji?: string }
 
 function FilterPill({ label, value, dotColor, options, onSelect }: { label: string; value: string | null; dotColor: string | null; options: FilterOption[]; onSelect: (id: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -1752,7 +1755,17 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
         <Popover onClose={() => setOpen(false)}>
           {options.map((o) => (
             <PopoverItem key={o.id} onClick={() => { onSelect(o.id); setOpen(false) }}>
-              {o.color && <span className="mk-dot" style={{ background: o.color, width: 8, height: 8 }} />}
+              {o.emoji ? (
+                <span style={{
+                  width: 20, height: 20, borderRadius: 5,
+                  background: o.color ? `${o.color}1f` : 'rgba(0,0,0,0.04)',
+                  border: o.color ? `1px solid ${o.color}40` : '1px solid rgba(0,0,0,0.08)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, lineHeight: 1, flexShrink: 0,
+                }}>{o.emoji}</span>
+              ) : (
+                o.color && <span className="mk-dot" style={{ background: o.color, width: 8, height: 8 }} />
+              )}
               <span>{o.label}</span>
             </PopoverItem>
           ))}

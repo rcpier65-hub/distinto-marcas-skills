@@ -35,6 +35,9 @@ export type UpdatePublicacionInput = {
   editor_id?: string | null
   opcion_2?: string | null
   notas?: string | null
+  /* Motivo de pausa — solo se setea cuando estado_tarea pasa a 'pausada'.
+     Al reanudar (estado_tarea ≠ pausada) se limpia a null. */
+  motivo_pausa?: string | null
 }
 
 type ActionResult = { ok: true } | { ok: false; error: string }
