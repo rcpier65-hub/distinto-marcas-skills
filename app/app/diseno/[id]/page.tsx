@@ -33,7 +33,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
     .from('publicaciones')
     .select(`
       id, nombre, descripcion,
-      fecha_diseno, fecha_entrega,
+      fecha_diseno, fecha_entrega, fecha_publicacion,
       estado, estado_tarea,
       drive_material_url, drive_resultado_url,
       reunion_hora, invitados_emails,
@@ -52,9 +52,10 @@ export default async function DisenoDetailPage({ params }: PageProps) {
 
   const marca = Array.isArray(pub.marca) ? pub.marca[0] : pub.marca
 
-  /* Si la tarea NO es interna (es una marca cliente), redirigimos al
-     form completo. Esta página es SOLO para standalone. */
-  if (marca?.slug && marca.slug !== 'interno') {
+  /* Solo las tareas "para publicar" (con fecha de publicación) usan el form
+     completo de publicación. Las standalone / reunión (sin fecha) se quedan en
+     esta vista simple — AUNQUE tengan una marca elegida. */
+  if (pub.fecha_publicacion) {
     redirect(`/publicaciones/${id}`)
   }
 

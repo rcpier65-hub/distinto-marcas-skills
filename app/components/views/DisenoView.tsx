@@ -250,10 +250,12 @@ export function DisenoView({
      publicación que no aplican. */
   function openRow(id: string) {
     const entry = entries.find((e) => e.id === id)
-    if (entry?.esInterno) {
-      router.push(`/diseno/${id}`)
-    } else {
+    // "Para publicar" (tiene fecha de publicación) → vista de publicación completa.
+    // Standalone / reunión (sin fecha) → vista simple de diseño, AUNQUE tenga marca.
+    if (entry?.fechaPublicacion) {
       router.push(`/publicaciones/${id}`)
+    } else {
+      router.push(`/diseno/${id}`)
     }
   }
 
