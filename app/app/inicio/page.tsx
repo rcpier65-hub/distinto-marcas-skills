@@ -17,9 +17,10 @@
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
-import { tieneAcceso } from '@/lib/team/types'
+import { tieneAcceso, type ModuloPermiso } from '@/lib/team/types'
 import { InicioView, type InicioData } from './_components/inicio-view'
 import { getFraseDelDia } from '@/lib/inicio/get-frase-del-dia'
+import { loadCockpitData } from '@/lib/cockpit/load-cockpit-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -314,6 +315,22 @@ export default async function InicioPage() {
     created_at: row.created_at as string,
   }))
 
+  /* Cockpit ejecutivo embebido — Pedro unificó Cockpit con Inicio.
+     Solo lo cargamos si el user tiene permiso 'metricas' (admin/director/CM
+     con permiso explícito). Si NO tiene, el bloque cockpit no aparece y
+     la home queda en versión simple. */
+  const verCockpit = esAdmin || (p && tieneAcceso(p.permisos, 'metricas' as ModuloPermiso))
+  const puedeVerFinanzas = esAdmin || (p && tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso)) || false
+
+  const cockpitData = verCockpit
+    ? await loadCockpitData(service, {
+        nombreUsuario: nombreCapitalizado,
+        puedeVerFinanzas,
+        teamMemberIdHabitos: memberData.id,
+        permisos: p,
+      })
+    : null
+
   const data: InicioData = {
     nombre: nombreCapitalizado,
     /* Saludo calculado en server con timezone Lima — antes el cliente
@@ -335,6 +352,7 @@ export default async function InicioPage() {
       autor: fraseDia.frase.autor,
       contexto: fraseDia.frase.contexto ?? null,
     },
+    cockpitData,
   }
 
   return <InicioView data={data} />

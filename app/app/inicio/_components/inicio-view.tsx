@@ -23,6 +23,7 @@ import {
   eliminarPendienteRapido,
   convertirEnTarea,
 } from '../_actions'
+import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
 
 export type InicioData = {
   nombre: string
@@ -92,6 +93,11 @@ export type InicioData = {
     autor: string
     contexto: string | null
   }
+  /* Cockpit ejecutivo embebido — null si el user NO tiene 'metricas'.
+     Cuando hay data se renderiza <CockpitView embedded /> con KPIs,
+     alerta de coordinación, carrusel de comentarios y bloques de
+     trabajo encima del bloque de pendientes/chat. */
+  cockpitData: CockpitData | null
 }
 
 /* Color por categoría — paleta consistente en toda la app */
@@ -465,6 +471,19 @@ export function InicioView({ data }: { data: InicioData }) {
             </div>
           </div>
         </section>
+
+        {/* Cockpit ejecutivo embebido — Pedro unificó Cockpit con Inicio.
+            Solo se muestra a users con permiso 'metricas'. Contiene:
+            KPIs (publicaciones, comentarios respondidos, grillas, ingresos
+            secreto), alerta coordinación grabaciones, carrusel de
+            comentarios por marca, 3 bloques de trabajo (grillas/diseño/
+            videos), y próximas grabaciones. Todo lo que estaba antes en
+            /cockpit ahora vive acá sin saludo ni header duplicado. */}
+        {data.cockpitData && (
+          <section style={{ marginBottom: 28 }}>
+            <CockpitView data={data.cockpitData} embedded />
+          </section>
+        )}
 
         {/* Grid principal: 2/3 contenido + 1/3 sidebar de hábitos */}
         <div

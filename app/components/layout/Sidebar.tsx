@@ -146,15 +146,12 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           open={openSections.workspace}
           onToggle={() => setOpenSections((s) => ({ ...s, workspace: !s.workspace }))}
         >
-          {/* Inicio: dashboard de bienvenida personalizado.
-              Visible para TODOS (incluido Pedro admin) — pidió tener su
-              propio /inicio bonito con saludo + accesos + hábitos + chat,
-              no solo el cockpit ejecutivo. */}
-          <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio')} />
-          {/* Cockpit: solo si tiene métricas o es admin (sin team_member). */}
-          {puede('metricas') && (
-            <NavItem href="/cockpit"       icon={<HomeIcon />}     label="Cockpit"        active={isActive('/cockpit')}       shortcut="1" />
-          )}
+          {/* Inicio: dashboard unificado. Pedro pidió fusionar Cockpit
+              con Inicio porque 'es lo mismo'. Para users con métricas
+              (admin/director/CM con permiso) el Inicio muestra TODO el
+              contenido ejecutivo del Cockpit; para los demás muestra
+              versión simple. */}
+          <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio') || isActive('/cockpit')} shortcut="1" />
           {puede('inbox') && (
             <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={73} />
           )}

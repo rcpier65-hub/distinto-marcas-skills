@@ -52,9 +52,8 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }:
 
   const actions: Action[] = useMemo(() => [
     // Navegación
-    /* Inicio: dashboard de bienvenida — solo para miembros. Admin va a Cockpit. */
-    { id: 'nav-inicio',        title: 'Ir a Inicio',           subtitle: 'Tu dashboard personal',           category: 'navegacion', icon: <IconHome />,     keywords: 'home bienvenida',         href: '/inicio',         requiereModulo: undefined },
-    { id: 'nav-cockpit',       title: 'Ir a Cockpit',                                                       category: 'navegacion', icon: <IconHome />,     shortcut: ['G', 'C'], keywords: 'home dashboard',       href: '/cockpit',        requiereModulo: 'metricas' },
+    /* Inicio: dashboard unificado (Cockpit + Home en uno). */
+    { id: 'nav-inicio',        title: 'Ir a Inicio',           subtitle: 'Tu dashboard ejecutivo',          category: 'navegacion', icon: <IconHome />,     shortcut: ['G', 'I'], keywords: 'home dashboard cockpit ejecutivo bienvenida', href: '/inicio',         requiereModulo: undefined },
     { id: 'nav-inbox',         title: 'Inbox global de comentarios',                                        category: 'navegacion', icon: <IconInbox />,    shortcut: ['G', 'I'], keywords: 'comentarios respuestas', href: '/comentarios',  requiereModulo: 'comentarios' },
     { id: 'nav-pubs',          title: 'Publicaciones',                                                      category: 'navegacion', icon: <IconCalendar />, shortcut: ['G', 'P'], keywords: 'posts contenido',      href: '/publicaciones',  requiereModulo: 'publicaciones' },
     { id: 'nav-editor',        title: 'Editor de video',                                                    category: 'navegacion', icon: <IconVideo />,    shortcut: ['G', 'E'], keywords: 'editar videos',        href: '/editor',         requiereModulo: 'editor' },
@@ -66,7 +65,7 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }:
 
     // Crear — solo aparecen si el user tiene permiso de creación en ese módulo
     { id: 'create-pub',        title: 'Nueva publicación',     subtitle: 'Borrador para cualquier marca',   category: 'crear', icon: <IconPlus />,    shortcut: ['C'], keywords: 'crear post reel carrusel', href: '/publicaciones/nueva', requiereModulo: 'publicaciones' },
-    { id: 'create-grilla',     title: 'Generar grilla semanal',                                              category: 'crear', icon: <IconGrid />,    keywords: 'crear armar',              href: '/cockpit',             requiereModulo: 'grilla' },
+    { id: 'create-grilla',     title: 'Generar grilla semanal',                                              category: 'crear', icon: <IconGrid />,    keywords: 'crear armar',              href: '/inicio',              requiereModulo: 'grilla' },
     { id: 'create-grabacion',  title: 'Agendar grabación',                                                   category: 'crear', icon: <IconVideo />,   keywords: 'video shooting',           href: '/grabaciones',         requiereModulo: 'publicaciones' },
     { id: 'create-nota',       title: 'Nueva nota',                                                          category: 'crear', icon: <IconNote />,    keywords: 'apunte memo',              href: '/historial',           requiereModulo: null /* admin only */ },
 

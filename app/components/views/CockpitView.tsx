@@ -142,9 +142,13 @@ type CockpitViewProps = {
   data?: CockpitData
   nombreUsuario?: string
   puedeVerFinanzas?: boolean
+  /* embedded: cuando se renderiza dentro de /inicio. Quita el header
+     "Workspace / Cockpit", el saludo "Buen día" y la altura 100vh
+     para que fluya dentro del layout de /inicio sin duplicar UI. */
+  embedded?: boolean
 }
 
-export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false }: CockpitViewProps = {}) {
+export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false, embedded = false }: CockpitViewProps = {}) {
   /* Si recibimos data del page server, usamos esos valores. Si no, mock. */
   const nombreFinal = data?.nombreUsuario ?? nombreUsuario
   const puedeVerFinanzasFinal = data?.puedeVerFinanzas ?? puedeVerFinanzas
@@ -164,69 +168,76 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
   const grabacionesList = data?.grabacionesProximas
   const metricasReales = data?.metricas
 
+  /* Wrapper: en modo embedded (dentro de /inicio) no usamos 100vh, no
+     renderizamos header del cockpit ni el saludo "Buen día" porque
+     /inicio ya tiene su propio header animado. */
+  const containerStyle: React.CSSProperties = embedded
+    ? { display: 'flex', flexDirection: 'column', gap: 0 }
+    : { height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }
+  const bodyStyle: React.CSSProperties = embedded
+    ? { padding: 0 }
+    : { flex: 1, overflow: 'auto', padding: '24px 28px 80px' }
+
   return (
-    <div
-      style={{
-        height: '100vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--mk-bg-base)',
-      }}
-    >
-      {/* HEADER */}
-      <header
-        style={{
-          height: 'var(--mk-header-height)',
-          padding: '0 20px',
-          borderBottom: '1px solid var(--mk-border-subtle)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          background: 'var(--mk-bg-base)',
-          flexShrink: 0,
-          position: 'relative',
-          zIndex: 5,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-sm)' }}>
-          <span style={{ color: 'var(--mk-text-tertiary)' }}>Workspace</span>
-          <span style={{ color: 'var(--mk-text-quaternary)' }}>/</span>
-          <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Cockpit</span>
-        </div>
-        <div style={{ flex: 1 }} />
-        <PillSegment options={['Hoy', 'Semana', 'Mes']} active="Hoy" />
-        <button className="mk-focusable" style={btnGhostStyle}>
-          <PlusIcon /> Nueva publicación
-          <span className="mk-kbd" style={{ marginLeft: 4 }}>C</span>
-        </button>
-        <button className="mk-focusable" style={btnPrimaryStyle}>
-          Generar grillas semana
-        </button>
-      </header>
+    <div style={containerStyle}>
+      {/* HEADER del cockpit — solo en modo standalone (sin /inicio) */}
+      {!embedded && (
+        <header
+          style={{
+            height: 'var(--mk-header-height)',
+            padding: '0 20px',
+            borderBottom: '1px solid var(--mk-border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            background: 'var(--mk-bg-base)',
+            flexShrink: 0,
+            position: 'relative',
+            zIndex: 5,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-sm)' }}>
+            <span style={{ color: 'var(--mk-text-tertiary)' }}>Workspace</span>
+            <span style={{ color: 'var(--mk-text-quaternary)' }}>/</span>
+            <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Cockpit</span>
+          </div>
+          <div style={{ flex: 1 }} />
+          <PillSegment options={['Hoy', 'Semana', 'Mes']} active="Hoy" />
+          <button className="mk-focusable" style={btnGhostStyle}>
+            <PlusIcon /> Nueva publicación
+            <span className="mk-kbd" style={{ marginLeft: 4 }}>C</span>
+          </button>
+          <button className="mk-focusable" style={btnPrimaryStyle}>
+            Generar grillas semana
+          </button>
+        </header>
+      )}
 
       {/* BODY */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px 28px 80px' }}>
-        <div className="mk-anim-slide-up" style={{ marginBottom: 24 }}>
-          <h1
-            style={{
-              fontSize: 'var(--mk-text-2xl)',
-              fontWeight: 600,
-              letterSpacing: 'var(--mk-tracking-tight)',
-              lineHeight: 'var(--mk-leading-tight)',
-              color: 'var(--mk-text-primary)',
-              margin: 0,
-              marginBottom: 4,
-            }}
-          >
-            Buen día, {nombreFinal}
-          </h1>
-          <p style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)', margin: 0 }}>
-            {marcasActivasCount} {marcasActivasCount === 1 ? 'marca activa' : 'marcas activas'}
-            {' · '}{comentariosPendientesTotal} {comentariosPendientesTotal === 1 ? 'comentario pendiente' : 'comentarios pendientes'}
-            {' · '}{grillasParaEnviarHoy} {grillasParaEnviarHoy === 1 ? 'grilla a enviar hoy' : 'grillas a enviar hoy'}
-          </p>
-        </div>
+      <div style={bodyStyle}>
+        {/* Saludo: solo en modo standalone (en /inicio ya hay saludo bonito) */}
+        {!embedded && (
+          <div className="mk-anim-slide-up" style={{ marginBottom: 24 }}>
+            <h1
+              style={{
+                fontSize: 'var(--mk-text-2xl)',
+                fontWeight: 600,
+                letterSpacing: 'var(--mk-tracking-tight)',
+                lineHeight: 'var(--mk-leading-tight)',
+                color: 'var(--mk-text-primary)',
+                margin: 0,
+                marginBottom: 4,
+              }}
+            >
+              Buen día, {nombreFinal}
+            </h1>
+            <p style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)', margin: 0 }}>
+              {marcasActivasCount} {marcasActivasCount === 1 ? 'marca activa' : 'marcas activas'}
+              {' · '}{comentariosPendientesTotal} {comentariosPendientesTotal === 1 ? 'comentario pendiente' : 'comentarios pendientes'}
+              {' · '}{grillasParaEnviarHoy} {grillasParaEnviarHoy === 1 ? 'grilla a enviar hoy' : 'grillas a enviar hoy'}
+            </p>
+          </div>
+        )}
 
         {/* KPI grid. 3 columnas para users sin permiso finanzas (la card
             Ingresos no se muestra). 4 columnas para Pedro/admin con la
