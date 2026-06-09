@@ -31,16 +31,9 @@ export default async function DisenoDetailPage({ params }: PageProps) {
 
   const { data: pub, error } = await service
     .from('publicaciones')
-    .select(`
-      id, nombre, descripcion,
-      fecha_diseno, fecha_entrega, fecha_publicacion,
-      estado, estado_tarea,
-      drive_material_url, drive_resultado_url,
-      reunion_hora, invitados_emails,
-      started_at, archived_at,
-      created_at, updated_at,
-      marca:marcas(slug, nombre, emoji_marca, color_primario_hex)
-    `)
+    /* SELECT * para tolerar columnas nuevas (reunion_event_id / reunion_meet_link)
+       que se crean al vuelo al sincronizar la reunión. */
+    .select('*, marca:marcas(slug, nombre, emoji_marca, color_primario_hex)')
     .eq('id', id)
     .maybeSingle()
 
@@ -86,6 +79,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
           marcaEmoji: marca?.emoji_marca ?? '🎨',
           marcaNombre: marca?.nombre ?? 'Distinto · Interno',
           marcaColor: marca?.color_primario_hex ?? '#a78bfa',
+          reunionMeetLink: pub.reunion_meet_link ?? null,
         }}
       />
     </main>

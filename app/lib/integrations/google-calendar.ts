@@ -209,6 +209,70 @@ export async function createCalendarEvent(input: EventInput): Promise<{ ok: true
   return { ok: true, eventId: data.id }
 }
 
+export type ReunionEventInput = {
+  summary: string
+  description?: string
+  fecha: string          // YYYY-MM-DD (fecha de la reunión)
+  hora: string           // HH:MM (24h)
+  durationMin?: number   // duración, default 45
+  attendees?: string[]   // emails de invitados (clientes)
+}
+
+/**
+ * Crea un evento de REUNIÓN con hora + Google Meet + invitados. Devuelve el
+ * eventId y el link de Meet generado. Timezone fijo America/Lima.
+ * No envía emails automáticos (sendUpdates=none) — el link de Meet queda listo
+ * para compartir; los invitados aparecen en el evento.
+ */
+export async function createReunionEvent(
+  input: ReunionEventInput,
+): Promise<{ ok: true; eventId: string; meetLink: string | null } | { ok: false; error: string }> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'not_connected' }
+
+  const horaHM = input.hora.slice(0, 5)            // "HH:MM"
+  const [hh, mm] = horaHM.split(':').map(Number)
+  const dur = input.durationMin ?? 45
+
+  // Calcular fin (con rollover de día si cruza medianoche).
+  let endDate = input.fecha
+  let totalEnd = hh * 60 + mm + dur
+  if (totalEnd >= 1440) {
+    const d = new Date(input.fecha + 'T00:00:00')
+    d.setDate(d.getDate() + 1)
+    endDate = d.toISOString().slice(0, 10)
+    totalEnd -= 1440
+  }
+  const endHH = String(Math.floor(totalEnd / 60)).padStart(2, '0')
+  const endMM = String(totalEnd % 60).padStart(2, '0')
+
+  const requestId = globalThis.crypto?.randomUUID?.() ?? `meet-${input.fecha}-${horaHM}`
+
+  const res = await fetch(`${CAL_API}/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima' },
+      end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima' },
+      attendees: (input.attendees ?? []).filter(Boolean).map((email) => ({ email })),
+      conferenceData: {
+        createRequest: { requestId, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+      },
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meetLink: string | null =
+    data.hangoutLink ??
+    data.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri ??
+    null
+  return { ok: true, eventId: data.id, meetLink }
+}
+
 /**
  * Actualiza un evento existente (cambio de fecha o título).
  */

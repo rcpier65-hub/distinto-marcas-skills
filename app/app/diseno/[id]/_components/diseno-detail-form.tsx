@@ -13,10 +13,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Calendar, Clock, Folder, Image as ImageIcon, Users,
-  Save, Trash2, Archive, Hourglass, Copy as CopyIcon, ExternalLink,
+  Save, Trash2, Archive, Hourglass, Copy as CopyIcon, ExternalLink, Video, Loader2,
 } from 'lucide-react'
 import { updateDisenoEntry, archivarTarea } from '../../_actions'
 import { deletePublicacion } from '@/app/publicaciones/[id]/_actions'
+import { sincronizarReunion } from '../_reunion-actions'
 import {
   formatDateTimeES,
   formatDuracion,
@@ -48,6 +49,7 @@ type Publicacion = {
   marcaEmoji: string | null
   marcaNombre: string
   marcaColor: string
+  reunionMeetLink: string | null
 }
 
 export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) {
@@ -55,6 +57,23 @@ export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) 
   const [form, setForm] = useState(publicacion)
   const [, startTransition] = useTransition()
   const [isSaving, setIsSaving] = useState(false)
+  const [meetLink, setMeetLink] = useState<string | null>(publicacion.reunionMeetLink)
+  const [syncing, setSyncing] = useState(false)
+
+  // Crea/actualiza la reunión en Google Calendar (con hora + Meet + invitados).
+  function handleSincronizarReunion() {
+    setSyncing(true)
+    startTransition(async () => {
+      const r = await sincronizarReunion(form.id)
+      setSyncing(false)
+      if (r.ok) {
+        setMeetLink(r.meetLink)
+        toast.success(r.meetLink ? '✅ Reunión creada en Calendar con Meet' : '✅ Reunión creada en Calendar', { duration: 5000 })
+      } else {
+        toast.error(r.error, { duration: 8000 })
+      }
+    })
+  }
 
   function save(patch: Parameters<typeof updateDisenoEntry>[1], msg?: string) {
     setIsSaving(true)
@@ -260,9 +279,38 @@ export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) 
             className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring resize-y"
           />
         </Field>
-        {form.horaReunion && (
+        {/* Sincronizar reunión a Google Calendar (con Meet + invitados) */}
+        {form.horaReunion && form.fechaEntrega && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleSincronizarReunion}
+              disabled={syncing}
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
+              style={{ background: '#ba41f7' }}
+            >
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />}
+              {meetLink ? 'Actualizar reunión en Calendar' : 'Crear reunión en Calendar (con Meet)'}
+            </button>
+            {meetLink && (
+              <a
+                href={meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-emerald-600 hover:underline w-fit"
+              >
+                <Video className="w-4 h-4" /> Unirse por Google Meet <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Crea el evento el <strong>{form.fechaEntrega}</strong> a las <strong>{form.horaReunion}</strong>, con enlace de Meet e invitados.
+              Necesitas Google Calendar conectado (Grabaciones → “Conectar Google Calendar”).
+            </p>
+          </div>
+        )}
+        {form.horaReunion && !form.fechaEntrega && (
           <div className="px-3 py-2 rounded-md text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
-            ⚠ Sync con Google Calendar en proceso. La reunión queda guardada y se sincronizará automáticamente cuando se conecte.
+            ⚠ Pon también la <strong>fecha de entrega</strong> arriba — esa será la fecha de la reunión en el calendario.
           </div>
         )}
       </Section>
