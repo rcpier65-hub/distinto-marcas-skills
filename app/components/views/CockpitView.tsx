@@ -3,9 +3,18 @@
 /* CockpitView — la home Linear-style. Refactor del Cockpit del mockup
    pero diseñado para renderizar DENTRO del AppShell (no fullscreen).
    Usa MARCAS_NAV centralizado + mock data inline (mientras migramos
-   a Supabase). */
+   a Supabase).
+
+   Iconos: usamos lucide-react para los KPIs y headers de bloques.
+   Mantiene los SVG inline custom (PlusIcon, EyeIcon, etc.) que tienen
+   semántica específica y no quiero romper. */
 
 import { useState } from 'react'
+import {
+  Calendar, MessageCircle, Grid3x3, DollarSign,
+  Video, Palette, Megaphone,
+  Sparkles, Clock, AlertTriangle, type LucideIcon,
+} from 'lucide-react'
 import { MARCAS_NAV } from '@/lib/mock-marcas'
 
 // ============================================================
@@ -260,18 +269,24 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             value={(metricasReales?.publicacionesEstaSemana ?? METRICAS.publicacionesEstaSemana).toString()}
             delta={`${metricasReales?.publicacionesEditadasMes ?? 0} editadas este mes`}
             deltaPositive={null}
+            Icon={Calendar}
+            color="#06b6d4"
           />
           <Kpi
             label="Comentarios respondidos"
             value={(metricasReales?.comentariosRespondidosMes ?? METRICAS.comentariosRespondidos).toString()}
             delta={`${metricasReales?.comentariosPendientes ?? METRICAS.comentariosPendientes} pendientes`}
             deltaPositive={null}
+            Icon={MessageCircle}
+            color="#22c55e"
           />
           <Kpi
             label="Grillas enviadas"
             value={(metricasReales?.grillasEnviadasMes ?? METRICAS.grillasEnviadas).toString()}
             delta="este mes"
             deltaPositive={null}
+            Icon={Grid3x3}
+            color="#7170ff"
           />
           {puedeVerFinanzasFinal && (
             <KpiSecreto
@@ -279,6 +294,8 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
               value={`S/ ${(METRICAS.ingresoMes / 1000).toFixed(1)}k`}
               delta={`+${ingresoPct}% vs mes pasado`}
               deltaPositive
+              Icon={DollarSign}
+              color="#f59e0b"
             />
           )}
         </div>
@@ -294,6 +311,8 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             title="Comentarios por responder"
             count={comentariosList?.length ?? COMENTARIOS_PENDIENTES.length}
             actionLabel="Ver todos"
+            Icon={MessageCircle}
+            color="#22c55e"
           />
           {comentariosList && comentariosList.length === 0 ? (
             <div style={{
@@ -323,6 +342,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             actionHref="/diseno"
             actionLabel="Ver todo"
             color="#ec4899"
+            Icon={Palette}
           >
             {(!data?.tareasDiseno || data.tareasDiseno.length === 0) ? (
               <EmptyMini text="Sin tareas en diseño" />
@@ -347,6 +367,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             actionHref="/editor"
             actionLabel="Ver editor"
             color="#8b5cf6"
+            Icon={Video}
           >
             {(!data?.videosEditandoHoy || data.videosEditandoHoy.length === 0) ? (
               <EmptyMini text="Nadie marcó videos para editar hoy" />
@@ -371,6 +392,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             actionHref="/grabaciones"
             actionLabel="Calendario"
             color="#06b6d4"
+            Icon={Clock}
           >
             {grabacionesList ? (
               grabacionesList.length === 0 ? (
@@ -408,7 +430,12 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
         {/* === GRILLAS A ENVIAR + HÁBITOS DEL DÍA === */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             <section>
-              <SectionHeader title="Grillas a enviar" count={grillasList ? grillasList.filter((g) => g.estado === 'aprobada').length : GRILLAS_SEMANA.filter((g) => g.estado === 'aprobada').length} />
+              <SectionHeader
+                title="Grillas a enviar"
+                count={grillasList ? grillasList.filter((g) => g.estado === 'aprobada').length : GRILLAS_SEMANA.filter((g) => g.estado === 'aprobada').length}
+                Icon={Grid3x3}
+                color="#7170ff"
+              />
               <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', overflow: 'hidden' }}>
                 {grillasList ? (
                   grillasList.length === 0 ? (
@@ -474,6 +501,8 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
                 count={habitosList
                   ? `${habitosCompletadosHoyCount}/${habitosList.length}`
                   : `${HABITOS_HOY.filter((h) => h.completado).length}/${HABITOS_HOY.length}`}
+                Icon={Sparkles}
+                color="#ba41f7"
               />
               <div style={{ border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg)', background: 'var(--mk-bg-elevated)', padding: 4 }}>
                 {habitosList ? (
@@ -546,9 +575,17 @@ function AlertaCoordinacionGrabacion({ marcas }: { marcas: NonNullable<CockpitDa
       boxShadow: '0 1px 2px rgba(245, 158, 11, 0.08)',
     }}>
       <span style={{
-        fontSize: 20, lineHeight: 1, flexShrink: 0,
-        marginTop: 1,
-      }}>⚠️</span>
+        width: 32, height: 32,
+        borderRadius: 9,
+        background: '#fde68a',
+        color: '#92400e',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <AlertTriangle size={18} strokeWidth={2} />
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>
           Coordinación de grabación pendiente
@@ -734,13 +771,14 @@ function CarruselComentarios({ comentarios }: { comentarios: NonNullable<Cockpit
    Editando hoy, Grabaciones). Header con title, count y link a la
    sección completa; body con los items. */
 function BloqueTrabajo({
-  title, count, actionHref, actionLabel, color, children,
+  title, count, actionHref, actionLabel, color, Icon, children,
 }: {
   title: string
   count: number
   actionHref: string
   actionLabel: string
   color: string
+  Icon?: LucideIcon
   children: React.ReactNode
 }) {
   return (
@@ -754,13 +792,28 @@ function BloqueTrabajo({
       <div style={{
         padding: '12px 14px',
         borderBottom: '1px solid var(--mk-border-subtle)',
-        display: 'flex', alignItems: 'center', gap: 8,
+        display: 'flex', alignItems: 'center', gap: 10,
         background: `linear-gradient(180deg, ${color}10, transparent)`,
       }}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: color, flexShrink: 0,
-        }} />
+        {Icon ? (
+          <span style={{
+            width: 26, height: 26,
+            borderRadius: 7,
+            background: `${color}1a`,
+            color,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon size={14} strokeWidth={1.8} />
+          </span>
+        ) : (
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: color, flexShrink: 0,
+          }} />
+        )}
         <h3 style={{
           flex: 1, margin: 0,
           fontSize: 13, fontWeight: 600,
@@ -866,7 +919,14 @@ function subEstadoLabel(estado: string): string {
    sean visibles a primera vista. Por defecto muestra ••••••; al
    hacer clic en el ojo se revela. El toggle es state local (no se
    persiste) — al recargar vuelve a estar oculto. */
-function KpiSecreto({ label, value, delta, deltaPositive }: { label: string; value: string; delta: string; deltaPositive: boolean | null }) {
+function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
+  label: string
+  value: string
+  delta: string
+  deltaPositive: boolean | null
+  Icon?: LucideIcon
+  color?: string
+}) {
   const [revealed, setRevealed] = useState(false)
   const deltaColor = deltaPositive === true ? 'var(--mk-success)' : deltaPositive === false ? 'var(--mk-danger)' : 'var(--mk-text-tertiary)'
   return (
@@ -881,8 +941,22 @@ function KpiSecreto({ label, value, delta, deltaPositive }: { label: string; val
       onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--mk-bg-elevated)' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <div className="mk-label" style={{ flex: 1 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {Icon && (
+          <span style={{
+            width: 30, height: 30,
+            borderRadius: 8,
+            background: `${color ?? '#22c55e'}14`,
+            color: color ?? '#22c55e',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon size={16} strokeWidth={1.8} />
+          </span>
+        )}
+        <div className="mk-label" style={{ flex: 1, fontSize: 11, lineHeight: 1.3 }}>{label}</div>
         <button
           onClick={(e) => { e.stopPropagation(); setRevealed((v) => !v) }}
           title={revealed ? 'Ocultar' : 'Revelar — solo tú lo ves'}
@@ -954,22 +1028,46 @@ function EyeOffIcon() {
   )
 }
 
-function Kpi({ label, value, delta, deltaPositive }: { label: string; value: string; delta: string; deltaPositive: boolean | null }) {
+function Kpi({ label, value, delta, deltaPositive, Icon, color }: {
+  label: string
+  value: string
+  delta: string
+  deltaPositive: boolean | null
+  Icon?: LucideIcon
+  color?: string
+}) {
   const deltaColor = deltaPositive === true ? 'var(--mk-success)' : deltaPositive === false ? 'var(--mk-danger)' : 'var(--mk-text-tertiary)'
+  const acento = color ?? '#7170ff'
   return (
     <div
       style={{
         background: 'var(--mk-bg-elevated)',
         padding: '16px 18px',
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 8,
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         cursor: 'pointer',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--mk-bg-elevated)' }}
     >
-      <div className="mk-label">{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: 'var(--mk-tracking-tight)', color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {Icon && (
+          <span style={{
+            width: 30, height: 30,
+            borderRadius: 8,
+            background: `${acento}14`,
+            color: acento,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon size={16} strokeWidth={1.8} />
+          </span>
+        )}
+        <div className="mk-label" style={{ fontSize: 11, lineHeight: 1.3 }}>{label}</div>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: 'var(--mk-tracking-tight)', color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.05 }}>
         {value}
       </div>
       <div style={{ fontSize: 'var(--mk-text-xs)', color: deltaColor, fontWeight: 500 }}>
@@ -981,11 +1079,30 @@ function Kpi({ label, value, delta, deltaPositive }: { label: string; value: str
   )
 }
 
-function SectionHeader({ title, count, actionLabel }: { title: string; count: number | string; actionLabel?: string }) {
+function SectionHeader({ title, count, actionLabel, Icon, color }: {
+  title: string
+  count: number | string
+  actionLabel?: string
+  Icon?: LucideIcon
+  color?: string
+}) {
+  const acento = color ?? '#7170ff'
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      {Icon && (
+        <span style={{ color: acento, display: 'inline-flex' }}>
+          <Icon size={16} strokeWidth={2} />
+        </span>
+      )}
       <h2 style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, letterSpacing: 'var(--mk-tracking-snug)', color: 'var(--mk-text-primary)', margin: 0 }}>{title}</h2>
-      <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums', background: 'rgba(255, 255, 255, 0.04)', padding: '1px 6px', borderRadius: 'var(--mk-radius-sm)' }}>{count}</span>
+      <span style={{
+        fontSize: 11, fontWeight: 700,
+        color: acento,
+        background: `${acento}15`,
+        padding: '2px 8px',
+        borderRadius: 999,
+        fontVariantNumeric: 'tabular-nums',
+      }}>{count}</span>
       {actionLabel && (
         <button
           style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', fontFamily: 'inherit', fontSize: 'var(--mk-text-xs)', cursor: 'pointer', padding: '2px 4px' }}
