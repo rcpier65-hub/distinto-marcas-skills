@@ -22,32 +22,58 @@ await c.connect()
 
 async function ensureAuthUser(email, password) {
   const ex = await c.query('SELECT id FROM auth.users WHERE LOWER(email) = LOWER($1) LIMIT 1', [email])
+  let userId, existed
   if (ex.rows[0]) {
+    userId = ex.rows[0].id
+    existed = true
     await c.query(
       `UPDATE auth.users
-       SET encrypted_password = crypt($1, gen_salt('bf')),
+       SET encrypted_password = crypt($1, gen_salt('bf', 10)),
            email_confirmed_at = COALESCE(email_confirmed_at, now()),
            updated_at = now()
        WHERE id = $2`,
-      [password, ex.rows[0].id]
+      [password, userId]
     )
-    return { id: ex.rows[0].id, existed: true }
+  } else {
+    const r = await c.query(
+      /* gotrue valida que confirmation_token, email_change,
+         email_change_token_new y recovery_token sean STRING vacío,
+         no NULL. Si quedan NULL, el login devuelve "invalid_grant"
+         aunque el hash y la identidad estén correctos. */
+      `INSERT INTO auth.users (
+         id, instance_id, aud, role, email, encrypted_password,
+         email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+         created_at, updated_at, is_sso_user, is_anonymous,
+         confirmation_token, email_change, email_change_token_new, recovery_token
+       ) VALUES (
+         gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
+         'authenticated', 'authenticated',
+         $1, crypt($2, gen_salt('bf', 10)),
+         now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+         now(), now(), false, false,
+         '', '', '', ''
+       ) RETURNING id`,
+      [email, password]
+    )
+    userId = r.rows[0].id
+    existed = false
   }
-  const r = await c.query(
-    `INSERT INTO auth.users (
-       id, instance_id, aud, role, email, encrypted_password,
-       email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-       created_at, updated_at, is_sso_user, is_anonymous
+  /* Garantizar entrada en auth.identities — Supabase Auth requiere esta
+     fila para que signInWithPassword funcione. Sin ella, la query encuentra
+     el usuario pero rechaza el login con "credenciales incorrectas". */
+  await c.query(
+    `INSERT INTO auth.identities (
+       id, user_id, provider, provider_id, identity_data,
+       last_sign_in_at, created_at, updated_at
      ) VALUES (
-       gen_random_uuid(), '00000000-0000-0000-0000-000000000000',
-       'authenticated', 'authenticated',
-       $1, crypt($2, gen_salt('bf')),
-       now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
-       now(), now(), false, false
-     ) RETURNING id`,
-    [email, password]
+       gen_random_uuid(), $1::uuid, 'email', $2::text,
+       jsonb_build_object('sub', $2::text, 'email', $3::text, 'email_verified', false, 'phone_verified', false),
+       now(), now(), now()
+     )
+     ON CONFLICT (provider, provider_id) DO NOTHING`,
+    [userId, userId, email]
   )
-  return { id: r.rows[0].id, existed: false }
+  return { id: userId, existed }
 }
 
 // ===== PIEER (Editor + override grilla) =====

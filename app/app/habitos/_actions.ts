@@ -136,13 +136,52 @@ export async function listHabitosConEstado(): Promise<
 }
 
 /**
+ * Helper: confirma que el habitoId pertenece al user actual.
+ * Devuelve { ok: false } si el hábito no existe o no es del user.
+ *
+ * Cada user tiene sus propios hábitos (team_member_id) y NO debe poder
+ * tocar los de otro. Sin este check, Lorena podría completar/borrar
+ * los hábitos de Pieer si conoce el UUID.
+ */
+async function assertOwnership(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: any,
+  userId: string,
+  habitoId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  /* team_member_id del user actual (null si es admin/owner sin perfil) */
+  const { data: tm } = await service
+    .from('team_members')
+    .select('id')
+    .eq('auth_user_id', userId)
+    .maybeSingle()
+  const teamMemberId = tm?.id ?? null
+
+  const { data: h } = await service
+    .from('habitos')
+    .select('id, team_member_id')
+    .eq('id', habitoId)
+    .maybeSingle()
+
+  if (!h) return { ok: false, error: 'Hábito no encontrado' }
+  if (h.team_member_id !== teamMemberId) {
+    return { ok: false, error: 'Este hábito no es tuyo' }
+  }
+  return { ok: true }
+}
+
+/**
  * Toggle de hábito: si NO está marcado hoy → marca. Si está marcado → desmarca.
  */
 export async function toggleHabitoHoy(habitoId: string): Promise<{ ok: true; completado: boolean } | { ok: false; error: string }> {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const today = todayStr()
+
+  /* Validar que el hábito sea del user actual antes de tocarlo */
+  const own = await assertOwnership(service, user.id, habitoId)
+  if (!own.ok) return own
 
   // Check si ya está marcado hoy
   const existing = await service
@@ -187,12 +226,16 @@ export async function toggleHabitoFecha(
   habitoId: string,
   fecha: string,
 ): Promise<{ ok: true; completado: boolean } | { ok: false; error: string }> {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Fecha inválida' }
   if (fecha > todayStr()) return { ok: false, error: 'No puedes marcar días futuros' }
+
+  /* Validar ownership */
+  const own = await assertOwnership(service, user.id, habitoId)
+  if (!own.ok) return own
 
   const existing = await service
     .from('habitos_completados')
@@ -282,9 +325,12 @@ export async function createHabito(args: {
  * Soft-delete: marca activo=false en lugar de borrar (conserva historial).
  */
 export async function archivarHabito(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+  /* Validar ownership: Lorena no puede archivar el hábito de Pieer */
+  const own = await assertOwnership(service, user.id, id)
+  if (!own.ok) return own
   const { error } = await service.from('habitos').update({ activo: false }).eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/habitos')
@@ -298,9 +344,12 @@ export async function updateHabito(
   id: string,
   patch: { nombre?: string; icono?: string; color?: string; dias_activos?: number[] },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+  /* Validar ownership */
+  const own = await assertOwnership(service, user.id, id)
+  if (!own.ok) return own
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload: any = {}
   if (patch.nombre !== undefined) payload.nombre = patch.nombre.trim()

@@ -132,43 +132,56 @@ export function GrillaWorkspace({
   }, [marca.slug, semanaInicio, semanaFin, publicaciones])
 
   /* Copiar PNG al portapapeles.
-     CRITICAL: la Clipboard API requiere que ClipboardItem se cree DENTRO
-     del mismo user gesture. Si hago `const blob = await fetch(...)` y
-     LUEGO `clipboard.write([new ClipboardItem({...blob})])`, Safari falla
-     porque el user gesture se perdió en el await.
-     Solución: pasar la PROMESA del blob directo al ClipboardItem
-     (Safari 16+ y Chrome lo soportan). */
+     Critical: la Clipboard API rechaza el write si blob.type no coincide
+     con la KEY del dictionary ('image/png'). Si el server devuelve algo
+     que NO es PNG (ej. error en text/plain por timeout de Chromium), el
+     browser tira:
+       "Type image/png does not match the blob's type text/plain"
+     Pedro vio exactamente ese error.
+
+     Fix robusto:
+     1. fetch + verificar response OK + content-type empieza con image/
+     2. Si no es imagen, leer el body como texto y mostrar el ERROR REAL
+        del servidor (mejor que un misleading "no se pudo copiar")
+     3. Si es imagen, RE-CREAR el blob con type forzado a 'image/png'
+        para garantizar que coincida con la key del ClipboardItem
+     4. clipboard.write
+  */
   async function handleCopyImage() {
     if (isCopyingImage) return
     setIsCopyingImage(true)
     toast.loading('Generando PNG (~10s)…', { id: 'copy-img' })
     try {
-      const blobPromise = fetch(pngEndpointUrl).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.blob()
-      })
+      const res = await fetch(pngEndpointUrl)
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '')
+        throw new Error(
+          `Servidor falló (${res.status})${errBody ? `: ${errBody.slice(0, 200)}` : ''}`,
+        )
+      }
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.startsWith('image/')) {
+        /* El endpoint devolvió texto/JSON (probablemente error de Chromium).
+           Mostrar el cuerpo para diagnóstico. */
+        const errBody = await res.text().catch(() => '')
+        throw new Error(
+          `Esperaba PNG pero recibí ${contentType || 'desconocido'}${errBody ? `: ${errBody.slice(0, 200)}` : ''}`,
+        )
+      }
+      /* Re-crear el blob con type forzado a image/png. Esto asegura que
+         coincida con la key del ClipboardItem aunque el server haya
+         devuelto image/jpeg o algo con sufijos. */
+      const buf = await res.arrayBuffer()
+      const pngBlob = new Blob([buf], { type: 'image/png' })
       await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blobPromise }),
+        new ClipboardItem({ 'image/png': pngBlob }),
       ])
       toast.success('Imagen copiada al portapapeles ✓ — ya podés pegarla', {
         id: 'copy-img',
       })
     } catch (err) {
-      /* Fallback para Safari < 16 o cuando el navegador no soporta
-         pasar promesas: bajamos el blob primero y reintentamos. Si
-         este path corre fuera del user gesture, igual va a fallar en
-         Safari, pero al menos Chrome/Edge funcionan. */
-      try {
-        const res = await fetch(pngEndpointUrl)
-        const blob = await res.blob()
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob }),
-        ])
-        toast.success('Imagen copiada al portapapeles ✓', { id: 'copy-img' })
-      } catch (fallbackErr) {
-        const msg = fallbackErr instanceof Error ? fallbackErr.message : String(err)
-        toast.error(`No se pudo copiar: ${msg}`, { id: 'copy-img' })
-      }
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(`No se pudo copiar: ${msg}`, { id: 'copy-img' })
     } finally {
       setIsCopyingImage(false)
     }
