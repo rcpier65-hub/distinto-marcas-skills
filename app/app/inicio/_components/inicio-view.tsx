@@ -10,7 +10,7 @@
 import { useState, useTransition, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { toggleHabitoHoy } from '@/app/habitos/_actions'
+import { toggleHabitoHoy, toggleHabitoFecha } from '@/app/habitos/_actions'
 import {
   crearPendienteRapido,
   togglePendienteRapido,
@@ -39,6 +39,9 @@ export type InicioData = {
     icono: string
     color: string
     completado: boolean
+    /* Fechas YYYY-MM-DD cumplidas en los últimos 7 días — alimenta
+       los círculos por día estilo /habitos. */
+    historial: string[]
   }>
   tareasMias: Array<{
     id: string
@@ -203,18 +206,62 @@ export function InicioView({ data }: { data: InicioData }) {
     /[aá]$/.test(data.nombre) ? 'Bienvenida' : 'Bienvenido'
   const completadosCount = habitos.filter((h) => h.completado).length
 
+  /* Hoy en YMD local (Lima TZ) — para el tracker de 7 días. Tomado del
+     primer item de habitosHoy si existe (calculado en server con misma
+     lógica), o fallback al cliente. */
+  const hoy = useMemo(() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }, [])
+
   function toggleHabito(id: string) {
     const prev = habitos
+    const habito = habitos.find((h) => h.id === id)
+    if (!habito) return
+    const yaCompletado = habito.historial.includes(hoy)
     setHabitos((curr) =>
-      curr.map((h) => (h.id === id ? { ...h, completado: !h.completado } : h))
+      curr.map((h) => {
+        if (h.id !== id) return h
+        const nuevoHistorial = yaCompletado
+          ? h.historial.filter((f) => f !== hoy)
+          : [...h.historial, hoy]
+        return { ...h, completado: !yaCompletado, historial: nuevoHistorial }
+      })
     )
     startTransition(async () => {
       const r = await toggleHabitoHoy(id)
       if (!r.ok) {
         setHabitos(prev)
         toast.error(r.error)
-      } else {
-        router.refresh()
+      }
+    })
+  }
+
+  /* Toggle de cualquier fecha (no solo hoy) para clicks en el tracker.
+     Si fecha == hoy delegamos a toggleHabito para mantener consistencia
+     del estado 'completado'. */
+  function toggleHabitoFechaHome(id: string, fecha: string) {
+    if (fecha === hoy) { toggleHabito(id); return }
+    if (fecha > hoy) return  /* no marcar futuros */
+    const prev = habitos
+    setHabitos((curr) =>
+      curr.map((h) => {
+        if (h.id !== id) return h
+        const tiene = h.historial.includes(fecha)
+        const nuevoHistorial = tiene
+          ? h.historial.filter((f) => f !== fecha)
+          : [...h.historial, fecha]
+        return { ...h, historial: nuevoHistorial }
+      })
+    )
+    startTransition(async () => {
+      const r = await toggleHabitoFecha(id, fecha)
+      if (!r.ok) {
+        setHabitos(prev)
+        toast.error(r.error)
       }
     })
   }
@@ -420,8 +467,9 @@ export function InicioView({ data }: { data: InicioData }) {
             gap: 24,
           }}
         >
-          {/* Columna principal: trabajo de hoy + reuniones + tareas rápidas + chat anclado */}
+          {/* Columna principal: accesos rápidos + trabajo + reuniones + chat */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <AccesosRapidos rolBase={data.rolBase} acento={acento} />
             <TrabajoYReuniones
               tareas={data.tareasMias}
               reuniones={data.reuniones}
@@ -434,109 +482,17 @@ export function InicioView({ data }: { data: InicioData }) {
             />
           </div>
 
-          {/* Sidebar: hábitos del día */}
+          {/* Sidebar: tracker de hábitos estilo /habitos.
+              Diseño consistente con el módulo de hábitos: violeta #ba41f7,
+              círculos por día de la semana clickeables. */}
           <aside>
-            <h2
-              style={{
-                fontSize: 12, fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: '#9ca3af',
-                margin: '0 0 12px',
-                display: 'flex', alignItems: 'baseline', gap: 6,
-              }}
-            >
-              Tus hábitos de hoy{' '}
-              <span style={{ color: '#d1d5db', fontWeight: 500 }}>·</span>{' '}
-              <span style={{ color: '#7170ff' }}>
-                {completadosCount}/{habitos.length}
-              </span>
-            </h2>
-            <div
-              style={{
-                background: '#fff',
-                border: '1px solid #f1f1f3',
-                borderRadius: 14,
-                padding: 6,
-                boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-              }}
-            >
-              {habitos.length === 0 ? (
-                <div style={{ padding: 18, textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>
-                  No tienes hábitos configurados.{' '}
-                  <a href="/habitos" style={{ color: '#7170ff' }}>Crear →</a>
-                </div>
-              ) : (
-                habitos.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => toggleHabito(h.id)}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '10px 12px',
-                      background: h.completado ? `${h.color}10` : 'transparent',
-                      border: 'none',
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      textAlign: 'left',
-                      transition: 'background 100ms ease-out',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!h.completado) e.currentTarget.style.background = '#f9fafb'
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!h.completado) e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 20, height: 20, borderRadius: 6,
-                        border: `2px solid ${h.completado ? h.color : '#e5e7eb'}`,
-                        background: h.completado ? h.color : 'transparent',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: 12, fontWeight: 700,
-                        flexShrink: 0,
-                        transition: 'all 150ms ease-out',
-                      }}
-                    >
-                      {h.completado && '✓'}
-                    </span>
-                    <span style={{ fontSize: 15 }}>{h.icono}</span>
-                    <span
-                      style={{
-                        flex: 1,
-                        fontSize: 13.5,
-                        color: h.completado ? '#9ca3af' : '#111827',
-                        textDecoration: h.completado ? 'line-through' : 'none',
-                      }}
-                    >
-                      {h.nombre}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-            <a
-              href="/habitos"
-              style={{
-                display: 'block',
-                marginTop: 10,
-                padding: '8px 14px',
-                fontSize: 12, fontWeight: 500,
-                color: '#7170ff',
-                textAlign: 'center',
-                textDecoration: 'none',
-              }}
-            >
-              Ver heatmap completo →
-            </a>
+            <HabitosTrackerHome
+              habitos={habitos}
+              today={hoy}
+              completadosCount={completadosCount}
+              onToggleHoy={toggleHabito}
+              onToggleFecha={toggleHabitoFechaHome}
+            />
           </aside>
         </div>
       </div>
@@ -1138,4 +1094,341 @@ function PendienteItem({
       )}
     </div>
   )
+}
+
+/* ====================================================================
+   AccesosRapidos
+   --------------------------------------------------------------------
+   Cards de acceso rápido por rol. Nombres descriptivos en lugar de
+   genéricos: "Mis diseños para hoy" en vez de "Diseño". Hover lift +
+   color del rol como acento. 2-3 cards máximo para no saturar.
+   ==================================================================== */
+function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }) {
+  const accesos = useMemo(() => {
+    const COMUNES = {
+      perfil: { titulo: 'Mi perfil', subtitulo: 'Foto, datos, contraseña', href: '/perfil', icon: '👤' },
+      habitos: { titulo: 'Mis hábitos', subtitulo: 'Heatmap completo y rutinas', href: '/habitos', icon: '🔥' },
+    }
+    if (rolBase === 'disenador') {
+      return [
+        { titulo: 'Mis diseños para hoy', subtitulo: 'Tareas pendientes en diseño', href: '/diseno', icon: '🎨', color: '#ec4899' },
+        COMUNES.habitos,
+        COMUNES.perfil,
+      ]
+    }
+    if (rolBase === 'editor') {
+      return [
+        { titulo: 'Editar hoy', subtitulo: 'Videos asignados a ti', href: '/editor', icon: '✂️', color: '#8b5cf6' },
+        { titulo: 'Publicaciones semanales', subtitulo: 'Toda la grilla de la semana', href: '/publicaciones', icon: '📅', color: '#06b6d4' },
+        COMUNES.habitos,
+      ]
+    }
+    if (rolBase === 'community_manager' || rolBase === 'social_media_manager') {
+      return [
+        { titulo: 'Atender comentarios', subtitulo: 'Inbox y respuestas pendientes', href: '/comentarios', icon: '💬', color: '#22c55e' },
+        { titulo: 'Publicaciones de la semana', subtitulo: 'Qué sale, cuándo y dónde', href: '/publicaciones', icon: '📅', color: '#06b6d4' },
+        COMUNES.habitos,
+      ]
+    }
+    /* director / admin / default */
+    return [
+      { titulo: 'Cockpit ejecutivo', subtitulo: 'Métricas globales del día', href: '/cockpit', icon: '🎯', color: '#7170ff' },
+      { titulo: 'Mi equipo', subtitulo: 'Miembros, permisos, accesos', href: '/equipo', icon: '👥', color: '#22c55e' },
+      COMUNES.habitos,
+    ]
+  }, [rolBase])
+
+  return (
+    <section>
+      <SectionTitle label="Accesos rápidos" count={accesos.length} countColor={acento} icon="⚡" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+        {accesos.map((a) => {
+          const accColor = ('color' in a ? a.color : acento) as string
+          return (
+            <a
+              key={a.href}
+              href={a.href}
+              style={{
+                padding: '14px 14px 12px',
+                background: '#fff',
+                border: '1px solid #f1f1f3',
+                borderRadius: 14,
+                textDecoration: 'none',
+                display: 'flex', flexDirection: 'column', gap: 6,
+                transition: 'all 180ms cubic-bezier(.22,1,.36,1)',
+                boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = `${accColor}66`
+                e.currentTarget.style.boxShadow = `0 8px 20px -6px ${accColor}33`
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#f1f1f3'
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(16, 24, 40, 0.04)'
+                e.currentTarget.style.transform = 'none'
+              }}
+            >
+              {/* Detalle decorativo: cinta del color en la esquina superior */}
+              <span aria-hidden style={{
+                position: 'absolute',
+                top: 0, right: 0,
+                width: 38, height: 38,
+                background: `radial-gradient(circle at top right, ${accColor}22, transparent 70%)`,
+                pointerEvents: 'none',
+              }} />
+              <span style={{ fontSize: 22, lineHeight: 1 }}>{a.icon}</span>
+              <span style={{
+                fontSize: 13.5, fontWeight: 600,
+                color: '#111827',
+                letterSpacing: '-0.005em',
+                lineHeight: 1.3,
+              }}>
+                {a.titulo}
+              </span>
+              <span style={{ fontSize: 11.5, color: '#6b7280', lineHeight: 1.4 }}>
+                {a.subtitulo}
+              </span>
+              <span style={{ fontSize: 10.5, color: accColor, fontWeight: 600, marginTop: 2 }}>
+                Entrar →
+              </span>
+            </a>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/* ====================================================================
+   HabitosTrackerHome
+   --------------------------------------------------------------------
+   Versión compacta del HabitosTracker de /habitos para el sidebar de
+   la home. Mismo estilo violeta #ba41f7, círculos por día clickeables,
+   pero pensado para una columna angosta (≈360px).
+   ==================================================================== */
+const VIOLETA_HABITOS = '#ba41f7'
+
+function HabitosTrackerHome({
+  habitos,
+  today,
+  completadosCount,
+  onToggleHoy,
+  onToggleFecha,
+}: {
+  habitos: InicioData['habitosHoy']
+  today: string
+  completadosCount: number
+  onToggleHoy: (id: string) => void
+  onToggleFecha: (id: string, fecha: string) => void
+}) {
+  /* Últimos 7 días con hoy a la derecha */
+  const semana = useMemo(() => {
+    const hoyDate = new Date(today + 'T12:00:00')
+    const letras = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(hoyDate)
+      d.setDate(d.getDate() + i - 6)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const ymd = `${y}-${m}-${day}`
+      return { ymd, letra: letras[d.getDay()], num: d.getDate(), esHoy: ymd === today }
+    })
+  }, [today])
+
+  if (habitos.length === 0) {
+    return (
+      <section>
+        <h2 style={tituloHabitosStyle}>
+          <span>🔥</span>
+          <span>Tus hábitos del día</span>
+        </h2>
+        <div style={{
+          background: '#fff',
+          border: '1px solid #f1f1f3',
+          borderRadius: 14,
+          padding: 24,
+          textAlign: 'center',
+          color: '#9ca3af',
+          fontSize: 12.5,
+        }}>
+          No tienes hábitos configurados.{' '}
+          <a href="/habitos" style={{ color: VIOLETA_HABITOS, fontWeight: 600 }}>Crear →</a>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <h2 style={tituloHabitosStyle}>
+        <span>🔥</span>
+        <span style={{ flex: 1 }}>Tus hábitos del día</span>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          padding: '2px 8px',
+          borderRadius: 999,
+          background: `${VIOLETA_HABITOS}15`,
+          color: VIOLETA_HABITOS,
+          letterSpacing: 0,
+        }}>
+          {completadosCount}/{habitos.length}
+        </span>
+      </h2>
+      <p style={{
+        fontSize: 11.5,
+        color: '#6b7280',
+        margin: '0 0 12px',
+        lineHeight: 1.4,
+      }}>
+        Hoy no olvides marcarlos. Toca el día <strong style={{ color: VIOLETA_HABITOS }}>de hoy</strong> para registrarlo.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {habitos.map((h) => {
+          const cumplidosSemana = semana.filter((d) => h.historial.includes(d.ymd)).length
+          return (
+            <div
+              key={h.id}
+              style={{
+                background: '#fff',
+                border: '1px solid #f1f1f3',
+                borderRadius: 14,
+                padding: '12px 14px',
+                boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 10,
+              }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{h.icono}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 600,
+                    color: '#111827',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    letterSpacing: '-0.005em',
+                  }}>
+                    {h.nombre}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>
+                    {cumplidosSemana}/7 esta semana
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'space-between' }}>
+                {semana.map((d) => {
+                  const ok = h.historial.includes(d.ymd)
+                  return (
+                    <button
+                      key={d.ymd}
+                      onClick={() => onToggleFecha(h.id, d.ymd)}
+                      title={d.ymd + (ok ? ' (cumplido)' : '')}
+                      style={{
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', gap: 3,
+                        padding: 0,
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <span style={{
+                        width: 30, height: 30, borderRadius: '50%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11, fontWeight: 600,
+                        transition: 'all 150ms ease-out',
+                        ...(ok
+                          ? { background: VIOLETA_HABITOS, color: '#fff', boxShadow: `0 2px 6px ${VIOLETA_HABITOS}44` }
+                          : d.esHoy
+                          ? { border: `2px solid ${VIOLETA_HABITOS}`, background: `${VIOLETA_HABITOS}14`, color: VIOLETA_HABITOS }
+                          : { border: '1.5px solid #e4e4e7', color: '#a1a1aa' }
+                        ),
+                      }}>
+                        {ok ? '✓' : d.num}
+                      </span>
+                      <span style={{
+                        fontSize: 9.5,
+                        color: d.esHoy ? '#111827' : '#9ca3af',
+                        fontWeight: d.esHoy ? 700 : 500,
+                      }}>
+                        {d.letra}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {/* Botón ¡Hecho hoy! solo si NO está completado */}
+              {!h.completado && (
+                <button
+                  onClick={() => onToggleHoy(h.id)}
+                  style={{
+                    width: '100%',
+                    marginTop: 10,
+                    padding: '7px 12px',
+                    background: `${VIOLETA_HABITOS}0c`,
+                    border: `1px dashed ${VIOLETA_HABITOS}44`,
+                    color: VIOLETA_HABITOS,
+                    borderRadius: 10,
+                    fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    transition: 'all 150ms',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = `${VIOLETA_HABITOS}15`
+                    e.currentTarget.style.borderStyle = 'solid'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = `${VIOLETA_HABITOS}0c`
+                    e.currentTarget.style.borderStyle = 'dashed'
+                  }}
+                >
+                  ✓ Marcar como hecho hoy
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <a
+        href="/habitos"
+        style={{
+          display: 'block',
+          marginTop: 10,
+          padding: '8px 14px',
+          fontSize: 11.5, fontWeight: 600,
+          color: VIOLETA_HABITOS,
+          textAlign: 'center',
+          textDecoration: 'none',
+        }}
+      >
+        Ver tracker completo →
+      </a>
+    </section>
+  )
+}
+
+const tituloHabitosStyle: React.CSSProperties = {
+  fontSize: 12, fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  color: '#9ca3af',
+  margin: '0 0 6px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
 }

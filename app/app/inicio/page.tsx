@@ -63,7 +63,14 @@ export default async function InicioPage() {
     modulosAccesibles.push({ key: 'grilla', label: 'Grilla semanal', href: '/dashboard', color: '#7170ff', icon: '📊' })
   }
 
-  /* Hábitos del día (los del user actual) */
+  /* Hábitos del día (los del user actual) + historial de los últimos 7
+     días para los círculos clickeables del tracker en la home.
+     Cargar historial es CRUCIAL: sin él los días anteriores
+     aparecerían vacíos aunque el user los hubiera marcado. */
+  const desde7 = new Date()
+  desde7.setDate(desde7.getDate() - 6)
+  const desde7Str = desde7.toISOString().slice(0, 10)
+
   const { data: habitos } = await service
     .from('habitos')
     .select('id, nombre, icono, color, orden')
@@ -71,21 +78,36 @@ export default async function InicioPage() {
     .eq('team_member_id', p.member.id)
     .order('orden')
 
-  const { data: completados } = await service
+  const habitoIds = ((habitos ?? []) as Array<{ id: string }>).map((h) => h.id)
+
+  const { data: completados } = habitoIds.length > 0 ? await service
     .from('habitos_completados')
-    .select('habito_id')
-    .eq('fecha', hoy)
+    .select('habito_id, fecha')
+    .in('habito_id', habitoIds)
+    .gte('fecha', desde7Str)
+    : { data: [] }
+
+  /* Map habito_id → Set de fechas YYYY-MM-DD cumplidas en últimos 7 días */
+  const historialPorHabito = new Map<string, string[]>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const c of (completados ?? []) as any[]) {
+    const arr = historialPorHabito.get(c.habito_id as string) ?? []
+    arr.push(c.fecha as string)
+    historialPorHabito.set(c.habito_id as string, arr)
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const completadosSet = new Set(((completados ?? []) as any[]).map((c) => c.habito_id as string))
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const habitosHoy = ((habitos ?? []) as any[]).map((h) => ({
-    id: h.id as string,
-    nombre: h.nombre as string,
-    icono: (h.icono ?? '✅') as string,
-    color: (h.color ?? '#6366F1') as string,
-    completado: completadosSet.has(h.id as string),
-  }))
+  const habitosHoy = ((habitos ?? []) as any[]).map((h) => {
+    const hist = historialPorHabito.get(h.id as string) ?? []
+    return {
+      id: h.id as string,
+      nombre: h.nombre as string,
+      icono: (h.icono ?? '✅') as string,
+      color: (h.color ?? '#6366F1') as string,
+      completado: hist.includes(hoy),
+      historial: hist,
+    }
+  })
 
   /* Datos contextuales según el rol */
   let tareasMias: InicioData['tareasMias'] = []
@@ -98,7 +120,7 @@ export default async function InicioPage() {
       .ilike('editor_nombre', p.member.nombre)
       .eq('estado', 'editar')
       .order('fecha_publicacion', { ascending: true, nullsFirst: false })
-      .limit(10)
+      .limit(3)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tareasMias = ((data ?? []) as any[]).map((r) => {
       const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
@@ -122,7 +144,7 @@ export default async function InicioPage() {
       .eq('estado', 'disenar')
       .eq('portada_lista', false)
       .order('fecha_diseno', { ascending: true, nullsFirst: false })
-      .limit(10)
+      .limit(3)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tareasMias = ((data ?? []) as any[]).map((r) => {
       const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
@@ -145,7 +167,7 @@ export default async function InicioPage() {
       .select(`id, author_username, author_display_name, comment_text, marca:marcas(slug, nombre, color_primario_hex)`)
       .eq('status', 'pending')
       .order('comment_created_at', { ascending: false })
-      .limit(10)
+      .limit(3)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tareasMias = ((data ?? []) as any[]).map((r) => {
       const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
