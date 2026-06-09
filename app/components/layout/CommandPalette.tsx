@@ -1,11 +1,25 @@
 'use client'
 
 /* CommandPalette global Raycast-style. Cmd+K abre desde cualquier vista.
-   Acciones reales: navegación via Next router, ejecutables (signal handlers). */
+   Acciones reales: navegación via Next router, ejecutables (signal handlers).
+
+   Filtro por permisos: si el user es miembro (permisos != null), cada
+   action declara qué módulo requiere y se oculta si no tiene acceso.
+   Admin/owner (permisos null) ve todo. */
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
+import { tieneAcceso, type ModuloPermiso, type Permisos } from '@/lib/team/types'
+
+type PermisosSimple = {
+  modulos: Permisos
+  marcasAcceso: string[] | null
+  nombre: string
+  rol: string
+  email: string
+  avatarUrl: string | null
+} | null
 
 type Action = {
   id: string
@@ -17,6 +31,9 @@ type Action = {
   keywords?: string
   href?: string             /* si tiene → router.push al ejecutar */
   onRun?: () => void        /* si tiene → ejecuta al ejecutar */
+  /* Módulo de permiso requerido. Si está vacío → visible para todos
+     los miembros (siempre). null = action de owner-only (Pedro). */
+  requiereModulo?: ModuloPermiso | null
 }
 
 type Props = {
@@ -24,29 +41,36 @@ type Props = {
   onClose: () => void
   /* Marcas desde la base (vía layout raíz). Fallback a la lista fija. */
   marcas?: MarcaNav[]
+  /* Permisos del usuario logueado. null = admin/owner, ve todo. */
+  permisos?: PermisosSimple
 }
 
-export function CommandPalette({ open, onClose, marcas = MARCAS_NAV }: Props) {
+export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }: Props) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [selectedIdx, setSelectedIdx] = useState(0)
 
   const actions: Action[] = useMemo(() => [
     // Navegación
-    { id: 'nav-cockpit',       title: 'Ir a Cockpit',                                                category: 'navegacion', icon: <IconHome />,     shortcut: ['G', 'C'], keywords: 'home dashboard inicio', href: '/cockpit' },
-    { id: 'nav-inbox',         title: 'Inbox global de comentarios',                                  category: 'navegacion', icon: <IconInbox />,    shortcut: ['G', 'I'], keywords: 'comentarios respuestas',  href: '/comentarios' },
-    { id: 'nav-pubs',          title: 'Publicaciones',                                                category: 'navegacion', icon: <IconCalendar />, shortcut: ['G', 'P'], keywords: 'posts contenido',         href: '/publicaciones' },
-    { id: 'nav-recordings',    title: 'Grabaciones',                                                  category: 'navegacion', icon: <IconVideo />,    shortcut: ['G', 'R'], keywords: 'video shooting',          href: '/grabaciones' },
-    { id: 'nav-habits',        title: 'Hábitos',                                                      category: 'navegacion', icon: <IconCheck />,    shortcut: ['G', 'H'], keywords: 'rutinas streak',          href: '/habitos' },
-    { id: 'nav-settings',      title: 'Settings',    subtitle: 'Configuración del workspace',         category: 'navegacion', icon: <IconSettings />, shortcut: ['⌘', ','], keywords: 'config preferencias',     href: '/settings' },
+    /* Inicio: dashboard de bienvenida — solo para miembros. Admin va a Cockpit. */
+    { id: 'nav-inicio',        title: 'Ir a Inicio',           subtitle: 'Tu dashboard personal',           category: 'navegacion', icon: <IconHome />,     keywords: 'home bienvenida',         href: '/inicio',         requiereModulo: undefined },
+    { id: 'nav-cockpit',       title: 'Ir a Cockpit',                                                       category: 'navegacion', icon: <IconHome />,     shortcut: ['G', 'C'], keywords: 'home dashboard',       href: '/cockpit',        requiereModulo: 'metricas' },
+    { id: 'nav-inbox',         title: 'Inbox global de comentarios',                                        category: 'navegacion', icon: <IconInbox />,    shortcut: ['G', 'I'], keywords: 'comentarios respuestas', href: '/comentarios',  requiereModulo: 'comentarios' },
+    { id: 'nav-pubs',          title: 'Publicaciones',                                                      category: 'navegacion', icon: <IconCalendar />, shortcut: ['G', 'P'], keywords: 'posts contenido',      href: '/publicaciones',  requiereModulo: 'publicaciones' },
+    { id: 'nav-editor',        title: 'Editor de video',                                                    category: 'navegacion', icon: <IconVideo />,    shortcut: ['G', 'E'], keywords: 'editar videos',        href: '/editor',         requiereModulo: 'editor' },
+    { id: 'nav-diseno',        title: 'Diseño',                                                             category: 'navegacion', icon: <IconCalendar />, shortcut: ['G', 'D'], keywords: 'portadas piezas',      href: '/diseno',         requiereModulo: 'diseno' },
+    { id: 'nav-recordings',    title: 'Grabaciones',                                                        category: 'navegacion', icon: <IconVideo />,    shortcut: ['G', 'R'], keywords: 'video shooting',       href: '/grabaciones',    requiereModulo: 'publicaciones' },
+    { id: 'nav-habits',        title: 'Hábitos',                                                            category: 'navegacion', icon: <IconCheck />,    shortcut: ['G', 'H'], keywords: 'rutinas streak',       href: '/habitos',        requiereModulo: undefined },
+    { id: 'nav-equipo',        title: 'Mi equipo',                                                          category: 'navegacion', icon: <IconSettings />, keywords: 'team miembros',           href: '/equipo',         requiereModulo: 'equipo' },
+    { id: 'nav-settings',      title: 'Settings',    subtitle: 'Configuración del workspace',               category: 'navegacion', icon: <IconSettings />, shortcut: ['⌘', ','], keywords: 'config preferencias',  href: '/settings',       requiereModulo: 'settings' },
 
-    // Crear
-    { id: 'create-pub',        title: 'Nueva publicación',     subtitle: 'Borrador para cualquier marca',  category: 'crear', icon: <IconPlus />,    shortcut: ['C'], keywords: 'crear post reel carrusel', href: '/publicaciones/nueva' },
-    { id: 'create-grilla',     title: 'Generar grilla semanal',                                              category: 'crear', icon: <IconGrid />,    keywords: 'crear armar',              href: '/cockpit' },
-    { id: 'create-grabacion',  title: 'Agendar grabación',                                                   category: 'crear', icon: <IconVideo />,   keywords: 'video shooting',           href: '/grabaciones' },
-    { id: 'create-nota',       title: 'Nueva nota',                                                          category: 'crear', icon: <IconNote />,    keywords: 'apunte memo',              href: '/historial' },
+    // Crear — solo aparecen si el user tiene permiso de creación en ese módulo
+    { id: 'create-pub',        title: 'Nueva publicación',     subtitle: 'Borrador para cualquier marca',   category: 'crear', icon: <IconPlus />,    shortcut: ['C'], keywords: 'crear post reel carrusel', href: '/publicaciones/nueva', requiereModulo: 'publicaciones' },
+    { id: 'create-grilla',     title: 'Generar grilla semanal',                                              category: 'crear', icon: <IconGrid />,    keywords: 'crear armar',              href: '/cockpit',             requiereModulo: 'grilla' },
+    { id: 'create-grabacion',  title: 'Agendar grabación',                                                   category: 'crear', icon: <IconVideo />,   keywords: 'video shooting',           href: '/grabaciones',         requiereModulo: 'publicaciones' },
+    { id: 'create-nota',       title: 'Nueva nota',                                                          category: 'crear', icon: <IconNote />,    keywords: 'apunte memo',              href: '/historial',           requiereModulo: null /* admin only */ },
 
-    // Por marca
+    // Por marca — las marcas ya vienen filtradas desde el layout según marcas_acceso del user
     ...marcas.map<Action>((m) => ({
       id: `marca-${m.slug}`,
       title: `Abrir ${m.nombreCorto}`,
@@ -55,20 +79,36 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV }: Props) {
       icon: <span className="mk-dot" style={{ background: m.color, width: 8, height: 8, boxShadow: `0 0 4px ${m.color}` }} />,
       keywords: `${m.slug} ${m.nombre} ${m.industria}`,
       href: `/grilla/${m.slug}`,
+      requiereModulo: 'grilla',
     })),
   ], [marcas])
 
-  // Filtro fuzzy
+  /* Filtro por permisos.
+     - Admin/owner (permisos==null): ve TODO
+     - Miembro: solo acciones donde
+       requiereModulo === undefined  → siempre visible (ej. Inicio, Hábitos)
+       requiereModulo === null       → owner-only, OCULTAR
+       requiereModulo === 'xxx'      → visible solo si tieneAcceso(xxx) */
+  const visibles = useMemo(() => {
+    if (!permisos) return actions  /* admin/owner ve todo */
+    return actions.filter((a) => {
+      if (a.requiereModulo === undefined) return true
+      if (a.requiereModulo === null) return false
+      return tieneAcceso(permisos.modulos, a.requiereModulo)
+    })
+  }, [actions, permisos])
+
+  // Filtro fuzzy aplicado sobre las visibles
   const filtered = useMemo(() => {
-    if (!query) return actions
+    if (!query) return visibles
     const q = query.toLowerCase()
-    return actions.filter((a) =>
+    return visibles.filter((a) =>
       a.title.toLowerCase().includes(q) ||
       a.subtitle?.toLowerCase().includes(q) ||
       a.keywords?.toLowerCase().includes(q) ||
       a.category.toLowerCase().includes(q)
     )
-  }, [query, actions])
+  }, [query, visibles])
 
   useEffect(() => { setSelectedIdx(0) }, [query])
 

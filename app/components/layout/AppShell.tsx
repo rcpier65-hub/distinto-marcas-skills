@@ -73,7 +73,7 @@ export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
       <main style={{ flex: 1, minWidth: 0 }}>
         {children}
       </main>
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} />
     </div>
   )
 }
