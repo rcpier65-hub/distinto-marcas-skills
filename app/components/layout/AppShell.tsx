@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
+import { RealtimeBridge } from '@/lib/realtime/realtime-bridge'
 import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
 
@@ -62,6 +63,12 @@ export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--mk-bg-base)' }}>
+      {/* RealtimeBridge: escucha cambios en BD (publicaciones, comentarios,
+          hábitos, equipo, marcas, grabaciones) y dispara router.refresh()
+          para que TODOS los Server Components reflejen lo nuevo sin que
+          el user tenga que recargar. Pedro pidió "live updates" entre
+          miembros: si Ailyn crea una tarea, Lorena la ve en ~500ms. */}
+      <RealtimeBridge />
       <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
       <main style={{ flex: 1, minWidth: 0 }}>
         {children}
