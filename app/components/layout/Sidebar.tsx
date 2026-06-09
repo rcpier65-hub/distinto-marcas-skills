@@ -228,20 +228,20 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           </Section>
         )}
 
-        {/* Personal: Hábitos e Historial son del owner solo (Pedro).
-            Mi equipo / Settings tienen su permiso específico. */}
+        {/* Personal: Mi equipo / Settings tienen su permiso específico.
+            Hábitos lo ven TODOS los miembros (cada uno ve sus propios).
+            Historial sigue siendo solo del admin/owner. */}
         <Section
           label="Personal"
           open={openSections.personal}
           onToggle={() => setOpenSections((s) => ({ ...s, personal: !s.personal }))}
         >
-          {/* Hábitos e Historial son personales del owner. Solo se ven
-              cuando NO hay miembro asociado (= Pedro/admin). */}
+          {/* Hábitos: cada user tiene los suyos (clonados al crear el
+              team_member). Pedro pidió que aparezca para todos. */}
+          <NavItem href="/habitos" icon={<CheckIcon />} label="Hábitos" active={isActive('/habitos')} />
+          {/* Historial: solo admin/owner por ahora */}
           {!permisos && (
-            <>
-              <NavItem href="/habitos"   icon={<CheckIcon />}  label="Hábitos"   active={isActive('/habitos')}   badge={2} />
-              <NavItem href="/historial" icon={<NoteIcon />}   label="Historial" active={isActive('/historial')} />
-            </>
+            <NavItem href="/historial" icon={<NoteIcon />} label="Historial" active={isActive('/historial')} />
           )}
           {puede('equipo') && (
             <NavItem href="/equipo"    icon={<TeamIcon />}   label="Mi equipo" active={isActive('/equipo')} />
