@@ -15,6 +15,7 @@ import {
   crearPendienteRapido,
   togglePendienteRapido,
   eliminarPendienteRapido,
+  convertirEnTarea,
 } from '../_actions'
 
 export type InicioData = {
@@ -47,6 +48,18 @@ export type InicioData = {
     meta: string
     marcadaHoy: boolean
     modulo: 'editor' | 'diseno' | 'comentarios'
+  }>
+  /* Reuniones programadas (publicaciones con reunion_hora). Solo a
+     futuro, ordenadas por fecha+hora. Caen acá solo si el user tiene
+     acceso a algún módulo de tareas (editor/diseno/publicaciones). */
+  reuniones: Array<{
+    id: string
+    titulo: string
+    marca: string
+    marcaColor: string
+    cuando: string  /* 'Hoy', 'lun 12 jun', etc. */
+    hora: string    /* 'HH:MM' */
+    esHoy: boolean
   }>
   /* Pendientes rápidos: lo que el user escribió en el chat de la home.
      La IA (o heurística) ya parseó título + categoría + prioridad. */
@@ -407,8 +420,13 @@ export function InicioView({ data }: { data: InicioData }) {
             gap: 24,
           }}
         >
-          {/* Columna principal: Pendientes rápidos + chat */}
+          {/* Columna principal: trabajo de hoy + reuniones + tareas rápidas + chat anclado */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <TrabajoYReuniones
+              tareas={data.tareasMias}
+              reuniones={data.reuniones}
+              acento={acento}
+            />
             <PendientesPanel
               pendientesIniciales={data.pendientes}
               acento={acento}
@@ -527,6 +545,177 @@ export function InicioView({ data }: { data: InicioData }) {
 }
 
 /* ====================================================================
+   TrabajoYReuniones
+   --------------------------------------------------------------------
+   Bloque superior de la columna principal: muestra
+     1) Tu trabajo de hoy  (tareas reales de publicaciones según rol)
+     2) Reuniones pendientes (publicaciones con reunion_hora)
+   Si ambas están vacías, muestra un empty-state amable.
+   ==================================================================== */
+function TrabajoYReuniones({
+  tareas,
+  reuniones,
+  acento,
+}: {
+  tareas: InicioData['tareasMias']
+  reuniones: InicioData['reuniones']
+  acento: string
+}) {
+  const tituloTareas =
+    tareas[0]?.modulo === 'editor' ? 'Tus videos por editar' :
+    tareas[0]?.modulo === 'diseno' ? 'Tus tareas de diseño' :
+    tareas[0]?.modulo === 'comentarios' ? 'Comentarios por responder' :
+    'Tu trabajo de hoy'
+
+  if (tareas.length === 0 && reuniones.length === 0) {
+    return (
+      <section style={cardStyle}>
+        <div style={{ padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🎉</div>
+          <div style={{ color: '#374151', fontWeight: 500, fontSize: 14 }}>
+            No tienes pendientes asignados ni reuniones programadas.
+          </div>
+          <div style={{ color: '#9ca3af', fontSize: 12.5, marginTop: 4 }}>
+            Cuando lleguen tareas nuevas las verás aquí. Mientras tanto puedes anotar tareas rápidas abajo ↓
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <>
+      {/* Tu trabajo de hoy */}
+      {tareas.length > 0 && (
+        <section>
+          <SectionTitle
+            label={tituloTareas}
+            count={tareas.length}
+            countColor={acento}
+          />
+          <div style={cardStyle}>
+            {tareas.map((t, i) => (
+              <a
+                key={t.id}
+                href={`/publicaciones/${t.id}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px',
+                  borderBottom: i < tareas.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  textDecoration: 'none',
+                  transition: 'background 100ms ease-out',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: t.marcaColor, flexShrink: 0,
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 14, fontWeight: 500, color: '#111827',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {t.nombre}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2 }}>
+                    {t.marca} · {t.meta}
+                    {t.marcadaHoy && ' · 🔥 Hoy'}
+                  </div>
+                </div>
+                <span style={{ color: '#d1d5db' }}>→</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Reuniones pendientes */}
+      {reuniones.length > 0 && (
+        <section>
+          <SectionTitle
+            label="Reuniones pendientes"
+            count={reuniones.length}
+            countColor={acento}
+            icon="📅"
+          />
+          <div style={cardStyle}>
+            {reuniones.map((r, i) => (
+              <a
+                key={r.id}
+                href={`/publicaciones/${r.id}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px',
+                  borderBottom: i < reuniones.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  textDecoration: 'none',
+                  transition: 'background 100ms ease-out',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: r.marcaColor, flexShrink: 0,
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 14, fontWeight: 500, color: '#111827',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    textTransform: 'capitalize',
+                  }}>
+                    {r.titulo}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2, textTransform: 'capitalize' }}>
+                    {r.marca} · {r.cuando}{r.hora && ` · ${r.hora}`}
+                    {r.esHoy && ' · 🔥'}
+                  </div>
+                </div>
+                <span style={{ color: '#d1d5db' }}>→</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  )
+}
+
+const cardStyle: React.CSSProperties = {
+  background: '#fff',
+  border: '1px solid #f1f1f3',
+  borderRadius: 14,
+  overflow: 'hidden',
+  boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+}
+
+function SectionTitle({ label, count, countColor, icon }: {
+  label: string
+  count: number
+  countColor: string
+  icon?: string
+}) {
+  return (
+    <h2 style={{
+      fontSize: 12, fontWeight: 600,
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+      color: '#9ca3af',
+      margin: '0 0 10px',
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 6,
+    }}>
+      {icon && <span style={{ fontSize: 14 }}>{icon}</span>}
+      <span>{label}</span>
+      <span style={{ color: '#d1d5db', fontWeight: 500 }}>·</span>
+      <span style={{ color: countColor, fontWeight: 700 }}>{count}</span>
+    </h2>
+  )
+}
+
+/* ====================================================================
    PendientesPanel
    --------------------------------------------------------------------
    Panel principal de la home: arriba lista de tareas pendientes
@@ -553,6 +742,7 @@ function PendientesPanel({
   acento: string
   rolBase: string
 }) {
+  const router = useRouter()
   const [items, setItems] = useState<Pendiente[]>(pendientesIniciales)
   const [input, setInput] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -562,13 +752,13 @@ function PendientesPanel({
   /* Placeholder de ejemplo según rol — tip al user de qué tipo de
      mensajes funcionan bien */
   const ejemplos: Record<string, string> = {
-    disenador: 'Ej: "Tengo que mandar las portadas de Manrique a Lorena hoy mismo"',
-    editor: 'Ej: "Editar el reel de Kintu antes de las 6pm"',
-    community_manager: 'Ej: "Responder los DMs de Lozano y subir story de Fitness"',
-    social_media_manager: 'Ej: "Revisar grilla de la semana de Kintu"',
-    director: 'Ej: "Revisar caja chica del mes"',
+    disenador: 'Anota una tarea rápida: "Mandar portadas a Lorena hoy"',
+    editor: 'Anota una tarea rápida: "Editar reel Kintu antes de las 6pm"',
+    community_manager: 'Anota una tarea rápida: "Responder DMs de Lozano"',
+    social_media_manager: 'Anota una tarea rápida: "Revisar grilla de Kintu"',
+    director: 'Anota una tarea rápida: "Revisar caja chica del mes"',
   }
-  const placeholder = ejemplos[rolBase] ?? 'Escribe lo que tienes que hacer y lo organizo por ti…'
+  const placeholder = ejemplos[rolBase] ?? 'Anota una tarea rápida…'
 
   async function enviar() {
     const texto = input.trim()
@@ -654,206 +844,156 @@ function PendientesPanel({
   }, [items])
 
   const totalActivos = items.filter((p) => !p.completado).length
+  const puedeConvertir = rolBase === 'disenador' || rolBase === 'editor' || rolBase === 'admin'
+
+  async function convertir(id: string) {
+    if (id.startsWith('temp-')) return
+    setItems((curr) => curr.map((p) => p.id === id ? { ...p, completado: true } : p))
+    const r = await convertirEnTarea(id)
+    if (r.ok) {
+      setItems((curr) => curr.filter((p) => p.id !== id))
+      toast.success('Convertida en tarea real — abriendo el detalle...')
+      router.push(`/publicaciones/${r.publicacionId}`)
+    } else {
+      setItems((curr) => curr.map((p) => p.id === id ? { ...p, completado: false } : p))
+      toast.error(r.error)
+    }
+  }
 
   return (
-    <section
-      style={{
-        background: '#fff',
-        border: '1px solid #f1f1f3',
-        borderRadius: 16,
-        boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 480,
-      }}
-    >
-      {/* Header del panel */}
-      <header
-        style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid #f3f4f6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 14, fontWeight: 600,
-            color: '#111827',
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <span>✨</span>
-          <span>Pendientes rápidos de hoy</span>
-          {totalActivos > 0 && (
-            <span style={{
-              fontSize: 11, fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: 999,
-              background: `${acento}15`,
-              color: acento,
-              marginLeft: 4,
-            }}>
-              {totalActivos}
-            </span>
-          )}
-        </h2>
-        <span style={{ fontSize: 11, color: '#9ca3af' }}>
-          Te organizo todo con IA
-        </span>
-      </header>
-
-      {/* Lista agrupada por categoría */}
-      <div style={{ flex: 1, padding: '12px 16px', overflowY: 'auto', maxHeight: 520 }}>
-        {grupos.length === 0 ? (
-          <div style={{
-            padding: '48px 16px',
-            textAlign: 'center',
-            color: '#9ca3af',
-            fontSize: 13.5,
-            lineHeight: 1.6,
-          }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
-            <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>
-              Sin pendientes
-            </div>
-            <div style={{ color: '#9ca3af' }}>
-              Escribe abajo lo que tienes que hacer.<br />
-              Yo lo organizo, categorizo y prioritizo por ti.
-            </div>
-          </div>
-        ) : (
-          grupos.map(([categoria, pendientes]) => {
-            const col = getColorCategoria(categoria)
-            return (
-              <div key={categoria} style={{ marginBottom: 16 }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 8,
-                  paddingLeft: 4,
-                }}>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    padding: '2px 8px',
-                    borderRadius: 6,
-                    background: col.bg,
-                    color: col.text,
-                    border: `1px solid ${col.border}`,
-                  }}>
-                    {categoria}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                    {pendientes.length}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {pendientes.map((p) => (
-                    <PendienteItem
-                      key={p.id}
-                      p={p}
-                      acento={acento}
-                      onToggle={() => toggleItem(p.id)}
-                      onDelete={() => eliminarItem(p.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* Barra de chat estilo ChatGPT */}
-      <div
-        style={{
-          borderTop: '1px solid #f3f4f6',
-          padding: 12,
-          background: '#fafafa',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: 8,
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 14,
-            padding: '8px 8px 8px 14px',
-            transition: 'border-color 150ms',
-          }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = acento }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = '#e5e7eb' }}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={placeholder}
-            disabled={enviando}
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                enviar()
-              }
-            }}
-            onInput={(e) => {
-              const ta = e.currentTarget
-              ta.style.height = 'auto'
-              ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
-            }}
-            style={{
-              flex: 1,
-              fontFamily: 'inherit',
-              fontSize: 14,
-              lineHeight: 1.5,
-              color: '#111827',
-              border: 'none',
-              outline: 'none',
-              resize: 'none',
-              padding: '6px 0',
-              background: 'transparent',
-              maxHeight: 120,
-            }}
+    <>
+      {/* Tareas rápidas — solo aparece si hay items.
+          Al inicio queda oculto para no dejar espacio vacío. */}
+      {totalActivos > 0 && (
+        <section>
+          <SectionTitle
+            label="Tareas rápidas"
+            count={totalActivos}
+            countColor={acento}
+            icon="✨"
           />
-          <button
-            onClick={enviar}
-            disabled={!input.trim() || enviando}
-            title="Enviar (Enter)"
-            style={{
-              width: 34, height: 34,
-              borderRadius: 10,
-              background: input.trim() ? acento : '#e5e7eb',
-              color: '#fff',
-              border: 'none',
-              cursor: input.trim() ? 'pointer' : 'not-allowed',
-              fontSize: 16,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 150ms',
-              flexShrink: 0,
-            }}
-          >
-            {enviando ? '…' : '↑'}
-          </button>
-        </div>
-        <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 6, paddingLeft: 4 }}>
-          Enter para enviar · Shift+Enter para nueva línea
-        </div>
-      </div>
-    </section>
+          <div style={{ ...cardStyle, padding: '8px 6px' }}>
+            {grupos.map(([categoria, pendientes]) => {
+              const col = getColorCategoria(categoria)
+              return (
+                <div key={categoria} style={{ marginBottom: 6 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '6px 10px 4px',
+                  }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      background: col.bg,
+                      color: col.text,
+                      border: `1px solid ${col.border}`,
+                    }}>
+                      {categoria}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                      {pendientes.length}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {pendientes.map((p) => (
+                      <PendienteItem
+                        key={p.id}
+                        p={p}
+                        acento={acento}
+                        puedeConvertir={puedeConvertir}
+                        onToggle={() => toggleItem(p.id)}
+                        onDelete={() => eliminarItem(p.id)}
+                        onConvertir={() => convertir(p.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Barra de chat — siempre anclada abajo (sticky bottom dentro del flow).
+          Diseño compacto, una sola línea por defecto.  */}
+      <section
+        style={{
+          position: 'sticky',
+          bottom: 12,
+          marginTop: 4,
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 14,
+          boxShadow: '0 4px 16px -4px rgba(16, 24, 40, 0.08)',
+          padding: '8px 8px 8px 14px',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 8,
+          zIndex: 5,
+        }}
+      >
+        <span style={{ fontSize: 14, marginBottom: 6, opacity: 0.7 }} aria-hidden>
+          ✨
+        </span>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={placeholder}
+          disabled={enviando}
+          rows={1}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              enviar()
+            }
+          }}
+          onInput={(e) => {
+            const ta = e.currentTarget
+            ta.style.height = 'auto'
+            ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
+          }}
+          style={{
+            flex: 1,
+            fontFamily: 'inherit',
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: '#111827',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            padding: '6px 0',
+            background: 'transparent',
+            maxHeight: 120,
+          }}
+        />
+        <button
+          onClick={enviar}
+          disabled={!input.trim() || enviando}
+          title="Enviar (Enter)"
+          style={{
+            width: 34, height: 34,
+            borderRadius: 10,
+            background: input.trim() ? acento : '#e5e7eb',
+            color: '#fff',
+            border: 'none',
+            cursor: input.trim() ? 'pointer' : 'not-allowed',
+            fontSize: 16,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 150ms',
+            flexShrink: 0,
+            fontWeight: 700,
+          }}
+        >
+          {enviando ? '…' : '↑'}
+        </button>
+      </section>
+    </>
   )
 }
 
@@ -862,13 +1002,17 @@ function PendientesPanel({
 function PendienteItem({
   p,
   acento,
+  puedeConvertir,
   onToggle,
   onDelete,
+  onConvertir,
 }: {
   p: Pendiente
   acento: string
+  puedeConvertir: boolean
   onToggle: () => void
   onDelete: () => void
+  onConvertir: () => void
 }) {
   const [hover, setHover] = useState(false)
   const dotPri =
@@ -942,30 +1086,55 @@ function PendienteItem({
         )}
       </div>
       {hover && !p.id.startsWith('temp-') && (
-        <button
-          onClick={onDelete}
-          title="Eliminar"
-          style={{
-            width: 24, height: 24,
-            borderRadius: 6,
-            background: 'transparent',
-            border: 'none',
-            color: '#9ca3af',
-            fontSize: 14,
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#fef2f2'
-            e.currentTarget.style.color = '#dc2626'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = '#9ca3af'
-          }}
-        >
-          ×
-        </button>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {puedeConvertir && (
+            <button
+              onClick={onConvertir}
+              title="Convertir en tarea real (aparece en tu módulo)"
+              style={{
+                height: 24,
+                padding: '0 8px',
+                borderRadius: 6,
+                background: `${acento}10`,
+                border: `1px solid ${acento}33`,
+                color: acento,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${acento}20` }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = `${acento}10` }}
+            >
+              ↗ Tarea
+            </button>
+          )}
+          <button
+            onClick={onDelete}
+            title="Eliminar"
+            style={{
+              width: 24, height: 24,
+              borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+              color: '#9ca3af',
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fef2f2'
+              e.currentTarget.style.color = '#dc2626'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = '#9ca3af'
+            }}
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   )

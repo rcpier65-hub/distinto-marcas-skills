@@ -112,6 +112,104 @@ export async function togglePendienteRapido(id: string): Promise<
   return { ok: true, completado: nuevo }
 }
 
+/**
+ * Convierte un pendiente rápido en una tarea REAL en publicaciones.
+ *
+ * Mapeo de rol → estado de la publicación creada:
+ *   disenador           → 'disenar'   (aparece en /diseno)
+ *   editor              → 'editar'    (aparece en /editor)
+ *   community_manager,
+ *   social_media_manager → 'tareas'   (genérica, aparece en /publicaciones)
+ *   director / admin    → 'tareas'
+ *
+ * marca_id: usa la marca 'interno' (Distinto interno) como default —
+ * después el user puede cambiarla en el detalle. No queremos forzar
+ * elegir marca en el chat (rompería el flow rápido).
+ *
+ * Tras convertir: el pendiente se elimina (NO se completa) porque ya
+ * vive como publicación real.
+ */
+export async function convertirEnTarea(id: string): Promise<
+  { ok: true; publicacionId: string; estado: string } | { ok: false; error: string }
+> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  /* team_member del user */
+  const { data: tm } = await service
+    .from('team_members')
+    .select('id, nombre, rol_base')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+  const teamMemberId = tm?.id ?? null
+  const rolBase = tm?.rol_base ?? 'admin'
+  const nombreMiembro = tm?.nombre ?? null
+
+  /* Ownership */
+  const { data: p } = await service
+    .from('pendientes_rapidos')
+    .select('id, team_member_id, titulo, descripcion, texto_original, categoria, prioridad')
+    .eq('id', id)
+    .maybeSingle()
+  if (!p) return { ok: false, error: 'Pendiente no encontrado' }
+  if (p.team_member_id !== teamMemberId) return { ok: false, error: 'Este pendiente no es tuyo' }
+
+  /* Estado destino según rol */
+  const estado =
+    rolBase === 'disenador' ? 'disenar' :
+    rolBase === 'editor' ? 'editar' :
+    'tareas'
+
+  /* Marca default = interno (Distinto · Interno). Si por alguna razón
+     no existe, usar la primera marca de la BD. */
+  const { data: marcaInterno } = await service
+    .from('marcas')
+    .select('id')
+    .eq('slug', 'interno')
+    .maybeSingle()
+  let marcaId = marcaInterno?.id
+  if (!marcaId) {
+    const { data: anyMarca } = await service
+      .from('marcas')
+      .select('id')
+      .limit(1)
+      .maybeSingle()
+    marcaId = anyMarca?.id
+  }
+  if (!marcaId) return { ok: false, error: 'No hay ninguna marca configurada' }
+
+  /* Payload base; rellenamos editor_nombre / disenador_nombre según rol */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: any = {
+    nombre: p.titulo,
+    descripcion: p.descripcion || p.texto_original,
+    marca_id: marcaId,
+    estado,
+  }
+  if (rolBase === 'editor' && nombreMiembro) payload.editor_nombre = nombreMiembro
+  if (rolBase === 'disenador' && nombreMiembro) payload.disenador_nombre = nombreMiembro
+
+  /* INSERT publicación */
+  const { data: pub, error: errPub } = await service
+    .from('publicaciones')
+    .insert(payload)
+    .select('id')
+    .single()
+  if (errPub || !pub) return { ok: false, error: errPub?.message ?? 'No se pudo crear la tarea' }
+
+  /* Borrar el pendiente rápido (ya vive como publicación) */
+  await service.from('pendientes_rapidos').delete().eq('id', id)
+
+  /* Revalidar todas las vistas que muestran publicaciones */
+  revalidatePath('/inicio')
+  revalidatePath('/diseno')
+  revalidatePath('/editor')
+  revalidatePath('/publicaciones')
+
+  return { ok: true, publicacionId: pub.id, estado }
+}
+
 /** Eliminar un pendiente (hard delete con ownership check). */
 export async function eliminarPendienteRapido(id: string): Promise<
   { ok: true } | { ok: false; error: string }

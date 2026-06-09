@@ -161,6 +161,40 @@ export default async function InicioPage() {
     })
   }
 
+  /* Reuniones pendientes (publicaciones con reunion_hora seteada
+     y fecha_publicacion futura o de hoy). */
+  let reuniones: InicioData['reuniones'] = []
+  if (tieneAcceso(p.permisos, 'publicaciones') || tieneAcceso(p.permisos, 'editor') || tieneAcceso(p.permisos, 'diseno')) {
+    const { data: reuRaw } = await service
+      .from('publicaciones')
+      .select(`id, nombre, fecha_publicacion, reunion_hora, marca:marcas(slug, nombre, color_primario_hex)`)
+      .not('reunion_hora', 'is', null)
+      .gte('fecha_publicacion', hoy)
+      .order('fecha_publicacion', { ascending: true })
+      .order('reunion_hora', { ascending: true })
+      .limit(6)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    reuniones = ((reuRaw ?? []) as any[]).map((r) => {
+      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      const fechaDate = new Date(r.fecha_publicacion + 'T00:00:00')
+      const esHoy = r.fecha_publicacion === hoy
+      const cuando = esHoy
+        ? 'Hoy'
+        : fechaDate.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'short' })
+      /* Hora en HH:MM (la BD devuelve time as HH:MM:SS) */
+      const hora = (r.reunion_hora as string)?.slice(0, 5) ?? ''
+      return {
+        id: r.id as string,
+        titulo: (r.nombre ?? 'Reunión') as string,
+        marca: (m?.nombre ?? m?.slug ?? '—') as string,
+        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
+        cuando,
+        hora,
+        esHoy,
+      }
+    })
+  }
+
   /* Cumple hoy? */
   let cumpleHoy = false
   if (p.member.fecha_cumpleanos) {
@@ -203,6 +237,7 @@ export default async function InicioPage() {
     modulosAccesibles,
     habitosHoy,
     tareasMias,
+    reuniones,
     pendientes,
     fraseDia: {
       texto: fraseDia.frase.texto,
