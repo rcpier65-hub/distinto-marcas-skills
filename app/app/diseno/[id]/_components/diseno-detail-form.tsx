@@ -115,7 +115,9 @@ export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) 
     if (!confirm('¿Eliminar esta tarea? No se puede deshacer.')) return
     startTransition(async () => {
       try {
-        await deletePublicacion(form.id)
+        /* Volver al listado de Diseño, NO a /publicaciones — Ailyn no
+           tiene acceso a publicaciones y la veía como página rara. */
+        await deletePublicacion(form.id, '/diseno')
       } catch (e) {
         toast.error(`Error al eliminar: ${(e as Error).message}`)
       }

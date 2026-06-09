@@ -16,6 +16,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function EquipoPage() {
   await requireUser()
+  /* Solo admin/owner o quien tenga permiso 'equipo' explícito */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('equipo')
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 

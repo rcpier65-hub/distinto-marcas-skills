@@ -21,6 +21,10 @@ type SP = { desde?: string; hasta?: string }
 
 export default async function GrabacionesPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
+  /* Grabaciones es parte de publicaciones — usa el mismo permiso */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('publicaciones')
+
   const sp = await searchParams
   const desde = sp.desde
   const hasta = sp.hasta

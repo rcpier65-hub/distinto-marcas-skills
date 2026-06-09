@@ -17,6 +17,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function SettingsPage() {
   const user = await requireUser()
+  /* Solo admin/owner o quien tenga permiso settings explícito */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('settings')
+
   const supabase = await createClient()
 
   // Cargamos marcas + grupos WhatsApp + config integraciones en paralelo

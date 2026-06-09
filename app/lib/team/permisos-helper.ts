@@ -123,6 +123,31 @@ export async function requirePermisoModulo(
 }
 
 /**
+ * Versión simplificada de requirePermisoModulo: si el user no tiene
+ * acceso al módulo, lo redirige a su landing (o /cockpit si es admin).
+ *
+ * Usar al inicio de cualquier page.tsx que sea de un módulo restringido:
+ *
+ *   import { ensureAccesoModulo } from '@/lib/team/permisos-helper'
+ *   export default async function MiPage() {
+ *     await ensureAccesoModulo('publicaciones')
+ *     // ... resto de la page
+ *   }
+ *
+ * Esto evita que Ailyn (sin permiso publicaciones) acceda escribiendo
+ * /publicaciones en la URL directamente. El sidebar ya lo oculta, pero
+ * sin guard la página es accesible.
+ */
+export async function ensureAccesoModulo(modulo: ModuloPermiso): Promise<void> {
+  const { redirect } = await import('next/navigation')
+  const p = await getCurrentMemberPermisos()
+  if (!p) return  /* admin/owner: passthrough */
+  if (tieneAcceso(p.permisos, modulo)) return
+  /* Sin permiso: a su landing (probablemente /inicio para miembros) */
+  redirect(await getLandingRoute())
+}
+
+/**
  * Determina la ruta de "landing" para el usuario actual.
  *
  * Pedro pidió que CADA miembro tenga su dashboard personalizado de

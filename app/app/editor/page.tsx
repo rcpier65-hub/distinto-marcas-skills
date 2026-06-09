@@ -53,6 +53,10 @@ function abbreviatePlataforma(p: string): string {
 
 export default async function EditorPage() {
   await requireUser()
+  /* Route guard: Ailyn (diseñadora) no debe poder llegar acá por URL */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('editor')
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 

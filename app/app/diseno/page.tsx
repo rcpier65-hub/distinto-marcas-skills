@@ -42,6 +42,10 @@ function abbreviatePlataforma(p: string): string {
 
 export default async function DisenoPage() {
   await requireUser()
+  /* Route guard: Pieer (editor) o Lorena (CM) sin acceso a diseño */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('diseno')
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 

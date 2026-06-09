@@ -120,6 +120,12 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
 }
 
 export default async function PublicacionesPage() {
+  /* Route guard: si el user no tiene permiso publicaciones, redirige
+     a su landing. Antes era accesible por URL directa aunque el
+     sidebar lo escondiera. */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('publicaciones')
+
   const pubs = (await fetchFromSupabase()) ?? PUBLICACIONES_MOCK
   return (
     <>

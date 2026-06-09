@@ -160,8 +160,17 @@ export async function updateGuionTexto(
 /**
  * Borra una publicación. Hard delete por ahora.
  * Si en el futuro queremos soft delete, cambiar a UPDATE estado='archivado'.
+ *
+ * @param returnTo - ruta a donde redirigir DESPUÉS del delete. Default
+ *   '/publicaciones'. El módulo Diseño pasa '/diseno' y el Editor
+ *   pasa '/editor' para que el user vuelva al listado correcto según
+ *   desde dónde haya entrado. Importante para Ailyn (diseñadora) y
+ *   Pieer (editor) que NO tienen acceso a /publicaciones.
  */
-export async function deletePublicacion(id: string): Promise<void> {
+export async function deletePublicacion(
+  id: string,
+  returnTo: string = '/publicaciones',
+): Promise<void> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -172,7 +181,16 @@ export async function deletePublicacion(id: string): Promise<void> {
     throw new Error(`No se pudo eliminar: ${error.message}`)
   }
 
+  /* Revalidamos todas las rutas que listan publicaciones, no solo la
+     de retorno — alguien podría tener /editor en otra pestaña. */
   revalidatePath('/publicaciones')
   revalidatePath('/publicaciones/tabla')
-  redirect('/publicaciones')
+  revalidatePath('/diseno')
+  revalidatePath('/editor')
+  revalidatePath('/cockpit')
+  revalidatePath('/inicio')
+
+  /* Validar que returnTo sea una ruta interna (no URL externa) */
+  const safeReturn = returnTo.startsWith('/') ? returnTo : '/publicaciones'
+  redirect(safeReturn)
 }
