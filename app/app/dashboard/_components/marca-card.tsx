@@ -40,7 +40,7 @@ export function MarcaCard({ marca }: { marca: MarcaCardData }) {
   return (
     <Card className={`transition-all ${activa ? 'hover:shadow-md' : 'opacity-60'}`}>
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-3 min-w-0 flex-1">
             <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={44} />
             <span className="text-base truncate min-w-0">{marca.nombre}</span>
