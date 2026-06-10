@@ -59,6 +59,9 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       plataformas: string[] | null
       tipo_contenido: string[] | null
       copy: string | null
+      copy_listo: boolean | null
+      portada_lista: boolean | null
+      editado: boolean | null
       editor_id: string | null
       editor: { nombre: string } | { nombre: string }[] | null
       marca: { slug: string } | { slug: string }[] | null
@@ -74,6 +77,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       .select(`
         id, nombre, fecha_publicacion, estado,
         plataformas, tipo_contenido, copy, editor_id,
+        copy_listo, portada_lista, editado,
         editor:editores(nombre),
         marca:marcas(slug)
       `)
@@ -112,6 +116,9 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         estado: normalizeEstadoPub(r.estado),
         editorId: r.editor_id,
         editorNombre: editor?.nombre ?? null,
+        copyListo: r.copy_listo ?? false,
+        portadaLista: r.portada_lista ?? false,
+        editado: r.editado ?? false,
       }
     })
   } catch {

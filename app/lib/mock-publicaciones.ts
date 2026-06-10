@@ -30,6 +30,11 @@ export type PublicacionMock = {
   estado: EstadoPubMetricool
   editorId: string | null
   editorNombre?: string | null   /* nombre real del editor desde BD (JOIN) */
+  /* Indicadores de workflow (checklist del detalle). Se reflejan como
+     iconos en la grilla: plomo = pendiente, verde = listo. */
+  copyListo?: boolean
+  portadaLista?: boolean
+  editado?: boolean
 }
 
 /* Colores de estado Metricool-style (suaves para chip) */

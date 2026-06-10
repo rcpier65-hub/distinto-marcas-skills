@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Scissors, FileText, Image as ImageIcon } from 'lucide-react'
 import {
   PUBLICACIONES_MOCK,
   ESTADO_PUB_CONFIG,
@@ -482,6 +483,40 @@ function CalendarNav({
   )
 }
 
+/* StatusIcons — indicadores de workflow por publicación: Copy, Portada,
+   Editado. Plomo (gris) = pendiente, verde = listo. El verde es el mismo
+   de "Publicado" en ESTADO_PUB_CONFIG → coherente con la paleta de estados.
+   Los 3 booleanos vienen del checklist del detalle de cada publicación, así
+   que marcar el checklist actualiza la grilla automáticamente. */
+const STATUS_READY = '#4cb782'                 /* verde "listo" (== estado Publicado) */
+const STATUS_IDLE = 'var(--mk-text-quaternary)' /* plomo "pendiente" */
+
+function StatusIcons({ pub, size = 13 }: { pub: PublicacionMock; size?: number }) {
+  const items: { on: boolean; Icon: typeof Scissors; label: string }[] = [
+    { on: !!pub.copyListo,    Icon: FileText,  label: 'Copy' },
+    { on: !!pub.portadaLista, Icon: ImageIcon, label: 'Portada' },
+    { on: !!pub.editado,      Icon: Scissors,  label: 'Editado' },
+  ]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      {items.map(({ on, Icon, label }) => (
+        <span
+          key={label}
+          title={`${label}: ${on ? 'listo ✓' : 'pendiente'}`}
+          style={{ display: 'inline-flex', alignItems: 'center' }}
+        >
+          <Icon
+            size={size}
+            color={on ? STATUS_READY : STATUS_IDLE}
+            strokeWidth={on ? 2.4 : 1.7}
+            style={{ opacity: on ? 1 : 0.5 }}
+          />
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /* PubChip — strip clickeable de publicación usado en celdas calendario.
    Variantes: compact (mes con muchas pubs) y full (semana / mes pocas pubs). */
 function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 'full' }) {
@@ -558,6 +593,8 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
           <span style={{ fontSize: 11, color: 'var(--mk-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.3 }}>
             {pub.caption}
           </span>
+          {/* Línea 3: indicadores de workflow (copy / portada / editado) */}
+          <StatusIcons pub={pub} size={11} />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -588,8 +625,12 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
           <div style={{ fontSize: 11.5, color: 'var(--mk-text-primary)', lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
             {pub.caption}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {pub.redes.map((r) => <RedIcon key={r} red={r} />)}
+            {pub.redes.length > 0 && (
+              <span style={{ width: 1, height: 11, background: 'var(--mk-border-subtle)', flexShrink: 0 }} />
+            )}
+            <StatusIcons pub={pub} size={13} />
             {editor && (
               <span style={{ marginLeft: 'auto', width: 14, height: 14, borderRadius: '50%', background: editor.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700 }}>
                 {editor.nombre.slice(0, 1).toUpperCase()}
