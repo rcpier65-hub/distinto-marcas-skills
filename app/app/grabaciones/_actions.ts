@@ -29,6 +29,9 @@ export type GrabacionWithMarca = {
   estado: GrabacionEstado
   videos_grabados: number | null
   notas: string | null
+  /* Pedro: 'añade un espacio para poner enlace de guiones'. Suele ser
+     una URL de Google Drive con los guiones que se van a grabar. */
+  enlace_guiones: string | null
   google_event_id: string | null   // ID del evento en Google Calendar (sync)
   created_at: string
   updated_at: string
@@ -75,7 +78,7 @@ export async function listGrabaciones(
 
   const { data, error } = await service
     .from('grabaciones')
-    .select('id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
+    .select('id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
     .gte('fecha_planeada', d)
     .lte('fecha_planeada', h)
     .order('fecha_planeada', { ascending: false })
@@ -102,6 +105,7 @@ export async function listGrabaciones(
     estado: r.estado as GrabacionEstado,
     videos_grabados: r.videos_grabados,
     notas: r.notas,
+    enlace_guiones: r.enlace_guiones ?? null,
     google_event_id: r.google_event_id ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -447,6 +451,41 @@ export async function toggleCoordinacionConfirmada(
   if (error) {
     if ((error.message ?? '').includes('does not exist')) {
       return { ok: false, error: 'Falta migración: ALTER TABLE marcas ADD COLUMN grabaciones_confirmadas_mes boolean' }
+    }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/grabaciones')
+  return { ok: true }
+}
+
+/**
+ * Guarda el enlace de guiones de una grabación. Pedro: 'añade un
+ * espacio para poner enlace de guiones, suele ser un link de Drive'.
+ * Empty string → null para limpieza visual. Validación mínima: máx 500
+ * chars (URLs de Drive son largas pero entran cómodo).
+ */
+export async function updateGrabacionEnlaceGuiones(
+  id: string,
+  enlace: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const v = enlace.trim()
+  if (v.length > 500) {
+    return { ok: false, error: 'El enlace es muy largo (máx 500 caracteres)' }
+  }
+  const value = v.length === 0 ? null : v
+
+  const { error } = await service
+    .from('grabaciones')
+    .update({ enlace_guiones: value })
+    .eq('id', id)
+
+  if (error) {
+    if ((error.message ?? '').includes('does not exist')) {
+      return { ok: false, error: 'Falta migración: ALTER TABLE grabaciones ADD COLUMN enlace_guiones text' }
     }
     return { ok: false, error: error.message }
   }

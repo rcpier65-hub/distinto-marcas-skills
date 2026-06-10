@@ -13,7 +13,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatHora12, sufijoAmPm } from '@/lib/utils/format-hora'
-import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, AlertTriangle, ShieldCheck, Link2, ExternalLink } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ObjetivoInput } from './objetivo-input'
@@ -23,6 +23,7 @@ import {
   updateGrabacionEstado,
   deleteGrabacion,
   toggleCoordinacionConfirmada,
+  updateGrabacionEnlaceGuiones,
   type MarcaKPI,
   type GrabacionWithMarca,
 } from '../_actions'
@@ -201,11 +202,26 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
   /* hora_planeada viene de BD como "HH:MM:SS"; el input type=time
      funciona con HH:MM (acepta también HH:MM:SS pero recorta segs). */
   const [hora, setHora] = useState((grabacion.hora_planeada ?? '').slice(0, 5))
+  /* Pedro: enlace de guiones (suele ser un Drive). Editable inline. */
+  const [enlace, setEnlace] = useState(grabacion.enlace_guiones ?? '')
   const cfg = ESTADO_CFG[grabacion.estado] ?? ESTADO_CFG.planeada
   const busy = disabled || isPending
 
   const fechaInicial = grabacion.fecha_planeada
   const horaInicial = (grabacion.hora_planeada ?? '').slice(0, 5)
+  const enlaceInicial = grabacion.enlace_guiones ?? ''
+
+  function saveEnlace() {
+    if (enlace === enlaceInicial) return
+    startTransition(async () => {
+      const r = await updateGrabacionEnlaceGuiones(grabacion.id, enlace)
+      if (r.ok) toast.success(enlace ? 'Enlace de guiones guardado' : 'Enlace eliminado')
+      else {
+        setEnlace(enlaceInicial)
+        toast.error(r.error)
+      }
+    })
+  }
 
   function saveFecha() {
     if (fecha === fechaInicial && hora === horaInicial) return
@@ -240,7 +256,8 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
   }
 
   return (
-    <div className="flex items-center gap-1.5 group">
+    <div className="space-y-1 group">
+      <div className="flex items-center gap-1.5">
       <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
       {/* Fecha editable */}
       <input
@@ -294,6 +311,34 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
+      </div>
+      {/* Segunda línea: enlace de guiones (Drive). Pedro pidió este
+          espacio para pegar el link de los guiones que se van a grabar.
+          Indentado para alinear visualmente con el contenido de arriba. */}
+      <div className="flex items-center gap-1.5 pl-5">
+        <Link2 className="w-3 h-3 text-muted-foreground/70 shrink-0" />
+        <input
+          type="url"
+          value={enlace}
+          onChange={(e) => setEnlace(e.target.value)}
+          onBlur={saveEnlace}
+          disabled={busy}
+          placeholder="Enlace de guiones (Google Drive, Notion…)"
+          title={enlace ? `Enlace: ${enlace}` : 'Pegar enlace de guiones'}
+          className="h-6 px-2 rounded border border-input bg-background text-[10.5px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 flex-1 min-w-0 placeholder:text-muted-foreground/60"
+        />
+        {enlace && (
+          <a
+            href={enlace.startsWith('http') ? enlace : `https://${enlace}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir en nueva pestaña"
+            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-[#ba41f7] hover:bg-[#ba41f7]/8 shrink-0"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+      </div>
     </div>
   )
 }
