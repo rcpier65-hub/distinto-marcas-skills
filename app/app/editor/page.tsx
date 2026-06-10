@@ -74,8 +74,12 @@ export default async function EditorPage() {
         iniciado_edicion_at, editado_at,
         marca:marcas(slug)
       `)
-      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
-      .limit(500),
+      /* DESC + límite alto: el Editor DEBE incluir los videos recientes/futuros
+         (ej. junio) que están en "Editar". Antes era ASC + limit 500 → con +500
+         publicaciones los recientes quedaban fuera y el Editor se veía casi vacío,
+         aunque en Publicaciones/Kanban (sin límite) sí aparecían. */
+      .order('fecha_publicacion', { ascending: false, nullsFirst: false })
+      .limit(1000),
     service
       .from('editores')
       .select('id, nombre, activo')
@@ -108,8 +112,8 @@ export default async function EditorPage() {
         editor_id, editor_nombre, enlace_tomas, guion,
         marca:marcas(slug)
       `)
-      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
-      .limit(500)
+      .order('fecha_publicacion', { ascending: false, nullsFirst: false })
+      .limit(1000)
     pubs = retry.data
   }
 
