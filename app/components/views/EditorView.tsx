@@ -56,6 +56,15 @@ const ALERTA_COLOR: Record<AlertaFecha, { fg: string; bg: string; label: string 
   verde:    { fg: '#34d399', bg: 'rgba(52, 211, 153, 0.10)',  label: 'a tiempo' },
 }
 
+/* Etiquetas de los estados REALES de la BD (enum estado_publicacion).
+   Usadas en el diagnóstico de "dónde quedaron" los videos cuando el editor
+   se ve vacío. */
+const ESTADO_RAW_LABEL: Record<string, string> = {
+  tareas: 'Tareas', idear: 'Idear', editando: 'Editando', editar: 'Editar',
+  disenar: 'Diseñar', enviado: 'Enviado', aprobar: 'Aprobar',
+  programar: 'Programar', programar_anuncios: 'Programar anuncios', archivado: 'Archivado',
+}
+
 function formatDateES(iso: string) {
   const d = new Date(iso + 'T00:00:00')
   if (isNaN(d.getTime())) return '—'
@@ -135,6 +144,17 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
   const marcaBySlug = useMemo(() => new Map(marcas.map((m) => [m.slug, m])), [marcas])
   const editorById = useMemo(() => new Map(editores.map((e) => [e.id, e])), [editores])
   const hoy = new Date().toISOString().slice(0, 10)
+
+  /* Desglose por estado REAL (para el diagnóstico cuando la vista queda vacía:
+     muestra en qué estado están los videos que existen). */
+  const estadoBreakdown = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const e of entries) {
+      const k = e.estadoRaw ?? 'sin_estado'
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [entries])
 
   /* ============ Métricas del dashboard ============ */
   const metricas = useMemo(() => {
@@ -541,13 +561,32 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
               />
             ))}
             {visible.length === 0 && (
-              <tr><td colSpan={9} style={{ padding: '60px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
-                  {filters.soloHoy ? 'Aún no marcaste tareas para hoy' : 'Sin tareas con esos filtros'}
-                </div>
-                <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
-                  {filters.soloHoy ? 'Toca "Editar hoy" en alguna fila para agregarla' : 'Prueba limpiar los filtros'}
-                </div>
+              <tr><td colSpan={9} style={{ padding: '40px 20px' }}>
+                {filters.soloHoy ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
+                      Aún no marcaste tareas para hoy
+                    </div>
+                    <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
+                      Toca &quot;＋ Hoy&quot; en alguna fila para agregarla
+                    </div>
+                  </div>
+                ) : entries.length === 0 ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
+                      No hay videos cargados
+                    </div>
+                    <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)' }}>
+                      Sincroniza Notion para traer las publicaciones
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyEditarDiagnostico
+                    total={entries.length}
+                    breakdown={estadoBreakdown}
+                    onVerTodos={() => setFilters((f) => ({ ...f, estado: 'todos', vistaRapida: 'todas', soloHoy: false }))}
+                  />
+                )}
               </td></tr>
             )}
           </tbody>
@@ -979,6 +1018,54 @@ function EnlaceTomasCell({ url }: { url: string | null }) {
       <button onClick={open} title="Abrir en Drive"
         style={{ padding: '3px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-sm)', color: 'var(--mk-text-tertiary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontFamily: 'inherit' }}>
         <IconExternal /> Drive
+      </button>
+    </div>
+  )
+}
+
+/* ============================================================
+   EmptyEditarDiagnostico — cuando el editor está vacío bajo el filtro
+   "Editar", muestra DÓNDE quedaron los videos (desglose por estado real)
+   para que se entienda por qué no aparecen + cómo traerlos.
+   ============================================================ */
+
+function EmptyEditarDiagnostico({
+  total, breakdown, onVerTodos,
+}: {
+  total: number
+  breakdown: [string, number][]
+  onVerTodos: () => void
+}) {
+  return (
+    <div style={{ maxWidth: 540, margin: '0 auto', textAlign: 'center' }}>
+      <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
+        Ningún video está en “Editar” o “Editando”
+      </div>
+      <div style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-tertiary)', marginBottom: 16 }}>
+        Tienes <strong style={{ color: 'var(--mk-text-secondary)' }}>{total}</strong> video{total !== 1 ? 's' : ''} en total, pero en otros estados. Aquí están:
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 18 }}>
+        {breakdown.map(([k, n]) => {
+          const esEdicion = k === 'editar' || k === 'editando'
+          return (
+            <span key={k} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 'var(--mk-radius-md)',
+              background: esEdicion ? 'rgba(242, 201, 76, 0.14)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${esEdicion ? 'rgba(242,201,76,0.4)' : 'var(--mk-border-subtle)'}`,
+              fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-secondary)',
+            }}>
+              <span style={{ fontWeight: 600 }}>{ESTADO_RAW_LABEL[k] ?? k}</span>
+              <span style={{ color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+            </span>
+          )
+        })}
+      </div>
+      <div style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-quaternary)', marginBottom: 14, lineHeight: 1.5 }}>
+        Para que un video aparezca acá, muévelo a la columna <strong>Editar</strong> en Notion (o cambia su estado a Editar) y sincroniza.
+      </div>
+      <button onClick={onVerTodos} style={btnPrimaryStyle}>
+        Ver todos los videos
       </button>
     </div>
   )

@@ -17,6 +17,8 @@ export type EditorEntry = {
                                // pero hay editor_nombre del sync Notion
   grillaFit: string            // ISO YYYY-MM-DD (fecha_publicacion)
   estado: EstadoPub
+  estadoRaw: string | null     // estado original de la BD (tareas/editando/disenar/etc.)
+                               // — para diagnóstico de "dónde quedaron" los videos
   fechaEdicion: string         // ISO YYYY-MM-DD
   plataformas: string[]        // ['IG', 'FB', 'TT']
   enlaceTomas: string | null   // URL Drive de las tomas

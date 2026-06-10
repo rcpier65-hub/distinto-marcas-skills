@@ -90,11 +90,14 @@ export default async function EditorPage() {
      027 = iniciado_edicion_at + editado_at (tiempo edición + reporte) */
   let pubs = pubsResult.data
   let marcaMigrationPendiente = false
-  if (
-    pubsResult.error?.code === '42703' ||
-    /fecha_marcada_para_editar|iniciado_edicion_at|editado_at/i.test(pubsResult.error?.message ?? '')
-  ) {
-    marcaMigrationPendiente = true
+  /* Reintenta con columnas base ante CUALQUIER error de la primera query
+     (columna nueva ausente, timeout puntual, etc.) para que el editor NUNCA
+     quede vacío por un fallo de fetch. Si el error es por columnas de
+     migrations recientes, marcamos el flag para avisar en la UI. */
+  if (pubsResult.error) {
+    marcaMigrationPendiente =
+      pubsResult.error.code === '42703' ||
+      /fecha_marcada_para_editar|iniciado_edicion_at|editado_at/i.test(pubsResult.error.message ?? '')
     const retry = await service
       .from('publicaciones')
       .select(`
@@ -137,6 +140,7 @@ export default async function EditorPage() {
       editorNombre: r.editor_nombre ?? null,
       grillaFit: r.fecha_publicacion ?? new Date().toISOString().slice(0, 10),
       estado: normalizeEstado(r.estado),
+      estadoRaw: r.estado ?? null,
       fechaEdicion: r.fecha_edicion ?? r.fecha_publicacion ?? new Date().toISOString().slice(0, 10),
       plataformas: (r.plataformas ?? []).map(abbreviatePlataforma),
       enlaceTomas: r.enlace_tomas ?? null,
