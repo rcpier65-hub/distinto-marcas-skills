@@ -249,6 +249,9 @@ export async function sincronizarTodoNotion(opts?: {
     revalidatePath('/publicaciones/tabla')
     revalidatePath('/publicaciones/calendario')
     revalidatePath('/publicaciones/kanban')
+    revalidatePath('/editor')   /* el editor lee la misma tabla — refrescar tras sync */
+    revalidatePath('/inicio')
+    revalidatePath('/equipo')
     return {
       ok: true,
       totals: json.totals,

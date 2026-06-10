@@ -26,6 +26,8 @@ import {
   desmarcarEnEdicion,
   crearPublicacion,
 } from '@/app/editor/_actions'
+import { sincronizarTodoNotion } from '@/app/publicaciones/_actions'
+import { RefreshCw, Loader2 } from 'lucide-react'
 import {
   type EditorEntry,
   type EditorOption,
@@ -128,6 +130,32 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
   })
   const [reporteOpen, setReporteOpen] = useState(false)
   const [nuevaTareaOpen, setNuevaTareaOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  /* Sincroniza desde Notion (todas las marcas, sin filtro de fecha) y refresca
+     la tabla al instante. Trae lo que está en "Editar" en Notion con su editor
+     asignado — soluciona "el editor está vacío / desactualizado". */
+  async function handleSyncNotion() {
+    if (syncing) return
+    setSyncing(true)
+    const t = toast.loading('Sincronizando con Notion… (puede tardar ~1 min)')
+    try {
+      const r = await sincronizarTodoNotion()
+      if (r.ok) {
+        toast.success(
+          `Notion sincronizado · ${r.totals.inserted} nuevos, ${r.totals.updated} actualizados`,
+          { id: t, duration: 3500 },
+        )
+        router.refresh()
+      } else {
+        toast.error(`No se pudo sincronizar: ${r.error}`, { id: t })
+      }
+    } catch (e) {
+      toast.error(`Error: ${e instanceof Error ? e.message : 'desconocido'}`, { id: t })
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   /* Ticker para actualizar los cronómetros "tiempo editando" cada
      minuto. No re-renderiza si nadie tiene iniciado_edicion_at. */
@@ -406,6 +434,27 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
             ⚠ Migration 026 pendiente
           </span>
         )}
+        <button
+          onClick={handleSyncNotion}
+          disabled={syncing}
+          className="mk-focusable"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            height: 'var(--mk-button-height-lg)', padding: '0 12px',
+            background: 'var(--mk-bg-elevated)',
+            border: '1px solid var(--mk-border-subtle)',
+            borderRadius: 'var(--mk-radius-md)',
+            color: 'var(--mk-text-secondary)',
+            fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
+            cursor: syncing ? 'wait' : 'pointer',
+            opacity: syncing ? 0.7 : 1,
+            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+          }}
+          title="Trae de Notion todo lo que está en Editar (y demás estados) con su editor asignado. Sin filtro de fecha."
+        >
+          {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {syncing ? 'Sincronizando…' : 'Sincronizar Notion'}
+        </button>
         <button
           onClick={() => setNuevaTareaOpen(true)}
           className="mk-focusable"
