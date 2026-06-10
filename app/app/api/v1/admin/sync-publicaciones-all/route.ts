@@ -31,8 +31,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
-  let from = '2026-05-01'
-  let to = '2026-06-30'
+  /* Default: SIN rango → trae TODAS las tareas de Notion (Pedro:
+     "sincroniza desde el copy la tarea el editor todo en absoluto").
+     El body puede sobrescribir con un rango específico si hace falta. */
+  let from: string | null = null
+  let to: string | null = null
   try {
     const body = await request.json()
     if (body && typeof body === 'object') {

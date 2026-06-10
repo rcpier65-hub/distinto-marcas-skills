@@ -122,8 +122,10 @@ export async function syncMarcaPublicaciones(args: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   service: any
   marca: { id: string; notion_proyecto_id: string }
-  from: string
-  to: string
+  /* Rango opcional. Si NO se pasa (o null), sincroniza TODAS las
+     tareas del proyecto sin filtrar por fecha. */
+  from?: string | null
+  to?: string | null
   concurrency?: number
 }): Promise<SyncResult> {
   const concurrency = args.concurrency ?? 5

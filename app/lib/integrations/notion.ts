@@ -227,15 +227,23 @@ export type GrillaPublicacionExtendida = GrillaPublicacion & {
  */
 export async function queryGrillaForBrandExtended(args: {
   notionProyectoId: string
-  semanaInicio: string
-  semanaFin: string
+  /* Rango opcional. Si NO se pasa, trae TODAS las tareas del proyecto
+     (sin filtrar por fecha). Pedro: "sincroniza todas las tareas
+     completas... todo en absoluto". */
+  semanaInicio?: string | null
+  semanaFin?: string | null
 }): Promise<GrillaPublicacionExtendida[]> {
   const token = process.env.NOTION_TOKEN
   const dbId = process.env.NOTION_GRILLA_DB_ID
   if (!token) throw new Error('NOTION_TOKEN no configurado')
   if (!dbId) throw new Error('NOTION_GRILLA_DB_ID no configurado')
 
-  /* Filter: tareas del proyecto AND (fecha publicación en rango OR
+  /* Sin rango → solo filtra por proyecto. Esto trae ABSOLUTAMENTE
+     todas las tareas asignadas a la marca, sin importar fecha de
+     publicación, fecha de diseño, ni estado. */
+  const sinRango = !args.semanaInicio || !args.semanaFin
+
+  /* Con rango: tareas del proyecto AND (fecha publicación en rango OR
      fecha diseño en rango). Pedro pidió que el módulo /diseno cargue
      también las tareas que SOLO tienen Fecha de diseño (Manual de
      marca, Banner web, etc.) — esas no entran si filtramos solo por
@@ -243,27 +251,29 @@ export async function queryGrillaForBrandExtended(args: {
 
      Nota sobre el nombre: la property en Notion es "Fecha de diseño "
      con un espacio al final en algunas marcas; probamos ambos. */
-  const filter = {
-    and: [
-      { property: 'proyecto', relation: { contains: args.notionProyectoId } },
-      {
-        or: [
+  const filter = sinRango
+    ? { property: 'proyecto', relation: { contains: args.notionProyectoId } }
+    : {
+        and: [
+          { property: 'proyecto', relation: { contains: args.notionProyectoId } },
           {
-            and: [
-              { property: 'Grilla de FIT', date: { on_or_after: args.semanaInicio } },
-              { property: 'Grilla de FIT', date: { on_or_before: args.semanaFin } },
-            ],
-          },
-          {
-            and: [
-              { property: 'Fecha de diseño ', date: { on_or_after: args.semanaInicio } },
-              { property: 'Fecha de diseño ', date: { on_or_before: args.semanaFin } },
+            or: [
+              {
+                and: [
+                  { property: 'Grilla de FIT', date: { on_or_after: args.semanaInicio } },
+                  { property: 'Grilla de FIT', date: { on_or_before: args.semanaFin } },
+                ],
+              },
+              {
+                and: [
+                  { property: 'Fecha de diseño ', date: { on_or_after: args.semanaInicio } },
+                  { property: 'Fecha de diseño ', date: { on_or_before: args.semanaFin } },
+                ],
+              },
             ],
           },
         ],
-      },
-    ],
-  }
+      }
   const sorts = [{ property: 'Grilla de FIT', direction: 'ascending' as const }]
 
   const all: GrillaPublicacionExtendida[] = []

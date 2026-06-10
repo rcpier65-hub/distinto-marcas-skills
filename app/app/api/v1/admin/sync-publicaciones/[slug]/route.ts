@@ -30,9 +30,11 @@ export async function POST(
 
   const { slug } = await params
 
-  // Body opcional para overrides
-  let from = '2026-05-01'
-  let to = '2026-06-30'
+  /* Default: SIN rango → trae todas las tareas de esta marca en Notion.
+     Pedro pidió que el botón sincronice "todo en absoluto". El body
+     puede pasar from/to si en algún caso se quiere acotar (CRON, etc). */
+  let from: string | null = null
+  let to: string | null = null
   try {
     const body = await request.json()
     if (body && typeof body === 'object') {

@@ -51,7 +51,7 @@ export function SyncNotionButton() {
         onClick={handleClick}
         disabled={loading}
         className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-        title="Trae todas las publicaciones de Notion (mayo + junio 2026) y sobrescribe las del sistema"
+        title="Trae TODAS las tareas de Notion (sin filtro de fecha) — titulo, fechas, estado, copy, guión, editor, plataformas, enlaces y videos. Sobrescribe lo del sistema."
       >
         {loading ? (
           <>

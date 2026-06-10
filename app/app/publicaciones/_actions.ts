@@ -211,10 +211,12 @@ export async function sincronizarTodoNotion(opts?: {
     return { ok: false, error: 'CRON_SECRET no configurado en server' }
   }
 
-  const body = {
-    from: opts?.from ?? '2026-05-01',
-    to: opts?.to ?? '2026-06-30',
-  }
+  /* Sin rango por default — Pedro: "sincroniza desde el copy la tarea
+     el editor, todo en absoluto". El endpoint interpreta from/to null
+     como "todas las tareas del proyecto sin filtro de fecha". */
+  const body: { from?: string; to?: string } = {}
+  if (opts?.from) body.from = opts.from
+  if (opts?.to) body.to = opts.to
 
   try {
     const res = await fetch(`${appUrl}/api/v1/admin/sync-publicaciones-all`, {
