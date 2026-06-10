@@ -62,6 +62,8 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       copy_listo: boolean | null
       portada_lista: boolean | null
       editado: boolean | null
+      iniciado_edicion_at: string | null
+      editado_at: string | null
       editor_id: string | null
       editor: { nombre: string } | { nombre: string }[] | null
       marca: { slug: string } | { slug: string }[] | null
@@ -72,17 +74,36 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
        la query falle y caiga al mock (genera 404 al hacer click en pubs).
        JOIN con editores para traer el nombre real (las vistas mostraban
        "sin asignar" porque buscaban el UUID en EDITORES_MOCK — bug fixeado). */
-    const { data, error } = await service
-      .from('publicaciones')
-      .select(`
+    const FULL_COLS = `
         id, nombre, fecha_publicacion, estado,
         plataformas, tipo_contenido, copy, editor_id,
         copy_listo, portada_lista, editado,
+        iniciado_edicion_at, editado_at,
         editor:editores(nombre),
         marca:marcas(slug)
-      `)
+      `
+    const BASE_COLS = `
+        id, nombre, fecha_publicacion, estado,
+        plataformas, tipo_contenido, copy, editor_id,
+        editor:editores(nombre),
+        marca:marcas(slug)
+      `
+    let res = await service
+      .from('publicaciones')
+      .select(FULL_COLS)
       .order('fecha_publicacion', { ascending: false, nullsFirst: false })
       .limit(200)
+    /* Si faltan columnas nuevas (workflow / timing de edición), reintenta con
+       las columnas base — así la grilla NO cae al mock por una columna ausente.
+       Los iconos de estado simplemente quedan en "pendiente". */
+    if (res.error) {
+      res = await service
+        .from('publicaciones')
+        .select(BASE_COLS)
+        .order('fecha_publicacion', { ascending: false, nullsFirst: false })
+        .limit(200)
+    }
+    const { data, error } = res
     if (error || !data) return null
     return (data as RawRow[])
       // Excluir tareas de diseño "standalone": las que están en estado 'disenar'
@@ -118,7 +139,10 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         editorNombre: editor?.nombre ?? null,
         copyListo: r.copy_listo ?? false,
         portadaLista: r.portada_lista ?? false,
-        editado: r.editado ?? false,
+        /* Terminado: editado_at (timestamp del editor) o el check manual.
+           En curso: cronómetro iniciado y aún sin terminar. */
+        editado: !!r.editado_at || !!r.editado,
+        editando: !!r.iniciado_edicion_at && !r.editado_at && !r.editado,
       }
     })
   } catch {

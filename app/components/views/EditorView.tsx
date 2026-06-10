@@ -529,6 +529,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
                 editorInfo={e.editorId ? editorById.get(e.editorId) ?? null : null}
                 editores={editores}
                 hoy={hoy}
+                mostrarHoy={filters.soloHoy}
                 onOpenDetail={() => openRow(e.id)}
                 onSetEstado={(s) => setEstado(e.id, s)}
                 onSetEditor={(eid) => setEditor(e.id, eid)}
@@ -774,7 +775,7 @@ function MetricaCard({
    ============================================================ */
 
 function Row({
-  entry, marcaInfo, editorInfo, editores, hoy,
+  entry, marcaInfo, editorInfo, editores, hoy, mostrarHoy,
   onOpenDetail, onSetEstado, onSetEditor, onSetNombre, onSetGrilla, onSetFechaEd, onToggleHoy, onToggleEnEdicion,
 }: {
   entry: EditorEntry
@@ -782,6 +783,7 @@ function Row({
   editorInfo: EditorOption | null
   editores: EditorOption[]
   hoy: string
+  mostrarHoy: boolean
   onOpenDetail: () => void
   onSetEstado: (s: EstadoPub) => void
   onSetEditor: (eid: string | null) => void
@@ -829,8 +831,28 @@ function Row({
           videos que no se van a editar). */}
       <Td>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
+            {/* Texto chiquito "editando hoy" — solo cuando el editor está en
+                el filtro "Mi trabajo para hoy". El punto pulsa cyan si el
+                cronómetro está corriendo, o queda plomo si aún no empezó. */}
+            {mostrarHoy && !yaEditado && (
+              <span
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: 0.6,
+                  color: enEdicion ? '#22d3ee' : 'var(--mk-text-tertiary)',
+                }}
+                title={enEdicion ? 'Cronómetro de edición corriendo' : 'Marcada para editar hoy'}
+              >
+                <span
+                  className={enEdicion ? 'mk-anim-editing' : undefined}
+                  style={{ width: 5, height: 5, borderRadius: '50%', background: enEdicion ? '#22d3ee' : 'var(--mk-text-quaternary)', flexShrink: 0 }}
+                />
+                editando hoy
+              </span>
+            )}
           </span>
           {estaMarcadaHoy && !yaEditado && (
             <BotonEditando

@@ -489,27 +489,39 @@ function CalendarNav({
    Los 3 booleanos vienen del checklist del detalle de cada publicación, así
    que marcar el checklist actualiza la grilla automáticamente. */
 const STATUS_READY = '#4cb782'                 /* verde "listo" (== estado Publicado) */
+const STATUS_EDITING = '#22d3ee'                /* cyan "editando" (== badge del editor) */
 const STATUS_IDLE = 'var(--mk-text-quaternary)' /* plomo "pendiente" */
 
+type StatusState = 'idle' | 'done' | 'editing'
+
 function StatusIcons({ pub, size = 13 }: { pub: PublicacionMock; size?: number }) {
-  const items: { on: boolean; Icon: typeof Scissors; label: string }[] = [
-    { on: !!pub.copyListo,    Icon: FileText,  label: 'Copy' },
-    { on: !!pub.portadaLista, Icon: ImageIcon, label: 'Portada' },
-    { on: !!pub.editado,      Icon: Scissors,  label: 'Editado' },
+  /* Copy y Portada: 2 estados (pendiente / listo).
+     Editado: 3 estados (pendiente plomo → editando animado cyan → editado verde fijo).
+     El estado "editando" se sincroniza con el cronómetro del editor. */
+  const items: { state: StatusState; Icon: typeof Scissors; label: string }[] = [
+    { state: pub.copyListo ? 'done' : 'idle',    Icon: FileText,  label: 'Copy' },
+    { state: pub.portadaLista ? 'done' : 'idle', Icon: ImageIcon, label: 'Portada' },
+    { state: pub.editado ? 'done' : pub.editando ? 'editing' : 'idle', Icon: Scissors, label: 'Editado' },
   ]
+  const colorFor = (s: StatusState) =>
+    s === 'done' ? STATUS_READY : s === 'editing' ? STATUS_EDITING : STATUS_IDLE
+  const titleFor = (label: string, s: StatusState) =>
+    s === 'editing' ? `${label}: editando ahora…` : `${label}: ${s === 'done' ? 'listo ✓' : 'pendiente'}`
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-      {items.map(({ on, Icon, label }) => (
+      {items.map(({ state, Icon, label }) => (
         <span
           key={label}
-          title={`${label}: ${on ? 'listo ✓' : 'pendiente'}`}
+          title={titleFor(label, state)}
+          className={state === 'editing' ? 'mk-anim-editing' : undefined}
           style={{ display: 'inline-flex', alignItems: 'center' }}
         >
           <Icon
             size={size}
-            color={on ? STATUS_READY : STATUS_IDLE}
-            strokeWidth={on ? 2.4 : 1.7}
-            style={{ opacity: on ? 1 : 0.5 }}
+            color={colorFor(state)}
+            strokeWidth={state === 'idle' ? 1.7 : 2.4}
+            style={{ opacity: state === 'idle' ? 0.5 : 1 }}
           />
         </span>
       ))}

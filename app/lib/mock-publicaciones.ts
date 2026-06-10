@@ -34,7 +34,8 @@ export type PublicacionMock = {
      iconos en la grilla: plomo = pendiente, verde = listo. */
   copyListo?: boolean
   portadaLista?: boolean
-  editado?: boolean
+  editado?: boolean        /* edición terminada (editado_at o checklist) */
+  editando?: boolean       /* edición en curso (iniciado_edicion_at sin terminar) */
 }
 
 /* Colores de estado Metricool-style (suaves para chip) */
