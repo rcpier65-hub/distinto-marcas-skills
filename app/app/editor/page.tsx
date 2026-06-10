@@ -19,6 +19,9 @@ import { EditorView } from '@/components/views/EditorView'
 import type { EditorEntry, EditorOption, EstadoPub } from '@/lib/editor/types'
 
 export const dynamic = 'force-dynamic'
+/* El sync de Notion (acción sincronizarNotionDirecto) puede tardar ~1-2 min.
+   Damos hasta 5 min a las funciones de esta ruta para que no haga timeout. */
+export const maxDuration = 300
 
 /* Paleta de colores para asignar a editores que no tienen color en BD.
    Estable por nombre (mismo nombre → mismo color), así no cambia entre

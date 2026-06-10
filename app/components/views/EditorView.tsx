@@ -25,8 +25,8 @@ import {
   marcarEnEdicion,
   desmarcarEnEdicion,
   crearPublicacion,
+  sincronizarNotionDirecto,
 } from '@/app/editor/_actions'
-import { sincronizarTodoNotion } from '@/app/publicaciones/_actions'
 import { RefreshCw, Loader2 } from 'lucide-react'
 import {
   type EditorEntry,
@@ -140,7 +140,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     setSyncing(true)
     const t = toast.loading('Sincronizando con Notion… (puede tardar ~1 min)')
     try {
-      const r = await sincronizarTodoNotion()
+      const r = await sincronizarNotionDirecto()
       if (r.ok) {
         toast.success(
           `Notion sincronizado · ${r.totals.inserted} nuevos, ${r.totals.updated} actualizados`,

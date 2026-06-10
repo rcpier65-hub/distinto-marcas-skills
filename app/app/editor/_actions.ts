@@ -15,6 +15,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { syncMarcaPublicaciones } from '@/lib/publicaciones/sync'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -294,4 +295,83 @@ export async function desmarcarEnEdicion(id: string): Promise<ActionResult> {
   if (error) return { ok: false, error: error.message }
   revalidatePath('/editor')
   return { ok: true }
+}
+
+/**
+ * Sincroniza Notion → app DIRECTO (en proceso). A diferencia de
+ * sincronizarTodoNotion(), NO hace un fetch HTTP a /api/v1/admin/... con
+ * CRON_SECRET — llama syncMarcaPublicaciones() directamente. Esto evita:
+ *   - El timeout del server action esperando un fetch a sí mismo.
+ *   - La protección de deployment de Vercel que intercepta el fetch interno.
+ *   - La dependencia de CRON_SECRET.
+ * Recorre TODAS las marcas activas con notion_proyecto_id, sin filtro de fecha
+ * (trae todo lo que está en Notion, incluido lo que está en "Editar").
+ * Reporta el error real si algo falla (para no quedarnos con "no funciona").
+ */
+export async function sincronizarNotionDirecto(): Promise<
+  | { ok: true; totals: { inserted: number; updated: number; failed: number; ok: number; skipped: number; errored: number }; duration_ms: number }
+  | { ok: false; error: string }
+> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { data: marcas, error } = await service
+    .from('marcas')
+    .select('id, slug, notion_proyecto_id, activa')
+    .eq('activa', true)
+    .order('slug')
+  if (error) return { ok: false, error: `No se pudieron leer las marcas: ${error.message}` }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const conProyecto = ((marcas ?? []) as any[]).filter((m) => m.notion_proyecto_id)
+  if (conProyecto.length === 0) {
+    return { ok: false, error: 'Ninguna marca activa tiene notion_proyecto_id configurado.' }
+  }
+
+  const startedAt = Date.now()
+  const results = await Promise.all(
+    conProyecto.map((m) =>
+      syncMarcaPublicaciones({
+        service,
+        marca: { id: m.id, notion_proyecto_id: m.notion_proyecto_id },
+        from: null,
+        to: null,
+      })
+        .then((r) => ({ slug: m.slug as string, status: 'ok' as const, ...r }))
+        .catch((e) => ({
+          slug: m.slug as string,
+          status: 'error' as const,
+          error: e instanceof Error ? e.message : 'unknown',
+        })),
+    ),
+  )
+
+  const totals = { inserted: 0, updated: 0, failed: 0, ok: 0, skipped: 0, errored: 0 }
+  const erroredMarcas: { slug: string; error: string }[] = []
+  for (const r of results) {
+    if (r.status === 'ok') {
+      totals.inserted += r.inserted
+      totals.updated += r.updated
+      totals.failed += r.failed
+      totals.ok++
+    } else {
+      totals.errored++
+      erroredMarcas.push({ slug: r.slug, error: r.error })
+    }
+  }
+
+  revalidatePath('/editor')
+  revalidatePath('/publicaciones')
+  revalidatePath('/inicio')
+
+  // Si TODO falló, devolvemos el error real (no un "ok" engañoso).
+  if (totals.ok === 0 && totals.errored > 0) {
+    return {
+      ok: false,
+      error: erroredMarcas.map((e) => `${e.slug}: ${e.error}`).join(' · ').slice(0, 400),
+    }
+  }
+
+  return { ok: true, totals, duration_ms: Date.now() - startedAt }
 }
