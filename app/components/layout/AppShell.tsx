@@ -1,16 +1,26 @@
 'use client'
 
-/* AppShell — wrapper global de la app. Reemplaza el Header horizontal
-   viejo por sidebar 240px + main area. Maneja:
-   - Cmd+K global → abre CommandPalette
-   - Condicional: rutas que NO deben tener shell (login, mockup) renderizan
-     children sin envoltorio. */
+/* AppShell — wrapper global de la app.
+ *
+ * Desktop (>= 768px):
+ *   - Sidebar fijo a la izquierda 240px + Main area
+ *
+ * Mobile (< 768px) — feel de app nativa:
+ *   - TopBar fijo con hamburguesa + título + isotipo
+ *   - Sidebar como drawer overlay (transform translateX)
+ *   - Backdrop blureado al abrir
+ *   - body scroll lock cuando el drawer está abierto
+ *   - Cierre automático al cambiar de ruta (Pedro pidió "como app")
+ *   - Safe area top + bottom para iOS notch / home indicator
+ */
 
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Menu, Search } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
 import { RealtimeBridge } from '@/lib/realtime/realtime-bridge'
+import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
 
@@ -21,7 +31,6 @@ export type PermisosSimple = {
   marcasAcceso: string[] | null
   nombre: string
   rol: string
-  /* rolBase ('director' = CEO con team_member, tratado como admin) */
   rolBase?: string
   email: string
   avatarUrl: string | null
@@ -29,23 +38,42 @@ export type PermisosSimple = {
 
 type Props = {
   children: React.ReactNode
-  /* Marcas desde la base, inyectadas por el layout raíz (server). Se reparten
-     al sidebar y al command palette para que toda la nav esté sincronizada. */
   marcas?: MarcaNav[]
-  /* Permisos del usuario logueado. null = admin/owner sin team_member
-     asociado (Pedro original) → sidebar muestra todo. */
   permisos?: PermisosSimple
-  /* Email del usuario logueado para mostrar SIEMPRE en el sidebar.
-     Sirve como indicador visual claro de qué sesión está activa
-     (admin vs Lorena vs Pieer, etc.) */
   emailActivo?: string | null
+}
+
+/* Mapeo path → título humano para el topbar móvil. Si no matchea,
+   capitaliza el primer segmento. */
+function getPageTitle(pathname: string | null): string {
+  if (!pathname) return 'Distinto'
+  const seg = pathname.split('/').filter(Boolean)[0] ?? ''
+  const titles: Record<string, string> = {
+    cockpit: 'Cockpit',
+    inicio: 'Inicio',
+    publicaciones: 'Publicaciones',
+    editor: 'Editor',
+    diseno: 'Diseño',
+    grabaciones: 'Grabaciones',
+    comentarios: 'Comentarios',
+    habitos: 'Hábitos',
+    historial: 'Historial',
+    equipo: 'Mi equipo',
+    settings: 'Configuración',
+    marca: 'Marca',
+    grilla: 'Grilla',
+    perfil: 'Perfil',
+    dashboard: 'Dashboard',
+  }
+  return titles[seg] ?? (seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Distinto')
 }
 
 export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
   const pathname = usePathname()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Cmd+K global
+  /* Cmd+K global */
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -57,25 +85,88 @@ export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Rutas sin shell — login, mockup, portales públicos
+  /* Cerrar drawer al cambiar de ruta (UX nativa: tocar nav cierra menú) */
+  useEffect(() => {
+    setDrawerOpen(false)
+  }, [pathname])
+
+  /* Body scroll lock mientras el drawer está abierto. Evita el bounce
+     scroll detrás del overlay en iOS. */
+  useEffect(() => {
+    if (drawerOpen) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = prev }
+    }
+  }, [drawerOpen])
+
+  /* Rutas sin shell — login, mockup, portales públicos */
   const skipShell = NO_SHELL_ROUTES.some((p) => pathname?.startsWith(p))
   if (skipShell) {
     return <>{children}</>
   }
 
+  const pageTitle = getPageTitle(pathname)
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--mk-bg-base)' }}>
-      {/* RealtimeBridge: escucha cambios en BD (publicaciones, comentarios,
-          hábitos, equipo, marcas, grabaciones) y dispara router.refresh()
-          para que TODOS los Server Components reflejen lo nuevo sin que
-          el user tenga que recargar. Pedro pidió "live updates" entre
-          miembros: si Ailyn crea una tarea, Lorena la ve en ~500ms. */}
+    <>
       <RealtimeBridge />
-      <Sidebar onOpenPalette={() => setPaletteOpen(true)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
-      <main style={{ flex: 1, minWidth: 0 }}>
-        {children}
-      </main>
+
+      {/* ============== TOPBAR MOBILE ==============
+          Sticky, ocupa altura --mk-mobile-topbar-height. Solo se muestra
+          en <md. Tiene safe-area-top para iOS notch. */}
+      <header className="mk-mobile-topbar">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Abrir menú"
+          className="mk-topbar-btn"
+        >
+          <Menu size={22} />
+        </button>
+
+        <div className="mk-topbar-title">
+          <IsotipoDistinto size={20} />
+          <span>{pageTitle}</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          aria-label="Buscar"
+          className="mk-topbar-btn"
+        >
+          <Search size={20} />
+        </button>
+      </header>
+
+      {/* ============== BACKDROP DRAWER (mobile) ============== */}
+      {drawerOpen && (
+        <div
+          className="mk-drawer-backdrop"
+          onClick={() => setDrawerOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      <div className="mk-shell">
+        {/* Sidebar — en desktop: posición sticky en flujo.
+            En mobile: position fixed con transform translateX. */}
+        <div className={`mk-sidebar-wrap ${drawerOpen ? 'mk-sidebar-open' : ''}`}>
+          <Sidebar
+            onOpenPalette={() => { setPaletteOpen(true); setDrawerOpen(false) }}
+            marcas={marcas}
+            permisos={permisos}
+            emailActivo={emailActivo}
+          />
+        </div>
+
+        <main className="mk-main">
+          {children}
+        </main>
+      </div>
+
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} />
-    </div>
+    </>
   )
 }

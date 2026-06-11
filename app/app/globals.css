@@ -404,3 +404,172 @@
   z-index: 1;
   opacity: 0.6;
 }
+
+/* ============================================================
+   MOBILE SHELL — drawer + topbar + responsive
+   ============================================================
+   Filosofía: a partir de 768px desktop sin cambios. Bajo 768px,
+   el sidebar se convierte en drawer overlay y aparece un topbar
+   sticky con hamburguesa + título. Pedro: "haz como app".
+   ============================================================ */
+
+:root {
+  --mk-mobile-topbar-height: 52px;
+}
+
+/* TOPBAR — solo visible en mobile */
+.mk-mobile-topbar {
+  display: none;
+}
+
+/* Shell flex — base desktop */
+.mk-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--mk-bg-base);
+}
+
+.mk-sidebar-wrap {
+  flex-shrink: 0;
+}
+
+.mk-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Drawer backdrop — solo cuando está abierto en mobile */
+.mk-drawer-backdrop {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  /* Topbar sticky con safe-area-top para iOS notch */
+  .mk-mobile-topbar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: calc(var(--mk-mobile-topbar-height) + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 12px 0;
+    background: var(--mk-bg-elevated);
+    border-bottom: 1px solid var(--mk-border-subtle);
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
+    backdrop-filter: saturate(180%) blur(8px);
+  }
+  .mk-topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--mk-text-primary);
+    cursor: pointer;
+    transition: background var(--mk-dur-fast) var(--mk-ease-out);
+  }
+  .mk-topbar-btn:active {
+    background: var(--mk-bg-hover);
+  }
+  .mk-topbar-title {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--mk-text-primary);
+    min-width: 0;
+  }
+  .mk-topbar-title > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Sidebar overlay: fixed, off-canvas por default, transform al abrir */
+  .mk-sidebar-wrap {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(86vw, 320px);
+    transform: translateX(-100%);
+    transition: transform 260ms var(--mk-ease-out);
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.15);
+    will-change: transform;
+  }
+  .mk-sidebar-wrap.mk-sidebar-open {
+    transform: translateX(0);
+  }
+  /* El sidebar interno hereda height 100% del wrap, no del aside */
+  .mk-sidebar-wrap > aside {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Backdrop: solo cuando está abierto */
+  .mk-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0, 0, 0, 0.4);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    animation: mk-backdrop-fade 200ms var(--mk-ease-out);
+  }
+  @keyframes mk-backdrop-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Main area: deja respirar al contenido + safe-area-bottom */
+  .mk-main {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Container global de páginas: reducir padding horizontal en mobile.
+     La mayoría usa Tailwind p-6 o p-4 con container — overrideamos. */
+  .mk-main main.container,
+  .mk-main > main {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  /* Tipografías más compactas para no saturar pantalla chica */
+  .mk-main h1.text-3xl,
+  .mk-main h1.text-2xl {
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
+  .mk-main h2.text-lg {
+    font-size: 15px !important;
+  }
+
+  /* Las tablas anchas se vuelven scroll horizontal en su contenedor */
+  .mk-main table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Por encima de 768px: garantizar que el shell NO use overlay */
+@media (min-width: 768px) {
+  .mk-sidebar-wrap {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    transform: none !important;
+  }
+}
