@@ -76,6 +76,11 @@ export async function createMarca(input: {
   // alimenta el sidebar/command palette en TODAS las rutas.
   revalidatePath('/dashboard')
   revalidatePath('/grabaciones')
+  // /publicaciones e /inicio leen getMarcasNav() para filtros y marcaMap;
+  // sin esto, la marca nueva aparece en sidebar pero el filtro de marcas
+  // queda con la lista vieja hasta el próximo build.
+  revalidatePath('/publicaciones')
+  revalidatePath('/inicio')
   revalidatePath('/', 'layout')
 
   return { ok: true, slug }

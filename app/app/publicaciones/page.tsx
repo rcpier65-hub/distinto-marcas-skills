@@ -9,6 +9,7 @@
 
 import { PublicacionesView } from '@/components/views/PublicacionesView'
 import { SyncNotionButton } from './_components/SyncNotionButton'
+import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import {
   PUBLICACIONES_MOCK,
   type PublicacionMock,
@@ -157,13 +158,19 @@ export default async function PublicacionesPage() {
   const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
   await ensureAccesoModulo('publicaciones')
 
-  const pubs = (await fetchFromSupabase()) ?? PUBLICACIONES_MOCK
+  /* Cargamos pubs y marcas en paralelo. `marcas` viene de la tabla `marcas`
+     de Supabase (vía getMarcasNav), así cualquier marca creada en
+     /dashboard aparece en el filtro de la cabecera sin tocar el mock. */
+  const [pubs, marcas] = await Promise.all([
+    fetchFromSupabase().then((d) => d ?? PUBLICACIONES_MOCK),
+    getMarcasNav(),
+  ])
   return (
     <>
       <div className="flex items-center justify-end gap-3 px-6 pt-4">
         <SyncNotionButton />
       </div>
-      <PublicacionesView publicaciones={pubs} />
+      <PublicacionesView publicaciones={pubs} marcas={marcas} />
     </>
   )
 }

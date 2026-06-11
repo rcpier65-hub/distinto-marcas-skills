@@ -15,7 +15,7 @@ import {
   Video, Palette, Megaphone,
   Sparkles, Clock, AlertTriangle, type LucideIcon,
 } from 'lucide-react'
-import { MARCAS_NAV } from '@/lib/mock-marcas'
+import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 
 // ============================================================
 // MOCK DATA — luego viene de Supabase
@@ -142,6 +142,11 @@ export type CockpitData = {
     marcaNombre: string
     marcaColor: string
   }>
+  /* Lista de marcas activas (de la DB vía getMarcasNav). Si no viene,
+     el componente cae al mock — pero entonces las marcas nuevas creadas
+     en /dashboard no se ven en el dashboard del Cockpit. La page real de
+     /inicio debe pasarla siempre. */
+  marcasNav?: MarcaNav[]
 }
 
 /* Props:
@@ -165,12 +170,17 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
   const nombreFinal = data?.nombreUsuario ?? nombreUsuario
   const puedeVerFinanzasFinal = data?.puedeVerFinanzas ?? puedeVerFinanzas
 
-  const marcaMap = Object.fromEntries(MARCAS_NAV.map((m) => [m.slug, m]))
+  /* Lista canónica de marcas: la real (de DB) si la page la pasó, sino mock.
+     marcaMap se usa en TODA la vista para resolver slug → {nombreCorto,
+     color, emoji}. Si una marca nueva no está acá no se ve el nombre/color
+     en las cards del cockpit. */
+  const marcasNav = data?.marcasNav ?? MARCAS_NAV
+  const marcaMap = Object.fromEntries(marcasNav.map((m) => [m.slug, m]))
   const ingresoDelta = METRICAS.ingresoMes - METRICAS.ingresoMesPasado
   const ingresoPct = ((ingresoDelta / METRICAS.ingresoMesPasado) * 100).toFixed(1)
 
   /* Datos efectivos: reales si vienen, mock si no */
-  const marcasActivasCount = data?.marcasActivasCount ?? MARCAS_NAV.length
+  const marcasActivasCount = data?.marcasActivasCount ?? marcasNav.length
   const comentariosPendientesTotal = data?.comentariosPendientesTotal ?? METRICAS.comentariosPendientes
   const grillasParaEnviarHoy = data?.grillasParaEnviarHoy ?? 6
   const comentariosList = data?.comentariosVisibles

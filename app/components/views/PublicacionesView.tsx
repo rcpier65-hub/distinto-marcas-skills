@@ -8,7 +8,7 @@
    Default tab: Listado (porque Pedro pidió "listado ayuda a entender mejor").
    Iter 1: read-only. Iter 2: bulk actions + crear/editar inline. */
 
-import { useMemo, useState } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Scissors, FileText, Image as ImageIcon } from 'lucide-react'
 import {
@@ -19,7 +19,16 @@ import {
   type EstadoPubMetricool,
   type Red,
 } from '@/lib/mock-publicaciones'
-import { MARCAS_NAV } from '@/lib/mock-marcas'
+import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
+
+/* Context interno: el componente principal recibe `marcas` (de la DB) y lo
+   inyecta acá. Los sub-componentes (ListRow / PubChip / etc.) leen con
+   useMarcasNav() en lugar de importar el mock — así marcas nuevas creadas
+   en /dashboard aparecen en TODOS los renders sin tocar el mock. */
+const MarcasNavContext = createContext<MarcaNav[]>(MARCAS_NAV)
+function useMarcasNav(): MarcaNav[] {
+  return useContext(MarcasNavContext)
+}
 
 type ViewMode = 'listado' | 'mes' | 'semana'
 
@@ -46,9 +55,13 @@ type Filters = {
 
 type Props = {
   publicaciones?: PublicacionMock[]
+  /* Lista de marcas activa (viene de la DB vía getMarcasNav() en el server).
+     Cae al mock solo si el page no la pasa — así marcas nuevas creadas en
+     /dashboard aparecen automáticamente en el filtro. */
+  marcas?: MarcaNav[]
 }
 
-export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK }: Props) {
+export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas = MARCAS_NAV }: Props) {
   /* router para que el botón "Nueva publicación" navegue a
      /publicaciones/nueva. Antes el botón era fantasma (sin onClick). */
   const router = useRouter()
@@ -75,6 +88,7 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK }: Props)
     filters.marcaSlug !== 'todas' || filters.estado !== 'todos' || filters.red !== 'todas' || !!search
 
   return (
+   <MarcasNavContext.Provider value={marcas}>
     <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }}>
       {/* ============== HEADER ============== */}
       <header
@@ -149,14 +163,15 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK }: Props)
 
         <FilterPill
           label="Marca"
-          value={filters.marcaSlug === 'todas' ? null : MARCAS_NAV.find((m) => m.slug === filters.marcaSlug)?.nombreCorto ?? null}
-          dotColor={filters.marcaSlug === 'todas' ? null : MARCAS_NAV.find((m) => m.slug === filters.marcaSlug)?.color ?? null}
+          value={filters.marcaSlug === 'todas' ? null : marcas.find((m) => m.slug === filters.marcaSlug)?.nombreCorto ?? null}
+          dotColor={filters.marcaSlug === 'todas' ? null : marcas.find((m) => m.slug === filters.marcaSlug)?.color ?? null}
           options={[
             { id: 'todas', label: 'Todas' },
             /* Incluimos emoji de la marca para que se vea el logo en el
                dropdown (Pedro: 'no salen sus logos en las marcas cuando
-               pongo el filtro'). */
-            ...MARCAS_NAV.map((m) => ({ id: m.slug, label: m.nombreCorto, color: m.color, emoji: m.emoji })),
+               pongo el filtro'). `marcas` viene de la DB → marcas nuevas
+               creadas en /dashboard aparecen acá automáticamente. */
+            ...marcas.map((m) => ({ id: m.slug, label: m.nombreCorto, color: m.color, emoji: m.emoji })),
           ]}
           onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
         />
@@ -232,6 +247,7 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK }: Props)
         {view === 'semana' && <SemanaView entries={filtered} />}
       </div>
     </div>
+   </MarcasNavContext.Provider>
   )
 }
 
@@ -309,7 +325,7 @@ function ListadoView({ entries, selected, onToggleSelect }: { entries: Publicaci
 }
 
 function ListRow({ pub, selected, onToggleSelect }: { pub: PublicacionMock; selected: boolean; onToggleSelect: () => void }) {
-  const marca = MARCAS_NAV.find((m) => m.slug === pub.marcaSlug)
+  const marca = useMarcasNav().find((m) => m.slug === pub.marcaSlug)
   const editor = editorFromPub(pub)
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
   const fecha = new Date(pub.fecha + 'T00:00:00')
@@ -533,7 +549,7 @@ function StatusIcons({ pub, size = 13 }: { pub: PublicacionMock; size?: number }
    Variantes: compact (mes con muchas pubs) y full (semana / mes pocas pubs). */
 function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 'full' }) {
   const router = useRouter()
-  const marca = MARCAS_NAV.find((m) => m.slug === pub.marcaSlug)
+  const marca = useMarcasNav().find((m) => m.slug === pub.marcaSlug)
   const editor = editorFromPub(pub)
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
 

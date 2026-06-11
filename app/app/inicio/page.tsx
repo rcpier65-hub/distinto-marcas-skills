@@ -21,6 +21,7 @@ import { tieneAcceso, type ModuloPermiso } from '@/lib/team/types'
 import { InicioView, type InicioData } from './_components/inicio-view'
 import { getFraseDelDia } from '@/lib/inicio/get-frase-del-dia'
 import { loadCockpitData } from '@/lib/cockpit/load-cockpit-data'
+import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { formatHora12 } from '@/lib/utils/format-hora'
 
 export const dynamic = 'force-dynamic'
@@ -387,14 +388,22 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   const verCockpit = esCEO || (p && tieneAcceso(p.permisos, 'metricas' as ModuloPermiso))
   const puedeVerFinanzas = esCEO || (p && tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso)) || false
 
-  const cockpitData = verCockpit
-    ? await loadCockpitData(service, {
-        nombreUsuario: nombreCapitalizado,
-        puedeVerFinanzas,
-        teamMemberIdHabitos: memberData.id,
-        permisos: p,
-      })
-    : null
+  /* Cargamos cockpitData y la lista canónica de marcas en paralelo.
+     marcasNav viene de la tabla `marcas` (Supabase) → cualquier marca
+     creada en /dashboard aparece automáticamente en cards y dropdowns
+     del cockpit, sin tocar el mock estático. */
+  const [cockpitDataRaw, marcasNav] = await Promise.all([
+    verCockpit
+      ? loadCockpitData(service, {
+          nombreUsuario: nombreCapitalizado,
+          puedeVerFinanzas,
+          teamMemberIdHabitos: memberData.id,
+          permisos: p,
+        })
+      : Promise.resolve(null),
+    getMarcasNav(),
+  ])
+  const cockpitData = cockpitDataRaw ? { ...cockpitDataRaw, marcasNav } : null
 
   const data: InicioData = {
     nombre: nombreCapitalizado,
