@@ -26,6 +26,7 @@ import {
 } from '../_actions'
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
 import { WelcomeAnimation } from './welcome-animation'
+import { ReporteDelDiaCard } from './reporte-del-dia'
 
 export type InicioData = {
   nombre: string
@@ -113,6 +114,10 @@ export type InicioData = {
      alerta de coordinación, carrusel de comentarios y bloques de
      trabajo encima del bloque de pendientes/chat. */
   cockpitData: CockpitData | null
+  /* Reporte del día — data ya pre-calculada en server para que el
+     componente cliente (ReporteDelDia) solo renderice + capture la
+     imagen. Si null, el card no se muestra (no debería pasar). */
+  reporteDelDia: import('@/lib/inicio/load-reporte-del-dia').ReporteDelDiaData | null
   /* Si viene true, se muestra el overlay WelcomeAnimation que dura
      ~6-7 seg con bienvenida personalizada por rol. Se setea cuando el
      user acaba de hacer login (via ?welcome=1 en la URL). */
@@ -535,7 +540,7 @@ export function InicioView({ data }: { data: InicioData }) {
               reuniones={data.reuniones}
               acento={acento}
             />
-            <ReporteDelDia acento={acento} />
+            {data.reporteDelDia && <ReporteDelDiaCard data={data.reporteDelDia} />}
             <PendientesPanel
               pendientesIniciales={data.pendientes}
               acento={acento}
@@ -1324,191 +1329,6 @@ function AvisoGrabaciones({
   )
 }
 
-/* ====================================================================
-   ReporteDelDia
-   --------------------------------------------------------------------
-   Pedro: 'reportar avance automático en inicio, generar reporte un
-   resumen escrito rápido día fecha y lo que se hizo, botón de generar
-   reporte del día, opción de copiar directo'.
-
-   Card colapsada por default con botón 'Generar reporte'. Al click,
-   server action arma el texto con avances + tareas + comentarios +
-   hábitos del día. Muestra resumen + botón 'Copiar' (clipboard API).
-   ==================================================================== */
-function ReporteDelDia({ acento }: { acento: string }) {
-  const [reporte, setReporte] = useState<{
-    fechaBonita: string
-    textoCopia: string
-    resumenLineas: string[]
-    totalAcciones: number
-  } | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  async function generar() {
-    if (loading) return
-    setLoading(true)
-    setCopied(false)
-    try {
-      const { generarReporteDelDia } = await import('../_actions-reporte')
-      const r = await generarReporteDelDia()
-      if (r.ok) setReporte(r.reporte)
-      else toast.error(r.error)
-    } catch (e) {
-      toast.error((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function copiar() {
-    if (!reporte) return
-    try {
-      await navigator.clipboard.writeText(reporte.textoCopia)
-      setCopied(true)
-      toast.success('Reporte copiado al portapapeles ✓')
-      setTimeout(() => setCopied(false), 2200)
-    } catch {
-      toast.error('No se pudo copiar (permisos del browser)')
-    }
-  }
-
-  return (
-    <section style={{
-      background: '#fff',
-      border: '1px solid #f1f1f3',
-      borderRadius: 14,
-      padding: 16,
-      boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: reporte ? 12 : 0 }}>
-        <span style={{
-          width: 30, height: 30, borderRadius: 8,
-          background: `${acento}14`,
-          color: acento,
-          display: 'inline-flex',
-          alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <ClipboardList size={16} strokeWidth={1.8} />
-        </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{
-            fontSize: 13.5, fontWeight: 600,
-            color: '#111827',
-            margin: 0, lineHeight: 1.3,
-            letterSpacing: '-0.005em',
-          }}>
-            Reporte del día
-          </h3>
-          <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>
-            {reporte
-              ? reporte.fechaBonita
-              : 'Resumen de lo que hiciste hoy — listo para copiar.'}
-          </p>
-        </div>
-        {!reporte && (
-          <button
-            onClick={generar}
-            disabled={loading}
-            style={{
-              padding: '7px 14px',
-              borderRadius: 999,
-              background: loading ? '#e5e7eb' : acento,
-              color: loading ? '#9ca3af' : '#fff',
-              border: 'none',
-              fontSize: 12, fontWeight: 600,
-              cursor: loading ? 'wait' : 'pointer',
-              fontFamily: 'inherit',
-              whiteSpace: 'nowrap',
-              transition: 'background 150ms',
-            }}
-          >
-            {loading ? 'Generando…' : 'Generar reporte'}
-          </button>
-        )}
-      </div>
-
-      {reporte && (
-        <>
-          {/* Resumen visual rápido */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-            {reporte.resumenLineas.map((linea, i) => (
-              <span key={i} style={{
-                fontSize: 11, fontWeight: 500,
-                padding: '4px 10px',
-                borderRadius: 999,
-                background: reporte.totalAcciones > 0 ? `${acento}10` : '#f3f4f6',
-                color: reporte.totalAcciones > 0 ? acento : '#6b7280',
-              }}>
-                {linea}
-              </span>
-            ))}
-          </div>
-
-          {/* Texto plano editable visual (read-only) */}
-          <pre style={{
-            margin: 0,
-            padding: '10px 12px',
-            background: '#fafafa',
-            border: '1px solid #f3f4f6',
-            borderRadius: 10,
-            fontSize: 11.5,
-            lineHeight: 1.55,
-            fontFamily: 'inherit',
-            color: '#374151',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            maxHeight: 240,
-            overflowY: 'auto',
-          }}>
-            {reporte.textoCopia}
-          </pre>
-
-          {/* Acciones */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-            <button
-              onClick={generar}
-              disabled={loading}
-              style={{
-                padding: '7px 12px',
-                borderRadius: 8,
-                background: 'transparent',
-                border: '1px solid #e5e7eb',
-                color: '#6b7280',
-                fontSize: 11.5, fontWeight: 600,
-                cursor: loading ? 'wait' : 'pointer',
-                fontFamily: 'inherit',
-              }}
-              title="Regenerar"
-            >
-              ↻ Regenerar
-            </button>
-            <button
-              onClick={copiar}
-              style={{
-                padding: '7px 16px',
-                borderRadius: 8,
-                background: copied ? '#22c55e' : acento,
-                color: '#fff',
-                border: 'none',
-                fontSize: 12, fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'background 200ms',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              {copied ? '✓ Copiado' : 'Copiar todo'}
-            </button>
-          </div>
-        </>
-      )}
-    </section>
-  )
-}
 
 /* ====================================================================
    AccesosRapidos
