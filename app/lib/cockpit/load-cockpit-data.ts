@@ -158,12 +158,16 @@ export async function loadCockpitData(
       .eq('status', 'responded')
       .gte('responded_at', `${inicioMes}T00:00:00Z`)
       .lte('responded_at', `${finMes}T23:59:59Z`),
+    /* Tareas de diseño = SOLO las del módulo Diseño (es_tarea_diseno).
+       Modelo Pedro: Diseño es base de datos aparte; las pubs del
+       pipeline en etapa 'disenar' no son tareas de Ailyn. Excluimos
+       las ya terminadas/archivadas (sub-estado). */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any)
       .from('publicaciones')
       .select(`id, nombre, fecha_diseno, estado_tarea, marca:marcas(slug, nombre, color_primario_hex)`)
-      .eq('estado', 'disenar')
-      .eq('portada_lista', false)
+      .eq('es_tarea_diseno', true)
+      .not('estado_tarea', 'in', '(listo,archivado)')
       .order('fecha_diseno', { ascending: true, nullsFirst: false })
       .limit(6),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

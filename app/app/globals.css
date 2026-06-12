@@ -562,6 +562,44 @@
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* ====== Grids con inline-styles que deben apilarse en mobile ======
+     Los componentes usan style={{gridTemplateColumns}} inline (gana a
+     cualquier clase sin !important). Estas reglas los vencen SOLO en
+     viewport chico para que la app se vea como app nativa en iPhone. */
+
+  /* /inicio: columna principal + hábitos → apilar (hábitos abajo) */
+  .mk-inicio-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Cockpit embebido: KPIs 4-up → 2x2 */
+  .mk-cockpit-kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Cockpit: bloques de trabajo 3-up → 1 columna */
+  .mk-cockpit-bloques {
+    grid-template-columns: 1fr !important;
+  }
+  /* Cockpit: grillas + hábitos 2-up → 1 columna */
+  .mk-cockpit-split {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Welcome animation: módulos del rol → 2 columnas máx */
+  .mk-welcome-modulos {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* /inicio main: reducir padding del contenedor (usa 40px/32px inline) */
+  .mk-inicio-main {
+    padding: 16px 12px 90px !important;
+  }
+
+  /* Header de inicio: nombre grande baja de 30 a 24px */
+  .mk-inicio-main h1 {
+    font-size: 24px !important;
+  }
 }
 
 /* Por encima de 768px: garantizar que el shell NO use overlay */

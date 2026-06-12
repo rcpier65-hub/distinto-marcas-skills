@@ -213,12 +213,15 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       }
     })
   } else if (tieneAcceso(p!.permisos, 'diseno')) {
-    /* Diseñadora: tareas en estado='disenar' */
+    /* Diseñadora: SOLO tareas del módulo Diseño (es_tarea_diseno=true).
+       Las pubs del pipeline en etapa 'disenar' no son suyas (modelo
+       Notion de Pedro: Diseño = base de datos aparte). Excluimos las
+       terminadas/archivadas. */
     const { data } = await service
       .from('publicaciones')
-      .select(`id, nombre, fecha_diseno, estado_tarea, portada_lista, marca:marcas(slug, nombre, color_primario_hex)`)
-      .eq('estado', 'disenar')
-      .eq('portada_lista', false)
+      .select(`id, nombre, fecha_diseno, estado_tarea, marca:marcas(slug, nombre, color_primario_hex)`)
+      .eq('es_tarea_diseno', true)
+      .not('estado_tarea', 'in', '(listo,archivado)')
       .order('fecha_diseno', { ascending: true, nullsFirst: false })
       .limit(3)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

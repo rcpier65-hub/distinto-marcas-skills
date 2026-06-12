@@ -71,7 +71,7 @@ export default async function EditorPage() {
       .select(`
         id, nombre, fecha_publicacion, fecha_edicion, estado, plataformas,
         editor_id, editor_nombre, enlace_tomas, guion, fecha_marcada_para_editar,
-        iniciado_edicion_at, editado_at,
+        iniciado_edicion_at, editado_at, es_tarea_diseno,
         marca:marcas(slug)
       `)
       /* DESC + límite alto: el Editor DEBE incluir los videos recientes/futuros
@@ -129,8 +129,17 @@ export default async function EditorPage() {
      porque el sync de Notion guarda solo editor_nombre. */
   const editorByName = new Map(editoresRaw.map((e) => [e.nombre.toLowerCase().trim(), e.id]))
 
+  /* Excluir tareas de diseño STANDALONE (es_tarea_diseno sin fecha de
+     publicación) — son la 'base aparte' de Ailyn y no deben verse en
+     el editor ni en filtro 'todos'. Las 'para publicar' SÍ pasan
+     (tienen fecha_publicacion → entran al pipeline normal).
+     Defensive: si la columna no existe (fallback query), r.es_tarea_diseno
+     es undefined y no se filtra nada. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entries: EditorEntry[] = (pubs ?? []).map((r: any) => {
+  const pubsFiltradas = (pubs ?? []).filter((r: any) => !(r.es_tarea_diseno === true && !r.fecha_publicacion))
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entries: EditorEntry[] = pubsFiltradas.map((r: any) => {
     const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
     /* Resuelve editor_id: si la columna está vacía pero hay
        editor_nombre del sync de Notion, buscamos el id por nombre. */

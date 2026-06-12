@@ -318,6 +318,7 @@ export function InicioView({ data }: { data: InicioData }) {
 
   return (
     <main
+      className="mk-inicio-main"
       style={{
         minHeight: '100vh',
         padding: '40px 32px',
@@ -521,8 +522,10 @@ export function InicioView({ data }: { data: InicioData }) {
           </section>
         )}
 
-        {/* Grid principal: 2/3 contenido + 1/3 sidebar de hábitos */}
+        {/* Grid principal: 2/3 contenido + 1/3 sidebar de hábitos.
+            En mobile (mk-inicio-grid en globals.css) se apila 1 col. */}
         <div
+          className="mk-inicio-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: '2fr 1fr',

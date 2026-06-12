@@ -188,7 +188,13 @@ export async function convertirEnTarea(id: string): Promise<
     estado,
   }
   if (rolBase === 'editor' && nombreMiembro) payload.editor_nombre = nombreMiembro
-  if (rolBase === 'disenador' && nombreMiembro) payload.disenador_nombre = nombreMiembro
+  if (rolBase === 'disenador' && nombreMiembro) {
+    payload.disenador_nombre = nombreMiembro
+    /* Las tareas que la diseñadora convierte van a SU base de Diseño
+       (es_tarea_diseno) — no al pipeline general. */
+    payload.es_tarea_diseno = true
+    payload.estado_tarea = 'sin_empezar'
+  }
 
   /* INSERT publicación */
   const { data: pub, error: errPub } = await service

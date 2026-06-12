@@ -30,8 +30,9 @@ export async function GET(request: Request) {
       disenador_nombre,
       marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
     `)
-    .eq('estado', 'disenar')
-    .eq('portada_lista', false)
+    /* Solo tareas del módulo Diseño (modelo Pedro: base aparte).
+       Las pubs del pipeline en etapa 'disenar' NO entran. */
+    .eq('es_tarea_diseno', true)
     .order('fecha_diseno', { ascending: true, nullsFirst: false })
 
   if (subEstado) q = q.eq('estado_tarea', subEstado)

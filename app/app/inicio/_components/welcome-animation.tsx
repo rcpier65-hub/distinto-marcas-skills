@@ -376,7 +376,7 @@ export function WelcomeAnimation({
                   {modulos.length} módulos para tu día a día
                 </h2>
               </div>
-              <div style={{
+              <div className="mk-welcome-modulos" style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${Math.min(modulos.length, 4)}, minmax(0, 1fr))`,
                 gap: 14,

@@ -276,6 +276,13 @@ export async function crearDisenoTask(args: {
        que el sub-estado las marca como 'listo' o 'archivado'. */
     estado: 'disenar',
     estado_tarea: 'sin_empezar',
+    /* Flag que separa la "base de datos" de Diseño del pipeline de
+       publicaciones (modelo Notion de Pedro: Diseño es una DB aparte;
+       solo se vincula al pipeline si es 'para publicar'). El módulo
+       /diseno SOLO muestra filas con este flag — así las publicaciones
+       sincronizadas desde Notion en etapa 'disenar' no contaminan el
+       tablero de Ailyn. */
+    es_tarea_diseno: true,
     /* Nueva tarea: sin started_at ni archived_at. Se setean
        automáticamente cuando el sub-estado avance. */
     started_at: null,

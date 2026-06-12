@@ -265,7 +265,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             Ingresos no se muestra). 4 columnas para Pedro/admin con la
             card de Ingresos secreta (oculta por default, toggle con ojo). */}
         <div
-          className="mk-stagger"
+          className="mk-stagger mk-cockpit-kpis"
           style={{
             display: 'grid',
             gridTemplateColumns: puedeVerFinanzasFinal ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
@@ -347,7 +347,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
         </section>
 
         {/* === BLOQUES INFERIORES: Diseño + Editando hoy + Grabaciones === */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+        <div className="mk-cockpit-bloques" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
           {/* Tareas en diseño */}
           <BloqueTrabajo
             title="Tareas en diseño"
@@ -441,7 +441,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
         </div>
 
         {/* === GRILLAS A ENVIAR + HÁBITOS DEL DÍA === */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div className="mk-cockpit-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             <section>
               <SectionHeader
                 title="Grillas a enviar"

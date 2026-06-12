@@ -93,20 +93,28 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
      las tareas "desaparecerían" al archivarlas.
      La tabla las oculta cliente-side con filters.mostrarArchivadas
      (default false); el Kanban las muestra siempre. */
+  /* MODELO PEDRO (como su Notion): Diseño es una BASE DE DATOS APARTE.
+     Solo muestra tareas creadas en este módulo (es_tarea_diseno=true).
+     Las publicaciones del pipeline que pasan por etapa 'disenar'
+     (sincronizadas de Notion) NO aparecen acá — antes contaminaban el
+     tablero de Ailyn con ~110 pubs que no eran suyas.
+     La tarea de diseño 'para publicar' SÍ está vinculada al pipeline
+     (tiene fecha_publicacion) pero sigue viva acá aunque avance de
+     estado — su ciclo en Diseño lo maneja estado_tarea (sub-estado). */
   let res = await service
     .from('publicaciones')
     .select(SELECT)
-    .eq('estado', 'disenar')
-    .eq('portada_lista', false)
+    .eq('es_tarea_diseno', true)
     .order('fecha_diseno', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(1000)
 
   let migrationPendiente = false
-  /* Defensive: si descripcion/fecha_entrega no existen, reintentamos */
+  /* Defensive: si descripcion/fecha_entrega/es_tarea_diseno no existen,
+     reintentamos con el filtro viejo para no romper la página. */
   if (
     res.error?.code === '42703' ||
-    /descripcion|fecha_entrega|fecha_marcada_para_disenar/i.test(res.error?.message ?? '')
+    /descripcion|fecha_entrega|fecha_marcada_para_disenar|es_tarea_diseno/i.test(res.error?.message ?? '')
   ) {
     migrationPendiente = true
     res = await service
