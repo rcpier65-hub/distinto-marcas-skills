@@ -26,7 +26,7 @@ export type ReporteTareaCompletada = {
   marca: string
   marcaColor: string
   marcaEmoji: string | null
-  tipo: 'editada' | 'disenada' | 'aprobada'
+  tipo: 'editada' | 'disenada' | 'aprobada' | 'grabada' | 'comentario'
 }
 
 export type ReporteHabitoCumplido = {
@@ -81,10 +81,10 @@ export async function loadReporteDelDia(
   const inicioDiaIso = `${hoy}T00:00:00.000-05:00`
   const finDiaIso = `${hoy}T23:59:59.999-05:00`
 
-  // Cuatro queries en paralelo — la idea es que el reporte cargue rápido.
+  // Seis queries en paralelo — la idea es que el reporte cargue rápido.
   const [pubsEditadasRes, pubsDisenoRes, habitosRes, habitosCompletadosRes, grabacionesRes, comentariosRes] =
     await Promise.all([
-      // 1. Pubs editadas hoy por el usuario (editor_nombre match).
+      // 1. Pubs editadas hoy por el usuario (editor_nombre match + editado_at).
       //    Para CEO traemos todas, sin filtro de editor_nombre.
       opts.esCEO
         ? service
@@ -101,14 +101,30 @@ export async function loadReporteDelDia(
             .lte('editado_at', finDiaIso)
             .limit(20),
 
-      // 2. Diseños terminados hoy (portada_lista=true + fecha_diseno=hoy).
-      //    Aplica a diseñadoras; CEO ve todos.
-      service
-        .from('publicaciones')
-        .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
-        .eq('portada_lista', true)
-        .eq('fecha_diseno', hoy)
-        .limit(20),
+      // 2. Tareas de DISEÑO marcadas como "listo" hoy por el usuario.
+      //    El módulo /diseno setea estado_tarea='listo' cuando Ailyn (o
+      //    cualquier diseñador) termina una tarea — NO hay columna
+      //    `listo_at` dedicada todavía, así que usamos updated_at como
+      //    proxy de "cuándo se marcó como terminada". Pragmático para
+      //    iter 1; iter 2 podría agregar columna terminado_at via
+      //    migration. Filtro por disenador_nombre evita que un editor
+      //    vea tareas de diseño en su reporte.
+      opts.esCEO
+        ? service
+            .from('publicaciones')
+            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
+            .eq('estado_tarea', 'listo')
+            .gte('updated_at', inicioDiaIso)
+            .lte('updated_at', finDiaIso)
+            .limit(20)
+        : service
+            .from('publicaciones')
+            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
+            .ilike('disenador_nombre', opts.usuarioNombre)
+            .eq('estado_tarea', 'listo')
+            .gte('updated_at', inicioDiaIso)
+            .lte('updated_at', finDiaIso)
+            .limit(20),
 
       // 3. Hábitos activos del usuario hoy (para saber el total).
       opts.teamMemberId

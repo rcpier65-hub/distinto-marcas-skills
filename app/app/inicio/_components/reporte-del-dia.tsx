@@ -399,9 +399,11 @@ function ReporteImage({
 
   /* Color por tipo de tarea */
   const COLOR_TIPO: Record<ReporteTareaCompletada['tipo'], { bg: string; label: string; emoji: string }> = {
-    editada:  { bg: '#dbeafe', label: 'Editada',  emoji: '✂️' },
-    disenada: { bg: '#fce7f3', label: 'Diseñada', emoji: '🎨' },
-    aprobada: { bg: '#dcfce7', label: 'Aprobada', emoji: '✅' },
+    editada:    { bg: '#dbeafe', label: 'Editada',  emoji: '✂️' },
+    disenada:   { bg: '#fce7f3', label: 'Diseñada', emoji: '🎨' },
+    aprobada:   { bg: '#dcfce7', label: 'Aprobada', emoji: '✅' },
+    grabada:    { bg: '#fef3c7', label: 'Grabada',  emoji: '🎥' },
+    comentario: { bg: '#cffafe', label: 'Respondido', emoji: '💬' },
   }
 
   return (
