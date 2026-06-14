@@ -6,6 +6,8 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import {
   createCalendarEvent,
+  createTimedEvent,
+  createReunionEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
 } from '@/lib/integrations/google-calendar'
@@ -208,13 +210,32 @@ export async function getGrabacionesKPIs(
 }
 
 /**
- * Crear nueva grabación planeada.
+ * Crear nueva grabación con campos estilo Google Calendar:
+ * título, fecha, hora inicio, duración, descripción, y opcionalmente Meet
+ * con invitados. Crea el evento en GCal como dateTime (no all-day) y guarda
+ * google_event_id + meet_link para poder modificar/borrar después.
+ *
+ * Defensive: si la migration 028 (columnas titulo/duracion_min/es_reunion_meet/
+ * meet_link/invitados_emails) NO se aplicó aún, reintenta el insert con SOLO
+ * las columnas base. Así la app no se rompe en deploys donde el SQL no se
+ * corrió todavía — el evento de GCal igual queda completo, solo no
+ * persistimos el detalle en BD.
  */
 export async function createGrabacion(args: {
   marca_slug: string
+  titulo?: string
   fecha_planeada: string
+  hora_planeada?: string          // HH:MM — si null/undefined, evento all-day
+  duracion_min?: number           // default 60
+  descripcion?: string | null
+  es_reunion_meet?: boolean
+  invitados_emails?: string[]
+  // Legacy compat — algunos callers viejos pasan 'notas'.
   notas?: string
-}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; id: string; gcalSynced: boolean; meetLink: string | null }
+  | { ok: false; error: string }
+> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -227,33 +248,115 @@ export async function createGrabacion(args: {
     .maybeSingle()
   if (!marca) return { ok: false, error: `Marca '${args.marca_slug}' no encontrada` }
 
-  const { data, error } = await service
+  const titulo = args.titulo?.trim() || `Grabación – ${marca.nombre}`
+  const descripcion = args.descripcion?.trim() || args.notas?.trim() || null
+  const duracion = Math.max(5, Math.min(720, args.duracion_min ?? 60))
+  const esMeet = !!args.es_reunion_meet
+  const invitados = (args.invitados_emails ?? []).filter((e) => e && /@/.test(e))
+
+  // Intento 1: insert FULL (con todas las columnas nuevas).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertFull: Record<string, any> = {
+    marca_id: marca.id,
+    fecha_planeada: args.fecha_planeada,
+    hora_planeada: args.hora_planeada ?? null,
+    estado: 'planeada',
+    notas: descripcion,
+    titulo,
+    duracion_min: duracion,
+    es_reunion_meet: esMeet,
+    invitados_emails: invitados.length > 0 ? invitados : null,
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertBase: Record<string, any> = {
+    marca_id: marca.id,
+    fecha_planeada: args.fecha_planeada,
+    estado: 'planeada',
+    notas: descripcion,
+  }
+
+  let inserted = await service
     .from('grabaciones')
-    .insert({
-      marca_id: marca.id,
-      fecha_planeada: args.fecha_planeada,
-      estado: 'planeada',
-      notas: args.notas?.trim() || null,
-    })
+    .insert(insertFull)
     .select('id')
     .single()
 
-  if (error) return { ok: false, error: error.message }
+  // Si falla por columnas ausentes (42703 / "column does not exist"), reintentar
+  // con set mínimo de columnas que sabemos que siempre existen.
+  if (inserted.error && (inserted.error.code === '42703' || /column .* does not exist|titulo|duracion_min|es_reunion_meet|invitados_emails/i.test(inserted.error.message ?? ''))) {
+    inserted = await service
+      .from('grabaciones')
+      .insert(insertBase)
+      .select('id')
+      .single()
+  }
+  if (inserted.error) return { ok: false, error: inserted.error.message }
+  const grabId = inserted.data.id as string
 
-  // Sync con Google Calendar (best-effort — no bloquea si no está conectado)
+  // Sync con Google Calendar — elige método según es_reunion_meet + si hay hora.
+  // Best-effort: si GCal no está conectado o falla, la grabación queda guardada
+  // y reportamos gcalSynced=false para que la UI muestre el mensaje correcto.
+  let gcalSynced = false
+  let meetLink: string | null = null
   try {
-    const ev = await createCalendarEvent({
-      summary: eventoTitulo(marca.nombre),
-      description: args.notas?.trim() || `Sesión de grabación planificada para ${marca.nombre}.`,
-      date: args.fecha_planeada,
-    })
-    if (ev.ok) {
-      await service.from('grabaciones').update({ google_event_id: ev.eventId }).eq('id', data.id)
+    if (esMeet && args.hora_planeada) {
+      const ev = await createReunionEvent({
+        summary: titulo,
+        description: descripcion ?? `Sesión de grabación – ${marca.nombre}.`,
+        fecha: args.fecha_planeada,
+        hora: args.hora_planeada,
+        durationMin: duracion,
+        attendees: invitados,
+      })
+      if (ev.ok) {
+        gcalSynced = true
+        meetLink = ev.meetLink
+        // Defensive update — si meet_link no existe en BD, ignora silenciosamente.
+        await service
+          .from('grabaciones')
+          .update({ google_event_id: ev.eventId, meet_link: ev.meetLink })
+          .eq('id', grabId)
+          .then(async (r: { error: { code?: string; message?: string } | null }) => {
+            if (r.error && /meet_link/i.test(r.error.message ?? '')) {
+              await service
+                .from('grabaciones')
+                .update({ google_event_id: ev.eventId })
+                .eq('id', grabId)
+            }
+          })
+      }
+    } else if (args.hora_planeada) {
+      // Evento con hora pero sin Meet.
+      const ev = await createTimedEvent({
+        summary: titulo,
+        description: descripcion ?? `Sesión de grabación – ${marca.nombre}.`,
+        fecha: args.fecha_planeada,
+        hora: args.hora_planeada,
+        durationMin: duracion,
+      })
+      if (ev.ok) {
+        gcalSynced = true
+        await service.from('grabaciones').update({ google_event_id: ev.eventId }).eq('id', grabId)
+      }
+    } else {
+      // Sin hora: evento all-day (comportamiento legacy).
+      const ev = await createCalendarEvent({
+        summary: titulo,
+        description: descripcion ?? `Sesión de grabación para ${marca.nombre}.`,
+        date: args.fecha_planeada,
+      })
+      if (ev.ok) {
+        gcalSynced = true
+        await service.from('grabaciones').update({ google_event_id: ev.eventId }).eq('id', grabId)
+      }
     }
-  } catch { /* GCal no conectado o falló — la grabación ya se guardó igual */ }
+  } catch (e) {
+    console.error('[grabaciones] GCal sync falló — sigo con la grabación local:', e)
+  }
 
   revalidatePath('/grabaciones')
-  return { ok: true, id: data.id }
+  revalidatePath('/grabaciones/calendario')
+  return { ok: true, id: grabId, gcalSynced, meetLink }
 }
 
 /**

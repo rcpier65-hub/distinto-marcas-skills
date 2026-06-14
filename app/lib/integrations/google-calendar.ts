@@ -179,6 +179,15 @@ type EventInput = {
   colorId?: string      // 1-11 colores de Google Calendar
 }
 
+export type TimedEventInput = {
+  summary: string       // título
+  description?: string
+  fecha: string         // YYYY-MM-DD
+  hora: string          // HH:MM (24h)
+  durationMin?: number  // duración, default 60
+  colorId?: string
+}
+
 /**
  * Crea un evento all-day. Devuelve el event_id de Google (para guardarlo
  * en grabaciones.google_event_id) o null si no está conectado / falla.
@@ -271,6 +280,50 @@ export async function createReunionEvent(
     data.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri ??
     null
   return { ok: true, eventId: data.id, meetLink }
+}
+
+/**
+ * Crea un evento con HORA en GCal — NO all-day. SIN Google Meet ni invitados
+ * (para eso usa createReunionEvent). Devuelve eventId para guardar en
+ * grabaciones.google_event_id y poder hacer update/delete después.
+ *
+ * Timezone fijo America/Lima. Rollover de día si la duración cruza medianoche.
+ */
+export async function createTimedEvent(
+  input: TimedEventInput,
+): Promise<{ ok: true; eventId: string } | { ok: false; error: string }> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'not_connected' }
+
+  const horaHM = input.hora.slice(0, 5)
+  const [hh, mm] = horaHM.split(':').map(Number)
+  const dur = input.durationMin ?? 60
+
+  let endDate = input.fecha
+  let totalEnd = hh * 60 + mm + dur
+  if (totalEnd >= 1440) {
+    const d = new Date(input.fecha + 'T00:00:00')
+    d.setDate(d.getDate() + 1)
+    endDate = d.toISOString().slice(0, 10)
+    totalEnd -= 1440
+  }
+  const endHH = String(Math.floor(totalEnd / 60)).padStart(2, '0')
+  const endMM = String(totalEnd % 60).padStart(2, '0')
+
+  const res = await fetch(`${CAL_API}/calendars/primary/events`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima' },
+      end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima' },
+      ...(input.colorId ? { colorId: input.colorId } : {}),
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
+  return { ok: true, eventId: data.id }
 }
 
 /**
