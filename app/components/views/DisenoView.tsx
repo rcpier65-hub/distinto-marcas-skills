@@ -487,6 +487,8 @@ export function DisenoView({
           onMoveCard={(id, newSub) => setSubEstado(id, newSub)}
           onOpenCard={openRow}
           onArchive={(id) => archivarVal(id, true)}
+          onToggleHoy={toggleDisenarHoy}
+          hoy={hoy}
         />
       )}
 
@@ -682,12 +684,19 @@ function TablaVista({
    ============================================================ */
 
 function KanbanVista({
-  entries, onMoveCard, onOpenCard, onArchive,
+  entries, onMoveCard, onOpenCard, onArchive, onToggleHoy, hoy,
 }: {
   entries: DisenoEntry[]
   onMoveCard: (id: string, newSub: SubEstadoDiseno) => void
   onOpenCard: (id: string) => void
   onArchive: (id: string) => void
+  /* Marcar tarea para "hacer hoy". Setea fecha_marcada_para_disenar = hoy
+     (o null si ya estaba marcada → toggle). El filtro "Mi trabajo HOY"
+     usa esa columna. */
+  onToggleHoy: (id: string, estaMarcadaActual: boolean) => void
+  /* Fecha YMD del día actual en zona Lima — para comparar con
+     fechaMarcadaParaDisenar y saber si la card está marcada. */
+  hoy: string
 }) {
   const [dragOver, setDragOver] = useState<SubEstadoDiseno | null>(null)
 
@@ -792,15 +801,20 @@ function KanbanVista({
 
               {/* Cards */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {items.map((entry) => (
-                  <KanbanCard
-                    key={entry.id}
-                    entry={entry}
-                    onClick={() => onOpenCard(entry.id)}
-                    onDragStart={(e) => onDragStart(e, entry.id)}
-                    onArchive={() => onArchive(entry.id)}
-                  />
-                ))}
+                {items.map((entry) => {
+                  const estaMarcadaHoy = entry.fechaMarcadaParaDisenar === hoy
+                  return (
+                    <KanbanCard
+                      key={entry.id}
+                      entry={entry}
+                      onClick={() => onOpenCard(entry.id)}
+                      onDragStart={(e) => onDragStart(e, entry.id)}
+                      onArchive={() => onArchive(entry.id)}
+                      estaMarcadaHoy={estaMarcadaHoy}
+                      onToggleHoy={() => onToggleHoy(entry.id, estaMarcadaHoy)}
+                    />
+                  )
+                })}
                 {items.length === 0 && (
                   <div style={{
                     padding: '32px 8px', textAlign: 'center',
@@ -820,11 +834,18 @@ function KanbanVista({
   )
 }
 
-function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
+function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, onToggleHoy }: {
   entry: DisenoEntry
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
   onArchive: () => void
+  /* Si la tarea está en el "set HOY" del diseñador. Cuando es true,
+     la card se pinta con un ring violeta sutil + el botón "Hacer hoy"
+     se convierte en "✓ HOY" para indicar el estado. */
+  estaMarcadaHoy: boolean
+  /* Toggle. La server action ya sabe si quitar o agregar según el
+     estado actual (el caller pasa el valor de estaMarcadaHoy). */
+  onToggleHoy: () => void
 }) {
   const alerta = calcularAlertaFecha(entry.fechaDiseno, entry.fechaEntrega)
   const [hover, setHover] = useState(false)
@@ -848,7 +869,14 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
         background: hover
           ? 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.025) 100%)'
           : 'rgba(255, 255, 255, 0.025)',
-        border: `1px solid ${hover ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.05)'}`,
+        /* Si la tarea está marcada para HOY, ring violeta sutil para que
+           Ailyn la vea destacada incluso sin clickear el filtro. Reusa
+           el mismo violeta #a78bfa que la fila de tabla tiene (línea 156). */
+        border: `1px solid ${
+          estaMarcadaHoy
+            ? 'rgba(167, 139, 250, 0.45)'
+            : hover ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.05)'
+        }`,
         borderLeft: `3px solid ${entry.marcaColor}`,
         borderRadius: 10,
         cursor: 'grab',
@@ -880,6 +908,38 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive }: {
         }}>
           {entry.marcaNombre}
         </span>
+        {/* Hacer HOY — solo en columnas que NO son archivado. Si ya
+            está marcada, queda VISIBLE siempre (con look "activo" violeta
+            para que Ailyn vea de un vistazo cuáles son sus de hoy). Si
+            no está marcada, aparece solo en hover para no saturar la
+            card en estado normal. */}
+        {entry.subEstado !== 'archivado' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleHoy() }}
+            title={estaMarcadaHoy ? 'Quitar de "Hoy"' : 'Marcar para hacer HOY'}
+            style={{
+              padding: '3px 7px',
+              background: estaMarcadaHoy
+                ? 'rgba(167, 139, 250, 0.18)'
+                : 'rgba(255, 255, 255, 0.05)',
+              border: estaMarcadaHoy
+                ? '1px solid rgba(167, 139, 250, 0.45)'
+                : '1px solid transparent',
+              borderRadius: 999,
+              color: estaMarcadaHoy ? '#c4b5fd' : 'var(--mk-text-tertiary)',
+              cursor: 'pointer',
+              opacity: estaMarcadaHoy || hover ? 1 : 0,
+              transition: 'opacity 120ms ease, background 120ms ease',
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontFamily: 'inherit',
+              fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              flexShrink: 0,
+            }}
+          >
+            {estaMarcadaHoy ? '✓ HOY' : 'HOY'}
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onArchive() }}
           title="Archivar tarea"
