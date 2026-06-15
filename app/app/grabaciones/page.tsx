@@ -176,11 +176,7 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
         </Card>
       )}
 
-      {/* PRÓXIMAS GRABACIONES — Pedro: "debe ser lo primero que salga
-          al principio". Card glass full-width arriba de todo. */}
-      <ProximasGrabacionesCard grabaciones={proximas} hoyIso={hoyIso} />
-
-      {/* RESUMEN GLOBAL */}
+      {/* RESUMEN GLOBAL — Pedro: "las estadísticas siempre van arriba". */}
       <Card>
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -224,6 +220,10 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
           </div>
         </CardContent>
       </Card>
+
+      {/* PRÓXIMAS GRABACIONES — debajo de las estadísticas. Glass panel
+          compacto, máx 6 ítems para no ocupar demasiado. */}
+      <ProximasGrabacionesCard grabaciones={proximas} hoyIso={hoyIso} />
 
       {/* KPIs POR MARCA — cada card muestra sus fechas + botón agregar */}
       <section>

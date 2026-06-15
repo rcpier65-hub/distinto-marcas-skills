@@ -50,6 +50,12 @@ function distanciaTextual(iso: string, hoyIso: string): string | null {
 
 export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
   const total = grabaciones.length
+  /* Pedro: "pon seis grabaciones para que no quede vacío". Máx 6 ítems
+     (= 2 filas limpias en grid de 3 columnas). El resto se resume en
+     un "+N más" para no ocupar demasiado alto. */
+  const MAX = 6
+  const visibles = grabaciones.slice(0, MAX)
+  const restantes = total - visibles.length
 
   return (
     <section
@@ -94,7 +100,7 @@ export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {grabaciones.map((g) => {
+            {visibles.map((g) => {
               const f = fechaPill(g.fecha)
               const distancia = distanciaTextual(g.fecha, hoyIso)
               const color = g.marca_color ?? '#737373'
@@ -138,6 +144,12 @@ export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
               )
             })}
           </div>
+        )}
+
+        {restantes > 0 && (
+          <p className="text-[11px] text-muted-foreground mt-3 text-center font-medium">
+            +{restantes} grabación{restantes === 1 ? '' : 'es'} más esta semana
+          </p>
         )}
       </div>
     </section>

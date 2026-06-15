@@ -147,17 +147,20 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <MarcaLogo slug={kpi.marca_slug} nombre={kpi.marca_nombre} emoji={kpi.marca_emoji} size={32} />
+        {/* Header — más limpio y con aire (Pedro). Sin el slug técnico
+            mono, logo más grande, nombre prominente. */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <MarcaLogo slug={kpi.marca_slug} nombre={kpi.marca_nombre} emoji={kpi.marca_emoji} size={38} />
             <div className="min-w-0">
-              <p className="font-semibold text-sm truncate">{kpi.marca_nombre}</p>
-              <code className="text-[10px] text-muted-foreground font-mono">{kpi.marca_slug}</code>
+              <p className="font-semibold text-[15px] truncate leading-tight tracking-tight">{kpi.marca_nombre}</p>
+              <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                {kpi.cumplidas} de {kpi.objetivo || '—'} este mes
+              </p>
             </div>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Objetivo</p>
+            <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5">Objetivo</p>
             <ObjetivoInput slug={kpi.marca_slug} initial={kpi.objetivo} />
           </div>
         </div>
@@ -167,14 +170,9 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
           <div className="h-2 rounded-full bg-black/5 overflow-hidden mb-1.5">
             <div className={`h-full ${barColor} transition-all rounded-full`} style={{ width: `${Math.min(100, pct)}%` }} />
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono">
-              <strong className="text-emerald-600">{kpi.cumplidas}</strong>
-              {' / '}
-              <span className="text-muted-foreground">{kpi.objetivo}</span>
-              {' grabaciones'}
-            </span>
-            <span className={`font-semibold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground font-medium">Cumplimiento del mes</span>
+            <span className={`font-bold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}>
               {pct}%
             </span>
           </div>
