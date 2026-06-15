@@ -52,7 +52,12 @@ export function CalendarGrid({ mes, grabaciones }: Props) {
   const todayStr = new Date().toISOString().slice(0, 10)
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden bg-card">
+    /* En mobile el mes de 7 columnas se aplastaba. Lo envolvemos en un
+       contenedor con scroll horizontal y le damos ancho mínimo a la grilla
+       para que las celdas queden legibles y se deslice de lado (mismo
+       patrón que el calendario de Publicaciones). En ≥640px ocupa todo. */
+    <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+     <div className="min-w-[640px] sm:min-w-0 border border-border rounded-lg overflow-hidden bg-card">
       {/* Header días de la semana */}
       <div className="grid grid-cols-7 bg-muted/40">
         {DIAS_SEMANA.map((d) => (
@@ -107,6 +112,7 @@ export function CalendarGrid({ mes, grabaciones }: Props) {
           )
         })}
       </div>
+     </div>
     </div>
   )
 }
