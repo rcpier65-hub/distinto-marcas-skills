@@ -303,12 +303,6 @@ export function InicioView({ data }: { data: InicioData }) {
     })
   }
 
-  const tituloMisTareas =
-    data.tareasMias[0]?.modulo === 'editor' ? 'Tus videos por editar' :
-    data.tareasMias[0]?.modulo === 'diseno' ? 'Tus tareas de diseño' :
-    data.tareasMias[0]?.modulo === 'comentarios' ? 'Comentarios por responder' :
-    'Tu trabajo de hoy'
-
   /* Color de acento según rol — coordina con el ícono animado */
   const acento =
     data.rolBase === 'disenador' ? '#ec4899' :
@@ -542,6 +536,7 @@ export function InicioView({ data }: { data: InicioData }) {
               tareas={data.tareasMias}
               reuniones={data.reuniones}
               acento={acento}
+              rolBase={data.rolBase}
             />
             {data.reporteDelDia && <ReporteDelDiaCard data={data.reporteDelDia} />}
             <PendientesPanel
@@ -581,16 +576,24 @@ function TrabajoYReuniones({
   tareas,
   reuniones,
   acento,
+  rolBase,
 }: {
   tareas: InicioData['tareasMias']
   reuniones: InicioData['reuniones']
   acento: string
+  rolBase: string
 }) {
-  const tituloTareas =
-    tareas[0]?.modulo === 'editor' ? 'Tus videos por editar' :
-    tareas[0]?.modulo === 'diseno' ? 'Tus tareas de diseño' :
-    tareas[0]?.modulo === 'comentarios' ? 'Comentarios por responder' :
-    'Tu trabajo de hoy'
+  /* Para el CEO/owner (rol_base director) la lista NO es "tuya" — son
+     pubs en varios estados del workspace. Pedro: "eso solo debe salirle
+     al editor; si se dirige a mí debe decir 'Videos por editar
+     pendientes'". Para roles operativos sí es "tu trabajo". */
+  const esAdmin = rolBase === 'director'
+  const tituloTareas = esAdmin
+    ? 'Videos por editar pendientes'
+    : tareas[0]?.modulo === 'editor' ? 'Tus videos por editar' :
+      tareas[0]?.modulo === 'diseno' ? 'Tus tareas de diseño' :
+      tareas[0]?.modulo === 'comentarios' ? 'Comentarios por responder' :
+      'Tu trabajo de hoy'
 
   if (tareas.length === 0 && reuniones.length === 0) {
     return (
