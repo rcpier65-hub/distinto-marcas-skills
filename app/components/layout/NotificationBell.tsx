@@ -7,7 +7,7 @@
    vía el layout. Panel dropdown posicionado con position:fixed sobre el
    rect del botón (robusto contra overflow del sidebar). */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, CalendarClock, Scissors, MessageCircle, X } from 'lucide-react'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
@@ -21,37 +21,27 @@ const ICONO: Record<Notificacion['tipo'], typeof Bell> = {
 export function NotificationBell({ notificaciones }: { notificaciones: Notificacion[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
+  /* Panel anclado a la esquina superior derecha del viewport (estilo
+     Facebook) en desktop, y full-width tipo sheet en mobile. NO lo
+     anclamos al botón para evitar que tape el contenido del sidebar. */
+  const [isMobile, setIsMobile] = useState(false)
 
   const total = notificaciones.length
   const altas = notificaciones.filter((n) => n.urgencia === 'alta').length
 
-  const recalc = useCallback(() => {
-    const r = btnRef.current?.getBoundingClientRect()
-    if (!r) return
-    /* Panel 340px. Lo anclamos debajo del botón; si se sale por la
-       derecha, lo alineamos al borde derecho de la ventana. */
-    const width = 340
-    let left = r.left
-    if (left + width > window.innerWidth - 12) left = window.innerWidth - width - 12
-    setCoords({ top: r.bottom + 8, left: Math.max(12, left) })
-  }, [])
-
   useEffect(() => {
     if (!open) return
-    recalc()
-    const onResize = () => recalc()
+    setIsMobile(window.innerWidth < 768)
+    const onResize = () => setIsMobile(window.innerWidth < 768)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     window.addEventListener('resize', onResize)
-    window.addEventListener('scroll', onResize, true)
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('resize', onResize)
-      window.removeEventListener('scroll', onResize, true)
       window.removeEventListener('keydown', onKey)
     }
-  }, [open, recalc])
+  }, [open])
 
   return (
     <>
@@ -91,22 +81,30 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
 
       {open && (
         <>
-          {/* Backdrop para cerrar al clickear fuera */}
+          {/* Backdrop opaco-suave para cerrar al clickear fuera */}
           <div
             onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: 1200 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9998,
+              background: isMobile ? 'rgba(15,23,42,0.35)' : 'transparent',
+              backdropFilter: isMobile ? 'blur(2px)' : undefined,
+            }}
           />
           <div
             style={{
               position: 'fixed',
-              top: coords?.top ?? 56,
-              left: coords?.left ?? 12,
-              width: 340, maxHeight: '70vh',
-              zIndex: 1201,
+              /* Desktop: esquina superior derecha (estilo Facebook).
+                 Mobile: sheet full-width pegado arriba. */
+              top: isMobile ? 56 : 16,
+              right: isMobile ? 8 : 16,
+              left: isMobile ? 8 : 'auto',
+              width: isMobile ? 'auto' : 380,
+              maxHeight: isMobile ? '78vh' : '82vh',
+              zIndex: 9999,
               background: '#fff',
               borderRadius: 16,
               border: '1px solid rgba(0,0,0,0.08)',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.22)',
               display: 'flex', flexDirection: 'column', overflow: 'hidden',
             }}
           >
