@@ -31,7 +31,15 @@ type PageContent = {
 // Mapeo estado Notion → ENUM Postgres estado_publicacion
 // ──────────────────────────────────────────────────────────────────────
 
+/* Mapeo estado Notion → ENUM Postgres `estado_publicacion`.
+   El sync ignora estados no listados acá (deja el estado anterior en
+   DB) → causa el bug clásico de "la pub se queda atascada en /editor
+   aunque en Notion ya la pasaron a publicada/listo". Para diagnosticar
+   qué labels reales tiene Pedro en Notion, usar GET
+   /api/v1/admin/diagnose-notion-estados (devuelve estados únicos por
+   marca + cuáles no mapean). */
 const ESTADO_MAP: Record<string, string> = {
+  // Estados canónicos (mismo label en Notion y en DB)
   tareas: 'tareas',
   idear: 'idear',
   editando: 'editando',
@@ -43,19 +51,57 @@ const ESTADO_MAP: Record<string, string> = {
   'programar anuncios': 'programar_anuncios',
   programar_anuncios: 'programar_anuncios',
   archivado: 'archivado',
+  borrador: 'borrador',
+  // Variantes del estado "ideando"
   idea: 'idear',
   ideando: 'idear',
+  // Variantes de "edición"
   edicion: 'editando',
   'en edicion': 'editando',
+  'en edición': 'editando',
   'por editar': 'editar',
+  'para editar': 'editar',
+  edited: 'aprobar',           // editor terminó → pasa a "por aprobar"
+  // Variantes de "diseño"
   diseno: 'disenar',
   'diseñando': 'disenar',
   'por disenar': 'disenar',
   'por diseñar': 'disenar',
+  // Variantes de "envío / aprobación / programación"
   'enviado al cliente': 'enviado',
   'por aprobar': 'aprobar',
   aprobado: 'aprobar',
+  aprobada: 'aprobar',
+  'para aprobar': 'aprobar',
   programado: 'programar',
+  programada: 'programar',
+  'por programar': 'programar',
+  // Variantes "publicado/listo/terminado/hecho/completado" — Pedro y el
+  // equipo usan estos labels en Notion para marcar pubs ya cerradas.
+  // Sin estos mappings, esas pubs se quedaban en 'editar' viejo y
+  // seguían apareciendo en /editor (bug reportado por Pedro 2026-06-15).
+  publicado: 'enviado',
+  publicada: 'enviado',
+  publicados: 'enviado',
+  publicadas: 'enviado',
+  publicar: 'programar',       // pub que está EN COLA para publicar
+  listo: 'aprobar',
+  lista: 'aprobar',
+  terminado: 'aprobar',
+  terminada: 'aprobar',
+  hecho: 'aprobar',
+  hecha: 'aprobar',
+  completado: 'aprobar',
+  completada: 'aprobar',
+  completo: 'aprobar',
+  completa: 'aprobar',
+  // Variantes "revisar / pendiente / draft"
+  'en revision': 'aprobar',
+  'en revisión': 'aprobar',
+  revisar: 'aprobar',
+  pendiente: 'tareas',
+  draft: 'borrador',
+  // Variantes "archivar"
   archivar: 'archivado',
 }
 
