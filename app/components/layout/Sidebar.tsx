@@ -124,7 +124,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           <button
             className="mk-focusable"
             onClick={onOpenPalette}
-            style={{ ...searchBtnStyle, flex: 1 }}
+            style={{ ...searchBtnStyle, flex: 1, minWidth: 0 }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--mk-bg-hover)'
               e.currentTarget.style.borderColor = 'var(--mk-border-strong)'

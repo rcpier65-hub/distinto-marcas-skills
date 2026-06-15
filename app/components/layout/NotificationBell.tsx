@@ -65,9 +65,9 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
           position: 'relative',
           width: 36, height: 36, borderRadius: 10,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: open ? 'rgba(186,65,247,0.10)' : 'transparent',
-          border: '1px solid var(--mk-border-subtle, rgba(0,0,0,0.08))',
-          color: 'var(--mk-text-secondary, #475569)',
+          background: open ? 'rgba(186,65,247,0.12)' : 'rgba(0,0,0,0.04)',
+          border: '1px solid var(--mk-border-subtle, rgba(0,0,0,0.10))',
+          color: open ? '#ba41f7' : 'var(--mk-text-secondary, #475569)',
           cursor: 'pointer', flexShrink: 0,
         }}
       >
