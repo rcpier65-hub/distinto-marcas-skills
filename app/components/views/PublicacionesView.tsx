@@ -10,7 +10,8 @@
 
 import { createContext, useContext, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Scissors, FileText, Image as ImageIcon } from 'lucide-react'
+import { Scissors, FileText, Image as ImageIcon, Rocket } from 'lucide-react'
+import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import {
   PUBLICACIONES_MOCK,
   ESTADO_PUB_CONFIG,
@@ -65,6 +66,7 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
   /* router para que el botón "Nueva publicación" navegue a
      /publicaciones/nueva. Antes el botón era fantasma (sin onClick). */
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [view, setView] = useState<ViewMode>('semana')  /* default: semana — más útil día a día */
   const [filters, setFilters] = useState<Filters>({
     marcaSlug: 'todas',
@@ -90,25 +92,52 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
   return (
    <MarcasNavContext.Provider value={marcas}>
     <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }}>
-      {/* ============== HEADER ============== */}
+      {/* ============== HEADER ==============
+          Responsive: en mobile el header se apila/comprime — Pedro usa
+          mucho la app en celular. Ocultamos el breadcrumb "Workspace /",
+          el view-toggle scrollea y los botones quedan compactos. */}
       <header
         style={{
-          height: 'var(--mk-header-height)',
-          padding: '0 20px',
+          minHeight: 'var(--mk-header-height)',
+          padding: isMobile ? '8px 12px' : '0 20px',
           borderBottom: '1px solid var(--mk-border-subtle)',
-          display: 'flex', alignItems: 'center', gap: 12,
+          display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12,
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-sm)' }}>
-          <span style={{ color: 'var(--mk-text-tertiary)' }}>Workspace</span>
-          <span style={{ color: 'var(--mk-text-quaternary)' }}>/</span>
-          <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Publicaciones</span>
-        </div>
-        <div style={{ flex: 1 }} />
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--mk-text-sm)' }}>
+            <span style={{ color: 'var(--mk-text-tertiary)' }}>Workspace</span>
+            <span style={{ color: 'var(--mk-text-quaternary)' }}>/</span>
+            <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Publicaciones</span>
+          </div>
+        )}
+        {/* Spacer solo en desktop: empuja toggle+botones a la derecha. */}
+        {!isMobile && <div style={{ flex: 1 }} />}
 
-        {/* View toggle */}
-        <ViewToggle current={view} onChange={setView} />
+        {/* View toggle — en mobile ocupa su propia fila (order 2) y scrollea
+            horizontal si los 3 chips no entran. */}
+        <div style={{
+          order: isMobile ? 2 : 0,
+          flex: isMobile ? '1 1 100%' : '0 0 auto',
+          overflowX: isMobile ? 'auto' : 'visible',
+          maxWidth: '100%',
+        }}>
+          <ViewToggle current={view} onChange={setView} />
+        </div>
+
+        {/* "Publicar hoy" → vista guiada para quien publica manualmente.
+            Pedro: "muy importante para la persona que publica manualmente
+            los videos". Verde para diferenciarlo de "Nueva publicación". */}
+        <button
+          className="mk-focusable"
+          style={{ ...btnPublicarHoyStyle, order: isMobile ? 1 : 0, flexShrink: 0 }}
+          onClick={() => router.push('/publicaciones/publicar-hoy')}
+          title="Lo que toca publicar hoy, paso a paso"
+        >
+          <Rocket size={14} strokeWidth={2.2} /> {isMobile ? 'Hoy' : 'Publicar hoy'}
+        </button>
 
         {/* "Nueva publicación" → navega a /publicaciones/nueva.
             Antes era un <button> sin onClick (botón fantasma) — Pedro
@@ -117,11 +146,11 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
             conectar el botón. */}
         <button
           className="mk-focusable"
-          style={btnPrimaryStyle}
+          style={{ ...btnPrimaryStyle, order: isMobile ? 1 : 0, flexShrink: 0 }}
           onClick={() => router.push('/publicaciones/nueva')}
         >
-          <IconPlus /> Nueva publicación
-          <span className="mk-kbd" style={{ marginLeft: 4 }}>C</span>
+          <IconPlus /> {isMobile ? 'Nueva' : 'Nueva publicación'}
+          {!isMobile && <span className="mk-kbd" style={{ marginLeft: 4 }}>C</span>}
         </button>
       </header>
 
@@ -243,8 +272,8 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
             }}
           />
         )}
-        {view === 'mes' && <MesView entries={filtered} />}
-        {view === 'semana' && <SemanaView entries={filtered} />}
+        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} />}
+        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} />}
       </div>
     </div>
    </MarcasNavContext.Provider>
@@ -675,7 +704,7 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
    MES VIEW — grid mensual mejorado, todas las pubs clickeables
    ============================================================ */
 
-function MesView({ entries }: { entries: PublicacionMock[] }) {
+function MesView({ entries, isMobile = false }: { entries: PublicacionMock[]; isMobile?: boolean }) {
   const today = new Date()
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   const year = cursor.getFullYear()
@@ -702,8 +731,8 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
   const todayKey = dayKey(today)
 
   return (
-    <div style={{ padding: '16px 24px 60px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+    <div style={{ padding: isMobile ? '12px 12px 60px' : '16px 24px 60px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
         <CalendarNav
           label={`${MONTH_NAMES[month]} ${year}`}
           onPrev={() => setCursor(new Date(year, month - 1, 1))}
@@ -716,6 +745,12 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
         </span>
       </div>
 
+      {/* En mobile el mes scrollea horizontal: 7 columnas en una pantalla
+          angosta quedan ilegibles. Le damos minWidth para que las celdas
+          mantengan tamaño usable y se deslice de lado (fix del bug
+          "deslizar a la derecha no sale correctamente"). */}
+      <div style={{ overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', margin: isMobile ? '0 -12px' : 0, padding: isMobile ? '0 12px' : 0 }}>
+       <div style={{ minWidth: isMobile ? 760 : 'auto' }}>
       {/* Day headers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-lg) var(--mk-radius-lg) 0 0', overflow: 'hidden' }}>
         {DAY_NAMES_SHORT.map((d) => (
@@ -814,6 +849,8 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
           )
         })}
       </div>
+       </div>
+      </div>
     </div>
   )
 }
@@ -822,7 +859,7 @@ function MesView({ entries }: { entries: PublicacionMock[] }) {
    SEMANA VIEW — 7 columnas con detalle completo por publicación
    ============================================================ */
 
-function SemanaView({ entries }: { entries: PublicacionMock[] }) {
+function SemanaView({ entries, isMobile = false }: { entries: PublicacionMock[]; isMobile?: boolean }) {
   const today = new Date()
   /* Cursor apunta al lunes de la semana actual */
   function startOfWeek(d: Date): Date {
@@ -854,8 +891,8 @@ function SemanaView({ entries }: { entries: PublicacionMock[] }) {
   const totalPubsSemana = days.reduce((acc, d) => acc + (byDay.get(dayKey(d))?.length ?? 0), 0)
 
   return (
-    <div style={{ padding: '20px 28px 60px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+    <div style={{ padding: isMobile ? '14px 12px 60px' : '20px 28px 60px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
         <CalendarNav
           label={label}
           onPrev={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 7))}
@@ -868,15 +905,30 @@ function SemanaView({ entries }: { entries: PublicacionMock[] }) {
         </span>
       </div>
 
+      {isMobile && (
+        <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span>Desliza para ver los otros días</span>
+          <span aria-hidden>→</span>
+        </div>
+      )}
+
+      {/* Mobile: cada día es una columna ancha (82vw) con scroll-snap, así
+          se desliza de a un día limpio. Antes eran 7 columnas 1fr aplastadas
+          que no scrolleaban → "deslizar a la derecha no sale correctamente". */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
+          gridTemplateColumns: isMobile ? undefined : 'repeat(7, 1fr)',
+          gridAutoFlow: isMobile ? 'column' : undefined,
+          gridAutoColumns: isMobile ? '82vw' : undefined,
           gap: 1,
           background: 'var(--mk-border-subtle)',
           borderRadius: 'var(--mk-radius-lg)',
-          overflow: 'hidden',
-          minHeight: 'calc(100vh - 240px)',
+          overflowX: isMobile ? 'auto' : 'hidden',
+          overflowY: 'hidden',
+          scrollSnapType: isMobile ? 'x mandatory' : undefined,
+          WebkitOverflowScrolling: 'touch',
+          minHeight: isMobile ? 'calc(100vh - 220px)' : 'calc(100vh - 240px)',
         }}
       >
         {days.map((d, i) => {
@@ -890,6 +942,7 @@ function SemanaView({ entries }: { entries: PublicacionMock[] }) {
                 background: 'var(--mk-bg-elevated)',
                 display: 'flex', flexDirection: 'column',
                 minHeight: '100%',
+                scrollSnapAlign: isMobile ? 'start' : undefined,
               }}
             >
               {/* Day header */}
@@ -1096,6 +1149,19 @@ const btnPrimaryStyle: React.CSSProperties = {
   color: 'white', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
   cursor: 'pointer',
   boxShadow: '0 0 0 1px rgba(113, 112, 255, 0.20), 0 0 16px rgba(113, 112, 255, 0.20)',
+  transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
+}
+
+/* Botón "Publicar hoy" — verde (acción de "ir a publicar"), distinto del
+   morado de "Nueva publicación" para que no se confundan. */
+const btnPublicarHoyStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  height: 'var(--mk-button-height-lg)', padding: '0 12px',
+  background: '#16a34a', border: '1px solid #16a34a',
+  borderRadius: 'var(--mk-radius-md)',
+  color: 'white', fontFamily: 'inherit', fontSize: 'var(--mk-text-sm)', fontWeight: 600,
+  cursor: 'pointer',
+  boxShadow: '0 0 0 1px rgba(22,163,74,0.18), 0 0 16px rgba(22,163,74,0.22)',
   transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
 }
 
