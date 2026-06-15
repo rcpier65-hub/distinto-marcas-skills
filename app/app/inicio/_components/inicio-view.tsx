@@ -526,12 +526,24 @@ export function InicioView({ data }: { data: InicioData }) {
             gap: 24,
           }}
         >
-          {/* Columna principal: aviso grabaciones + accesos + trabajo + chat */}
+          {/* Columna principal. Orden (Pedro):
+              1) Tareas rápidas del chat ARRIBA — antes estaban al final
+                 y tenía que scrollear hasta abajo para ver lo que anotó.
+              2) Aviso grabaciones · 3) Accesos (oculto para CEO) ·
+              4) Trabajo · 5) Reporte del día. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <PendientesPanel
+              pendientesIniciales={data.pendientes}
+              acento={acento}
+              rolBase={data.rolBase}
+            />
             {data.grabacionesProximas.length > 0 && (
               <AvisoGrabaciones grabaciones={data.grabacionesProximas} acento={acento} />
             )}
-            <AccesosRapidos rolBase={data.rolBase} acento={acento} />
+            {/* Accesos rápidos: Pedro (CEO) no los necesita. Solo equipo. */}
+            {data.rolBase !== 'director' && (
+              <AccesosRapidos rolBase={data.rolBase} acento={acento} />
+            )}
             <TrabajoYReuniones
               tareas={data.tareasMias}
               reuniones={data.reuniones}
@@ -539,11 +551,6 @@ export function InicioView({ data }: { data: InicioData }) {
               rolBase={data.rolBase}
             />
             {data.reporteDelDia && <ReporteDelDiaCard data={data.reporteDelDia} />}
-            <PendientesPanel
-              pendientesIniciales={data.pendientes}
-              acento={acento}
-              rolBase={data.rolBase}
-            />
           </div>
 
           {/* Sidebar: tracker de hábitos estilo /habitos.

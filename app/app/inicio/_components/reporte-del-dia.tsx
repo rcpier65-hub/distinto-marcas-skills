@@ -12,6 +12,7 @@
    grupo cuando cierra el día. */
 
 import { useState, useRef, useEffect } from 'react'
+import { ClipboardCheck } from 'lucide-react'
 import type { ReporteDelDiaData } from '@/lib/inicio/load-reporte-del-dia'
 
 type Props = {
@@ -162,7 +163,21 @@ export function ReporteDelDiaCard({ data }: Props) {
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ fontSize: 42, lineHeight: 1 }} aria-hidden>📊</div>
+        {/* Icono profesional (lucide) en un círculo glass — reemplaza el
+            emoji 📊 que se veía básico. */}
+        <div
+          aria-hidden
+          style={{
+            width: 52, height: 52, borderRadius: 16,
+            background: 'rgba(255,255,255,0.7)',
+            border: '1px solid rgba(168,85,247,0.25)',
+            boxShadow: '0 4px 14px rgba(109,40,217,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <ClipboardCheck className="w-6 h-6" style={{ color: '#7c3aed' }} strokeWidth={2} />
+        </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: '#581c87', marginBottom: 4 }}>
             ¿Listo para cerrar el día?
