@@ -57,6 +57,11 @@ const ESTADO_CFG: Record<string, { label: string; color: string; bg: string; Ico
 
 export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   const [isPending, startTransition] = useTransition()
+  /* Pedro: "cuando hago clic en añadir me debe salir un popup para
+     llenar los datos de la grabacion". Antes el botón creaba con
+     defaults y forzaba a editar después. Ahora abre un mini-form
+     inline en el lugar del botón. */
+  const [formOpen, setFormOpen] = useState(false)
   const pct = kpi.cumplimiento_pct
   const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : pct > 0 ? 'bg-rose-400' : 'bg-muted'
 
@@ -81,26 +86,32 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   const faltanGrabaciones = kpi.objetivo > 0 && (kpi.planeadas + kpi.cumplidas) < kpi.objetivo
   const mostrarAlerta = faltanGrabaciones && !confirmada
 
-  function handleAgregar() {
-    // Default: HOY si está dentro del mes activo, sino día 1 del mes
-    // activo. Antes era SIEMPRE día 15 — Pedro: "lo crea el 15 del mes
-    // y cuando cambio la fecha no se cambia". El 15 fijo molestaba
-    // porque obligaba a editar siempre. Hoy es lo más cercano a su
-    // intención cuando hace clic.
+  /* Default rendering del form: HOY si estamos en el mes activo, sino
+     día 1 del mes activo. Hora 10:00 → 11:00. */
+  function defaultFormFecha(): string {
     const hoyIso = new Date().toISOString().slice(0, 10)
     const mesActual = hoyIso.slice(0, 7)
-    const fechaDefault = mesActual === mesDefault ? hoyIso : `${mesDefault}-01`
-    // Hora + duración default — sin esto el sync con GCal creaba un evento
-    // all-day que aparecía como "filita" arriba del día.
+    return mesActual === mesDefault ? hoyIso : `${mesDefault}-01`
+  }
+
+  function handleCrearGrabacion(payload: {
+    fecha: string
+    hora: string
+    horaFin: string
+  }) {
+    const dur = (payload.hora && payload.horaFin)
+      ? Math.max(5, diffMin(payload.hora, payload.horaFin))
+      : 60
     startTransition(async () => {
       const r = await createGrabacion({
         marca_slug: kpi.marca_slug,
-        fecha_planeada: fechaDefault,
-        hora_planeada: '10:00',
-        duracion_min: 60,
+        fecha_planeada: payload.fecha,
+        hora_planeada: payload.hora || undefined,
+        duracion_min: dur,
       })
       if (r.ok) {
-        toast.success(`Fecha agregada a ${kpi.marca_nombre} — ajustala al día real`)
+        toast.success(`Grabación agregada a ${kpi.marca_nombre}`)
+        setFormOpen(false)
       } else {
         toast.error(`Error: ${r.error}`)
       }
@@ -169,17 +180,27 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
             ))
           )}
 
-          {/* Botón añadir fecha (Pedro pidió cambiar el label
-              de 'Agregar fecha de grabación' a simplemente 'Añadir'). */}
-          <button
-            type="button"
-            onClick={handleAgregar}
-            disabled={isPending}
-            className="w-full flex items-center justify-center gap-1.5 h-8 mt-1 rounded-md border border-dashed border-[#ba41f7]/40 text-[#ba41f7] text-xs font-medium hover:bg-[#ba41f7]/8 disabled:opacity-50 transition-colors"
-          >
-            <CalendarPlus className="w-3.5 h-3.5" />
-            Añadir
-          </button>
+          {/* Botón Añadir → abre mini-popup inline. Cuando está abierto,
+              reemplaza el botón por el form en su lugar (no overlay, para
+              que Pedro vea el contexto de la lista mientras llena). */}
+          {formOpen ? (
+            <NuevaFechaInline
+              defaultFecha={defaultFormFecha()}
+              busy={isPending}
+              onCancel={() => setFormOpen(false)}
+              onSubmit={handleCrearGrabacion}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setFormOpen(true)}
+              disabled={isPending}
+              className="w-full flex items-center justify-center gap-1.5 h-8 mt-1 rounded-md border border-dashed border-[#ba41f7]/40 text-[#ba41f7] text-xs font-medium hover:bg-[#ba41f7]/8 disabled:opacity-50 transition-colors"
+            >
+              <CalendarPlus className="w-3.5 h-3.5" />
+              Añadir
+            </button>
+          )}
         </div>
 
         {/* Check 'Coordinación confirmada' — Pedro lo pidió debajo del
@@ -316,12 +337,14 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
     <div className="space-y-1.5 group">
       <div className="flex items-center gap-2 flex-wrap">
       {/* Pill grupo: fecha + horas. Bg unificado, bordes en grupo, hover
-          ring violeta. Cada control queda separado por una line vertical. */}
+          ring violeta. Mas compacto — el ancho de cada control redujo
+          para que entre con el chip de estado en cards angostas (Pedro:
+          "verifica el card porque la hora de finalizacion se esconde"). */}
       <div
-        className="inline-flex items-stretch h-9 rounded-lg bg-white border border-input shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-[#ba41f7]/40 focus-within:border-[#ba41f7]/40 transition-all"
+        className="inline-flex items-stretch h-9 rounded-lg bg-white border border-input shadow-sm focus-within:ring-2 focus-within:ring-[#ba41f7]/40 focus-within:border-[#ba41f7]/40 transition-all"
         title="Fecha y horario de la grabación"
       >
-        <div className="flex items-center gap-1.5 px-2.5 border-r border-input/60">
+        <div className="flex items-center gap-1 px-2 border-r border-input/60">
           <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           <input
             type="date"
@@ -329,10 +352,10 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             onChange={(e) => setFecha(e.target.value)}
             onBlur={saveFecha}
             disabled={busy}
-            className="h-7 w-[120px] bg-transparent text-[12px] font-mono focus:outline-none disabled:opacity-50"
+            className="h-7 w-[108px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
           />
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 border-r border-input/60">
+        <div className="flex items-center gap-1 px-1.5 border-r border-input/60">
           <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           <input
             type="time"
@@ -340,9 +363,6 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             onChange={(e) => {
               const nuevaHora = e.target.value
               setHora(nuevaHora)
-              /* Si setear inicio y aún no hay fin, auto-completar +60min.
-                 Si ya hay fin pero el nuevo inicio lo pasa, recalcular
-                 preservando duración previa (UX tipo GCal). */
               if (nuevaHora && !horaFin) setHoraFin(horaPlus(nuevaHora, 60))
               else if (nuevaHora && horaFin && nuevaHora >= horaFin) {
                 setHoraFin(horaPlus(nuevaHora, Math.max(15, diffMin(hora || '00:00', horaFin) || 60)))
@@ -352,12 +372,12 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             disabled={busy}
             step={300}
             placeholder="--:--"
-            title={hora ? `Inicio: ${hora}` : 'Hora inicio — deja vacío para evento de día completo'}
-            className="h-7 w-[60px] bg-transparent text-[12px] font-mono focus:outline-none disabled:opacity-50"
+            title={hora ? `Inicio: ${hora}` : 'Hora inicio — deja vacío para día completo'}
+            className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
           />
         </div>
-        <div className="flex items-center gap-1.5 px-2.5">
-          <span className="text-[10.5px] font-semibold text-muted-foreground shrink-0">→</span>
+        <div className="flex items-center gap-1 px-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground shrink-0">→</span>
           <input
             type="time"
             value={horaFin}
@@ -367,20 +387,22 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             step={300}
             placeholder="--:--"
             title={!hora ? 'Pon hora de inicio primero' : (horaFin ? `Fin: ${horaFin}` : 'Hora fin')}
-            className="h-7 w-[60px] bg-transparent text-[12px] font-mono focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed"
+            className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed"
           />
-          {hora && horaFin && (
-            <span
-              className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0"
-              title={`Duración: ${diffMin(hora, horaFin)} min`}
-            >
-              ({diffMin(hora, horaFin) >= 60
-                ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
-                : `${diffMin(hora, horaFin)}m`})
-            </span>
-          )}
         </div>
       </div>
+      {/* Duración como chip al lado de la pill — antes estaba dentro y
+          se cortaba cuando la pantalla era angosta. */}
+      {hora && horaFin && (
+        <span
+          className="text-[10px] font-semibold text-muted-foreground tabular-nums shrink-0 px-1.5 py-0.5 rounded bg-muted/40"
+          title={`Duración: ${diffMin(hora, horaFin)} min`}
+        >
+          {diffMin(hora, horaFin) >= 60
+            ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
+            : `${diffMin(hora, horaFin)}m`}
+        </span>
+      )}
       {/* AM/PM badge afuera de la pill — solo si hay hora */}
       {hora && (
         <span
@@ -443,6 +465,111 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             <ExternalLink className="w-3 h-3" />
           </a>
         )}
+      </div>
+    </div>
+  )
+}
+
+/* Mini-popup inline para "+ Añadir". Reemplaza el botón cuando está
+   abierto; tiene fecha + hora-inicio + hora-fin compactos (mismo estilo
+   visual que el pill del FechaRow para consistencia) + ✓ Crear / ✕ Cancelar.
+   Pedro: "cuando hago clic en añadir me debe salir un popup para llenar
+   los datos de la grabacion es decir solo fecha y hora". */
+function NuevaFechaInline({
+  defaultFecha,
+  busy,
+  onCancel,
+  onSubmit,
+}: {
+  defaultFecha: string
+  busy: boolean
+  onCancel: () => void
+  onSubmit: (payload: { fecha: string; hora: string; horaFin: string }) => void
+}) {
+  const [fecha, setFecha] = useState(defaultFecha)
+  const [hora, setHora] = useState('10:00')
+  const [horaFin, setHoraFin] = useState('11:00')
+
+  function submit() {
+    if (!fecha || !hora || !horaFin) return
+    onSubmit({ fecha, hora, horaFin })
+  }
+
+  return (
+    <div className="mt-1 p-2.5 rounded-lg border-2 border-dashed border-[#ba41f7]/40 bg-[#ba41f7]/5 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Mismo pill compacto que FechaRow */}
+        <div
+          className="inline-flex items-stretch h-9 rounded-lg bg-white border border-input shadow-sm focus-within:ring-2 focus-within:ring-[#ba41f7]/40 focus-within:border-[#ba41f7]/40 transition-all"
+        >
+          <div className="flex items-center gap-1 px-2 border-r border-input/60">
+            <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              disabled={busy}
+              autoFocus
+              className="h-7 w-[108px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
+            />
+          </div>
+          <div className="flex items-center gap-1 px-1.5 border-r border-input/60">
+            <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <input
+              type="time"
+              value={hora}
+              onChange={(e) => {
+                const v = e.target.value
+                setHora(v)
+                if (v && (!horaFin || v >= horaFin)) {
+                  setHoraFin(horaPlus(v, Math.max(15, diffMin(hora || '00:00', horaFin) || 60)))
+                }
+              }}
+              disabled={busy}
+              step={300}
+              className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
+            />
+          </div>
+          <div className="flex items-center gap-1 px-1.5">
+            <span className="text-[10px] font-semibold text-muted-foreground shrink-0">→</span>
+            <input
+              type="time"
+              value={horaFin}
+              onChange={(e) => setHoraFin(e.target.value)}
+              disabled={busy}
+              step={300}
+              className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
+            />
+          </div>
+        </div>
+        {/* Chip duración */}
+        {hora && horaFin && (
+          <span className="text-[10px] font-semibold text-muted-foreground tabular-nums shrink-0 px-1.5 py-0.5 rounded bg-white/70">
+            {diffMin(hora, horaFin) >= 60
+              ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
+              : `${diffMin(hora, horaFin)}m`}
+          </span>
+        )}
+      </div>
+      {/* Acciones */}
+      <div className="flex items-center gap-1.5 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="h-8 px-3 rounded-md text-[12px] font-medium text-muted-foreground hover:bg-muted/60 disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !fecha || !hora || !horaFin}
+          className="h-8 px-3 rounded-md bg-[#ba41f7] text-white text-[12px] font-semibold hover:bg-[#a936e0] disabled:opacity-50 inline-flex items-center gap-1"
+        >
+          <Check className="w-3.5 h-3.5" />
+          {busy ? 'Creando…' : 'Crear'}
+        </button>
       </div>
     </div>
   )
