@@ -454,7 +454,10 @@ export async function updateGrabacionFecha(
      de hora-fin en la UI). Si viene, persiste en BD y se usa al
      resincronizar el evento de GCal para preservar el bloque end. */
   duracion_min?: number | null,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; gcalSynced: boolean; gcalError?: string }
+  | { ok: false; error: string }
+> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -488,27 +491,29 @@ export async function updateGrabacionFecha(
   }
   if (error) return { ok: false, error: error.message }
 
-  // Sync GCal: mover el evento a la nueva fecha (best-effort).
-  // Bug fix: si la grabación tenía hora, ANTES usábamos updateCalendarEvent
-  // (all-day) y el evento se convertía a all-day en GCal — perdías la hora.
-  // Ahora si hay hora_planeada usamos updateTimedCalendarEvent que mantiene
-  // dateTime + duration. Si no hay hora, fallback all-day como antes.
+  // Sync GCal: ya no es silencioso. Si falla, devolvemos gcalSynced=false
+  // + gcalError para que la UI muestre toast informativo. Pedro: "le puse
+  // el 23 pero no se hace el cambio se queda con el 15" — antes el catch
+  // tragaba el error, ahora se reporta.
+  let gcalSynced = false
+  let gcalError: string | undefined
   try {
     const { data: g } = await service
       .from('grabaciones')
       .select('google_event_id, hora_planeada, duracion_min, titulo, notas, marcas:marca_id (nombre)')
       .eq('id', id)
       .maybeSingle()
-    if (g?.google_event_id) {
+    if (!g?.google_event_id) {
+      gcalSynced = true /* no hay nada que sincronizar, no es error */
+    } else {
       const titulo = g.titulo ?? eventoTitulo(g.marcas?.nombre ?? 'Marca')
       const horaFinal = horaNormalizada !== undefined ? horaNormalizada : g.hora_planeada
+      let r: { ok: true } | { ok: false; error: string }
       if (horaFinal) {
-        /* Si el caller pasó duracion_min usamos ese (vino del input
-           hora-fin de la UI). Sino, el de BD (que puede ser viejo). */
         const durFinal = (typeof duracion_min === 'number' && duracion_min > 0)
           ? duracion_min
           : (g.duracion_min ?? 60)
-        await updateTimedCalendarEvent(g.google_event_id, {
+        r = await updateTimedCalendarEvent(g.google_event_id, {
           summary: titulo,
           description: g.notas ?? undefined,
           fecha: fecha_planeada,
@@ -516,16 +521,22 @@ export async function updateGrabacionFecha(
           durationMin: durFinal,
         })
       } else {
-        await updateCalendarEvent(g.google_event_id, {
+        r = await updateCalendarEvent(g.google_event_id, {
           summary: titulo,
           date: fecha_planeada,
         })
       }
+      if (r.ok) gcalSynced = true
+      else gcalError = r.error
     }
-  } catch { /* best-effort */ }
+  } catch (e) {
+    gcalError = e instanceof Error ? e.message : String(e)
+    console.error('[grabaciones] updateGrabacionFecha GCal sync threw:', e)
+  }
 
   revalidatePath('/grabaciones')
-  return { ok: true }
+  revalidatePath('/grabaciones/calendario')
+  return { ok: true, gcalSynced, gcalError }
 }
 
 /**

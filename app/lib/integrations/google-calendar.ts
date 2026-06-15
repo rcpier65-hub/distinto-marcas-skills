@@ -393,24 +393,45 @@ export async function updateTimedCalendarEvent(
   const endMM = String(totalEnd % 60).padStart(2, '0')
 
   const calId = await getGrabacionesCalendarId(token)
-  /* IMPORTANTE: incluimos start.date=null + end.date=null para evitar el
-     bug donde GCal mantiene los campos all-day del PATCH anterior. Sin
-     esto, si el evento estaba all-day y le mandamos solo start.dateTime,
-     Google se queja con 400. Mandamos los 4 campos siempre. */
-  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      summary: input.summary,
-      description: input.description,
-      start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima', date: null },
-      end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima', date: null },
-      colorId: input.colorId ?? GRABACION_COLOR_ID,
-    }),
-  })
+  const startISO = `${input.fecha}T${horaHM}:00`
+  const endISO = `${endDate}T${endHH}:${endMM}:00`
+
+  /* Estrategia robusta:
+     1. Intentar PATCH normal con dateTime. Funciona si el evento ya era
+        timed o si Google acepta cambio de tipo all-day → timed.
+     2. Si Google rechaza con 400 (típicamente "ambiguous time" porque
+        el evento era all-day), fallback: PUT (replace completo) con
+        SOLO los campos dateTime — sin preservar nada del all-day. */
+  const body = {
+    summary: input.summary,
+    description: input.description,
+    start: { dateTime: startISO, timeZone: 'America/Lima' },
+    end: { dateTime: endISO, timeZone: 'America/Lima' },
+    colorId: input.colorId ?? GRABACION_COLOR_ID,
+  }
+  const url = `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+
+  let res = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) })
+
+  /* Fallback PUT — Google API acepta PUT como "replace event entirely".
+     PUT no permite ambigüedad start.date vs start.dateTime → resuelve el
+     400 cuando el evento estaba all-day. Necesita preservar campos
+     mínimos que GCal valida en PUT (status, summary). */
+  if (!res.ok && (res.status === 400 || res.status === 422)) {
+    console.warn('[gcal] PATCH falló', res.status, '→ intentando PUT fallback')
+    res = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ ...body, status: 'confirmed' }),
+    })
+  }
+
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
+    const msg = data.error?.message ?? `HTTP ${res.status}`
+    console.error('[gcal] updateTimedCalendarEvent falló:', msg, 'eventId:', eventId)
+    return { ok: false, error: msg }
   }
   return { ok: true }
 }

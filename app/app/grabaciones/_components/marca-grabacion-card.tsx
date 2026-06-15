@@ -270,7 +270,18 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
          null en ambos (evento all-day). */
       const dur = (hora && horaFin) ? Math.max(5, diffMin(hora, horaFin)) : null
       const r = await updateGrabacionFecha(grabacion.id, fecha, hora || null, dur)
-      if (r.ok) toast.success(hora ? `${hora}${horaFin ? '–' + horaFin : ''} guardado` : 'Fecha actualizada')
+      if (r.ok) {
+        if (r.gcalSynced) {
+          toast.success(hora ? `${hora}${horaFin ? '–' + horaFin : ''} guardado y sincronizado` : 'Fecha actualizada')
+        } else {
+          /* La fila local se guardó OK pero el evento de GCal NO se
+             actualizó. Pedro debe saber para reabrir GCal y revisar. */
+          toast.warning('Guardado en la app, pero NO se sincronizó con Google Calendar', {
+            description: r.gcalError ?? 'Revisa que GCal esté conectado en /grabaciones',
+            duration: 7000,
+          })
+        }
+      }
       else {
         setFecha(fechaInicial)
         setHora(horaInicial)
