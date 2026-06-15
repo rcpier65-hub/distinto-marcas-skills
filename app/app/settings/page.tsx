@@ -7,6 +7,7 @@ import { LogoUrlInput } from './_components/logo-url-input'
 import { WhatsappConfigInput } from './_components/whatsapp-config-input'
 import { MetricoolConfig } from './_components/metricool-config'
 import { OpenaiConfig } from './_components/openai-config'
+import { AnthropicConfig } from './_components/anthropic-config'
 import { InstruccionesComentarios, type MarcaInstr } from './_components/instrucciones-comentarios'
 import { MarcaFactsCard } from './_components/marca-facts-card'
 import { CorreosClientesInput } from './_components/correos-clientes-input'
@@ -35,7 +36,7 @@ export default async function SettingsPage() {
   const gruposError = gruposResult.ok ? null : gruposResult.error
   const integraciones = integracionesResult.ok
     ? integracionesResult.config
-    : { metricool_user_id: '', metricool_has_token: false, metricool_user_id_set: false, openai_has_key: false, updated_at: null }
+    : { metricool_user_id: '', metricool_has_token: false, metricool_user_id_set: false, openai_has_key: false, anthropic_has_key: false, updated_at: null }
 
   // Marcas con sus instrucciones de respuesta a comentarios (guardadas en tono_voz.instrucciones)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,6 +143,23 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <OpenaiConfig initial={integraciones} />
+        </CardContent>
+      </Card>
+
+      {/* Integraciones — IA (Claude / Anthropic) para generar copys */}
+      <Card>
+        <CardHeader>
+          <CardTitle>✨ Integraciones — IA (Claude) para copys</CardTitle>
+          <p className="text-xs text-muted-foreground mt-2">
+            Tu API key de Anthropic (Claude) para generar <strong>copys de publicaciones</strong> desde el guion + la voz
+            de cada marca, directo en el detalle de cada pieza (botón <strong>Generar copy con IA</strong>). Es el mismo
+            flujo que hacías en Notion. Modelo <code>Claude Opus 4.8</code>.
+            <br />
+            La key se guarda en tu base y <strong>nunca se muestra</strong> de vuelta.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <AnthropicConfig initial={integraciones} />
         </CardContent>
       </Card>
 

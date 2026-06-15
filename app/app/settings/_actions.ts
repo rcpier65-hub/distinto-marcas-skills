@@ -14,6 +14,7 @@ import {
   invalidateMetricoolCredsCache,
 } from '@/lib/integrations/metricool'
 import { getOpenAIApiKey } from '@/lib/integrations/openai'
+import { getAnthropicApiKey } from '@/lib/integrations/anthropic'
 
 /**
  * Actualiza el logo_url de una marca.
@@ -247,6 +248,7 @@ export async function getIntegracionesConfig(): Promise<{
     metricool_has_token: boolean  // never expose el token
     metricool_user_id_set: boolean
     openai_has_key: boolean       // never expose la key — solo si está puesta
+    anthropic_has_key: boolean    // never expose la key — solo si está puesta
     updated_at: string | null
   }
 } | { ok: false; error: string }> {
@@ -269,6 +271,7 @@ export async function getIntegracionesConfig(): Promise<{
           metricool_has_token: false,
           metricool_user_id_set: false,
           openai_has_key: false,
+          anthropic_has_key: false,
           updated_at: null,
         },
       }
@@ -282,6 +285,7 @@ export async function getIntegracionesConfig(): Promise<{
       metricool_has_token: !!data?.metricool_user_token,
       metricool_user_id_set: !!data?.metricool_user_id,
       openai_has_key: !!data?.openai_api_key,
+      anthropic_has_key: !!data?.anthropic_api_key,
       updated_at: data?.updated_at ?? null,
     },
   }
@@ -395,6 +399,116 @@ export async function probarOpenAI(): Promise<
     const body = await res.json().catch(() => null)
     if (res.status === 401) return { ok: false, error: 'Key inválida (401). Revisa que la copiaste bien.' }
     if (res.status === 429) return { ok: false, error: 'Sin saldo o límite alcanzado (429). Carga crédito en OpenAI.' }
+    return { ok: false, error: body?.error?.message ?? `HTTP ${res.status}` }
+  } catch (e) {
+    return { ok: false, error: `Error de red: ${(e as Error).message}` }
+  }
+}
+
+// ============================================================
+// Anthropic (Claude) — API key configurable desde Settings (IA)
+// ============================================================
+// Mismo patrón que OpenAI: se guarda en integraciones.anthropic_api_key.
+// Se usa para generar copys de publicaciones (lib/copys/generar.ts).
+
+/** Escribe (o borra) la key de Anthropic DIRECTO por pg (crea la columna si falta). */
+async function writeAnthropicKeyViaPg(value: string | null, userId: string): Promise<void> {
+  const dbUrl = process.env.SUPABASE_DB_URL || process.env.SUPABASE_DB_URL_DIRECT
+  if (!dbUrl) throw new Error('SUPABASE_DB_URL no disponible en el runtime')
+  const { Client } = await import('pg')
+  const u = new URL(dbUrl)
+  const client = new Client({
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    host: u.hostname,
+    port: parseInt(u.port || '5432', 10),
+    database: u.pathname.replace(/^\//, '') || 'postgres',
+    ssl: { rejectUnauthorized: false },
+  })
+  await client.connect()
+  try {
+    await client.query('ALTER TABLE integraciones ADD COLUMN IF NOT EXISTS anthropic_api_key text')
+    await client.query(
+      'UPDATE integraciones SET anthropic_api_key = $1, updated_by_user_id = $2 WHERE id = 1',
+      [value, userId],
+    )
+    await client.query("NOTIFY pgrst, 'reload schema'")
+  } finally {
+    await client.end()
+  }
+}
+
+/**
+ * Guarda (o borra) la API key de Anthropic en integraciones. Intenta vía
+ * PostgREST; si la columna no existe o su cache de schema está viejo, escribe
+ * DIRECTO por pg. La key NUNCA vuelve al cliente.
+ *
+ * @param key  la key (sk-ant-...). Vacío = borrar la key guardada.
+ */
+export async function updateAnthropicKey(
+  key: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const value = key.trim() || null
+  if (value && !value.startsWith('sk-ant-')) {
+    return { ok: false, error: 'La key de Anthropic debe empezar con "sk-ant-". Revisa que la copiaste completa.' }
+  }
+
+  const { error } = await service
+    .from('integraciones')
+    .update({ anthropic_api_key: value, updated_by_user_id: user.id })
+    .eq('id', 1)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = error as any
+  if (e && (e.code === '42703' || e.code === 'PGRST204' || /anthropic_api_key|column|schema cache/i.test(e.message ?? ''))) {
+    try {
+      await writeAnthropicKeyViaPg(value, user.id)
+    } catch (err) {
+      return { ok: false, error: `No pude guardar la key vía conexión directa: ${(err as Error).message}` }
+    }
+    revalidatePath('/settings')
+    return { ok: true }
+  }
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/settings')
+  return { ok: true }
+}
+
+/**
+ * Prueba la API key de Anthropic con una llamada mínima (1 token). Confirma que
+ * la key es válida y tiene saldo.
+ */
+export async function probarAnthropic(): Promise<
+  { ok: true; modelo: string } | { ok: false; error: string }
+> {
+  await requireUser()
+  const apiKey = await getAnthropicApiKey()
+  if (!apiKey) return { ok: false, error: 'No hay API key configurada todavía.' }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-8',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ok' }],
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (res.ok) return { ok: true, modelo: 'claude-opus-4-8' }
+    const body = await res.json().catch(() => null)
+    if (res.status === 401) return { ok: false, error: 'Key inválida (401). Revisa que la copiaste bien.' }
+    if (res.status === 429) return { ok: false, error: 'Sin saldo o límite alcanzado (429). Carga crédito en console.anthropic.com.' }
     return { ok: false, error: body?.error?.message ?? `HTTP ${res.status}` }
   } catch (e) {
     return { ok: false, error: `Error de red: ${(e as Error).message}` }

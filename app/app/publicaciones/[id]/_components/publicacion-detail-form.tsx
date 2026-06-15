@@ -20,7 +20,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { updatePublicacion, deletePublicacion, togglePublicacionField } from '../_actions'
+import { updatePublicacion, deletePublicacion, togglePublicacionField, generarCopysConIA } from '../_actions'
 import { duplicarPublicacion } from '../../_actions'
 import {
   ESTADO_PUBLICACION_LABEL,
@@ -148,6 +148,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDelete] = useTransition()
   const [isDuplicating, startDuplicate] = useTransition()
+  // Copys generados por IA (Claude). null = panel cerrado. Pedro elige uno y
+  // se carga en el textarea; no se guarda hasta que toca "Guardar cambios".
+  const [iaOpciones, setIaOpciones] = useState<string[] | null>(null)
+  const [isGenerando, startGenerar] = useTransition()
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null)
   // Plataforma custom inline: cuando el equipo necesita marcar la pub
   // para un canal que no es Instagram/Facebook/TikTok/YouTube (banner,
@@ -303,6 +307,36 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
       try { await duplicarPublicacion(initial.id) }
       catch (e) { toast.error(`Error: ${(e as Error).message}`) }
     })
+  }
+
+  // Genera 3 copys con Claude a partir del guion + voz de marca. Usa los
+  // valores ACTUALES del form (aunque no estén guardados) para que Pedro pueda
+  // pegar un guion y generar al toque.
+  function handleGenerarCopy() {
+    startGenerar(async () => {
+      const r = await generarCopysConIA({
+        publicacionId: initial.id,
+        guion: form.guion,
+        nombre: form.nombre,
+        tipoContenido: form.tipo_contenido,
+        plataformas: form.plataformas,
+        copyActual: form.copy,
+      })
+      if (r.ok) {
+        setIaOpciones(r.opciones)
+        toast.success(`Claude generó ${r.opciones.length} opciones ✨`)
+      } else {
+        toast.error(r.error, { duration: 9000 })
+      }
+    })
+  }
+
+  // Pedro elige una opción → se carga en el textarea (sin guardar).
+  function usarOpcionCopy(texto: string) {
+    setForm((s) => ({ ...s, copy: texto }))
+    setIaOpciones(null)
+    toast.success('Copy cargado — revísalo y guarda ✓')
+    setTimeout(() => autoResizeTextarea(), 0)
   }
 
   const brandHandle = marca ? `${marca.slug.replace(/-/g, '')}sac` : 'marca'
@@ -616,25 +650,99 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   1. Copy
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!form.copy) return
-                  try {
-                    await navigator.clipboard.writeText(form.copy)
-                    toast.success('Copy copiado al portapapeles 📋')
-                  } catch {
-                    toast.error('No se pudo copiar — copiá manualmente')
-                  }
-                }}
-                disabled={!form.copy}
-                title="Copiar copy al portapapeles"
-                className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <CopyIcon className="w-3 h-3" />
-                Copiar
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Generar copy con IA (Claude): analiza el guion + voz de marca
+                    y devuelve 3 opciones. Mismo flujo que Pedro hacía en Notion. */}
+                <button
+                  type="button"
+                  onClick={handleGenerarCopy}
+                  disabled={isGenerando}
+                  title="Genera 3 copys con Claude a partir del guion y la voz de la marca"
+                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                  style={{ background: 'linear-gradient(135deg, #ba41f7, #7c3aed)' }}
+                >
+                  <Sparkles className={`w-3 h-3 ${isGenerando ? 'animate-pulse' : ''}`} />
+                  {isGenerando ? 'Generando…' : 'Generar con IA'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!form.copy) return
+                    try {
+                      await navigator.clipboard.writeText(form.copy)
+                      toast.success('Copy copiado al portapapeles 📋')
+                    } catch {
+                      toast.error('No se pudo copiar — copiá manualmente')
+                    }
+                  }}
+                  disabled={!form.copy}
+                  title="Copiar copy al portapapeles"
+                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <CopyIcon className="w-3 h-3" />
+                  Copiar
+                </button>
+              </div>
             </div>
+            {/* Panel de copys generados por IA (Claude). Aparece al tocar
+                "Generar con IA"; Pedro elige una opción y se carga en el
+                textarea (sin guardar todavía). */}
+            {(isGenerando || iaOpciones) && (
+              <div className="mx-3 mt-3 rounded-lg border border-[#ba41f7]/30 bg-[#ba41f7]/[0.04]">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-[#ba41f7]/20">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#7c3aed]">
+                    <Sparkles className={`w-3.5 h-3.5 ${isGenerando ? 'animate-pulse' : ''}`} />
+                    {isGenerando ? 'Claude está escribiendo copys…' : 'Elige una opción'}
+                  </div>
+                  {iaOpciones && !isGenerando && (
+                    <button
+                      type="button"
+                      onClick={() => setIaOpciones(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Cerrar"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {isGenerando ? (
+                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    Analizando el guion y la voz de la marca… toma unos segundos.
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-2">
+                    {iaOpciones!.map((op, i) => (
+                      <div key={i} className="rounded-md border bg-background p-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#7c3aed]">
+                            Opción {i + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => usarOpcionCopy(op)}
+                            className="flex items-center gap-1 h-6 px-2 rounded text-[10px] font-semibold text-white"
+                            style={{ background: '#ba41f7' }}
+                          >
+                            <Check className="w-3 h-3" /> Usar este
+                          </button>
+                        </div>
+                        <p className="text-xs whitespace-pre-wrap text-foreground/90 max-h-40 overflow-y-auto">{op}</p>
+                      </div>
+                    ))}
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleGenerarCopy}
+                        disabled={isGenerando}
+                        className="text-[10px] text-[#7c3aed] hover:underline disabled:opacity-50"
+                      >
+                        ↻ Regenerar opciones
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Copy textarea — altura modesta porque copy suele ser corto.
                 Crece hasta ~280px con su propio contenido, no se estira
                 al alto del preview (eso causaba hueco gigante). */}

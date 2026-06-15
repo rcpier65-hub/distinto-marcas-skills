@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { generarCopysIA } from '@/lib/copys/generar'
 import type { EstadoPublicacion, EstadoTarea } from '@/lib/types/database'
 
 export type UpdatePublicacionInput = {
@@ -158,6 +159,69 @@ export async function updateGuionTexto(
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/publicaciones/${id}`)
   return { ok: true }
+}
+
+/**
+ * Genera copys con IA (Claude) para una publicación, replicando el flujo que
+ * Pedro hacía en Notion: analiza el guion + la voz de la marca y devuelve 3
+ * opciones para elegir. NO guarda nada: Pedro elige una, se carga en el
+ * textarea, y guarda con el botón normal.
+ *
+ * Recibe el contexto desde el cliente (guion/tipo/plataformas/nombre) para usar
+ * los valores ACTUALES del form aunque Pedro no haya guardado todavía. El
+ * marca_id + voz + facts se leen de la BD a partir de la publicación.
+ */
+export async function generarCopysConIA(input: {
+  publicacionId: string
+  guion: string
+  nombre: string
+  tipoContenido: string[]
+  plataformas: string[]
+  copyActual?: string
+}): Promise<{ ok: true; opciones: string[] } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // Resolver la marca de la publicación
+  const { data: pub } = await service
+    .from('publicaciones')
+    .select('marca_id')
+    .eq('id', input.publicacionId)
+    .maybeSingle()
+  if (!pub?.marca_id) {
+    return { ok: false, error: 'No pude identificar la marca de esta publicación.' }
+  }
+
+  // Voz de marca + facts canon en paralelo
+  const [{ data: marca }, { data: facts }] = await Promise.all([
+    service.from('marcas').select('nombre, tono_voz').eq('id', pub.marca_id).maybeSingle(),
+    service.from('marca_facts').select('*').eq('marca_id', pub.marca_id).maybeSingle(),
+  ])
+  if (!marca) return { ok: false, error: 'Marca no encontrada.' }
+
+  return generarCopysIA({
+    marcaNombre: marca.nombre as string,
+    tonoVoz: marca.tono_voz,
+    facts: facts
+      ? {
+          nombre_comercial: facts.nombre_comercial,
+          web_principal: facts.web_principal,
+          whatsapp_principal: facts.whatsapp_principal,
+          puntos_venta: facts.puntos_venta,
+          proximamente: facts.proximamente,
+          productos_datos: facts.productos_datos,
+          frases_prohibidas: facts.frases_prohibidas,
+          frases_canon: facts.frases_canon,
+          notas: facts.notas,
+        }
+      : null,
+    nombre: input.nombre,
+    guion: input.guion,
+    tipoContenido: input.tipoContenido ?? [],
+    plataformas: input.plataformas ?? [],
+    copyActual: input.copyActual,
+  })
 }
 
 /**

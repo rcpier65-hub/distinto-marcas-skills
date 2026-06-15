@@ -15,6 +15,25 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 const METRICOOL_BASE = 'https://app.metricool.com'
 
+/**
+ * Metricool usa nombres de provider específicos en /inbox/post-comments.
+ * OJO: TikTok = 'TIKTOKBUSINESS' — mandar 'TIKTOK' devuelve 400 ValidationError
+ * (confirmado live: "Valid message provider names are: INSTAGRAM, ..., TIKTOKBUSINESS, ...").
+ * Sin esto, los comentarios de TikTok NUNCA cargan para ninguna marca.
+ */
+function networkToProvider(network: 'instagram' | 'facebook' | 'tiktok'): string {
+  switch (network) {
+    case 'tiktok':
+      return 'TIKTOKBUSINESS'
+    case 'instagram':
+      return 'INSTAGRAM'
+    case 'facebook':
+      return 'FACEBOOK'
+    default:
+      return String(network).toUpperCase()
+  }
+}
+
 // Env vars sirven como FALLBACK si la BD no está configurada todavía.
 // La BD (tabla integraciones) tiene prioridad — Pedro la edita desde Settings UI.
 const ENV_USER_ID = process.env.METRICOOL_USER_ID ?? ''
@@ -163,7 +182,7 @@ export async function listComentarios(args: {
   // Confirmado vía services/metricool-pro-mcp/server.py que funciona OK.
   const params = new URLSearchParams({
     blogId: String(args.blogId),
-    provider: args.network.toUpperCase(),
+    provider: networkToProvider(args.network),
     limit: String(args.limit ?? 50),
   })
   if (args.onlyUnread) params.set('onlyUnread', 'true')
@@ -201,7 +220,7 @@ export async function responderComentario(args: {
     {
       method: 'POST',
       body: JSON.stringify({
-        provider: args.network.toUpperCase(),
+        provider: networkToProvider(args.network),
         objectId: args.commentId,
         text: args.text,
       }),

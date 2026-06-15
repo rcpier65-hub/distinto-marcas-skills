@@ -12,7 +12,7 @@
 import { useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { RefreshCw, Sparkles, Send, FlaskConical, CheckCircle2, Loader2 } from 'lucide-react'
+import { RefreshCw, Sparkles, Send, FlaskConical, CheckCircle2, Loader2, BrushCleaning } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import {
   fetchComentariosFromMetricool,
@@ -23,6 +23,7 @@ import {
   generarBorradoresIA,
   previewInformeNewTeam,
   enviarInformeResueltos,
+  reconciliarInbox,
 } from '../_actions'
 import { ComentarioRow } from './comentario-row'
 import type { ComentarioInboxRow, ComentarioCategoria } from '@/lib/types/database'
@@ -141,6 +142,26 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [isResponding, startResponding] = useTransition()
   const [isGenerating, startGenerating] = useTransition()
   const [informando, startInforme] = useTransition()
+  const [isReconciling, startReconciling] = useTransition()
+
+  // Limpia el inbox: marca como respondidos los que Metricool ya muestra
+  // contestados, y archiva los viejos fuera de la ventana. NO postea nada.
+  function handleReconciliar() {
+    startReconciling(async () => {
+      const toastId = toast.loading('🧹 Sincronizando con Metricool y limpiando el inbox…')
+      const r = await reconciliarInbox(marcaActual)
+      if (r.ok) {
+        toast.success(
+          `✅ Inbox limpio: ${r.reconciliados} ya respondidos · ${r.archivados} viejos archivados · ${r.siguen_pendientes} pendientes reales` +
+            (r.errors.length > 0 ? ` · ⚠️ ${r.errors.length} redes con error` : ''),
+          { id: toastId, duration: 9000 },
+        )
+        router.refresh()
+      } else {
+        toast.error(`Error: ${r.error}`, { id: toastId, duration: 9000 })
+      }
+    })
+  }
 
   // Envía el informe de lo respondido HOY (sin necesidad de seleccionar comentarios).
   function handleInforme(modo: 'cliente' | 'newteam') {
@@ -175,6 +196,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
         if (!silencioso) {
           toast.success(
             `✅ ${result.inserted} nuevos en inbox · ✨ ${result.generados} borradores IA listos` +
+              (result.reconciliados > 0 ? ` · 🧹 ${result.reconciliados} ya respondidos sacados` : '') +
               (result.errors.length > 0 ? ` · ${result.errors.length} errores` : ''),
             { id: 'fetch', duration: 8000 },
           )
@@ -354,6 +376,18 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             {isFetching ? 'Sincronizando…' : 'Refrescar'}
+          </button>
+
+          {/* Limpiar inbox — saca los que ya están respondidos en la red
+              (verifica contra Metricool) + archiva los viejos settled. */}
+          <button
+            onClick={handleReconciliar}
+            disabled={isReconciling || !marcaInfo?.metricool_blog_id}
+            title="Verifica en Metricool y saca del inbox los comentarios que ya están respondidos (o muy viejos). No postea nada."
+            className="inline-flex items-center gap-2 h-10 px-3.5 rounded-lg border border-border bg-background text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+          >
+            {isReconciling ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrushCleaning className="w-4 h-4" />}
+            {isReconciling ? 'Limpiando…' : 'Limpiar inbox'}
           </button>
 
           {/* Generar borradores con IA (OpenAI gpt-4o-mini) */}

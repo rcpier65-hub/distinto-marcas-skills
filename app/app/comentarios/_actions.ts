@@ -115,7 +115,7 @@ export async function dispatchRoutine(
  */
 export async function fetchComentariosFromMetricool(
   marcaSlug: string,
-): Promise<{ ok: true; fetched: number; inserted: number; generados: number; errors: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; fetched: number; inserted: number; reconciliados: number; generados: number; errors: string[] } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -134,6 +134,7 @@ export async function fetchComentariosFromMetricool(
 
   let fetched = 0
   let inserted = 0
+  let reconciliados = 0
   const errors: string[] = []
 
   // Pre-cargar templates de la marca + globales para asignar respuesta_sugerida
@@ -152,17 +153,35 @@ export async function fetchComentariosFromMetricool(
     }
     for (const c of r.data) {
       fetched++
-      if (c.hasReply) continue  // ya respondimos en la red, skip
 
-      // ¿Ya existe en la BD? Si sí, lo PRESERVAMOS tal cual — no pisamos la
-      // respuesta sugerida (IA o editada por Pedro), ni el estado. Esto evita
-      // que recargar borre borradores/edits y que se regenere (y se gaste API).
+      // ¿Ya existe en la BD? (lo necesitamos ANTES del check de hasReply para
+      // poder reconciliar filas viejas que quedaron pegadas en 'pending').
       const { data: existente } = await service
         .from('comentarios_inbox')
-        .select('id')
+        .select('id, status')
         .eq('network', network)
         .eq('metricool_comment_id', c.id)
         .maybeSingle()
+
+      // Ya respondido en la red (por la app, el cliente, la Routine, o a mano).
+      if (c.hasReply) {
+        // RECONCILIAR: si lo teníamos como pendiente/aprobado, marcarlo como
+        // respondido para que NO siga apareciendo en el inbox. Esta es la causa
+        // raíz del bug: antes solo se saltaba el insert, nunca se actualizaba la
+        // fila existente → comentarios contestados afuera quedaban 'pending' para
+        // siempre, y Pedro terminaba respondiéndolos de nuevo (doble respuesta).
+        if (existente && (existente.status === 'pending' || existente.status === 'approved')) {
+          await service
+            .from('comentarios_inbox')
+            .update({ status: 'responded' })
+            .eq('id', existente.id)
+          reconciliados++
+        }
+        continue  // nunca insertar un comentario ya respondido
+      }
+
+      // No respondido todavía. Si ya existe, lo PRESERVAMOS tal cual — no pisamos
+      // la respuesta sugerida (IA o editada por Pedro) ni el estado.
       if (existente) continue
 
       // Nuevo comentario → insert. Clasificación base por keywords (la IA la
@@ -205,7 +224,111 @@ export async function fetchComentariosFromMetricool(
   } catch { /* best-effort */ }
 
   revalidatePath('/comentarios')
-  return { ok: true, fetched, inserted, generados, errors }
+  return { ok: true, fetched, inserted, reconciliados, generados, errors }
+}
+
+// ============================================================
+// RECONCILIAR INBOX — limpia los "respondidos fantasma"
+// ============================================================
+// Días de antigüedad para archivar un pendiente que YA NO aparece en la ventana
+// activa de Metricool (fuera de la ventana + viejo = settled, lo sacamos del
+// inbox como 'leído'). No afirma que lo respondimos — solo lo archiva.
+const ARCHIVE_OLD_DAYS = 14
+
+/** Actualiza el status de muchos ids en lotes (evita URLs gigantes en PostgREST). */
+async function updateStatusBatch(
+  service: ReturnType<typeof createServiceClient>,
+  ids: string[],
+  status: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const svc = service as any
+  for (let i = 0; i < ids.length; i += 200) {
+    await svc.from('comentarios_inbox').update({ status }).in('id', ids.slice(i, i + 200))
+  }
+}
+
+/**
+ * Sincroniza el estado real de los comentarios con Metricool y limpia el inbox:
+ *   - pendientes/aprobados que Metricool reporta YA RESPONDIDOS → 'responded'
+ *   - pendientes fuera de la ventana activa de Metricool y de más de
+ *     ARCHIVE_OLD_DAYS días → 'skipped' (archivados, settled)
+ *   - los que siguen en la ventana SIN responder → se quedan 'pending'
+ *
+ * No postea nada a Metricool ni a la red — solo LEE el estado real. Es seguro y
+ * reversible (solo cambia el status en la BD). Resuelve el bug de "comentarios ya
+ * respondidos que siguen saliendo en el inbox".
+ */
+export async function reconciliarInbox(
+  marcaSlug: string,
+): Promise<
+  | { ok: true; reconciliados: number; archivados: number; siguen_pendientes: number; errors: string[] }
+  | { ok: false; error: string }
+> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { data: marca } = await service
+    .from('marcas')
+    .select('id, metricool_blog_id')
+    .eq('slug', marcaSlug)
+    .maybeSingle()
+  if (!marca) return { ok: false, error: `Marca '${marcaSlug}' no encontrada` }
+  if (!marca.metricool_blog_id) {
+    return { ok: false, error: `Marca '${marcaSlug}' no tiene metricool_blog_id configurado` }
+  }
+
+  // 1) Traer la ventana activa de Metricool → map (network|comment_id) → hasReply
+  const replyByKey = new Map<string, boolean>()
+  const errors: string[] = []
+  for (const network of NETWORKS) {
+    const r = await listComentarios({ blogId: marca.metricool_blog_id, network, onlyUnread: false, limit: 100 })
+    if (!r.ok) {
+      errors.push(`${network}: ${r.error}`)
+      continue
+    }
+    for (const c of r.data) replyByKey.set(`${network}|${c.id}`, c.hasReply)
+  }
+
+  // 2) Recorrer pendientes + aprobados de la marca y clasificar
+  const { data: rows } = await service
+    .from('comentarios_inbox')
+    .select('id, network, metricool_comment_id, comment_created_at, status')
+    .eq('marca_id', marca.id)
+    .in('status', ['pending', 'approved'])
+    .limit(2000)
+
+  const ahora = Date.now()
+  const VIEJO_MS = ARCHIVE_OLD_DAYS * 86400000
+  const idsResponded: string[] = []
+  const idsArchivar: string[] = []
+  let siguen = 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const row of (rows ?? []) as any[]) {
+    const key = `${row.network}|${row.metricool_comment_id}`
+    if (replyByKey.has(key)) {
+      if (replyByKey.get(key)) idsResponded.push(row.id) // ya respondido en la red
+      else siguen++ // en la ventana y sin responder → sigue pendiente (real)
+    } else {
+      const edadMs = ahora - new Date(row.comment_created_at).getTime()
+      if (edadMs > VIEJO_MS) idsArchivar.push(row.id) // fuera de ventana + viejo → settled
+      else siguen++ // fuera de ventana pero reciente → no tocar
+    }
+  }
+
+  // 3) Aplicar en lote
+  await updateStatusBatch(service, idsResponded, 'responded')
+  await updateStatusBatch(service, idsArchivar, 'skipped')
+
+  revalidatePath('/comentarios')
+  return {
+    ok: true,
+    reconciliados: idsResponded.length,
+    archivados: idsArchivar.length,
+    siguen_pendientes: siguen,
+    errors,
+  }
 }
 
 /**
