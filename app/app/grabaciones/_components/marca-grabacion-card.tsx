@@ -13,7 +13,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatHora12 } from '@/lib/utils/format-hora'
-import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, AlertTriangle, ShieldCheck, Link2, Pencil } from 'lucide-react'
+import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, Link2, Pencil, FileText, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ObjetivoInput } from './objetivo-input'
@@ -22,8 +22,8 @@ import {
   updateGrabacionFecha,
   updateGrabacionEstado,
   deleteGrabacion,
-  toggleCoordinacionConfirmada,
   updateGrabacionEnlaceGuiones,
+  updateGrabacionGuionListo,
   type MarcaKPI,
   type GrabacionWithMarca,
 } from '../_actions'
@@ -85,27 +85,6 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
      todas las cards tengan el mismo estilo glass que próximas). */
   const cardColor = kpi.color_primario_hex ?? '#737373'
 
-  /* Optimistic toggle del check 'coordinación confirmada con cliente' */
-  const [confirmada, setConfirmada] = useState<boolean>(kpi.coordinacionConfirmada)
-  function toggleConfirmada() {
-    const next = !confirmada
-    setConfirmada(next)
-    startTransition(async () => {
-      const r = await toggleCoordinacionConfirmada(kpi.marca_slug, next)
-      if (!r.ok) {
-        setConfirmada(!next)
-        toast.error(r.error)
-      } else {
-        toast.success(next ? 'Coordinación marcada como confirmada' : 'Coordinación pendiente')
-      }
-    })
-  }
-
-  /* Pedro: si las grabaciones planeadas/cumplidas NO alcanzan el objetivo
-     y la coordinación NO está confirmada → alerta arriba del card. */
-  const faltanGrabaciones = kpi.objetivo > 0 && (kpi.planeadas + kpi.cumplidas) < kpi.objetivo
-  const mostrarAlerta = faltanGrabaciones && !confirmada
-
   /* Default rendering del form: HOY si estamos en el mes activo, sino
      día 1 del mes activo. Hora 10:00 → 11:00. */
   function defaultFormFecha(): string {
@@ -150,19 +129,6 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
       {/* Tira de acento superior con el color de la marca */}
       <div className="absolute inset-x-0 top-0 h-1" style={{ background: cardColor }} aria-hidden />
       <CardContent className="pt-5 pb-4 space-y-3">
-        {/* Alerta: falta coordinación con cliente para alcanzar el objetivo */}
-        {mostrarAlerta && (
-          <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <div className="text-[11.5px] leading-snug">
-              <strong className="block">Falta coordinación con el cliente</strong>
-              <span className="text-amber-700">
-                Faltan {kpi.objetivo - (kpi.planeadas + kpi.cumplidas)} grabaciones para llegar al objetivo del mes.
-                Confirma fechas con la marca antes de cerrar el calendario.
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Header — más limpio y con aire (Pedro). Sin el slug técnico
             mono, logo más grande, nombre prominente. */}
@@ -230,39 +196,6 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
           )}
         </div>
 
-        {/* Check 'Coordinación confirmada' — Pedro lo pidió debajo del
-            card. Cuando está marcado, las fechas planeadas son creíbles
-            (validadas con el cliente) y la alerta de coordinación
-            desaparece. */}
-        <label
-          className="flex items-start gap-2 pt-2 border-t border-border/60 cursor-pointer select-none"
-          title="Marcar cuando las fechas estén coordinadas y confirmadas con el cliente"
-        >
-          <input
-            type="checkbox"
-            checked={confirmada}
-            onChange={toggleConfirmada}
-            disabled={isPending}
-            className="mt-0.5 w-4 h-4 rounded border-input accent-emerald-500 cursor-pointer disabled:opacity-50"
-          />
-          <div className="text-[11.5px] leading-snug">
-            <span className={`font-semibold ${confirmada ? 'text-emerald-700' : 'text-foreground'}`}>
-              {confirmada ? (
-                <span className="inline-flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Coordinación confirmada
-                </span>
-              ) : (
-                'Marcar como confirmada y creíble'
-              )}
-            </span>
-            <span className="block text-muted-foreground text-[10.5px]">
-              {confirmada
-                ? 'Las fechas planeadas están validadas con el cliente.'
-                : 'Las fechas planeadas todavía no se confirmaron con el cliente.'}
-            </span>
-          </div>
-        </label>
       </CardContent>
     </Card>
   )
@@ -294,8 +227,23 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
   )
   /* Pedro: enlace de guiones (suele ser un Drive). Editable inline. */
   const [enlace, setEnlace] = useState(grabacion.enlace_guiones ?? '')
+  /* Pedro: check por grabación "guion listo" vs "aún falta el guion". */
+  const [guionListo, setGuionListo] = useState<boolean>(grabacion.guion_listo)
   const cfg = ESTADO_CFG[grabacion.estado] ?? ESTADO_CFG.planeada
   const busy = disabled || isPending
+
+  function toggleGuion() {
+    const next = !guionListo
+    setGuionListo(next) // optimista
+    startTransition(async () => {
+      const r = await updateGrabacionGuionListo(grabacion.id, next)
+      if (r.ok) toast.success(next ? 'Guion marcado como listo' : 'Guion marcado como pendiente')
+      else {
+        setGuionListo(!next)
+        toast.error(r.error)
+      }
+    })
+  }
 
   const fechaInicial = grabacion.fecha_planeada
   const horaInicial = horaInicialVal
@@ -409,6 +357,22 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
               <cfg.Icon className="w-3 h-3" />
               {cfg.label}
             </button>
+            {/* Guion listo / falta — toggle clickeable. Verde = listo,
+                ámbar (alerta) = aún falta. Pedro lo pidió por grabación. */}
+            <button
+              type="button"
+              onClick={toggleGuion}
+              disabled={busy}
+              title={guionListo ? 'Guion listo — click para marcar pendiente' : 'Aún falta el guion — click para marcar listo'}
+              className={`inline-flex items-center gap-1 h-6 px-2 rounded-full text-[10.5px] font-semibold shrink-0 disabled:opacity-50 ${
+                guionListo
+                  ? 'text-emerald-700 bg-emerald-100'
+                  : 'text-amber-700 bg-amber-100'
+              }`}
+            >
+              {guionListo ? <FileText className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+              {guionListo ? 'Guion listo' : 'Falta guion'}
+            </button>
             {horaUrl && (
               <a
                 href={horaUrl}
@@ -417,7 +381,7 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
                 title="Abrir guiones"
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[10.5px] font-medium text-[#ba41f7] bg-[#ba41f7]/10 hover:bg-[#ba41f7]/18 shrink-0"
               >
-                <Link2 className="w-3 h-3" /> Guiones
+                <Link2 className="w-3 h-3" /> Ver
               </a>
             )}
           </div>

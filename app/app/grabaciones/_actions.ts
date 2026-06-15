@@ -39,6 +39,8 @@ export type GrabacionWithMarca = {
   /* Duración del bloque en GCal (min). Combinada con hora_planeada
      da el rango start/end del evento. Default 60. */
   duracion_min: number | null
+  /* Flag manual: el guion de esa grabación ya está armado. */
+  guion_listo: boolean
   created_at: string
   updated_at: string
 }
@@ -82,7 +84,7 @@ export async function listGrabaciones(
   const d = desde ?? firstDay
   const h = hasta ?? lastDay
 
-  const FULL_COLS = 'id, marca_id, fecha_planeada, hora_planeada, duracion_min, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
+  const FULL_COLS = 'id, marca_id, fecha_planeada, hora_planeada, duracion_min, guion_listo, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
   const BASE_COLS = 'id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
 
   let res = await service
@@ -91,10 +93,10 @@ export async function listGrabaciones(
     .gte('fecha_planeada', d)
     .lte('fecha_planeada', h)
     .order('fecha_planeada', { ascending: false })
-  /* Defensive SELECT: si duracion_min no existe aún (migration 028
-     pendiente), reintenta con columnas base — la UI muestra default 60
-     en lugar de leer de BD. */
-  if (res.error && /duracion_min/i.test(res.error.message ?? '')) {
+  /* Defensive SELECT: si duracion_min o guion_listo no existen aún
+     (migration 028/029 pendiente), reintenta con columnas base — la UI
+     usa defaults (60 min / guion no-listo) en lugar de leer de BD. */
+  if (res.error && /(duracion_min|guion_listo)/i.test(res.error.message ?? '')) {
     res = await service
       .from('grabaciones')
       .select(BASE_COLS)
@@ -129,6 +131,7 @@ export async function listGrabaciones(
     enlace_guiones: r.enlace_guiones ?? null,
     google_event_id: r.google_event_id ?? null,
     duracion_min: r.duracion_min ?? null,
+    guion_listo: r.guion_listo ?? false,
     created_at: r.created_at,
     updated_at: r.updated_at,
   }))
@@ -687,6 +690,33 @@ export async function updateGrabacionEnlaceGuiones(
   if (error) {
     if ((error.message ?? '').includes('does not exist')) {
       return { ok: false, error: 'Falta migración: ALTER TABLE grabaciones ADD COLUMN enlace_guiones text' }
+    }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/grabaciones')
+  return { ok: true }
+}
+
+/**
+ * Marca/desmarca el guion como listo para una grabación. Pedro: check
+ * pequeño por grabación "guion listo" vs "aún falta el guion".
+ */
+export async function updateGrabacionGuionListo(
+  id: string,
+  listo: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { error } = await service
+    .from('grabaciones')
+    .update({ guion_listo: listo })
+    .eq('id', id)
+
+  if (error) {
+    if ((error.message ?? '').includes('does not exist') || /guion_listo/i.test(error.message ?? '')) {
+      return { ok: false, error: 'Falta correr la migración 029 (guion_listo) en Supabase' }
     }
     return { ok: false, error: error.message }
   }
