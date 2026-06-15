@@ -27,6 +27,7 @@ import {
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
+import { TrabajoEquipo } from './trabajo-equipo'
 
 export type InicioData = {
   nombre: string
@@ -118,6 +119,9 @@ export type InicioData = {
      componente cliente (ReporteDelDia) solo renderice + capture la
      imagen. Si null, el card no se muestra (no debería pasar). */
   reporteDelDia: import('@/lib/inicio/load-reporte-del-dia').ReporteDelDiaData | null
+  /* "El trabajo de tu equipo" — solo para el CEO (director). null para
+     roles operativos (ellos ven su propio trabajo). */
+  trabajoEquipo: import('@/lib/inicio/get-trabajo-equipo').MiembroTrabajo[] | null
   /* Si viene true, se muestra el overlay WelcomeAnimation que dura
      ~6-7 seg con bienvenida personalizada por rol. Se setea cuando el
      user acaba de hacer login (via ?welcome=1 en la URL). */
@@ -539,6 +543,11 @@ export function InicioView({ data }: { data: InicioData }) {
             />
             {data.grabacionesProximas.length > 0 && (
               <AvisoGrabaciones grabaciones={data.grabacionesProximas} acento={acento} />
+            )}
+            {/* El trabajo de tu equipo — solo CEO. Reemplaza el panel
+                celeste de grabaciones próximas (que ahora ve solo el equipo). */}
+            {data.trabajoEquipo && data.trabajoEquipo.length > 0 && (
+              <TrabajoEquipo miembros={data.trabajoEquipo} />
             )}
             {/* Accesos rápidos: Pedro (CEO) no los necesita. Solo equipo. */}
             {data.rolBase !== 'director' && (

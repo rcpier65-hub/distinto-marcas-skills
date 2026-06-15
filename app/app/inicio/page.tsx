@@ -23,6 +23,7 @@ import { getFraseDelDia } from '@/lib/inicio/get-frase-del-dia'
 import { loadCockpitData } from '@/lib/cockpit/load-cockpit-data'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { loadReporteDelDia } from '@/lib/inicio/load-reporte-del-dia'
+import { getTrabajoEquipo } from '@/lib/inicio/get-trabajo-equipo'
 import { formatHora12 } from '@/lib/utils/format-hora'
 
 export const dynamic = 'force-dynamic'
@@ -418,7 +419,19 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       return null
     }),
   ])
-  const cockpitData = cockpitDataRaw ? { ...cockpitDataRaw, marcasNav } : null
+
+  /* Trabajo del equipo — solo para el CEO. Para él además ocultamos el
+     panel celeste "Grabaciones próximas" del cockpit (Pedro: en su inicio
+     prefiere ver el trabajo de Lorena/Ailyn/Pieer). */
+  const trabajoEquipo = esCEO
+    ? await getTrabajoEquipo(service).catch((e) => {
+        console.error('[inicio] getTrabajoEquipo falló — sigo con null:', e)
+        return null
+      })
+    : null
+  const cockpitData = cockpitDataRaw
+    ? { ...cockpitDataRaw, marcasNav, ocultarGrabacionesProximas: esCEO }
+    : null
 
   const data: InicioData = {
     nombre: nombreCapitalizado,
@@ -444,6 +457,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     },
     cockpitData,
     reporteDelDia,
+    trabajoEquipo,
     showWelcome,
   }
 

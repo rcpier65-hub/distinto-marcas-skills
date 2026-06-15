@@ -147,6 +147,10 @@ export type CockpitData = {
      en /dashboard no se ven en el dashboard del Cockpit. La page real de
      /inicio debe pasarla siempre. */
   marcasNav?: MarcaNav[]
+  /* CEO: oculta el panel celeste "Grabaciones próximas" — Pedro ya tiene
+     el aviso ámbar y el panel de /grabaciones; en su inicio prefiere ver
+     "El trabajo de tu equipo" en su lugar. */
+  ocultarGrabacionesProximas?: boolean
 }
 
 /* Props:
@@ -398,7 +402,9 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             )}
           </BloqueTrabajo>
 
-          {/* Grabaciones pendientes */}
+          {/* Grabaciones pendientes — oculto para el CEO (ve "El trabajo
+              de tu equipo" en su lugar). */}
+          {!data?.ocultarGrabacionesProximas && (
           <BloqueTrabajo
             title="Grabaciones próximas"
             count={grabacionesList?.length ?? GRABACIONES_PROXIMAS.length}
@@ -438,6 +444,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
               })
             )}
           </BloqueTrabajo>
+          )}
         </div>
 
         {/* === GRILLAS A ENVIAR + HÁBITOS DEL DÍA === */}
