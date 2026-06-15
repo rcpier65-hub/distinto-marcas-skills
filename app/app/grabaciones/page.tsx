@@ -12,6 +12,7 @@ import { GrabacionRow } from './_components/grabacion-row'
 import { NuevaGrabacionForm } from './_components/nueva-grabacion-form'
 import { MesSelector } from './_components/mes-selector'
 import { MarcaGrabacionCard } from './_components/marca-grabacion-card'
+import { ProximasGrabacionesCard, type ProximaGrabacion } from './_components/proximas-grabaciones-card'
 import { GoogleCalendarConnect } from './_components/gcal-connect'
 import { getGoogleCalendarStatus } from '@/lib/integrations/google-calendar'
 
@@ -68,6 +69,37 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
   // Mes activo en formato YYYY-MM (para defaultear nuevas fechas en las cards).
   // Deriva de `desde` o del mes actual.
   const mesDefault = (desde ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
+
+  /* Próximas grabaciones (7 días desde hoy). Pedro: "que diga
+     próximas grabaciones para ver qué viene de la semana ... 7 días
+     desde el día en que estamos". Aplano kpi.grabaciones, filtro por
+     fecha en ventana [hoy, hoy+7] y estado 'planeada', tomo color de
+     la marca (color_primario_hex) para el pill de la fecha. */
+  const hoyIso = new Date().toISOString().slice(0, 10)
+  const en7Dias = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    return d.toISOString().slice(0, 10)
+  })()
+  const proximas: ProximaGrabacion[] = kpis
+    .flatMap((k) =>
+      k.grabaciones
+        .filter((g) => g.estado === 'planeada' && g.fecha_planeada >= hoyIso && g.fecha_planeada <= en7Dias)
+        .map((g) => ({
+          id: g.id,
+          marca_slug: k.marca_slug,
+          marca_nombre: k.marca_nombre,
+          marca_emoji: k.marca_emoji,
+          marca_color: k.color_primario_hex,
+          fecha: g.fecha_planeada,
+          hora: (g.hora_planeada ?? '').slice(0, 5) || null,
+          estado: g.estado,
+        })),
+    )
+    .sort((a, b) => {
+      if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
+      return (a.hora ?? '99:99').localeCompare(b.hora ?? '99:99')
+    })
 
   // Estado de conexión con Google Calendar (best-effort — si la tabla no
   // existe o falla, asumimos no conectado)
@@ -178,6 +210,13 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
           {kpis.map((k) => (
             <MarcaGrabacionCard key={k.marca_id} kpi={k} mesDefault={mesDefault} />
           ))}
+          {/* Widget "Próximas grabaciones (7 días)" — Pedro pidió este
+              panel para llenar el espacio vacío del grid y tener a un
+              vistazo qué viene la próxima semana. Mismo tamaño que las
+              cards de marca, encaja como un slot más del grid. */}
+          {kpis.length > 0 && (
+            <ProximasGrabacionesCard grabaciones={proximas} hoyIso={hoyIso} />
+          )}
           {kpis.length === 0 && !error && (
             <p className="text-sm text-muted-foreground col-span-3 italic">Sin marcas activas.</p>
           )}
