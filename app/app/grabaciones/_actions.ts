@@ -260,19 +260,46 @@ export async function createGrabacion(args: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // Resolver marca_id + nombre por slug
-  const { data: marca } = await service
-    .from('marcas')
-    .select('id, nombre')
-    .eq('slug', args.marca_slug)
-    .maybeSingle()
+  // Resolver marca_id + nombre + correos_clientes por slug.
+  // Pedro: "cada marca tiene sus correos y si se crea un evento deben
+  // estar como invitados". Los correos guardados en Settings (columna
+  // correos_clientes) se mergean con los que el user pueda haber puesto
+  // a mano en el form, dedup por lowercase. Defensive: si la columna
+  // no existe (pre-migración) lee solo id+nombre.
+  let marca: { id: string; nombre: string; correos_clientes?: string[] | null } | null = null
+  {
+    const r1 = await service
+      .from('marcas')
+      .select('id, nombre, correos_clientes')
+      .eq('slug', args.marca_slug)
+      .maybeSingle()
+    if (r1.error && /correos_clientes/i.test(r1.error.message ?? '')) {
+      const r2 = await service
+        .from('marcas')
+        .select('id, nombre')
+        .eq('slug', args.marca_slug)
+        .maybeSingle()
+      marca = r2.data
+    } else {
+      marca = r1.data
+    }
+  }
   if (!marca) return { ok: false, error: `Marca '${args.marca_slug}' no encontrada` }
 
   const titulo = args.titulo?.trim() || `Grabación – ${marca.nombre}`
   const descripcion = args.descripcion?.trim() || args.notas?.trim() || null
   const duracion = Math.max(5, Math.min(720, args.duracion_min ?? 60))
   const esMeet = !!args.es_reunion_meet
-  const invitados = (args.invitados_emails ?? []).filter((e) => e && /@/.test(e))
+  /* Merge: invitados del form + correos_clientes guardados en Settings.
+     Dedup por lowercase para evitar duplicados si el user puso a mano
+     uno que ya estaba en Settings. */
+  const correosMarca = (marca.correos_clientes ?? [])
+    .map((e) => String(e).trim().toLowerCase())
+    .filter((e) => /@/.test(e))
+  const correosForm = (args.invitados_emails ?? [])
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => /@/.test(e))
+  const invitados = Array.from(new Set([...correosMarca, ...correosForm]))
 
   // Intento 1: insert FULL (con todas las columnas nuevas).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -346,24 +373,28 @@ export async function createGrabacion(args: {
           })
       }
     } else if (args.hora_planeada) {
-      // Evento con hora pero sin Meet.
+      // Evento con hora pero sin Meet. Los attendees igual van —
+      // Google les manda invitación de calendario aunque no haya Meet.
       const ev = await createTimedEvent({
         summary: titulo,
         description: descripcion ?? `Sesión de grabación – ${marca.nombre}.`,
         fecha: args.fecha_planeada,
         hora: args.hora_planeada,
         durationMin: duracion,
+        attendees: invitados.length > 0 ? invitados : undefined,
       })
       if (ev.ok) {
         gcalSynced = true
         await service.from('grabaciones').update({ google_event_id: ev.eventId }).eq('id', grabId)
       }
     } else {
-      // Sin hora: evento all-day (comportamiento legacy).
+      // Sin hora: evento all-day (comportamiento legacy). Attendees igual
+      // van si la marca tiene correos guardados — Google manda invitación.
       const ev = await createCalendarEvent({
         summary: titulo,
         description: descripcion ?? `Sesión de grabación para ${marca.nombre}.`,
         date: args.fecha_planeada,
+        attendees: invitados.length > 0 ? invitados : undefined,
       })
       if (ev.ok) {
         gcalSynced = true

@@ -211,6 +211,9 @@ type EventInput = {
   description?: string
   date: string          // YYYY-MM-DD (evento all-day)
   colorId?: string      // 1-11 colores de Google Calendar
+  /* Emails que Google agrega como attendees. Si vienen, Google manda
+     invitación de calendario aunque el evento sea all-day. */
+  attendees?: string[]
 }
 
 export type TimedEventInput = {
@@ -220,6 +223,11 @@ export type TimedEventInput = {
   hora: string          // HH:MM (24h)
   durationMin?: number  // duración, default 60
   colorId?: string
+  /* Emails que Google agrega como attendees. Si vienen, Google manda
+     invitación de calendario a cada uno. NO genera Meet — para Meet
+     usa createReunionEvent. Pedro: "todo evento de typhouse pone como
+     invitados a estos dos correos". */
+  attendees?: string[]
 }
 
 /**
@@ -237,7 +245,9 @@ export async function createCalendarEvent(input: EventInput): Promise<{ ok: true
   const end = endDate.toISOString().slice(0, 10)
 
   const calId = await getGrabacionesCalendarId(token)
-  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, {
+  const attendees = (input.attendees ?? []).filter((e) => e && /@/.test(e))
+  const qs = attendees.length > 0 ? '?sendUpdates=all' : ''
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events${qs}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -246,6 +256,7 @@ export async function createCalendarEvent(input: EventInput): Promise<{ ok: true
       start: { date: start },
       end: { date: end },
       colorId: input.colorId ?? GRABACION_COLOR_ID,
+      ...(attendees.length > 0 ? { attendees: attendees.map((email) => ({ email })) } : {}),
     }),
   })
   const data = await res.json()
@@ -348,7 +359,12 @@ export async function createTimedEvent(
   const endMM = String(totalEnd % 60).padStart(2, '0')
 
   const calId = await getGrabacionesCalendarId(token)
-  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, {
+  /* attendees opcionales: si vienen, agregamos sendUpdates=all para que
+     Google mande invitación de calendario. Sin attendees no hace falta
+     el query param. */
+  const attendees = (input.attendees ?? []).filter((e) => e && /@/.test(e))
+  const qs = attendees.length > 0 ? '?sendUpdates=all' : ''
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events${qs}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -357,6 +373,7 @@ export async function createTimedEvent(
       start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima' },
       end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima' },
       colorId: input.colorId ?? GRABACION_COLOR_ID,
+      ...(attendees.length > 0 ? { attendees: attendees.map((email) => ({ email })) } : {}),
     }),
   })
   const data = await res.json()
