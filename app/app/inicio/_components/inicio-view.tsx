@@ -7,14 +7,14 @@
    - Sidebar con hábitos del día (clickeables para marcar)
 */
 
-import { useState, useTransition, useRef, useMemo } from 'react'
+import { useState, useTransition, useRef, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Palette, Flame, User, Scissors, Calendar, MessageCircle,
   Target, Users, DollarSign, Zap, Sparkles, CalendarClock,
   ClipboardList, Image as LucideImage, FolderOpen, Megaphone,
-  Search, Save, BarChart3, Lightbulb, Smile,
+  Search, Save, BarChart3, Lightbulb, Smile, Mic, Plus,
   type LucideIcon,
 } from 'lucide-react'
 import { toggleHabitoHoy, toggleHabitoFecha } from '@/app/habitos/_actions'
@@ -26,6 +26,7 @@ import {
 } from '../_actions'
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
 import { AvisoGrabaciones } from './aviso-grabaciones'
+import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
 
@@ -379,6 +380,11 @@ export function InicioView({ data }: { data: InicioData }) {
             font-size: 40px !important;
           }
         }
+        @keyframes mk-mic-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+          50%      { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        }
+        .mk-mic-on { animation: mk-mic-pulse 1.2s ease-in-out infinite; }
       `}</style>
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -835,11 +841,77 @@ function PendientesPanel({
   rolBase: string
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [items, setItems] = useState<Pendiente[]>(pendientesIniciales)
   const [input, setInput] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [, startTransition] = useTransition()
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  /* Dictado por voz (como Claude/GPT) + botón "+" flotante en mobile. */
+  const chatRef = useRef<HTMLElement>(null)
+  const [chatVisible, setChatVisible] = useState(true)
+  const [escuchando, setEscuchando] = useState(false)
+  const [micSoportado, setMicSoportado] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null)
+
+  /* ¿El navegador soporta SpeechRecognition? (Safari iOS usa webkit-) */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMicSoportado(!!SR)
+  }, [])
+
+  /* Observa la barra de chat: el FAB flotante solo aparece cuando la barra
+     NO está a la vista (Pedro scrolleó hacia abajo) — para crear tareas
+     desde cualquier parte sin tapar el diseño. */
+  useEffect(() => {
+    const el = chatRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver(([e]) => setChatVisible(e.isIntersecting), { threshold: 0.1 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  function toggleMic() {
+    if (escuchando) { recognitionRef.current?.stop(); return }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) { toast.error('Tu navegador no soporta dictado por voz'); return }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec: any = new SR()
+    rec.lang = 'es-PE'
+    rec.continuous = true
+    rec.interimResults = true
+    const base = input.trim()
+    let finalText = base ? base + ' ' : ''
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (ev: any) => {
+      let interim = ''
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const t = ev.results[i][0].transcript
+        if (ev.results[i].isFinal) finalText += t
+        else interim += t
+      }
+      setInput((finalText + interim).trimStart())
+      const ta = inputRef.current
+      if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px' }
+    }
+    rec.onerror = () => setEscuchando(false)
+    rec.onend = () => { setEscuchando(false); inputRef.current?.focus() }
+    recognitionRef.current = rec
+    setEscuchando(true)
+    try { rec.start() } catch { setEscuchando(false) }
+  }
+
+  /* FAB → trae la barra de chat a la vista y enfoca el input. */
+  function abrirComposer() {
+    chatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => inputRef.current?.focus(), 350)
+  }
 
   /* Placeholder de ejemplo según rol — tip al user de qué tipo de
      mensajes funcionan bien */
@@ -1012,6 +1084,7 @@ function PendientesPanel({
       {/* Barra de chat — siempre anclada abajo (sticky bottom dentro del flow).
           Diseño compacto, una sola línea por defecto.  */}
       <section
+        ref={chatRef}
         style={{
           position: 'sticky',
           bottom: 12,
@@ -1062,6 +1135,29 @@ function PendientesPanel({
             maxHeight: 120,
           }}
         />
+        {/* Micrófono — dictado por voz (Web Speech API). Rojo y latiendo
+            mientras escucha. Solo si el navegador lo soporta. */}
+        {micSoportado && (
+          <button
+            onClick={toggleMic}
+            title={escuchando ? 'Detener dictado' : 'Dictar tarea por voz'}
+            aria-label={escuchando ? 'Detener dictado' : 'Dictar tarea por voz'}
+            className={escuchando ? 'mk-mic-on' : undefined}
+            style={{
+              width: 34, height: 34,
+              borderRadius: 10,
+              background: escuchando ? '#ef4444' : '#f3f4f6',
+              color: escuchando ? '#fff' : '#6b7280',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 150ms',
+              flexShrink: 0,
+            }}
+          >
+            <Mic size={17} strokeWidth={2} />
+          </button>
+        )}
         <button
           onClick={enviar}
           disabled={!input.trim() || enviando}
@@ -1085,6 +1181,27 @@ function PendientesPanel({
           {enviando ? '…' : '↑'}
         </button>
       </section>
+
+      {/* FAB "+" flotante (solo mobile, cuando la barra de chat no está a la
+          vista). Pedro: "un más a la derecha flotando, pequeñito, para crear
+          tareas rápidas cuando pueda". */}
+      {isMobile && !chatVisible && (
+        <button
+          onClick={abrirComposer}
+          aria-label="Crear tarea rápida"
+          title="Crear tarea rápida"
+          style={{
+            position: 'fixed', right: 16, bottom: 18,
+            width: 46, height: 46, borderRadius: '50%',
+            background: acento, color: '#fff', border: 'none',
+            boxShadow: '0 6px 20px -4px rgba(16,24,40,0.35)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 50, cursor: 'pointer',
+          }}
+        >
+          <Plus size={24} strokeWidth={2.6} />
+        </button>
+      )}
     </>
   )
 }
