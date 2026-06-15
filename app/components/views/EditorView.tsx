@@ -1502,8 +1502,9 @@ function ReporteEdicion({
           </button>
         </div>
 
-        {/* Resumen 4 columnas */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--mk-border-subtle)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        {/* Resumen 4 columnas — auto-fit para que en mobile baje a 2 cols
+            en vez de aplastar 4 en pantalla angosta. */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--mk-border-subtle)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
           <ResumenItem label="Total mes" valor={data.total.toString()} />
           <ResumenItem label="Días editados" valor={data.diasUnicos.toString()} />
           <ResumenItem label="Promedio / día" valor={data.promPorDia.toString()} />

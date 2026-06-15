@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MarcaSelect } from '@/components/marca-select'
+import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import {
   updateDisenoEntry,
   marcarParaDisenarHoy,
@@ -699,6 +700,7 @@ function KanbanVista({
   hoy: string
 }) {
   const [dragOver, setDragOver] = useState<SubEstadoDiseno | null>(null)
+  const isMobile = useIsMobile()
 
   function onDragStart(e: React.DragEvent, id: string) {
     e.dataTransfer.setData('text/plain', id)
@@ -727,8 +729,13 @@ function KanbanVista({
       background: 'var(--mk-bg-base)',
     }}>
       <div style={{
-        maxWidth: 1200, margin: '0 auto', padding: '18px 20px',
-        display: 'grid', gridTemplateColumns: 'repeat(4, minmax(260px, 1fr))', gap: 14,
+        maxWidth: 1200, margin: '0 auto', padding: isMobile ? '14px 12px' : '18px 20px',
+        /* Mobile: columnas apiladas (1 col) → kanban vertical scrolleable.
+           En desktop, 4 columnas. (El drag-drop HTML5 no funciona en touch,
+           así que en mobile se usa el menú de sub-estado de cada card.) */
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(260px, 1fr))',
+        gap: 14,
       }}>
         {KANBAN_COLUMNS.map((col) => {
           const cfg = SUBESTADO_CONFIG[col]
