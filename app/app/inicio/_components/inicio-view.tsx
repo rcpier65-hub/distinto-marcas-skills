@@ -27,7 +27,6 @@ import {
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
-import { TrabajoEquipo } from './trabajo-equipo'
 
 export type InicioData = {
   nombre: string
@@ -516,7 +515,12 @@ export function InicioView({ data }: { data: InicioData }) {
             /cockpit ahora vive acá sin saludo ni header duplicado. */}
         {data.cockpitData && (
           <section style={{ marginBottom: 28 }}>
-            <CockpitView data={data.cockpitData} embedded />
+            <CockpitView
+              data={data.cockpitData}
+              embedded
+              esCEO={data.rolBase === 'director'}
+              trabajoEquipo={data.trabajoEquipo ?? undefined}
+            />
           </section>
         )}
 
@@ -544,11 +548,9 @@ export function InicioView({ data }: { data: InicioData }) {
             {data.grabacionesProximas.length > 0 && (
               <AvisoGrabaciones grabaciones={data.grabacionesProximas} acento={acento} />
             )}
-            {/* El trabajo de tu equipo — solo CEO. Reemplaza el panel
-                celeste de grabaciones próximas (que ahora ve solo el equipo). */}
-            {data.trabajoEquipo && data.trabajoEquipo.length > 0 && (
-              <TrabajoEquipo miembros={data.trabajoEquipo} />
-            )}
+            {/* "El trabajo de tu equipo" se movió DENTRO del CockpitView,
+                debajo de "Comentarios por responder" (Pedro lo pidió ahí y
+                para que el carrusel scrollee contenido, no toda la pantalla). */}
             {/* Accesos rápidos: Pedro (CEO) no los necesita. Solo equipo. */}
             {data.rolBase !== 'director' && (
               <AccesosRapidos rolBase={data.rolBase} acento={acento} />

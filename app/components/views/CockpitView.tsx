@@ -16,6 +16,8 @@ import {
   Sparkles, Clock, AlertTriangle, type LucideIcon,
 } from 'lucide-react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
+import { TrabajoEquipo } from '@/app/inicio/_components/trabajo-equipo'
+import type { MiembroTrabajo } from '@/lib/inicio/get-trabajo-equipo'
 
 // ============================================================
 // MOCK DATA — luego viene de Supabase
@@ -167,9 +169,14 @@ type CockpitViewProps = {
      "Workspace / Cockpit", el saludo "Buen día" y la altura 100vh
      para que fluya dentro del layout de /inicio sin duplicar UI. */
   embedded?: boolean
+  /* esCEO (director): Pedro NO quiere ver los bloques "Tareas en diseño"
+     ni "Editando hoy" (eso es del equipo); en su lugar ve el carrusel
+     "El trabajo de tu equipo" debajo de Comentarios por responder. */
+  esCEO?: boolean
+  trabajoEquipo?: MiembroTrabajo[]
 }
 
-export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false, embedded = false }: CockpitViewProps = {}) {
+export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false, embedded = false, esCEO = false, trabajoEquipo }: CockpitViewProps = {}) {
   /* Si recibimos data del page server, usamos esos valores. Si no, mock. */
   const nombreFinal = data?.nombreUsuario ?? nombreUsuario
   const puedeVerFinanzasFinal = data?.puedeVerFinanzas ?? puedeVerFinanzas
@@ -350,7 +357,20 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
           )}
         </section>
 
-        {/* === BLOQUES INFERIORES: Diseño + Editando hoy + Grabaciones === */}
+        {/* === EL TRABAJO DE TU EQUIPO (solo CEO) ===
+            Va justo debajo de "Comentarios por responder". Mismo contenedor
+            que el carrusel de comentarios → scrollea contenido sin arrastrar
+            toda la pantalla. */}
+        {esCEO && trabajoEquipo && trabajoEquipo.length > 0 && (
+          <section style={{ marginBottom: 24 }}>
+            <TrabajoEquipo miembros={trabajoEquipo} />
+          </section>
+        )}
+
+        {/* === BLOQUES INFERIORES: Diseño + Editando hoy + Grabaciones ===
+            Ocultos para el CEO (ve el carrusel del equipo en su lugar). El
+            equipo (CM/admin con métricas) SÍ los ve. */}
+        {!esCEO && (
         <div className="mk-cockpit-bloques" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
           {/* Tareas en diseño */}
           <BloqueTrabajo
@@ -446,6 +466,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
           </BloqueTrabajo>
           )}
         </div>
+        )}
 
         {/* === GRILLAS A ENVIAR + HÁBITOS DEL DÍA === */}
         <div className="mk-cockpit-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>

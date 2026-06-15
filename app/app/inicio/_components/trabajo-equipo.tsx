@@ -63,7 +63,7 @@ export function TrabajoEquipo({ miembros }: { miembros: MiembroTrabajo[] }) {
         <div
           style={{
             display: 'flex', gap: 14,
-            overflowX: 'auto', paddingBottom: 6,
+            overflowX: 'auto', paddingBottom: 8,
             scrollSnapType: 'x mandatory',
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'thin',
@@ -83,12 +83,11 @@ function PersonaCard({ miembro }: { miembro: MiembroTrabajo }) {
 
   return (
     <section style={{
-      flex: '0 0 300px', width: 300, maxWidth: '85vw',
+      flexShrink: 0, width: 300,
       scrollSnapAlign: 'start',
-      background: '#fff',
-      border: '1px solid #f1f1f3',
+      background: 'var(--mk-bg-elevated, #fff)',
+      border: '1px solid var(--mk-border-subtle, #f1f1f3)',
       borderRadius: 14,
-      boxShadow: '0 1px 2px rgba(16,24,40,0.04)',
       overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
     }}>
