@@ -12,8 +12,8 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { formatHora12, sufijoAmPm } from '@/lib/utils/format-hora'
-import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, AlertTriangle, ShieldCheck, Link2, ExternalLink } from 'lucide-react'
+import { formatHora12 } from '@/lib/utils/format-hora'
+import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, AlertTriangle, ShieldCheck, Link2, Pencil } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ObjetivoInput } from './objetivo-input'
@@ -47,6 +47,23 @@ function diffMin(inicio: string, fin: string): number {
   const a = hi * 60 + mi
   const b = hf * 60 + mf
   return b >= a ? b - a : 1440 - a + b
+}
+
+/* Pill de fecha (día / número / mes) para la vista limpia del FechaRow. */
+const DIAS_PILL = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
+const MESES_PILL = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+function pillDeFecha(iso: string): { dia: string; numero: number; mes: string } {
+  const [y, m, d] = (iso || '').split('-').map(Number)
+  if (!y || !m || !d) return { dia: '—', numero: 0, mes: '' }
+  const dt = new Date(y, m - 1, d)
+  return { dia: DIAS_PILL[dt.getDay()], numero: d, mes: MESES_PILL[m - 1] }
+}
+/* "1h" / "1h 30m" / "45m" desde minutos. */
+function duracionLabel(min: number): string {
+  if (min <= 0) return ''
+  return min >= 60
+    ? `${Math.floor(min / 60)}h${min % 60 ? ` ${min % 60}m` : ''}`
+    : `${min}m`
 }
 
 const ESTADO_CFG: Record<string, { label: string; color: string; bg: string; Icon: typeof Check }> = {
@@ -257,6 +274,10 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
    "día sin hora específica". */
 function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disabled: boolean }) {
   const [isPending, startTransition] = useTransition()
+  /* Patrón vista/editar: por defecto se ve limpio (pill fecha + hora
+     legible + estado). Al tocar el lápiz se abre el panel de edición
+     con los inputs. Pedro: "los veo confusos, no los entiendo bien". */
+  const [editing, setEditing] = useState(false)
   const [fecha, setFecha] = useState(grabacion.fecha_planeada)
   /* hora_planeada viene de BD como "HH:MM:SS"; el input type=time
      funciona con HH:MM (acepta también HH:MM:SS pero recorta segs). */
@@ -339,34 +360,118 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
     })
   }
 
-  /* Mejor visual: pill-grouped (fecha + hora-inicio + hora-fin en un mismo
-     contenedor con bg unificado), labels micro, focus-ring violeta.
-     Estilo equivalente al date/time picker de Linear/GCal pero usando
-     los inputs nativos por dentro. */
-  return (
-    <div className="space-y-1.5 group">
-      <div className="flex items-center gap-2 flex-wrap">
-      {/* Pill grupo: fecha + horas. Bg unificado, bordes en grupo, hover
-          ring violeta. Mas compacto — el ancho de cada control redujo
-          para que entre con el chip de estado en cards angostas (Pedro:
-          "verifica el card porque la hora de finalizacion se esconde"). */}
-      <div
-        className="inline-flex items-stretch h-9 rounded-lg bg-white border border-input shadow-sm focus-within:ring-2 focus-within:ring-[#ba41f7]/40 focus-within:border-[#ba41f7]/40 transition-all"
-        title="Fecha y horario de la grabación"
-      >
-        <div className="flex items-center gap-1 px-2 border-r border-input/60">
-          <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            onBlur={saveFecha}
-            disabled={busy}
-            className="h-7 w-[108px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
-          />
+  const pill = pillDeFecha(fecha)
+  const durMin = (hora && horaFin) ? diffMin(hora, horaFin) : 0
+  const horaUrl = enlace ? (enlace.startsWith('http') ? enlace : `https://${enlace}`) : null
+
+  /* ============== VISTA LIMPIA (default) ============== */
+  if (!editing) {
+    return (
+      <div className="group flex items-stretch rounded-2xl bg-white/70 ring-1 ring-black/[0.06] hover:ring-black/[0.12] hover:shadow-sm transition-all overflow-hidden">
+        {/* Pill de fecha — ancla visual, tintado por estado */}
+        <div
+          className="flex flex-col items-center justify-center w-14 shrink-0 py-2"
+          style={{ background: `${cfg.color}16` }}
+          title={`${pill.dia} ${pill.numero} ${pill.mes}`}
+        >
+          <span className="text-[9px] font-bold uppercase tracking-wide leading-none" style={{ color: cfg.color }}>{pill.dia}</span>
+          <span className="text-[19px] font-extrabold leading-none mt-0.5" style={{ color: cfg.color }}>{pill.numero || '—'}</span>
+          <span className="text-[8px] uppercase leading-none mt-0.5" style={{ color: cfg.color }}>{pill.mes}</span>
         </div>
-        <div className="flex items-center gap-1 px-1.5 border-r border-input/60">
-          <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+
+        {/* Centro: hora legible + estado + guiones */}
+        <div className="flex-1 min-w-0 py-2 px-3 flex flex-col justify-center gap-1.5">
+          <div className="text-[13px] font-semibold text-foreground leading-tight">
+            {hora ? (
+              <>
+                {formatHora12(hora)}
+                {horaFin && <span className="text-muted-foreground font-medium"> – {formatHora12(horaFin)}</span>}
+                {durMin > 0 && <span className="text-muted-foreground font-normal text-[11px]"> · {duracionLabel(durMin)}</span>}
+              </>
+            ) : (
+              <span className="text-muted-foreground font-medium">Sin hora definida</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Estado clickeable — cicla planeada→cumplida→cancelada */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = grabacion.estado === 'planeada' ? 'cumplida'
+                  : grabacion.estado === 'cumplida' ? 'cancelada' : 'planeada'
+                cambiarEstado(next)
+              }}
+              disabled={busy}
+              title={`${cfg.label} — click para cambiar`}
+              className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[10.5px] font-semibold shrink-0 disabled:opacity-50"
+              style={{ color: cfg.color, background: cfg.bg }}
+            >
+              <cfg.Icon className="w-3 h-3" />
+              {cfg.label}
+            </button>
+            {horaUrl && (
+              <a
+                href={horaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir guiones"
+                className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[10.5px] font-medium text-[#ba41f7] bg-[#ba41f7]/10 hover:bg-[#ba41f7]/18 shrink-0"
+              >
+                <Link2 className="w-3 h-3" /> Guiones
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex items-center gap-0.5 pr-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            disabled={busy}
+            title="Editar fecha y hora"
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-[#ba41f7] hover:bg-[#ba41f7]/10 transition-colors disabled:opacity-50"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={borrar}
+            disabled={busy}
+            title="Eliminar"
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ============== PANEL DE EDICIÓN ============== */
+  return (
+    <div className="rounded-2xl ring-1 ring-[#ba41f7]/30 bg-[#ba41f7]/[0.04] p-3 space-y-2.5">
+      {/* Fecha */}
+      <div>
+        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
+          <CalendarDays className="w-3 h-3" /> Fecha
+        </label>
+        <input
+          type="date"
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+          onBlur={saveFecha}
+          disabled={busy}
+          className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50"
+        />
+      </div>
+
+      {/* Hora inicio + fin */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
+            <Clock className="w-3 h-3" /> Inicio
+          </label>
           <input
             type="time"
             value={hora}
@@ -381,13 +486,13 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             onBlur={saveFecha}
             disabled={busy}
             step={300}
-            placeholder="--:--"
-            title={hora ? `Inicio: ${hora}` : 'Hora inicio — deja vacío para día completo'}
-            className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
+            className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50"
           />
         </div>
-        <div className="flex items-center gap-1 px-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground shrink-0">→</span>
+        <div>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
+            Fin {durMin > 0 && <span className="text-[#ba41f7] normal-case font-bold">· {duracionLabel(durMin)}</span>}
+          </label>
           <input
             type="time"
             value={horaFin}
@@ -395,86 +500,45 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
             onBlur={saveFecha}
             disabled={busy || !hora}
             step={300}
-            placeholder="--:--"
-            title={!hora ? 'Pon hora de inicio primero' : (horaFin ? `Fin: ${horaFin}` : 'Hora fin')}
-            className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed"
+            className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-40 disabled:cursor-not-allowed"
           />
         </div>
       </div>
-      {/* Duración como chip al lado de la pill — antes estaba dentro y
-          se cortaba cuando la pantalla era angosta. */}
-      {hora && horaFin && (
-        <span
-          className="text-[10px] font-semibold text-muted-foreground tabular-nums shrink-0 px-1.5 py-0.5 rounded bg-muted/40"
-          title={`Duración: ${diffMin(hora, horaFin)} min`}
-        >
-          {diffMin(hora, horaFin) >= 60
-            ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
-            : `${diffMin(hora, horaFin)}m`}
-        </span>
-      )}
-      {/* AM/PM badge afuera de la pill — solo si hay hora */}
-      {hora && (
-        <span
-          className="text-[10px] font-bold text-muted-foreground tabular-nums shrink-0 px-1.5 py-0.5 rounded bg-muted/40"
-          title={`${hora} = ${formatHora12(hora)}`}
-        >
-          {sufijoAmPm(hora)}
-        </span>
-      )}
-      {/* Chip estado clickeable — cicla planeada→cumplida→cancelada→planeada */}
-      <button
-        type="button"
-        onClick={() => {
-          const next = grabacion.estado === 'planeada' ? 'cumplida'
-            : grabacion.estado === 'cumplida' ? 'cancelada' : 'planeada'
-          cambiarEstado(next)
-        }}
-        disabled={busy}
-        title={`${cfg.label} — click para cambiar`}
-        className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg text-[11px] font-semibold shrink-0 shadow-sm disabled:opacity-50"
-        style={{ color: cfg.color, background: cfg.bg }}
-      >
-        <cfg.Icon className="w-3.5 h-3.5" />
-        {cfg.label}
-      </button>
-      {/* Borrar — visible en hover */}
-      <button
-        type="button"
-        onClick={borrar}
-        disabled={busy}
-        title="Eliminar fecha"
-        className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 disabled:opacity-50"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-      </button>
-      </div>
-      {/* Segunda línea: enlace de guiones (Drive). Pedro pidió este
-          espacio para pegar el link de los guiones que se van a grabar.
-          Indentado para alinear visualmente con el contenido de arriba. */}
-      <div className="flex items-center gap-1.5 pl-5">
-        <Link2 className="w-3 h-3 text-muted-foreground/70 shrink-0" />
+
+      {/* Enlace de guiones */}
+      <div>
+        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
+          <Link2 className="w-3 h-3" /> Enlace de guiones <span className="normal-case font-normal opacity-60">(opcional)</span>
+        </label>
         <input
           type="url"
           value={enlace}
           onChange={(e) => setEnlace(e.target.value)}
           onBlur={saveEnlace}
           disabled={busy}
-          placeholder="Enlace de guiones (Google Drive, Notion…)"
-          title={enlace ? `Enlace: ${enlace}` : 'Pegar enlace de guiones'}
-          className="h-6 px-2 rounded border border-input bg-background text-[10.5px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 flex-1 min-w-0 placeholder:text-muted-foreground/60"
+          placeholder="Google Drive, Notion…"
+          className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 placeholder:text-muted-foreground/60"
         />
-        {enlace && (
-          <a
-            href={enlace.startsWith('http') ? enlace : `https://${enlace}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abrir en nueva pestaña"
-            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-[#ba41f7] hover:bg-[#ba41f7]/8 shrink-0"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        )}
+      </div>
+
+      {/* Acciones */}
+      <div className="flex items-center justify-between pt-0.5">
+        <button
+          type="button"
+          onClick={borrar}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12px] font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-[#ba41f7] text-white text-[12px] font-semibold hover:bg-[#a936e0] disabled:opacity-50"
+        >
+          <Check className="w-3.5 h-3.5" /> Listo
+        </button>
       </div>
     </div>
   )
