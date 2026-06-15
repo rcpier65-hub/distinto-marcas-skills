@@ -8,8 +8,8 @@
 
 import { useState } from 'react'
 
-// Excepciones de extensión (la mayoría son SVG vector; Little Joe solo tiene PNG).
-const EXT_OVERRIDE: Record<string, string> = { 'little-joe': 'png' }
+// Excepciones de extensión (la mayoría son SVG vector; Little Joe y Vid Natur solo tienen PNG).
+const EXT_OVERRIDE: Record<string, string> = { 'little-joe': 'png', 'vid-natur': 'png' }
 
 // Slugs internos / sin logo → directo al emoji (evita 404).
 const SIN_LOGO = new Set(['interno', 'unknown', 'warrior-supps', 'oral-bueaty'])

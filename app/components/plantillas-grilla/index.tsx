@@ -6,6 +6,7 @@
 import { GrillaManrique } from './grilla-manrique'
 import { GrillaLittleJoe } from './grilla-little-joe'
 import { GrillaNovaLamps } from './grilla-novalamps'
+import { GrillaVidNatur } from './grilla-vid-natur'
 import { GrillaGenerica } from './grilla-generica'
 import type { GrillaPublicacionLite } from './types'
 
@@ -47,6 +48,15 @@ export function GrillaPlantilla({ marca, semanaInicio, semanaFin, publicaciones 
     case 'novalamps':
       return (
         <GrillaNovaLamps
+          semanaInicio={semanaInicio}
+          semanaFin={semanaFin}
+          publicaciones={publicaciones}
+        />
+      )
+
+    case 'vid-natur':
+      return (
+        <GrillaVidNatur
           semanaInicio={semanaInicio}
           semanaFin={semanaFin}
           publicaciones={publicaciones}
