@@ -14,7 +14,7 @@ import {
   Palette, Flame, User, Scissors, Calendar, MessageCircle,
   Target, Users, DollarSign, Zap, Sparkles, CalendarClock,
   ClipboardList, Image as LucideImage, FolderOpen, Megaphone,
-  Search, Save, BarChart3, Lightbulb, Smile, Video,
+  Search, Save, BarChart3, Lightbulb, Smile,
   type LucideIcon,
 } from 'lucide-react'
 import { toggleHabitoHoy, toggleHabitoFecha } from '@/app/habitos/_actions'
@@ -25,6 +25,7 @@ import {
   convertirEnTarea,
 } from '../_actions'
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
+import { AvisoGrabaciones } from './aviso-grabaciones'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
 
@@ -363,6 +364,21 @@ export function InicioView({ data }: { data: InicioData }) {
           color: var(--mk-quote-color);
           opacity: 0.15;
         }
+        /* Mobile: la frase salía muy grande (Pedro). Achicamos padding,
+           el texto y la comilla decorativa. */
+        @media (max-width: 767.98px) {
+          .mk-frase-aparece {
+            padding: 14px 16px !important;
+            margin-bottom: 16px !important;
+          }
+          .mk-frase-aparece p {
+            font-size: 14px !important;
+            line-height: 1.45 !important;
+          }
+          .mk-quote-mark {
+            font-size: 40px !important;
+          }
+        }
       `}</style>
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -520,6 +536,7 @@ export function InicioView({ data }: { data: InicioData }) {
               embedded
               esCEO={data.rolBase === 'director'}
               trabajoEquipo={data.trabajoEquipo ?? undefined}
+              grabacionesProximas={data.grabacionesProximas}
             />
           </section>
         )}
@@ -545,7 +562,9 @@ export function InicioView({ data }: { data: InicioData }) {
               acento={acento}
               rolBase={data.rolBase}
             />
-            {data.grabacionesProximas.length > 0 && (
+            {/* El CEO ve las grabaciones ARRIBA (dentro del cockpit, después
+                de las métricas). El equipo las ve acá en su columna. */}
+            {data.rolBase !== 'director' && data.grabacionesProximas.length > 0 && (
               <AvisoGrabaciones grabaciones={data.grabacionesProximas} acento={acento} />
             )}
             {/* "El trabajo de tu equipo" se movió DENTRO del CockpitView,
@@ -1221,139 +1240,6 @@ function PendienteItem({
    Si hay grabación HOY o MAÑANA → versión urgente con rojo/ámbar.
    Si solo hay futuras → versión informativa con el acento.
    ==================================================================== */
-function AvisoGrabaciones({
-  grabaciones,
-  acento,
-}: {
-  grabaciones: InicioData['grabacionesProximas']
-  acento: string
-}) {
-  const hayHoy = grabaciones.some((g) => g.esHoy)
-  const hayManana = grabaciones.some((g) => g.esManana)
-  const urgente = hayHoy || hayManana
-  const bgColor = hayHoy ? '#fef2f2' : hayManana ? '#fffbeb' : '#fff'
-  const borderColor = hayHoy ? '#fca5a5' : hayManana ? '#fcd34d' : `${acento}33`
-  const titleColor = hayHoy ? '#991b1b' : hayManana ? '#92400e' : '#111827'
-
-  const titulo = hayHoy
-    ? '🎥 Tienes grabación hoy'
-    : hayManana
-    ? '🎥 Tienes grabación mañana'
-    : `Próximas grabaciones`
-  const showCount = grabaciones.length
-
-  return (
-    <section
-      style={{
-        background: bgColor,
-        border: `1px solid ${borderColor}`,
-        borderRadius: 14,
-        padding: '14px 16px',
-        boxShadow: urgente ? `0 4px 14px -6px ${borderColor}66` : '0 1px 2px rgba(16, 24, 40, 0.04)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <Video size={18} strokeWidth={2} color={titleColor} />
-        <h3 style={{
-          fontSize: 14, fontWeight: 600,
-          color: titleColor,
-          margin: 0,
-          letterSpacing: '-0.005em',
-          flex: 1,
-        }}>
-          {titulo}
-        </h3>
-        <span style={{
-          fontSize: 11, fontWeight: 700,
-          padding: '2px 8px',
-          borderRadius: 999,
-          background: `${titleColor}15`,
-          color: titleColor,
-        }}>
-          {showCount}
-        </span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {grabaciones.map((g) => (
-          <a
-            key={g.id}
-            href="/grabaciones"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '8px 10px',
-              borderRadius: 10,
-              textDecoration: 'none',
-              background: '#fff',
-              border: `1px solid ${borderColor}55`,
-              transition: 'background 100ms',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#fff' }}
-          >
-            {g.marcaEmoji ? (
-              <span style={{
-                width: 28, height: 28,
-                borderRadius: 8,
-                background: `${g.marcaColor}14`,
-                border: `1px solid ${g.marcaColor}33`,
-                display: 'inline-flex',
-                alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, lineHeight: 1,
-                flexShrink: 0,
-              }}>
-                {g.marcaEmoji}
-              </span>
-            ) : (
-              <span style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: g.marcaColor,
-                flexShrink: 0,
-              }} />
-            )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 13, fontWeight: 600,
-                color: '#111827',
-                display: 'flex', alignItems: 'center', gap: 6,
-                flexWrap: 'wrap',
-              }}>
-                <span>{g.marca}</span>
-                {g.esHoy && (
-                  <span style={{
-                    fontSize: 9.5, fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    letterSpacing: '0.04em',
-                  }}>HOY</span>
-                )}
-                {g.esManana && (
-                  <span style={{
-                    fontSize: 9.5, fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                    background: '#fffbeb',
-                    color: '#92400e',
-                    letterSpacing: '0.04em',
-                  }}>MAÑANA</span>
-                )}
-              </div>
-              <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>
-                {g.fechaCorta} · <strong style={{ color: '#111827' }}>{g.horaTexto}</strong>
-              </div>
-            </div>
-            <span style={{ color: '#d1d5db' }}>→</span>
-          </a>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-
 /* ====================================================================
    AccesosRapidos
    --------------------------------------------------------------------

@@ -18,6 +18,8 @@ import {
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 import { TrabajoEquipo } from '@/app/inicio/_components/trabajo-equipo'
 import type { MiembroTrabajo } from '@/lib/inicio/get-trabajo-equipo'
+import { AvisoGrabaciones, type GrabacionProxima } from '@/app/inicio/_components/aviso-grabaciones'
+import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 
 // ============================================================
 // MOCK DATA — luego viene de Supabase
@@ -174,9 +176,13 @@ type CockpitViewProps = {
      "El trabajo de tu equipo" debajo de Comentarios por responder. */
   esCEO?: boolean
   trabajoEquipo?: MiembroTrabajo[]
+  /* Próximas grabaciones: para el CEO se muestran ARRIBA (después de los
+     KPIs) porque es lo más importante de la semana. */
+  grabacionesProximas?: GrabacionProxima[]
 }
 
-export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false, embedded = false, esCEO = false, trabajoEquipo }: CockpitViewProps = {}) {
+export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = false, embedded = false, esCEO = false, trabajoEquipo, grabacionesProximas }: CockpitViewProps = {}) {
+  const isMobile = useIsMobile()
   /* Si recibimos data del page server, usamos esos valores. Si no, mock. */
   const nombreFinal = data?.nombreUsuario ?? nombreUsuario
   const puedeVerFinanzasFinal = data?.puedeVerFinanzas ?? puedeVerFinanzas
@@ -295,6 +301,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             deltaPositive={null}
             Icon={Calendar}
             color="#06b6d4"
+            compact={isMobile}
           />
           <Kpi
             label="Comentarios respondidos"
@@ -303,6 +310,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             deltaPositive={null}
             Icon={MessageCircle}
             color="#22c55e"
+            compact={isMobile}
           />
           <Kpi
             label="Grillas enviadas"
@@ -311,6 +319,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
             deltaPositive={null}
             Icon={Grid3x3}
             color="#7170ff"
+            compact={isMobile}
           />
           {puedeVerFinanzasFinal && (
             <KpiSecreto
@@ -320,12 +329,24 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
               deltaPositive
               Icon={DollarSign}
               color="#f59e0b"
+              compact={isMobile}
             />
           )}
         </div>
 
-        {/* === ALERTA: COORDINACIÓN DE GRABACIÓN PENDIENTE === */}
-        {data?.marcasSinGrabacion && data.marcasSinGrabacion.length > 0 && (
+        {/* === GRABACIONES DE LA SEMANA (solo CEO, arriba) ===
+            Pedro: "que las grabaciones salgan adelante, después de las
+            métricas, porque es lo más importante de la semana". */}
+        {esCEO && grabacionesProximas && grabacionesProximas.length > 0 && (
+          <section style={{ marginBottom: 24 }}>
+            <AvisoGrabaciones grabaciones={grabacionesProximas} acento="#06b6d4" />
+          </section>
+        )}
+
+        {/* === ALERTA: COORDINACIÓN DE GRABACIÓN PENDIENTE ===
+            Oculta para el CEO: eso ya le llega por la campana de
+            notificaciones (Pedro pidió quitarla de acá). */}
+        {!esCEO && data?.marcasSinGrabacion && data.marcasSinGrabacion.length > 0 && (
           <AlertaCoordinacionGrabacion marcas={data.marcasSinGrabacion} />
         )}
 
@@ -979,13 +1000,14 @@ function subEstadoLabel(estado: string): string {
    sean visibles a primera vista. Por defecto muestra ••••••; al
    hacer clic en el ojo se revela. El toggle es state local (no se
    persiste) — al recargar vuelve a estar oculto. */
-function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
+function KpiSecreto({ label, value, delta, deltaPositive, Icon, color, compact = false }: {
   label: string
   value: string
   delta: string
   deltaPositive: boolean | null
   Icon?: LucideIcon
   color?: string
+  compact?: boolean
 }) {
   const [revealed, setRevealed] = useState(false)
   const deltaColor = deltaPositive === true ? 'var(--mk-success)' : deltaPositive === false ? 'var(--mk-danger)' : 'var(--mk-text-tertiary)'
@@ -993,8 +1015,8 @@ function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
     <div
       style={{
         background: 'var(--mk-bg-elevated)',
-        padding: '16px 18px',
-        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: compact ? '10px 8px' : '16px 18px',
+        display: 'flex', flexDirection: 'column', gap: compact ? 4 : 6,
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         position: 'relative',
       }}
@@ -1002,7 +1024,7 @@ function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--mk-bg-elevated)' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {Icon && (
+        {Icon && !compact && (
           <span style={{
             width: 30, height: 30,
             borderRadius: 8,
@@ -1016,7 +1038,7 @@ function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
             <Icon size={16} strokeWidth={1.8} />
           </span>
         )}
-        <div className="mk-label" style={{ flex: 1, fontSize: 11, lineHeight: 1.3 }}>{label}</div>
+        <div className="mk-label" style={{ flex: 1, fontSize: compact ? 9.5 : 11, lineHeight: 1.25 }}>{label}</div>
         <button
           onClick={(e) => { e.stopPropagation(); setRevealed((v) => !v) }}
           title={revealed ? 'Ocultar' : 'Revelar — solo tú lo ves'}
@@ -1038,7 +1060,7 @@ function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
       </div>
       <div
         style={{
-          fontSize: 24, fontWeight: 600,
+          fontSize: compact ? 18 : 24, fontWeight: 600,
           letterSpacing: 'var(--mk-tracking-tight)',
           color: 'var(--mk-text-primary)',
           fontVariantNumeric: 'tabular-nums', lineHeight: 1.1,
@@ -1050,21 +1072,23 @@ function KpiSecreto({ label, value, delta, deltaPositive, Icon, color }: {
       >
         {revealed ? value : '••••••'}
       </div>
-      <div style={{
-        fontSize: 'var(--mk-text-xs)',
-        color: revealed ? deltaColor : 'var(--mk-text-quaternary)',
-        fontWeight: 500,
-      }}>
-        {revealed
-          ? (
-            <>
-              {deltaPositive === true && '↑ '}
-              {deltaPositive === false && '↓ '}
-              {delta}
-            </>
-          )
-          : 'Privado · solo el admin'}
-      </div>
+      {!compact && (
+        <div style={{
+          fontSize: 'var(--mk-text-xs)',
+          color: revealed ? deltaColor : 'var(--mk-text-quaternary)',
+          fontWeight: 500,
+        }}>
+          {revealed
+            ? (
+              <>
+                {deltaPositive === true && '↑ '}
+                {deltaPositive === false && '↓ '}
+                {delta}
+              </>
+            )
+            : 'Privado · solo el admin'}
+        </div>
+      )}
     </div>
   )
 }
@@ -1088,13 +1112,16 @@ function EyeOffIcon() {
   )
 }
 
-function Kpi({ label, value, delta, deltaPositive, Icon, color }: {
+function Kpi({ label, value, delta, deltaPositive, Icon, color, compact = false }: {
   label: string
   value: string
   delta: string
   deltaPositive: boolean | null
   Icon?: LucideIcon
   color?: string
+  /* compact: en mobile las métricas van en UNA fila → cards chiquitas,
+     sin icono ni línea de delta, número y label más pequeños. */
+  compact?: boolean
 }) {
   const deltaColor = deltaPositive === true ? 'var(--mk-success)' : deltaPositive === false ? 'var(--mk-danger)' : 'var(--mk-text-tertiary)'
   const acento = color ?? '#7170ff'
@@ -1102,8 +1129,8 @@ function Kpi({ label, value, delta, deltaPositive, Icon, color }: {
     <div
       style={{
         background: 'var(--mk-bg-elevated)',
-        padding: '16px 18px',
-        display: 'flex', flexDirection: 'column', gap: 8,
+        padding: compact ? '10px 8px' : '16px 18px',
+        display: 'flex', flexDirection: 'column', gap: compact ? 4 : 8,
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         cursor: 'pointer',
       }}
@@ -1111,7 +1138,7 @@ function Kpi({ label, value, delta, deltaPositive, Icon, color }: {
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--mk-bg-elevated)' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {Icon && (
+        {Icon && !compact && (
           <span style={{
             width: 30, height: 30,
             borderRadius: 8,
@@ -1125,16 +1152,18 @@ function Kpi({ label, value, delta, deltaPositive, Icon, color }: {
             <Icon size={16} strokeWidth={1.8} />
           </span>
         )}
-        <div className="mk-label" style={{ fontSize: 11, lineHeight: 1.3 }}>{label}</div>
+        <div className="mk-label" style={{ fontSize: compact ? 9.5 : 11, lineHeight: 1.25 }}>{label}</div>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: 'var(--mk-tracking-tight)', color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.05 }}>
+      <div style={{ fontSize: compact ? 18 : 26, fontWeight: 600, letterSpacing: 'var(--mk-tracking-tight)', color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.05 }}>
         {value}
       </div>
-      <div style={{ fontSize: 'var(--mk-text-xs)', color: deltaColor, fontWeight: 500 }}>
-        {deltaPositive === true && '↑ '}
-        {deltaPositive === false && '↓ '}
-        {delta}
-      </div>
+      {!compact && (
+        <div style={{ fontSize: 'var(--mk-text-xs)', color: deltaColor, fontWeight: 500 }}>
+          {deltaPositive === true && '↑ '}
+          {deltaPositive === false && '↓ '}
+          {delta}
+        </div>
+      )}
     </div>
   )
 }

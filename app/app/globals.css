@@ -573,9 +573,11 @@
     grid-template-columns: 1fr !important;
   }
 
-  /* Cockpit embebido: KPIs 4-up → 2x2 */
+  /* Cockpit embebido: KPIs en UNA sola fila en mobile (Pedro). El conteo
+     de columnas lo pone el inline (3 o 4); las cards van compactas (la
+     prop `compact` reduce padding/fuente y oculta icono+delta). Gap chico. */
   .mk-cockpit-kpis {
-    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1px !important;
   }
   /* Cockpit: bloques de trabajo 3-up → 1 columna */
   .mk-cockpit-bloques {
