@@ -8,6 +8,8 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 import { MarcaLogo } from '@/components/marca-logo'
+import { NotificationBell } from './NotificationBell'
+import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
 import { tieneAcceso, type Permisos, type ModuloPermiso } from '@/lib/team/types'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 
@@ -32,11 +34,13 @@ type Props = {
   permisos?: PermisosSimple
   /* Email del user logueado en Supabase Auth — visible siempre */
   emailActivo?: string | null
+  /* Notificaciones urgentes para la campanita (junto al buscador). */
+  notificaciones?: Notificacion[]
 }
 
 const STORAGE_KEY = 'mk:sidebar:sections'
 
-export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailActivo }: Props) {
+export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailActivo, notificaciones = [] }: Props) {
   /* esCEO = sin team_member (admin original) o team_member con rol
      director (caso pedro@agenciadistinto.com). Para items que antes
      eran 'solo admin sin team_member' (!permisos), ahora también
@@ -115,27 +119,30 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           <ChevronUpDown />
         </button>
 
-        {/* Cmd+K */}
-        <button
-          className="mk-focusable"
-          onClick={onOpenPalette}
-          style={searchBtnStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--mk-bg-hover)'
-            e.currentTarget.style.borderColor = 'var(--mk-border-strong)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-            e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'
-          }}
-        >
-          <SearchIcon />
-          <span style={{ flex: 1, textAlign: 'left' }}>Buscar o ejecutar…</span>
-          <span style={{ display: 'flex', gap: 2 }}>
-            <span className="mk-kbd">⌘</span>
-            <span className="mk-kbd">K</span>
-          </span>
-        </button>
+        {/* Cmd+K + campanita de notificaciones en una fila */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            className="mk-focusable"
+            onClick={onOpenPalette}
+            style={{ ...searchBtnStyle, flex: 1 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mk-bg-hover)'
+              e.currentTarget.style.borderColor = 'var(--mk-border-strong)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+              e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'
+            }}
+          >
+            <SearchIcon />
+            <span style={{ flex: 1, textAlign: 'left' }}>Buscar…</span>
+            <span style={{ display: 'flex', gap: 2 }}>
+              <span className="mk-kbd">⌘</span>
+              <span className="mk-kbd">K</span>
+            </span>
+          </button>
+          <NotificationBell notificaciones={notificaciones} />
+        </div>
       </div>
 
       {/* ============== Body ============== */}

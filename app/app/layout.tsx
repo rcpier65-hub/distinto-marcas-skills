@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { SwRegister } from '@/components/pwa/sw-register'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { getNotificaciones, type Notificacion } from '@/lib/notificaciones/get-notificaciones'
 import './globals.css'
 
 /* Inter Tight — la fuente signature de Linear. Sustituye Geist Sans.
@@ -76,6 +77,10 @@ export default async function RootLayout({
     getCurrentMemberPermisos(),
   ])
 
+  /* Notificaciones urgentes para la campanita del shell (best-effort). */
+  let notificaciones: Notificacion[] = []
+  try { notificaciones = await getNotificaciones() } catch { /* no rompemos el layout */ }
+
   /* Email del usuario logueado para mostrar en el sidebar — sirve como
      "indicador de sesión activa" para que Pedro pueda confirmar
      fácilmente si está como admin o como Lorena/etc. */
@@ -118,7 +123,7 @@ export default async function RootLayout({
       className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo}>{children}</AppShell>
+        <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo} notificaciones={notificaciones}>{children}</AppShell>
         <Toaster />
         {/* SwRegister: instala /sw.js para hacer la app instalable
             como PWA en macOS/iOS/Android con icono full color. */}

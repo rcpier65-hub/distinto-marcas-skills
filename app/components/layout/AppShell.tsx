@@ -21,8 +21,10 @@ import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
 import { RealtimeBridge } from '@/lib/realtime/realtime-bridge'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
+import { NotificationBell } from './NotificationBell'
 import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
+import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
 
 const NO_SHELL_ROUTES = ['/login', '/mockup', '/portal']
 
@@ -41,6 +43,7 @@ type Props = {
   marcas?: MarcaNav[]
   permisos?: PermisosSimple
   emailActivo?: string | null
+  notificaciones?: Notificacion[]
 }
 
 /* Mapeo path → título humano para el topbar móvil. Si no matchea,
@@ -68,7 +71,7 @@ function getPageTitle(pathname: string | null): string {
   return titles[seg] ?? (seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Distinto')
 }
 
-export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
+export function AppShell({ children, marcas, permisos, emailActivo, notificaciones = [] }: Props) {
   const pathname = usePathname()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -130,14 +133,17 @@ export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
           <span>{pageTitle}</span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setPaletteOpen(true)}
-          aria-label="Buscar"
-          className="mk-topbar-btn"
-        >
-          <Search size={20} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <NotificationBell notificaciones={notificaciones} />
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Buscar"
+            className="mk-topbar-btn"
+          >
+            <Search size={20} />
+          </button>
+        </div>
       </header>
 
       {/* ============== BACKDROP DRAWER (mobile) ============== */}
@@ -158,6 +164,7 @@ export function AppShell({ children, marcas, permisos, emailActivo }: Props) {
             marcas={marcas}
             permisos={permisos}
             emailActivo={emailActivo}
+            notificaciones={notificaciones}
           />
         </div>
 
