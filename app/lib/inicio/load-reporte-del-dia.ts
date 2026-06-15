@@ -75,6 +75,11 @@ export async function loadReporteDelDia(
     usuarioAvatarUrl: string | null
     usuarioRol: string
     esCEO: boolean
+    /* rol_base del miembro. Lo usamos para decidir qué tareas trae el
+       reporte: un diseñador ve TODAS las tareas de diseño terminadas
+       (el módulo /diseno no asigna diseñador — Ailyn es la única, así
+       que todas las de diseño son suyas). */
+    rolBase?: string
   },
 ): Promise<ReporteDelDiaData> {
   const hoy = fechaLimaIso(new Date())
@@ -101,30 +106,33 @@ export async function loadReporteDelDia(
             .lte('editado_at', finDiaIso)
             .limit(20),
 
-      // 2. Tareas de DISEÑO marcadas como "listo" hoy por el usuario.
-      //    El módulo /diseno setea estado_tarea='listo' cuando Ailyn (o
-      //    cualquier diseñador) termina una tarea — NO hay columna
-      //    `listo_at` dedicada todavía, así que usamos updated_at como
-      //    proxy de "cuándo se marcó como terminada". Pragmático para
-      //    iter 1; iter 2 podría agregar columna terminado_at via
-      //    migration. Filtro por disenador_nombre evita que un editor
-      //    vea tareas de diseño en su reporte.
-      opts.esCEO
+      // 2. Tareas de DISEÑO marcadas como "listo" hoy.
+      //    El módulo /diseno setea estado_tarea='listo' cuando se termina
+      //    una tarea. NO hay columna `listo_at`, así que usamos updated_at
+      //    como proxy de "cuándo se marcó terminada".
+      //
+      //    CLAVE (fix 2026-06-15): las tareas de diseño NO tienen
+      //    disenador_id ni disenador_nombre (0 de 968 en la BD) — el
+      //    módulo /diseno no asigna diseñador porque Ailyn es la única.
+      //    Por eso NO filtramos por nombre: el diseñador (o el CEO) ve
+      //    TODAS las tareas de diseño terminadas hoy. Los demás roles no
+      //    ven tareas de diseño en su reporte.
+      //
+      //    Filtramos a tareas de diseño REALES (es_tarea_diseno=true O
+      //    estado='disenar') para no incluir pubs de video que el editor
+      //    dejó en estado_tarea='listo' (esas salen en el query #1 por
+      //    editor_nombre + editado_at).
+      (opts.esCEO || opts.rolBase === 'disenador')
         ? service
             .from('publicaciones')
-            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
+            .select('id, nombre, es_tarea_diseno, estado, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
             .eq('estado_tarea', 'listo')
+            .or('es_tarea_diseno.eq.true,estado.eq.disenar')
             .gte('updated_at', inicioDiaIso)
             .lte('updated_at', finDiaIso)
-            .limit(20)
-        : service
-            .from('publicaciones')
-            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
-            .ilike('disenador_nombre', opts.usuarioNombre)
-            .eq('estado_tarea', 'listo')
-            .gte('updated_at', inicioDiaIso)
-            .lte('updated_at', finDiaIso)
-            .limit(20),
+            .limit(30)
+        : // Roles no-diseño/no-CEO: no traen tareas de diseño.
+          Promise.resolve({ data: [] }),
 
       // 3. Hábitos activos del usuario hoy (para saber el total).
       opts.teamMemberId

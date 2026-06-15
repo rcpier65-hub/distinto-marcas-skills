@@ -414,6 +414,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       usuarioAvatarUrl: memberData.avatar_url,
       usuarioRol: memberData.rolNombre,
       esCEO,
+      rolBase: memberData.rol_base,
     }).catch((e) => {
       console.error('[inicio] loadReporteDelDia falló — sigo con null:', e)
       return null
