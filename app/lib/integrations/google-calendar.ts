@@ -365,7 +365,58 @@ export async function createTimedEvent(
 }
 
 /**
- * Actualiza un evento existente (cambio de fecha o título).
+ * Actualiza un evento existente PRESERVANDO el formato dateTime con hora.
+ * Úsalo cuando la grabación tiene hora_planeada — si usaras
+ * updateCalendarEvent (legacy all-day), el PATCH convierte el evento a
+ * all-day en GCal y se pierde la hora original.
+ */
+export async function updateTimedCalendarEvent(
+  eventId: string,
+  input: TimedEventInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'not_connected' }
+
+  const horaHM = input.hora.slice(0, 5)
+  const [hh, mm] = horaHM.split(':').map(Number)
+  const dur = input.durationMin ?? 60
+
+  let endDate = input.fecha
+  let totalEnd = hh * 60 + mm + dur
+  if (totalEnd >= 1440) {
+    const d = new Date(input.fecha + 'T00:00:00')
+    d.setDate(d.getDate() + 1)
+    endDate = d.toISOString().slice(0, 10)
+    totalEnd -= 1440
+  }
+  const endHH = String(Math.floor(totalEnd / 60)).padStart(2, '0')
+  const endMM = String(totalEnd % 60).padStart(2, '0')
+
+  const calId = await getGrabacionesCalendarId(token)
+  /* IMPORTANTE: incluimos start.date=null + end.date=null para evitar el
+     bug donde GCal mantiene los campos all-day del PATCH anterior. Sin
+     esto, si el evento estaba all-day y le mandamos solo start.dateTime,
+     Google se queja con 400. Mandamos los 4 campos siempre. */
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima', date: null },
+      end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima', date: null },
+      colorId: input.colorId ?? GRABACION_COLOR_ID,
+    }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
+  }
+  return { ok: true }
+}
+
+/**
+ * Actualiza un evento existente (cambio de fecha o título). All-day.
  */
 export async function updateCalendarEvent(eventId: string, input: EventInput): Promise<{ ok: true } | { ok: false; error: string }> {
   const token = await getValidAccessToken()

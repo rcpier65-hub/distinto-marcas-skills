@@ -67,12 +67,16 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   const mostrarAlerta = faltanGrabaciones && !confirmada
 
   function handleAgregar() {
-    // Default: día 15 del mes activo (mitad de mes, fácil de mover después)
+    // Default: HOY si está dentro del mes activo, sino día 1 del mes
+    // activo. Antes era SIEMPRE día 15 — Pedro: "lo crea el 15 del mes
+    // y cuando cambio la fecha no se cambia". El 15 fijo molestaba
+    // porque obligaba a editar siempre. Hoy es lo más cercano a su
+    // intención cuando hace clic.
+    const hoyIso = new Date().toISOString().slice(0, 10)
+    const mesActual = hoyIso.slice(0, 7)
+    const fechaDefault = mesActual === mesDefault ? hoyIso : `${mesDefault}-01`
     // Hora + duración default — sin esto el sync con GCal creaba un evento
-    // all-day que aparecía como "filita" arriba del día (Pedro: "no me hace
-    // recordar"). Con hora, el evento sale como bloque en el slot horario,
-    // igual que el resto de sus reuniones.
-    const fechaDefault = `${mesDefault}-15`
+    // all-day que aparecía como "filita" arriba del día.
     startTransition(async () => {
       const r = await createGrabacion({
         marca_slug: kpi.marca_slug,

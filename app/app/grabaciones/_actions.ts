@@ -9,6 +9,7 @@ import {
   createTimedEvent,
   createReunionEvent,
   updateCalendarEvent,
+  updateTimedCalendarEvent,
   deleteCalendarEvent,
 } from '@/lib/integrations/google-calendar'
 import type { GrabacionEstado } from '@/lib/types/database'
@@ -453,18 +454,34 @@ export async function updateGrabacionFecha(
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
 
-  // Sync GCal: mover el evento a la nueva fecha (best-effort)
+  // Sync GCal: mover el evento a la nueva fecha (best-effort).
+  // Bug fix: si la grabación tenía hora, ANTES usábamos updateCalendarEvent
+  // (all-day) y el evento se convertía a all-day en GCal — perdías la hora.
+  // Ahora si hay hora_planeada usamos updateTimedCalendarEvent que mantiene
+  // dateTime + duration. Si no hay hora, fallback all-day como antes.
   try {
     const { data: g } = await service
       .from('grabaciones')
-      .select('google_event_id, marcas:marca_id (nombre)')
+      .select('google_event_id, hora_planeada, duracion_min, titulo, notas, marcas:marca_id (nombre)')
       .eq('id', id)
       .maybeSingle()
     if (g?.google_event_id) {
-      await updateCalendarEvent(g.google_event_id, {
-        summary: eventoTitulo(g.marcas?.nombre ?? 'Marca'),
-        date: fecha_planeada,
-      })
+      const titulo = g.titulo ?? eventoTitulo(g.marcas?.nombre ?? 'Marca')
+      const horaFinal = horaNormalizada !== undefined ? horaNormalizada : g.hora_planeada
+      if (horaFinal) {
+        await updateTimedCalendarEvent(g.google_event_id, {
+          summary: titulo,
+          description: g.notas ?? undefined,
+          fecha: fecha_planeada,
+          hora: horaFinal,
+          durationMin: g.duracion_min ?? 60,
+        })
+      } else {
+        await updateCalendarEvent(g.google_event_id, {
+          summary: titulo,
+          date: fecha_planeada,
+        })
+      }
     }
   } catch { /* best-effort */ }
 

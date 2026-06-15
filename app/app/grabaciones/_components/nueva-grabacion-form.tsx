@@ -18,15 +18,22 @@ type MarcaOption = {
   emoji_marca: string | null
 }
 
-const DURACIONES = [
-  { value: 30, label: '30 min' },
-  { value: 45, label: '45 min' },
-  { value: 60, label: '1 hora' },
-  { value: 90, label: '1h 30min' },
-  { value: 120, label: '2 horas' },
-  { value: 180, label: '3 horas' },
-  { value: 240, label: '4 horas' },
-]
+/* Suma minutos a una hora "HH:MM" → "HH:MM" (con rollover de día). */
+function horaPlus(hora: string, addMin: number): string {
+  const [h, m] = hora.split(':').map(Number)
+  const total = (h * 60 + m + addMin + 1440) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+/* Diferencia en minutos entre dos horas "HH:MM". Si fin < inicio asumimos
+   que cruzó medianoche (poco probable acá, pero defensive). */
+function diffMin(inicio: string, fin: string): number {
+  const [hi, mi] = inicio.split(':').map(Number)
+  const [hf, mf] = fin.split(':').map(Number)
+  const a = hi * 60 + mi
+  const b = hf * 60 + mf
+  return b >= a ? b - a : 1440 - a + b
+}
 
 export function NuevaGrabacionForm({ marcas }: { marcas: MarcaOption[] }) {
   const router = useRouter()
@@ -35,7 +42,10 @@ export function NuevaGrabacionForm({ marcas }: { marcas: MarcaOption[] }) {
   const [titulo, setTitulo] = useState('')
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
   const [hora, setHora] = useState('10:00')
-  const [duracion, setDuracion] = useState(60)
+  /* Hora fin como input independiente — Pedro: "no me deja poner hora
+     de terminación". GCal usa start/end, los humanos pensamos en
+     start/fin. La duración se calcula al submit por diferencia. */
+  const [horaFin, setHoraFin] = useState('11:00')
   const [descripcion, setDescripcion] = useState('')
   const [esMeet, setEsMeet] = useState(false)
   const [invitados, setInvitados] = useState('')
@@ -70,12 +80,13 @@ export function NuevaGrabacionForm({ marcas }: { marcas: MarcaOption[] }) {
             .filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))
         : []
 
+      const duracionCalc = Math.max(5, diffMin(hora, horaFin))
       const result = await createGrabacion({
         marca_slug: slug,
         titulo: titulo.trim() || tituloDefault,
         fecha_planeada: fecha,
         hora_planeada: hora,
-        duracion_min: duracion,
+        duracion_min: duracionCalc,
         descripcion: descripcion.trim() || null,
         es_reunion_meet: esMeet,
         invitados_emails: invitadosArr,
@@ -160,22 +171,28 @@ export function NuevaGrabacionForm({ marcas }: { marcas: MarcaOption[] }) {
           <input
             type="time"
             value={hora}
-            onChange={(e) => setHora(e.target.value)}
+            onChange={(e) => {
+              const nuevaHora = e.target.value
+              setHora(nuevaHora)
+              /* Si la nueva hora-inicio es >= hora-fin, recalcular fin
+                 preservando la duración previa (UX tipo GCal). */
+              if (nuevaHora >= horaFin) {
+                setHoraFin(horaPlus(nuevaHora, Math.max(15, diffMin(hora, horaFin) || 60)))
+              }
+            }}
             step={300}
             className="h-9 w-full px-2 rounded-md border bg-background text-sm font-mono"
           />
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-wide text-muted-foreground block mb-1">Duración</label>
-          <select
-            value={duracion}
-            onChange={(e) => setDuracion(Number(e.target.value))}
-            className="h-9 w-full px-2 rounded-md border bg-background text-sm"
-          >
-            {DURACIONES.map((d) => (
-              <option key={d.value} value={d.value}>{d.label}</option>
-            ))}
-          </select>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground block mb-1">Hora fin</label>
+          <input
+            type="time"
+            value={horaFin}
+            onChange={(e) => setHoraFin(e.target.value)}
+            step={300}
+            className="h-9 w-full px-2 rounded-md border bg-background text-sm font-mono"
+          />
         </div>
       </div>
 
