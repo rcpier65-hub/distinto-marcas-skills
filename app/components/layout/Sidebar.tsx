@@ -167,6 +167,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
               contenido ejecutivo del Cockpit; para los demás muestra
               versión simple. */}
           <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio') || isActive('/cockpit')} shortcut="1" />
+          {/* Tareas: tablero personal de cada uno (estilo Notas). Todos lo ven. */}
+          <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
           {puede('inbox') && (
             <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={73} />
           )}
@@ -498,6 +500,7 @@ function EditIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fil
 function PaintIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 1.5L10 5.5L7 8.5L3 4.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M3 4.5L1.5 8C1.5 9 2.5 9.5 3 9.5C3.5 9.5 4 9 4 8.5C4 8 3.5 7.5 3 7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function CheckIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 7L6.2 8.7L9.5 5.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function NoteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2.5H9L11 4.5V11.5C11 11.78 10.78 12 10.5 12H3.5C3.22 12 3 11.78 3 11.5V3C3 2.72 3.22 2.5 3.5 2.5Z" stroke="currentColor" strokeWidth="1.2" /><path d="M9 2.5V4.5H11M5 7H9M5 9H8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
+function TareasIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5L3 4.5L4.7 2.8M2 8L3 9L4.7 7.3M2 12L3 13L4.7 11.3M6.5 3.5H12M6.5 8H12M6.5 12H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function ChevronUpDown() { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><path d="M3 4L5 2L7 4M3 6L5 8L7 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function SettingsIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><circle cx="7" cy="7" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M7 1.5V3M7 11V12.5M2.55 3.55L3.5 4.5M10.5 9.5L11.45 10.45M1.5 7H3M11 7H12.5M2.55 10.45L3.5 9.5M10.5 4.5L11.45 3.55" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
