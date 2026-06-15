@@ -36,6 +36,9 @@ export type GrabacionWithMarca = {
      una URL de Google Drive con los guiones que se van a grabar. */
   enlace_guiones: string | null
   google_event_id: string | null   // ID del evento en Google Calendar (sync)
+  /* Duración del bloque en GCal (min). Combinada con hora_planeada
+     da el rango start/end del evento. Default 60. */
+  duracion_min: number | null
   created_at: string
   updated_at: string
 }
@@ -79,12 +82,27 @@ export async function listGrabaciones(
   const d = desde ?? firstDay
   const h = hasta ?? lastDay
 
-  const { data, error } = await service
+  const FULL_COLS = 'id, marca_id, fecha_planeada, hora_planeada, duracion_min, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
+  const BASE_COLS = 'id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
+
+  let res = await service
     .from('grabaciones')
-    .select('id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)')
+    .select(FULL_COLS)
     .gte('fecha_planeada', d)
     .lte('fecha_planeada', h)
     .order('fecha_planeada', { ascending: false })
+  /* Defensive SELECT: si duracion_min no existe aún (migration 028
+     pendiente), reintenta con columnas base — la UI muestra default 60
+     en lugar de leer de BD. */
+  if (res.error && /duracion_min/i.test(res.error.message ?? '')) {
+    res = await service
+      .from('grabaciones')
+      .select(BASE_COLS)
+      .gte('fecha_planeada', d)
+      .lte('fecha_planeada', h)
+      .order('fecha_planeada', { ascending: false })
+  }
+  const { data, error } = res
 
   if (error) {
     // Tolerar tabla no existe (migration 016 pendiente)
@@ -110,6 +128,7 @@ export async function listGrabaciones(
     notas: r.notas,
     enlace_guiones: r.enlace_guiones ?? null,
     google_event_id: r.google_event_id ?? null,
+    duracion_min: r.duracion_min ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   }))
@@ -431,6 +450,10 @@ export async function updateGrabacionFecha(
   id: string,
   fecha_planeada: string,
   hora_planeada?: string | null,
+  /* Nuevo: duración en minutos (si el caller calcula desde un input
+     de hora-fin en la UI). Si viene, persiste en BD y se usa al
+     resincronizar el evento de GCal para preservar el bloque end. */
+  duracion_min?: number | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -447,11 +470,22 @@ export async function updateGrabacionFecha(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const patch: any = { fecha_planeada }
   if (horaNormalizada !== undefined) patch.hora_planeada = horaNormalizada
+  if (typeof duracion_min === 'number' && duracion_min > 0) {
+    patch.duracion_min = Math.max(5, Math.min(720, Math.round(duracion_min)))
+  }
 
-  const { error } = await service
+  let { error } = await service
     .from('grabaciones')
     .update(patch)
     .eq('id', id)
+  /* Defensive: si la columna duracion_min no existe aún (migration 028
+     pendiente), reintenta sin ese campo. La sincronización a GCal sigue
+     funcionando con la duración calculada en memoria. */
+  if (error && /duracion_min/i.test(error.message ?? '')) {
+    delete patch.duracion_min
+    const retry = await service.from('grabaciones').update(patch).eq('id', id)
+    error = retry.error
+  }
   if (error) return { ok: false, error: error.message }
 
   // Sync GCal: mover el evento a la nueva fecha (best-effort).
@@ -469,12 +503,17 @@ export async function updateGrabacionFecha(
       const titulo = g.titulo ?? eventoTitulo(g.marcas?.nombre ?? 'Marca')
       const horaFinal = horaNormalizada !== undefined ? horaNormalizada : g.hora_planeada
       if (horaFinal) {
+        /* Si el caller pasó duracion_min usamos ese (vino del input
+           hora-fin de la UI). Sino, el de BD (que puede ser viejo). */
+        const durFinal = (typeof duracion_min === 'number' && duracion_min > 0)
+          ? duracion_min
+          : (g.duracion_min ?? 60)
         await updateTimedCalendarEvent(g.google_event_id, {
           summary: titulo,
           description: g.notas ?? undefined,
           fecha: fecha_planeada,
           hora: horaFinal,
-          durationMin: g.duracion_min ?? 60,
+          durationMin: durFinal,
         })
       } else {
         await updateCalendarEvent(g.google_event_id, {

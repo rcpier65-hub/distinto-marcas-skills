@@ -34,6 +34,21 @@ type Props = {
   mesDefault: string
 }
 
+/* Helpers para manipular horas "HH:MM". Compartidos entre el row inline
+   y el form de nueva grabación. */
+function horaPlus(hora: string, addMin: number): string {
+  const [h, m] = hora.split(':').map(Number)
+  const total = (h * 60 + m + addMin + 1440) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+function diffMin(inicio: string, fin: string): number {
+  const [hi, mi] = inicio.split(':').map(Number)
+  const [hf, mf] = fin.split(':').map(Number)
+  const a = hi * 60 + mi
+  const b = hf * 60 + mf
+  return b >= a ? b - a : 1440 - a + b
+}
+
 const ESTADO_CFG: Record<string, { label: string; color: string; bg: string; Icon: typeof Check }> = {
   planeada:  { label: 'Planeada',  color: '#b45309', bg: '#f59e0b18', Icon: Clock },
   cumplida:  { label: 'Cumplida',  color: '#047857', bg: '#10b98118', Icon: Check },
@@ -215,13 +230,24 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
   /* hora_planeada viene de BD como "HH:MM:SS"; el input type=time
      funciona con HH:MM (acepta también HH:MM:SS pero recorta segs). */
   const [hora, setHora] = useState((grabacion.hora_planeada ?? '').slice(0, 5))
+  /* Hora fin = hora_planeada + duracion_min, calculada al render.
+     Pedro: "no me sale para poner hora de finalizacion eso esta
+     complicado porque no podre poner a que hora terminara la
+     grabacion". El input es independiente del de inicio. Si Pedro
+     borra ambas, el evento queda como all-day. */
+  const horaInicialVal = (grabacion.hora_planeada ?? '').slice(0, 5)
+  const duracionInicial = grabacion.duracion_min ?? 60
+  const [horaFin, setHoraFin] = useState(
+    horaInicialVal ? horaPlus(horaInicialVal, duracionInicial) : '',
+  )
   /* Pedro: enlace de guiones (suele ser un Drive). Editable inline. */
   const [enlace, setEnlace] = useState(grabacion.enlace_guiones ?? '')
   const cfg = ESTADO_CFG[grabacion.estado] ?? ESTADO_CFG.planeada
   const busy = disabled || isPending
 
   const fechaInicial = grabacion.fecha_planeada
-  const horaInicial = (grabacion.hora_planeada ?? '').slice(0, 5)
+  const horaInicial = horaInicialVal
+  const horaFinInicial = horaInicialVal ? horaPlus(horaInicialVal, duracionInicial) : ''
   const enlaceInicial = grabacion.enlace_guiones ?? ''
 
   function saveEnlace() {
@@ -237,15 +263,18 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
   }
 
   function saveFecha() {
-    if (fecha === fechaInicial && hora === horaInicial) return
+    if (fecha === fechaInicial && hora === horaInicial && horaFin === horaFinInicial) return
     startTransition(async () => {
-      /* Mando hora aunque no haya cambiado, para que el server action
-         persista ambos campos en el mismo update. Empty string → null. */
-      const r = await updateGrabacionFecha(grabacion.id, fecha, hora || null)
-      if (r.ok) toast.success(hora ? 'Fecha y hora actualizadas' : 'Fecha actualizada')
+      /* Si hay hora-inicio y hora-fin, calcula duración para que el
+         evento de GCal salga con el bloque correcto. Si no hay hora,
+         null en ambos (evento all-day). */
+      const dur = (hora && horaFin) ? Math.max(5, diffMin(hora, horaFin)) : null
+      const r = await updateGrabacionFecha(grabacion.id, fecha, hora || null, dur)
+      if (r.ok) toast.success(hora ? `${hora}${horaFin ? '–' + horaFin : ''} guardado` : 'Fecha actualizada')
       else {
         setFecha(fechaInicial)
         setHora(horaInicial)
+        setHoraFin(horaFinInicial)
         toast.error(r.error)
       }
     })
@@ -268,33 +297,85 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
     })
   }
 
+  /* Mejor visual: pill-grouped (fecha + hora-inicio + hora-fin en un mismo
+     contenedor con bg unificado), labels micro, focus-ring violeta.
+     Estilo equivalente al date/time picker de Linear/GCal pero usando
+     los inputs nativos por dentro. */
   return (
-    <div className="space-y-1 group">
-      <div className="flex items-center gap-1.5">
-      <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-      {/* Fecha editable */}
-      <input
-        type="date"
-        value={fecha}
-        onChange={(e) => setFecha(e.target.value)}
-        onBlur={saveFecha}
-        disabled={busy}
-        className="h-7 px-1.5 rounded border border-input bg-background text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 flex-1 min-w-0"
-      />
-      {/* Hora opcional. Empty value = sin hora. Pedro pidió AM/PM —
-          mostramos sufijo al lado del input nativo (que en macOS muestra
-          24h). */}
-      <input
-        type="time"
-        value={hora}
-        onChange={(e) => setHora(e.target.value)}
-        onBlur={saveFecha}
-        disabled={busy}
-        title={hora ? `Hora: ${hora}` : 'Hora opcional — deja vacío para solo día'}
-        className="h-7 px-1.5 rounded border border-input bg-background text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50 w-[70px] shrink-0"
-      />
+    <div className="space-y-1.5 group">
+      <div className="flex items-center gap-2 flex-wrap">
+      {/* Pill grupo: fecha + horas. Bg unificado, bordes en grupo, hover
+          ring violeta. Cada control queda separado por una line vertical. */}
+      <div
+        className="inline-flex items-stretch h-9 rounded-lg bg-white border border-input shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-[#ba41f7]/40 focus-within:border-[#ba41f7]/40 transition-all"
+        title="Fecha y horario de la grabación"
+      >
+        <div className="flex items-center gap-1.5 px-2.5 border-r border-input/60">
+          <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <input
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            onBlur={saveFecha}
+            disabled={busy}
+            className="h-7 w-[120px] bg-transparent text-[12px] font-mono focus:outline-none disabled:opacity-50"
+          />
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 border-r border-input/60">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <input
+            type="time"
+            value={hora}
+            onChange={(e) => {
+              const nuevaHora = e.target.value
+              setHora(nuevaHora)
+              /* Si setear inicio y aún no hay fin, auto-completar +60min.
+                 Si ya hay fin pero el nuevo inicio lo pasa, recalcular
+                 preservando duración previa (UX tipo GCal). */
+              if (nuevaHora && !horaFin) setHoraFin(horaPlus(nuevaHora, 60))
+              else if (nuevaHora && horaFin && nuevaHora >= horaFin) {
+                setHoraFin(horaPlus(nuevaHora, Math.max(15, diffMin(hora || '00:00', horaFin) || 60)))
+              }
+            }}
+            onBlur={saveFecha}
+            disabled={busy}
+            step={300}
+            placeholder="--:--"
+            title={hora ? `Inicio: ${hora}` : 'Hora inicio — deja vacío para evento de día completo'}
+            className="h-7 w-[60px] bg-transparent text-[12px] font-mono focus:outline-none disabled:opacity-50"
+          />
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5">
+          <span className="text-[10.5px] font-semibold text-muted-foreground shrink-0">→</span>
+          <input
+            type="time"
+            value={horaFin}
+            onChange={(e) => setHoraFin(e.target.value)}
+            onBlur={saveFecha}
+            disabled={busy || !hora}
+            step={300}
+            placeholder="--:--"
+            title={!hora ? 'Pon hora de inicio primero' : (horaFin ? `Fin: ${horaFin}` : 'Hora fin')}
+            className="h-7 w-[60px] bg-transparent text-[12px] font-mono focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed"
+          />
+          {hora && horaFin && (
+            <span
+              className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0"
+              title={`Duración: ${diffMin(hora, horaFin)} min`}
+            >
+              ({diffMin(hora, horaFin) >= 60
+                ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
+                : `${diffMin(hora, horaFin)}m`})
+            </span>
+          )}
+        </div>
+      </div>
+      {/* AM/PM badge afuera de la pill — solo si hay hora */}
       {hora && (
-        <span className="text-[10px] font-semibold text-muted-foreground tabular-nums shrink-0" title={`${hora} = ${formatHora12(hora)}`}>
+        <span
+          className="text-[10px] font-bold text-muted-foreground tabular-nums shrink-0 px-1.5 py-0.5 rounded bg-muted/40"
+          title={`${hora} = ${formatHora12(hora)}`}
+        >
           {sufijoAmPm(hora)}
         </span>
       )}
@@ -308,10 +389,10 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
         }}
         disabled={busy}
         title={`${cfg.label} — click para cambiar`}
-        className="inline-flex items-center gap-1 h-7 px-2 rounded text-[10px] font-semibold shrink-0 disabled:opacity-50"
+        className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg text-[11px] font-semibold shrink-0 shadow-sm disabled:opacity-50"
         style={{ color: cfg.color, background: cfg.bg }}
       >
-        <cfg.Icon className="w-3 h-3" />
+        <cfg.Icon className="w-3.5 h-3.5" />
         {cfg.label}
       </button>
       {/* Borrar — visible en hover */}
@@ -320,7 +401,7 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
         onClick={borrar}
         disabled={busy}
         title="Eliminar fecha"
-        className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 disabled:opacity-50"
+        className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 disabled:opacity-50"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
