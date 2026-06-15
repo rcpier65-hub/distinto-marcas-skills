@@ -18,6 +18,7 @@ import {
   fetchComentariosFromMetricool,
   actualizarComentarioBorrador,
   skipComentario,
+  eliminarComentario,
   responderBatch,
   postearAprobados,
   generarBorradoresIA,
@@ -92,6 +93,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const [conInforme, setConInforme] = useState(true)  // si el responder lleva informe WhatsApp
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [respondiendoId, setRespondiendoId] = useState<string | null>(null)  // respuesta individual en curso
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null)  // eliminación de hate en curso
 
   // Postear aprobados directo a Metricool (sin rutina de Claude)
   const [isPosting, startPosting] = useTransition()
@@ -152,7 +154,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
       const r = await reconciliarInbox(marcaActual)
       if (r.ok) {
         toast.success(
-          `✅ Inbox limpio: ${r.reconciliados} ya respondidos · ${r.archivados} viejos archivados · ${r.siguen_pendientes} pendientes reales` +
+          `✅ Inbox sincronizado: ${r.archivados} basura sacada · ${r.reactivados} reales recuperados · ${r.reconciliados} ya respondidos · ${r.siguen_pendientes} pendientes reales` +
             (r.errors.length > 0 ? ` · ⚠️ ${r.errors.length} redes con error` : ''),
           { id: toastId, duration: 9000 },
         )
@@ -197,6 +199,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
           toast.success(
             `✅ ${result.inserted} nuevos en inbox · ✨ ${result.generados} borradores IA listos` +
               (result.reconciliados > 0 ? ` · 🧹 ${result.reconciliados} ya respondidos sacados` : '') +
+              (result.reactivados > 0 ? ` · ↩️ ${result.reactivados} recuperados` : '') +
               (result.errors.length > 0 ? ` · ${result.errors.length} errores` : ''),
             { id: 'fetch', duration: 8000 },
           )
@@ -286,6 +289,31 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
       } else {
         toast.error(`Error: ${r.error}`)
       }
+    })
+  }
+
+  function handleEliminar(id: string) {
+    /* Confirmación: el borrado es destructivo e irreversible — borra el
+       comentario de la red real (Facebook/IG/TikTok), no solo del inbox. */
+    const ok = window.confirm(
+      '¿Eliminar este comentario?\n\nSe borrará de la red (Facebook/Instagram/TikTok) y saldrá del inbox. Esta acción no se puede deshacer.',
+    )
+    if (!ok) return
+    setEliminandoId(id)
+    startFetching(async () => {
+      const r = await eliminarComentario(id)
+      if (r.ok) {
+        if (r.remoto) {
+          toast.success('Comentario eliminado de la red y del inbox')
+        } else {
+          // Salió del inbox pero el borrado remoto falló → avisar claro.
+          toast.warning(r.warning ?? 'Quitado del inbox, pero revisá la red manualmente')
+        }
+        router.refresh()
+      } else {
+        toast.error(`Error: ${r.error}`)
+      }
+      setEliminandoId(null)
     })
   }
 
@@ -491,8 +519,10 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
                     onChangeTexto={(t) => updateEdicion(r.id, { texto: t })}
                     onChangeCategoria={(c) => updateEdicion(r.id, { categoria: c })}
                     onSkip={() => handleSkip(r.id)}
+                    onEliminar={() => handleEliminar(r.id)}
                     onResponder={() => handleResponderIndividual(r.id)}
                     responding={respondiendoId === r.id}
+                    eliminando={eliminandoId === r.id}
                   />
                 )
               })}

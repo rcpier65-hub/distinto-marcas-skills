@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { listComentarios, responderComentario } from '@/lib/integrations/metricool'
+import { listComentarios, responderComentario, eliminarComentario as eliminarComentarioMetricool } from '@/lib/integrations/metricool'
 import { clasificarComentario } from '@/lib/comentarios/clasificador'
 import { sendWhatsAppImage } from '@/lib/integrations/whatsapp-router'
 import { generarRespuestaComentario, getOpenAIApiKey } from '@/lib/integrations/openai'
@@ -115,7 +115,7 @@ export async function dispatchRoutine(
  */
 export async function fetchComentariosFromMetricool(
   marcaSlug: string,
-): Promise<{ ok: true; fetched: number; inserted: number; reconciliados: number; generados: number; errors: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; fetched: number; inserted: number; reconciliados: number; reactivados: number; generados: number; errors: string[] } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -135,6 +135,7 @@ export async function fetchComentariosFromMetricool(
   let fetched = 0
   let inserted = 0
   let reconciliados = 0
+  let reactivados = 0
   const errors: string[] = []
 
   // Pre-cargar templates de la marca + globales para asignar respuesta_sugerida
@@ -163,6 +164,20 @@ export async function fetchComentariosFromMetricool(
         .eq('metricool_comment_id', c.id)
         .maybeSingle()
 
+      // Comentario escrito por la PROPIA marca (su página). NO es de un cliente
+      // → nunca debe estar en el inbox como "por responder". Si quedó pegado como
+      // pendiente (basura del bug anterior), lo archivamos.
+      if (c.isOwnComment) {
+        if (existente && (existente.status === 'pending' || existente.status === 'approved')) {
+          await service
+            .from('comentarios_inbox')
+            .update({ status: 'skipped' })
+            .eq('id', existente.id)
+          reconciliados++
+        }
+        continue
+      }
+
       // Ya respondido en la red (por la app, el cliente, la Routine, o a mano).
       if (c.hasReply) {
         // RECONCILIAR: si lo teníamos como pendiente/aprobado, marcarlo como
@@ -180,9 +195,19 @@ export async function fetchComentariosFromMetricool(
         continue  // nunca insertar un comentario ya respondido
       }
 
-      // No respondido todavía. Si ya existe, lo PRESERVAMOS tal cual — no pisamos
-      // la respuesta sugerida (IA o editada por Pedro) ni el estado.
-      if (existente) continue
+      // Comentario de cliente SIN responder = pendiente real.
+      if (existente) {
+        // Si lo habíamos archivado mal (skipped) y Metricool confirma que sigue
+        // sin responder, lo reactivamos para que vuelva a aparecer.
+        if (existente.status === 'skipped') {
+          await service
+            .from('comentarios_inbox')
+            .update({ status: 'pending' })
+            .eq('id', existente.id)
+          reactivados++
+        }
+        continue
+      }
 
       // Nuevo comentario → insert. Clasificación base por keywords (la IA la
       // puede refinar al generar el borrador). respuesta_sugerida arranca con el
@@ -224,16 +249,12 @@ export async function fetchComentariosFromMetricool(
   } catch { /* best-effort */ }
 
   revalidatePath('/comentarios')
-  return { ok: true, fetched, inserted, reconciliados, generados, errors }
+  return { ok: true, fetched, inserted, reconciliados, reactivados, generados, errors }
 }
 
 // ============================================================
-// RECONCILIAR INBOX — limpia los "respondidos fantasma"
+// RECONCILIAR INBOX — limpia el inbox contra el estado real de Metricool
 // ============================================================
-// Días de antigüedad para archivar un pendiente que YA NO aparece en la ventana
-// activa de Metricool (fuera de la ventana + viejo = settled, lo sacamos del
-// inbox como 'leído'). No afirma que lo respondimos — solo lo archiva.
-const ARCHIVE_OLD_DAYS = 14
 
 /** Actualiza el status de muchos ids en lotes (evita URLs gigantes en PostgREST). */
 async function updateStatusBatch(
@@ -249,20 +270,21 @@ async function updateStatusBatch(
 }
 
 /**
- * Sincroniza el estado real de los comentarios con Metricool y limpia el inbox:
- *   - pendientes/aprobados que Metricool reporta YA RESPONDIDOS → 'responded'
- *   - pendientes fuera de la ventana activa de Metricool y de más de
- *     ARCHIVE_OLD_DAYS días → 'skipped' (archivados, settled)
- *   - los que siguen en la ventana SIN responder → se quedan 'pending'
+ * Sincroniza el inbox con el estado REAL de Metricool. Sin afirmar ni postear
+ * nada — solo LEE Metricool y corrige el status en la BD. Reversible.
  *
- * No postea nada a Metricool ni a la red — solo LEE el estado real. Es seguro y
- * reversible (solo cambia el status en la BD). Resuelve el bug de "comentarios ya
- * respondidos que siguen saliendo en el inbox".
+ *   - basura: filas cuyo autor es la PROPIA página (su id = self) → 'skipped'.
+ *     Eran respuestas de la marca metidas por error como "comentario de cliente".
+ *   - ya respondidos en la red (hasReply) → 'responded'.
+ *   - clientes sin responder que habíamos archivado mal (skipped) → 'pending'.
+ *
+ * NO archiva por antigüedad (eso escondía comentarios reales). Solo toca filas
+ * que Metricool confirma o que son de la propia marca.
  */
 export async function reconciliarInbox(
   marcaSlug: string,
 ): Promise<
-  | { ok: true; reconciliados: number; archivados: number; siguen_pendientes: number; errors: string[] }
+  | { ok: true; reconciliados: number; reactivados: number; archivados: number; siguen_pendientes: number; errors: string[] }
   | { ok: false; error: string }
 > {
   await requireUser()
@@ -279,8 +301,10 @@ export async function reconciliarInbox(
     return { ok: false, error: `Marca '${marcaSlug}' no tiene metricool_blog_id configurado` }
   }
 
-  // 1) Traer la ventana activa de Metricool → map (network|comment_id) → hasReply
-  const replyByKey = new Map<string, boolean>()
+  // 1) Ventana activa de Metricool → map (network|id) → {isOwnComment, hasReply}
+  //    y el id `self` de la página (para detectar basura aunque esté fuera de la ventana).
+  const win = new Map<string, { isOwnComment: boolean; hasReply: boolean }>()
+  let self: string | null = null
   const errors: string[] = []
   for (const network of NETWORKS) {
     const r = await listComentarios({ blogId: marca.metricool_blog_id, network, onlyUnread: false, limit: 100 })
@@ -288,45 +312,58 @@ export async function reconciliarInbox(
       errors.push(`${network}: ${r.error}`)
       continue
     }
-    for (const c of r.data) replyByKey.set(`${network}|${c.id}`, c.hasReply)
+    for (const c of r.data) {
+      win.set(`${network}|${c.id}`, { isOwnComment: c.isOwnComment, hasReply: c.hasReply })
+      if (!self && c.self) self = c.self
+    }
   }
 
-  // 2) Recorrer pendientes + aprobados de la marca y clasificar
+  // 2) Recorrer pendientes + aprobados + skipped y clasificar
   const { data: rows } = await service
     .from('comentarios_inbox')
-    .select('id, network, metricool_comment_id, comment_created_at, status')
+    .select('id, network, metricool_comment_id, author_username, status')
     .eq('marca_id', marca.id)
-    .in('status', ['pending', 'approved'])
-    .limit(2000)
+    .in('status', ['pending', 'approved', 'skipped'])
+    .limit(3000)
 
-  const ahora = Date.now()
-  const VIEJO_MS = ARCHIVE_OLD_DAYS * 86400000
-  const idsResponded: string[] = []
-  const idsArchivar: string[] = []
-  let siguen = 0
+  const idsArchivar: string[] = []   // basura (autor = página) → skipped
+  const idsResponded: string[] = []  // ya respondidos en la red → responded
+  const idsReactivar: string[] = []  // reales que estaban skipped → pending
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const row of (rows ?? []) as any[]) {
-    const key = `${row.network}|${row.metricool_comment_id}`
-    if (replyByKey.has(key)) {
-      if (replyByKey.get(key)) idsResponded.push(row.id) // ya respondido en la red
-      else siguen++ // en la ventana y sin responder → sigue pendiente (real)
+    const w = win.get(`${row.network}|${row.metricool_comment_id}`)
+    const esBasura = (self != null && String(row.author_username) === self) || (w?.isOwnComment ?? false)
+    if (esBasura) {
+      if (row.status === 'pending' || row.status === 'approved') idsArchivar.push(row.id)
+      continue
+    }
+    if (!w) continue // fuera de la ventana y NO es basura → no tocar
+    if (w.hasReply) {
+      if (row.status === 'pending' || row.status === 'approved') idsResponded.push(row.id)
     } else {
-      const edadMs = ahora - new Date(row.comment_created_at).getTime()
-      if (edadMs > VIEJO_MS) idsArchivar.push(row.id) // fuera de ventana + viejo → settled
-      else siguen++ // fuera de ventana pero reciente → no tocar
+      if (row.status === 'skipped') idsReactivar.push(row.id) // cliente sin responder, lo habíamos archivado mal
     }
   }
 
   // 3) Aplicar en lote
-  await updateStatusBatch(service, idsResponded, 'responded')
   await updateStatusBatch(service, idsArchivar, 'skipped')
+  await updateStatusBatch(service, idsResponded, 'responded')
+  await updateStatusBatch(service, idsReactivar, 'pending')
+
+  // 4) Contar pendientes reales que quedan
+  const { count: siguen } = await service
+    .from('comentarios_inbox')
+    .select('id', { count: 'exact', head: true })
+    .eq('marca_id', marca.id)
+    .eq('status', 'pending')
 
   revalidatePath('/comentarios')
   return {
     ok: true,
     reconciliados: idsResponded.length,
+    reactivados: idsReactivar.length,
     archivados: idsArchivar.length,
-    siguen_pendientes: siguen,
+    siguen_pendientes: siguen ?? 0,
     errors,
   }
 }
@@ -478,7 +515,12 @@ export async function listInbox(
     .eq('marca_id', marca.id)
     .order('comment_created_at', { ascending: false })
     .limit(100)
-  if (status !== 'all') q = q.eq('status', status)
+  if (status !== 'all') {
+    q = q.eq('status', status)
+  } else {
+    // 'all' = todo MENOS los eliminados (hate moderado nunca se muestra).
+    q = q.neq('status', 'deleted')
+  }
 
   const { data, error } = await q
   if (error) {
@@ -517,6 +559,77 @@ export async function skipComentario(id: string): Promise<{ ok: true } | { ok: f
   if (error) return { ok: false, error: error.message }
   revalidatePath('/comentarios')
   return { ok: true }
+}
+
+/**
+ * Elimina un comentario (hate). Pedro: "a veces hay hate y necesito borrar".
+ *
+ * Doble acción:
+ *   1. Borra (oculta) el comentario en la red REAL vía Metricool DELETE,
+ *      para que el hate desaparezca de Facebook/IG/TikTok.
+ *   2. Marca el row como status='deleted' en la BD (auditoría:
+ *      deleted_at + deleted_by_user_id) para sacarlo del inbox.
+ *
+ * Si el borrado remoto falla (permisos, comentario ya borrado, etc.)
+ * IGUAL marcamos 'deleted' local — Pedro no quiere verlo más en su
+ * inbox — pero devolvemos `remoto: false` + warning para que sepa que
+ * en la red puede seguir visible y lo borre a mano.
+ *
+ * Usa status 'deleted' (no 'skipped') a propósito: el fetch reactiva
+ * 'skipped' → 'pending', pero nunca toca 'deleted'. Así el hate no
+ * reaparece en la próxima carga. Ver migración 20260615140001.
+ */
+export async function eliminarComentario(
+  id: string,
+): Promise<{ ok: true; remoto: boolean; warning?: string } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // Cargar el row + datos de la marca para el DELETE en Metricool.
+  const { data: row, error: e1 } = await service
+    .from('comentarios_inbox')
+    .select(`
+      id, network, metricool_comment_id,
+      marcas:marca_id ( metricool_blog_id )
+    `)
+    .eq('id', id)
+    .maybeSingle()
+  if (e1) return { ok: false, error: e1.message }
+  if (!row) return { ok: false, error: 'Comentario no encontrado' }
+
+  // Intentar borrar de la red real (si hay blogId + commentId).
+  let remoto = false
+  let warning: string | undefined
+  const blogId = row.marcas?.metricool_blog_id
+  if (blogId && row.metricool_comment_id) {
+    const del = await eliminarComentarioMetricool({
+      blogId,
+      network: row.network,
+      commentId: row.metricool_comment_id,
+    })
+    if (del.ok) {
+      remoto = true
+    } else {
+      warning = `Se quitó del inbox, pero NO se pudo borrar de la red: ${del.error}. Bórralo a mano en la publicación.`
+    }
+  } else {
+    warning = 'Se quitó del inbox. No tenía datos de red (blogId/commentId) para borrarlo de la publicación.'
+  }
+
+  // Marcar como deleted en la BD (siempre — sale del inbox de Pedro).
+  const { error: e2 } = await service
+    .from('comentarios_inbox')
+    .update({
+      status: 'deleted',
+      deleted_at: new Date().toISOString(),
+      deleted_by_user_id: user.id,
+    })
+    .eq('id', id)
+  if (e2) return { ok: false, error: e2.message }
+
+  revalidatePath('/comentarios')
+  return { ok: true, remoto, warning }
 }
 
 // ============================================================

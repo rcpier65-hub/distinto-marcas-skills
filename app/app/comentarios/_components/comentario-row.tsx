@@ -16,8 +16,10 @@ type Props = {
   onChangeTexto: (text: string) => void
   onChangeCategoria: (cat: ComentarioCategoria) => void
   onSkip: () => void
+  onEliminar: () => void
   onResponder: () => void
   responding?: boolean
+  eliminando?: boolean
 }
 
 /**
@@ -49,8 +51,10 @@ export function ComentarioRow({
   onChangeTexto,
   onChangeCategoria,
   onSkip,
+  onEliminar,
   onResponder,
   responding = false,
+  eliminando = false,
 }: Props) {
   const fechaCorta = new Date(row.comment_created_at).toLocaleDateString('es-PE', {
     day: 'numeric',
@@ -164,11 +168,22 @@ export function ComentarioRow({
         <button
           type="button"
           onClick={onSkip}
-          disabled={responding}
+          disabled={responding || eliminando}
           className="mt-2 w-full h-8 px-2 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           title="Marcar como leído — no se responde, se saca de pendientes"
         >
           ✓ Marcar como leído
+        </button>
+        {/* Eliminar — borra el comentario de la red real (hate) y lo saca del
+            inbox. Destructivo: el padre pide confirmación antes de llamar. */}
+        <button
+          type="button"
+          onClick={onEliminar}
+          disabled={responding || eliminando}
+          className="mt-2 w-full h-8 px-2 text-xs rounded-md border border-red-500/30 text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+          title="Eliminar — borra el comentario de la red (FB/IG/TikTok) y lo saca del inbox. No se puede deshacer."
+        >
+          {eliminando ? '⏳ Eliminando…' : '🗑️ Eliminar'}
         </button>
       </td>
 

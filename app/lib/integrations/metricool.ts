@@ -110,6 +110,9 @@ export type MetricoolComment = {
   commentText: string         // root.text
   createdAt: string           // root.creationDate
   hasReply: boolean           // si root.comments[] tiene reply nuestro
+  isOwnComment: boolean       // el comentario raíz lo escribió la PROPIA marca
+                              // (root.owner === self) → NO es un comentario de cliente
+  self: string | null         // id de la página/cuenta de la marca (thread.self)
 }
 
 async function callMetricool<T>(
@@ -230,6 +233,27 @@ export async function responderComentario(args: {
   return { ok: true, data: { messageId: r.data?.id ?? r.data?.messageId ?? null } }
 }
 
+/**
+ * Elimina (oculta) un comentario en una publicación de la red. Lo usa el
+ * botón "Eliminar" de /comentarios para moderar hate. Espejo del tool
+ * inbox_eliminar_comentario del metricool-pro-mcp:
+ *   DELETE /v2/inbox/post-comments?blogId=X&provider=Y&commentId=Z
+ * (callMetricool agrega userId + X-Mc-Auth automáticamente.)
+ */
+export async function eliminarComentario(args: {
+  blogId: number
+  network: 'instagram' | 'facebook' | 'tiktok'
+  commentId: string
+}): Promise<MetricoolResult<{ deleted: true }>> {
+  const provider = networkToProvider(args.network)
+  const r = await callMetricool<unknown>(
+    `/api/v2/inbox/post-comments?blogId=${args.blogId}&provider=${provider}&commentId=${encodeURIComponent(args.commentId)}`,
+    { method: 'DELETE' },
+  )
+  if (!r.ok) return r
+  return { ok: true, data: { deleted: true } }
+}
+
 // ============================================================
 // Mapper: estructura nested de Metricool → MetricoolComment plano
 // ============================================================
@@ -255,6 +279,11 @@ function mapRawToComment(thread: MetricoolRawThread): MetricoolComment | null {
     const authorDisplayName: string | null = ownerParticipant?.name ?? null
     const authorAvatarUrl: string | null = ownerParticipant?.imageProfileUrl ?? null
 
+    // El comentario raíz lo escribió la propia marca (su página) → NO es de un
+    // cliente, no debe entrar al inbox como "por responder". Comparamos como
+    // string porque Metricool a veces manda el id como número y otras como texto.
+    const isOwnComment = ownerId != null && selfId != null && String(ownerId) === String(selfId)
+
     return {
       id: thread.id,
       network: thread.provider,
@@ -270,6 +299,8 @@ function mapRawToComment(thread: MetricoolRawThread): MetricoolComment | null {
       commentText: root?.text ?? '',
       createdAt: root?.creationDate ?? thread?.creationDate ?? new Date().toISOString(),
       hasReply,
+      isOwnComment,
+      self: selfId != null ? String(selfId) : null,
     }
   } catch {
     return null
