@@ -134,9 +134,21 @@ export default async function EditorPage() {
      el editor ni en filtro 'todos'. Las 'para publicar' SÍ pasan
      (tienen fecha_publicacion → entran al pipeline normal).
      Defensive: si la columna no existe (fallback query), r.es_tarea_diseno
-     es undefined y no se filtra nada. */
+     es undefined y no se filtra nada.
+
+     NOTION MIRROR (2026-06-15): la vista del editor en Notion filtra
+     por `estado='editar' AND fecha_edicion IS NOT NULL`. Replicamos
+     ese filtro acá para que la app muestre EXACTO lo mismo que Notion.
+     Pubs en estado 'editar' sin fecha de edición son "fantasma" —
+     trabajo no asignado a un día concreto — y ensucian el listado.
+     Pubs en otros estados (aprobar, publicado, etc.) pasan sin filtro
+     porque las usan los KPIs de "editados este mes" y agregados. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pubsFiltradas = (pubs ?? []).filter((r: any) => !(r.es_tarea_diseno === true && !r.fecha_publicacion))
+  const pubsFiltradas = (pubs ?? []).filter((r: any) => {
+    if (r.es_tarea_diseno === true && !r.fecha_publicacion) return false
+    if (r.estado === 'editar' && !r.fecha_edicion) return false
+    return true
+  })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const entries: EditorEntry[] = pubsFiltradas.map((r: any) => {
