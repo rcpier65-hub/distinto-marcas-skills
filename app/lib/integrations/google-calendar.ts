@@ -22,7 +22,41 @@ const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const CAL_API = 'https://www.googleapis.com/calendar/v3'
 
 // Scope: gestionar eventos del calendario del usuario.
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email'
+const SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email'
+
+/* Color ID 11 ("tomato" en GCal) — rojizo, fácil de distinguir entre el
+   resto de eventos azules. Se aplica a grabaciones para que destaquen
+   visualmente sin necesitar calendario separado. */
+const GRABACION_COLOR_ID = '11'
+
+/* Buscamos un calendario del user cuyo summary contenga "grabacion" o
+   "recording". Si existe, los eventos van ahí. Si no, fallback a 'primary'.
+   Cacheo a nivel de módulo: 1 lookup por proceso Node, no por request.
+   Si Pedro crea/renombra el calendario, espera al próximo deploy. */
+let _grabacionesCalendarIdCache: string | null = null
+async function getGrabacionesCalendarId(token: string): Promise<string> {
+  if (_grabacionesCalendarIdCache) return _grabacionesCalendarIdCache
+  try {
+    const res = await fetch(`${CAL_API}/users/me/calendarList?fields=items(id,summary)`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      _grabacionesCalendarIdCache = 'primary'
+      return 'primary'
+    }
+    const data = await res.json()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: { id: string; summary: string }[] = (data.items ?? []) as any[]
+    const match = items.find((c) =>
+      /^(grabaciones?|recording|grabacion)/i.test((c.summary ?? '').trim()),
+    )
+    _grabacionesCalendarIdCache = match?.id ?? 'primary'
+    return _grabacionesCalendarIdCache
+  } catch {
+    _grabacionesCalendarIdCache = 'primary'
+    return 'primary'
+  }
+}
 
 function getRedirectUri(): string {
   return process.env.GOOGLE_OAUTH_REDIRECT_URI
@@ -202,7 +236,8 @@ export async function createCalendarEvent(input: EventInput): Promise<{ ok: true
   endDate.setDate(endDate.getDate() + 1)
   const end = endDate.toISOString().slice(0, 10)
 
-  const res = await fetch(`${CAL_API}/calendars/primary/events`, {
+  const calId = await getGrabacionesCalendarId(token)
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -210,7 +245,7 @@ export async function createCalendarEvent(input: EventInput): Promise<{ ok: true
       description: input.description,
       start: { date: start },
       end: { date: end },
-      ...(input.colorId ? { colorId: input.colorId } : {}),
+      colorId: input.colorId ?? GRABACION_COLOR_ID,
     }),
   })
   const data = await res.json()
@@ -257,7 +292,8 @@ export async function createReunionEvent(
 
   const requestId = globalThis.crypto?.randomUUID?.() ?? `meet-${input.fecha}-${horaHM}`
 
-  const res = await fetch(`${CAL_API}/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none`, {
+  const calId = await getGrabacionesCalendarId(token)
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events?conferenceDataVersion=1&sendUpdates=none`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -266,6 +302,7 @@ export async function createReunionEvent(
       start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima' },
       end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima' },
       attendees: (input.attendees ?? []).filter(Boolean).map((email) => ({ email })),
+      colorId: GRABACION_COLOR_ID,
       conferenceData: {
         createRequest: { requestId, conferenceSolutionKey: { type: 'hangoutsMeet' } },
       },
@@ -310,7 +347,8 @@ export async function createTimedEvent(
   const endHH = String(Math.floor(totalEnd / 60)).padStart(2, '0')
   const endMM = String(totalEnd % 60).padStart(2, '0')
 
-  const res = await fetch(`${CAL_API}/calendars/primary/events`, {
+  const calId = await getGrabacionesCalendarId(token)
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -318,7 +356,7 @@ export async function createTimedEvent(
       description: input.description,
       start: { dateTime: `${input.fecha}T${horaHM}:00`, timeZone: 'America/Lima' },
       end: { dateTime: `${endDate}T${endHH}:${endMM}:00`, timeZone: 'America/Lima' },
-      ...(input.colorId ? { colorId: input.colorId } : {}),
+      colorId: input.colorId ?? GRABACION_COLOR_ID,
     }),
   })
   const data = await res.json()
@@ -338,7 +376,8 @@ export async function updateCalendarEvent(eventId: string, input: EventInput): P
   endDate.setDate(endDate.getDate() + 1)
   const end = endDate.toISOString().slice(0, 10)
 
-  const res = await fetch(`${CAL_API}/calendars/primary/events/${eventId}`, {
+  const calId = await getGrabacionesCalendarId(token)
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -363,7 +402,8 @@ export async function deleteCalendarEvent(eventId: string): Promise<{ ok: true }
   const token = await getValidAccessToken()
   if (!token) return { ok: false, error: 'not_connected' }
 
-  const res = await fetch(`${CAL_API}/calendars/primary/events/${eventId}`, {
+  const calId = await getGrabacionesCalendarId(token)
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

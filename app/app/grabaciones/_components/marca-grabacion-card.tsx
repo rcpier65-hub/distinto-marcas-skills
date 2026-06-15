@@ -68,9 +68,18 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
 
   function handleAgregar() {
     // Default: día 15 del mes activo (mitad de mes, fácil de mover después)
+    // Hora + duración default — sin esto el sync con GCal creaba un evento
+    // all-day que aparecía como "filita" arriba del día (Pedro: "no me hace
+    // recordar"). Con hora, el evento sale como bloque en el slot horario,
+    // igual que el resto de sus reuniones.
     const fechaDefault = `${mesDefault}-15`
     startTransition(async () => {
-      const r = await createGrabacion({ marca_slug: kpi.marca_slug, fecha_planeada: fechaDefault })
+      const r = await createGrabacion({
+        marca_slug: kpi.marca_slug,
+        fecha_planeada: fechaDefault,
+        hora_planeada: '10:00',
+        duracion_min: 60,
+      })
       if (r.ok) {
         toast.success(`Fecha agregada a ${kpi.marca_nombre} — ajustala al día real`)
       } else {
