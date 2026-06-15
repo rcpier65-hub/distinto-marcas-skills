@@ -70,36 +70,54 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
   // Deriva de `desde` o del mes actual.
   const mesDefault = (desde ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
 
-  /* Próximas grabaciones (7 días desde hoy). Pedro: "que diga
-     próximas grabaciones para ver qué viene de la semana ... 7 días
-     desde el día en que estamos". Aplano kpi.grabaciones, filtro por
-     fecha en ventana [hoy, hoy+7] y estado 'planeada', tomo color de
-     la marca (color_primario_hex) para el pill de la fecha. */
-  const hoyIso = new Date().toISOString().slice(0, 10)
-  const en7Dias = (() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 7)
-    return d.toISOString().slice(0, 10)
-  })()
-  const proximas: ProximaGrabacion[] = kpis
-    .flatMap((k) =>
-      k.grabaciones
-        .filter((g) => g.estado === 'planeada' && g.fecha_planeada >= hoyIso && g.fecha_planeada <= en7Dias)
-        .map((g) => ({
-          id: g.id,
-          marca_slug: k.marca_slug,
-          marca_nombre: k.marca_nombre,
-          marca_emoji: k.marca_emoji,
-          marca_color: k.color_primario_hex,
-          fecha: g.fecha_planeada,
-          hora: (g.hora_planeada ?? '').slice(0, 5) || null,
-          estado: g.estado,
-        })),
-    )
-    .sort((a, b) => {
-      if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
-      return (a.hora ?? '99:99').localeCompare(b.hora ?? '99:99')
-    })
+  /* Próximas grabaciones (7 días desde hoy). Pedro: "que diga próximas
+     grabaciones para ver qué viene la semana ... 7 días desde el día en
+     que estamos".
+
+     BUG FIX: antes usaba `new Date().toISOString()` (UTC). En la
+     tarde-noche de Lima eso ya marca el día siguiente → "hoy" se corría
+     +1 día: las grabaciones de hoy desaparecían y las de mañana salían
+     etiquetadas "Hoy". Ahora calculo hoy/+7 en zona Lima con
+     Intl.DateTimeFormat.
+
+     Query DEDICADA a la tabla `grabaciones` (no dependo de kpis del mes
+     activo) → cubre la ventana rolling aunque cruce el cambio de mes. */
+  const ymdLima = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(d)
+  const hoyIso = ymdLima(new Date())
+  const en7Dias = ymdLima(new Date(Date.now() + 7 * 86_400_000))
+
+  let proximas: ProximaGrabacion[] = []
+  try {
+    const proxRes = await service
+      .from('grabaciones')
+      .select('id, fecha_planeada, hora_planeada, estado, marcas:marca_id (slug, nombre, emoji_marca, color_primario_hex)')
+      .eq('estado', 'planeada')
+      .gte('fecha_planeada', hoyIso)
+      .lte('fecha_planeada', en7Dias)
+      .order('fecha_planeada', { ascending: true })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    proximas = ((proxRes.data ?? []) as any[])
+      .map((g) => {
+        const m = Array.isArray(g.marcas) ? g.marcas[0] : g.marcas
+        return {
+          id: g.id as string,
+          marca_slug: (m?.slug ?? '') as string,
+          marca_nombre: (m?.nombre ?? 'Marca') as string,
+          marca_emoji: (m?.emoji_marca ?? null) as string | null,
+          marca_color: (m?.color_primario_hex ?? null) as string | null,
+          fecha: g.fecha_planeada as string,
+          hora: ((g.hora_planeada ?? '') as string).slice(0, 5) || null,
+          estado: g.estado as string,
+        }
+      })
+      .sort((a, b) => {
+        if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
+        return (a.hora ?? '99:99').localeCompare(b.hora ?? '99:99')
+      })
+  } catch { /* tabla no existe / pre-migration — lista vacía */ }
 
   // Estado de conexión con Google Calendar (best-effort — si la tabla no
   // existe o falla, asumimos no conectado)
@@ -158,6 +176,10 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
         </Card>
       )}
 
+      {/* PRÓXIMAS GRABACIONES — Pedro: "debe ser lo primero que salga
+          al principio". Card glass full-width arriba de todo. */}
+      <ProximasGrabacionesCard grabaciones={proximas} hoyIso={hoyIso} />
+
       {/* RESUMEN GLOBAL */}
       <Card>
         <CardContent className="pt-6">
@@ -210,13 +232,6 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
           {kpis.map((k) => (
             <MarcaGrabacionCard key={k.marca_id} kpi={k} mesDefault={mesDefault} />
           ))}
-          {/* Widget "Próximas grabaciones (7 días)" — Pedro pidió este
-              panel para llenar el espacio vacío del grid y tener a un
-              vistazo qué viene la próxima semana. Mismo tamaño que las
-              cards de marca, encaja como un slot más del grid. */}
-          {kpis.length > 0 && (
-            <ProximasGrabacionesCard grabaciones={proximas} hoyIso={hoyIso} />
-          )}
           {kpis.length === 0 && !error && (
             <p className="text-sm text-muted-foreground col-span-3 italic">Sin marcas activas.</p>
           )}

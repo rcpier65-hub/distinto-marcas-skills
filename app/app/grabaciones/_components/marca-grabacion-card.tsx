@@ -64,6 +64,9 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   const [formOpen, setFormOpen] = useState(false)
   const pct = kpi.cumplimiento_pct
   const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : pct > 0 ? 'bg-rose-400' : 'bg-muted'
+  /* Color de la marca para el tinte glass de la card (Pedro pidió que
+     todas las cards tengan el mismo estilo glass que próximas). */
+  const cardColor = kpi.color_primario_hex ?? '#737373'
 
   /* Optimistic toggle del check 'coordinación confirmada con cliente' */
   const [confirmada, setConfirmada] = useState<boolean>(kpi.coordinacionConfirmada)
@@ -119,8 +122,17 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="pt-4 pb-4 space-y-3">
+    <Card
+      className="relative overflow-hidden border-white/60 ring-1 ring-black/[0.04] rounded-3xl shadow-[0_6px_30px_-14px_rgba(0,0,0,0.18)] hover:shadow-[0_14px_44px_-14px_rgba(0,0,0,0.25)] hover:-translate-y-0.5 transition-all duration-300"
+      style={{
+        background: `linear-gradient(145deg, ${cardColor}14 0%, rgba(255,255,255,0.6) 55%)`,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+      }}
+    >
+      {/* Tira de acento superior con el color de la marca */}
+      <div className="absolute inset-x-0 top-0 h-1" style={{ background: cardColor }} aria-hidden />
+      <CardContent className="pt-5 pb-4 space-y-3">
         {/* Alerta: falta coordinación con cliente para alcanzar el objetivo */}
         {mostrarAlerta && (
           <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
@@ -152,8 +164,8 @@ export function MarcaGrabacionCard({ kpi, mesDefault }: Props) {
 
         {/* Barra de cumplimiento */}
         <div>
-          <div className="h-2 rounded-full bg-muted overflow-hidden mb-1.5">
-            <div className={`h-full ${barColor} transition-all`} style={{ width: `${Math.min(100, pct)}%` }} />
+          <div className="h-2 rounded-full bg-black/5 overflow-hidden mb-1.5">
+            <div className={`h-full ${barColor} transition-all rounded-full`} style={{ width: `${Math.min(100, pct)}%` }} />
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="font-mono">
