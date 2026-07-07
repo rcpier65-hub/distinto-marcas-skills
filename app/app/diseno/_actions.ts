@@ -126,19 +126,33 @@ export async function updateDisenoEntry(
         .maybeSingle()
       if (!prev?.started_at) update.started_at = new Date().toISOString()
     }
+    /* Diseño TERMINADO: 'listo' o 'enviado' sellan diseno_terminado_at (una
+       sola vez). Sirve para el Reporte del día (que Aylin veía vacío) y para
+       medir la duración (started_at → diseno_terminado_at). Si se reabre a un
+       estado no-terminado, se limpia para no contarlo como hecho. */
+    if (patch.subEstado === 'listo' || patch.subEstado === 'enviado') {
+      const { data: prev } = await service
+        .from('publicaciones')
+        .select('diseno_terminado_at')
+        .eq('id', id)
+        .maybeSingle()
+      if (!prev?.diseno_terminado_at) update.diseno_terminado_at = new Date().toISOString()
+    } else if (patch.subEstado === 'sin_empezar' || patch.subEstado === 'en_progreso' || patch.subEstado === 'pausada') {
+      update.diseno_terminado_at = null
+    }
     if (patch.subEstado === 'archivado') {
       update.archived_at = new Date().toISOString()
     } else {
-      /* Cualquier otro subEstado (sin_empezar / en_progreso / listo)
-         significa "no archivada" → limpiar archived_at. */
+      /* Cualquier otro subEstado (sin_empezar / en_progreso / pausada / listo /
+         enviado) significa "no archivada" → limpiar archived_at. */
       update.archived_at = null
     }
     /* SYNC con el estado de la PUBLICACIÓN (pedido de Pedro 15-jun-2026):
        el sub-estado de diseño maneja el estado del pipeline, igual que el
        editor. en_progreso → 'disenando'; listo → 'aprobar'; sin_empezar →
-       vuelve a 'disenar'. ('archivado' no toca el estado del pipeline.)
-       'disenando' es un valor de enum nuevo: si aún no se aplicó el SQL,
-       más abajo cae a 'disenar' (fallback) para no romper. */
+       vuelve a 'disenar'. ('archivado' / 'pausada' / 'enviado' no tocan el
+       estado del pipeline.) 'disenando' es un valor de enum nuevo: si aún no
+       se aplicó el SQL, más abajo cae a 'disenar' (fallback) para no romper. */
     if (patch.subEstado === 'en_progreso') update.estado = 'disenando'
     else if (patch.subEstado === 'listo') update.estado = 'aprobar'
     else if (patch.subEstado === 'sin_empezar') update.estado = 'disenar'

@@ -165,3 +165,87 @@ export async function setFocusLane(id: string, lane: FocusLane | null): Promise<
   revalidatePath('/tareas')
   return { ok: true }
 }
+
+/* Resuelve la marca de una nota: marca_slug explícita → categoría como nombre
+   de marca ("Little Joe") → categoría slugificada → 'interno' (bucket interno). */
+async function resolverMarcaDeTarea(
+  service: Service,
+  marcaSlug: string | null,
+  categoria: string | null,
+): Promise<{ id: string; slug: string } | null> {
+  const bySlug = async (slug: string) => {
+    const { data } = await service.from('marcas').select('id, slug').eq('slug', slug).maybeSingle()
+    return data ?? null
+  }
+  if (marcaSlug) { const m = await bySlug(marcaSlug.toLowerCase().trim()); if (m) return m }
+  const cat = (categoria ?? '').trim()
+  if (cat && cat.toLowerCase() !== 'general') {
+    const { data } = await service.from('marcas').select('id, slug').ilike('nombre', cat).limit(1)
+    if (data && data[0]) return data[0]
+    const slug = cat.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    if (slug) { const m = await bySlug(slug); if (m) return m }
+  }
+  return await bySlug('interno')
+}
+
+/* PUENTE: manda una nota rápida del tablero "Tareas" a "Mis diseños para hoy".
+   Crea una tarea de diseño (publicacion es_tarea_diseno=true) con la marca de la
+   nota, marcada para diseñar HOY y atribuida a quien la anotó (para que salga en
+   el Reporte del día). Enlaza tareas.diseno_id → así el trabajo vive en AMBAS
+   pantallas SIN duplicarse. Idempotente: si ya se mandó, devuelve el mismo id.
+   Pedro 07-jul: "que su trabajo esté en ambas: anota rápido en Tareas y que
+   tenga el flujo completo en Diseños". */
+export async function enviarTareaADiseno(id: string): Promise<{ ok: boolean; error?: string; disenoId?: string }> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const perm = await puedeEditar(service, user.id, id)
+  if (!perm.ok) return perm
+
+  const { data: t } = await service
+    .from('tareas')
+    .select('texto, categoria, marca_slug, diseno_id, team_member_id')
+    .eq('id', id)
+    .maybeSingle()
+  if (!t) return { ok: false, error: 'Tarea no encontrada' }
+  if (t.diseno_id) return { ok: true, disenoId: t.diseno_id as string }  // ya enlazada
+
+  const marca = await resolverMarcaDeTarea(service, t.marca_slug ?? null, t.categoria ?? null)
+  if (!marca) return { ok: false, error: 'No se pudo resolver la marca (falta la marca "interno").' }
+
+  /* Diseñador = dueño de la nota, para atribuirlo en el reporte. */
+  let disenadorNombre: string | null = null
+  let disenadorId: string | null = null
+  if (t.team_member_id) {
+    const { data: m } = await service.from('team_members').select('nombre').eq('id', t.team_member_id).maybeSingle()
+    disenadorNombre = m?.nombre ?? null
+    if (disenadorNombre) {
+      const { data: d } = await service.from('disenadores').select('id').ilike('nombre', disenadorNombre).limit(1)
+      disenadorId = (d && d[0]?.id) ?? null
+    }
+  }
+
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+
+  const insert: Record<string, unknown> = {
+    marca_id: marca.id,
+    nombre: (t.texto ?? 'Diseño').slice(0, 300),
+    estado: 'disenar',
+    estado_tarea: 'sin_empezar',
+    es_tarea_diseno: true,
+    fecha_diseno: hoy,
+    fecha_marcada_para_disenar: hoy,   // → aparece en "Mis diseños para hoy"
+    disenador_id: disenadorId,
+    disenador_nombre: disenadorNombre,
+    plataformas: [], tipo_contenido: [], objetivos: [],
+    created_by: user.id, updated_by: user.id,
+  }
+  const { data: nueva, error } = await service.from('publicaciones').insert(insert).select('id').single()
+  if (error) return { ok: false, error: error.message }
+
+  const { error: linkErr } = await service.from('tareas')
+    .update({ diseno_id: nueva.id, marca_slug: marca.slug }).eq('id', id)
+  if (linkErr) return { ok: false, error: linkErr.message }
+
+  revalidatePath('/diseno'); revalidatePath('/tareas'); revalidatePath('/inicio')
+  return { ok: true, disenoId: nueva.id as string }
+}

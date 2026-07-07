@@ -63,7 +63,7 @@ export async function loadActividadDerivada(
 ): Promise<ActividadRow[]> {
   const { resolver, memberById } = await construirResolverActor(service)
 
-  const [editsRes, tareasRes] = await Promise.all([
+  const [editsRes, tareasRes, disenosRes] = await Promise.all([
     // Videos terminados de editar en la ventana (editado_at).
     service
       .from('publicaciones')
@@ -82,6 +82,17 @@ export async function loadActividadDerivada(
       .lte('completada_at', opts.hasta)
       .order('completada_at', { ascending: false })
       .limit(500),
+    // Diseños terminados en la ventana (diseno_terminado_at). Antes NO
+    // aparecían en el reporte → Aylin duplicaba tareas para que figuren.
+    // Defensive: si la columna aún no existe en algún entorno, no rompe.
+    service
+      .from('publicaciones')
+      .select('id, nombre, disenador_nombre, diseno_terminado_at, started_at, marca:marcas(slug)')
+      .gte('diseno_terminado_at', opts.desde)
+      .lte('diseno_terminado_at', opts.hasta)
+      .order('diseno_terminado_at', { ascending: false })
+      .limit(500)
+      .then((r: unknown) => r, () => ({ data: [] })),
   ])
 
   const rows: ActividadRow[] = []
@@ -113,6 +124,24 @@ export async function loadActividadDerivada(
       marca_slug: null,
       detalle: t.texto ?? null,
       created_at: t.completada_at,
+    })
+  }
+
+  // Diseños terminados (Aylin). El actor viene de disenador_nombre, resuelto
+  // al perfil de equipo igual que el editor. detalle = nombre de la pieza.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const d of ((disenosRes?.data ?? []) as any[])) {
+    if (!d.disenador_nombre) continue  // sin diseñador atribuible → se omite
+    const actor = resolver(d.disenador_nombre)
+    const marca = Array.isArray(d.marca) ? d.marca[0] : d.marca
+    rows.push({
+      actor_nombre: actor.nombre,
+      rol: actor.rol,
+      accion: 'Completó diseño',
+      entidad_tipo: 'publicacion',
+      marca_slug: marca?.slug ?? null,
+      detalle: d.nombre ?? null,
+      created_at: d.diseno_terminado_at,
     })
   }
 

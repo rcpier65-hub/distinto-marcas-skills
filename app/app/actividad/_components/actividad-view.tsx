@@ -60,8 +60,9 @@ function fechaCorta(fecha: string): string {
 function accionMeta(accion: string): { emoji: string; color: string } {
   const a = accion.toLowerCase()
   if (a.includes('editó') || a.includes('editar') || a.includes('edición') || a.includes('video')) return { emoji: '✂️', color: '#8b5cf6' }
-  if (a.includes('completó') || a.includes('terminó') || a.includes('tarea')) return { emoji: '✅', color: '#16a34a' }
+  // Diseño ANTES que "completó"/"tarea": "Completó diseño" debe salir 🎨, no ✅.
   if (a.includes('diseñ') || a.includes('disen')) return { emoji: '🎨', color: '#ec4899' }
+  if (a.includes('completó') || a.includes('terminó') || a.includes('tarea')) return { emoji: '✅', color: '#16a34a' }
   if (a.includes('grab')) return { emoji: '🎥', color: '#f43f5e' }
   if (a.includes('coment') || a.includes('respond')) return { emoji: '💬', color: '#14b8a6' }
   if (a.includes('portada')) return { emoji: '🖼️', color: '#a855f7' }

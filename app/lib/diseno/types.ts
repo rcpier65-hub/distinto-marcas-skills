@@ -8,10 +8,11 @@
 export type EstadoPub =
   | 'disenar' | 'editar' | 'aprobar' | 'programar' | 'publicar' | 'publicado' | 'borrador'
 
-/* Sub-estados del workflow de diseño.
-   'archivado': la tarea ya no se muestra en lista normal. Pedro pidió
-   este estado para sacar cosas del kanban sin borrarlas. */
-export type SubEstadoDiseno = 'sin_empezar' | 'en_progreso' | 'listo' | 'archivado'
+/* Sub-estados del workflow de diseño (flujo de Aylin):
+   sin_empezar → en_progreso (avanza) → [pausada = no avanza] → listo (termina)
+   → enviado (se envió al cliente/grupo). 'archivado': sale del kanban sin
+   borrarse. Pedro 07-jul: pidió pausada y enviado explícitos. */
+export type SubEstadoDiseno = 'sin_empezar' | 'en_progreso' | 'pausada' | 'listo' | 'enviado' | 'archivado'
 
 export type DisenoEntry = {
   id: string
@@ -86,7 +87,9 @@ export function calcularAlertaFecha(
 export function normalizeSubEstado(estadoTarea: string | null | undefined): SubEstadoDiseno {
   const s = (estadoTarea ?? '').toLowerCase().trim()
   if (s === 'archivado' || s === 'archivada') return 'archivado'
+  if (s === 'enviado' || s === 'enviada') return 'enviado'
   if (s === 'listo' || s === 'completado') return 'listo'
+  if (s === 'pausada' || s === 'pausado' || s.includes('paus')) return 'pausada'
   if (s === 'en_progreso' || s === 'en progreso' || s.includes('progreso')) return 'en_progreso'
   return 'sin_empezar'
 }

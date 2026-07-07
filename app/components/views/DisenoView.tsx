@@ -44,14 +44,17 @@ import {
 const SUBESTADO_CONFIG: Record<SubEstadoDiseno, { label: string; color: string; bg: string }> = {
   sin_empezar:  { label: 'Sin empezar', color: '#737373', bg: 'rgba(115, 115, 115, 0.14)' },
   en_progreso:  { label: 'En progreso', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.14)' },
+  pausada:      { label: 'Pausada',     color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.14)' },
   listo:        { label: 'Listo',       color: '#34d399', bg: 'rgba(52, 211, 153, 0.14)' },
+  enviado:      { label: 'Enviado',     color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.14)' },
   archivado:    { label: 'Archivado',   color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.10)' },
 }
 
-/* Orden de columnas del kanban. Pedro pidió incluir 'archivado' como
-   4ta columna — útil para mover cards terminadas/canceladas sin
-   perderlas, y arrastrarlas devuelta si fue por error. */
-const KANBAN_COLUMNS: SubEstadoDiseno[] = ['sin_empezar', 'en_progreso', 'listo', 'archivado']
+/* Orden de columnas del kanban = flujo completo de Aylin:
+   Sin empezar → En progreso → Pausada (no avanza) → Listo → Enviado →
+   Archivado. Todas las etapas son columnas para que NINGUNA card
+   desaparezca al cambiarle el estado. */
+const KANBAN_COLUMNS: SubEstadoDiseno[] = ['sin_empezar', 'en_progreso', 'pausada', 'listo', 'enviado', 'archivado']
 
 const ALERTA_COLOR: Record<AlertaFecha, { fg: string; bg: string; label: string }> = {
   rojo:     { fg: '#fb7185', bg: 'rgba(251, 113, 133, 0.12)', label: 'urgente' },

@@ -1,7 +1,7 @@
 // app/lib/tareas/serialize.ts
 import type { Tarea, FocusLane } from './types'
 
-export const TAREA_SELECT = `id, team_member_id, created_by, texto, categoria, color, completada, completada_at, focus_lane, created_at,
+export const TAREA_SELECT = `id, team_member_id, created_by, texto, categoria, color, completada, completada_at, focus_lane, created_at, marca_slug, diseno_id,
   miembro:team_members!tareas_team_member_id_fkey(nombre)`
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,5 +19,7 @@ export function rowToTarea(r: any): Tarea {
     focusLane: (r.focus_lane ?? null) as FocusLane | null,
     createdAt: r.created_at,
     completadaAt: r.completada_at ?? null,
+    marcaSlug: r.marca_slug ?? null,
+    disenoId: r.diseno_id ?? null,
   }
 }
