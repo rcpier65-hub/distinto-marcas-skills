@@ -452,8 +452,10 @@ export function InicioView({ data }: { data: InicioData }) {
           </div>
         </header>
 
-        {/* Banner de recordatorios — Erick y Lorena (Operaciones) */}
-        {(data.nombre === 'Erick' || data.nombre === 'Lorena') && (
+        {/* Banner de recordatorios — solo Lorena (Operaciones).
+            Pedro 07-jul-2026: quitar el banner para Erick (no debe salirle al
+            iniciar sesión / abrir la app). Se mantiene para Lorena. */}
+        {(data.nombre === 'Lorena') && (
           <BannerRecordatorioErick nombre={data.nombre} tareas={data.tareasMias} pendientes={data.pendientes} />
         )}
 
