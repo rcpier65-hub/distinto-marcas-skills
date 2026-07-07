@@ -7,10 +7,10 @@
    de cambios de estado. Agrupado por tipo (✅ Tareas terminadas · N) con los
    NOMBRES, colores/emojis por marca, hábitos del día, colores de la agencia. */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, useEffect, forwardRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ClipboardList, Copy as CopyIcon, Check, ListChecks, AlignLeft, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
+import { ClipboardList, Copy as CopyIcon, Check, ListChecks, AlignLeft, ChevronLeft, ChevronRight, CalendarDays, Image as ImageIcon, Download, X } from 'lucide-react'
 
 export type ActividadRow = {
   actor_nombre: string
@@ -46,6 +46,14 @@ function shiftFecha(fecha: string, dias: number): string {
   const [y, m, d] = fecha.split('-').map(Number)
   const dt = new Date(y, m - 1, d + dias)
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+function fechaCorta(fecha: string): string {
+  try {
+    const [y, m, d] = fecha.split('-').map(Number)
+    const dia = new Intl.DateTimeFormat('es-PE', { weekday: 'long' }).format(new Date(y, m - 1, d))
+    return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${d}`
+  } catch { return fecha }
 }
 
 /* Emoji + color por TIPO de acción. */
@@ -175,6 +183,65 @@ export function ActividadView({
     router.push(`/actividad${params.toString() ? `?${params}` : ''}`)
   }
 
+  /* ---------- Imagen del reporte (por persona) para WhatsApp ---------- */
+  const [imagenDe, setImagenDe] = useState<[string, ActividadRow[]] | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [imgBusy, setImgBusy] = useState<false | 'copy' | 'download'>(false)
+
+  useEffect(() => {
+    if (!imagenDe) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setImagenDe(null) }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [imagenDe])
+
+  async function capturarBlob(): Promise<Blob> {
+    if (!cardRef.current) throw new Error('sin tarjeta')
+    const { toBlob } = await import('html-to-image')
+    if (document.fonts?.ready) await document.fonts.ready
+    const blob = await toBlob(cardRef.current, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true })
+    if (!blob) throw new Error('No se pudo generar la imagen')
+    return blob
+  }
+
+  function descargar(blob: Blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reporte-${(imagenDe?.[0] ?? 'dia').toLowerCase().replace(/\s+/g, '-')}-${fecha}.png`
+    document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 4000)
+  }
+
+  async function copiarImagen() {
+    setImgBusy('copy')
+    try {
+      const blob = await capturarBlob()
+      try {
+        if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+          toast.success('Imagen copiada ✓ — pégala en WhatsApp')
+          return
+        }
+        throw new Error('sin portapapeles')
+      } catch {
+        descargar(blob)
+        toast.success('Imagen descargada ✓ — adjúntala en WhatsApp')
+      }
+    } catch {
+      toast.error('No se pudo generar la imagen')
+    } finally { setImgBusy(false) }
+  }
+
+  async function descargarImagen() {
+    setImgBusy('download')
+    try { descargar(await capturarBlob()); toast.success('Imagen descargada ✓') }
+    catch { toast.error('No se pudo generar la imagen') }
+    finally { setImgBusy(false) }
+  }
+
   const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
   const esHoy = fecha === hoyLima
 
@@ -289,9 +356,20 @@ export function ActividadView({
                     </span>
                   </div>
                 </div>
-                <span className="text-[13px] font-bold shrink-0 px-3 py-1.5 rounded-xl" style={{ color: AGENCY, background: `${AGENCY}12` }}>
-                  {arr.length + habs.length} {arr.length + habs.length === 1 ? 'cosa' : 'cosas'}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[13px] font-bold px-3 py-1.5 rounded-xl" style={{ color: AGENCY, background: `${AGENCY}12` }}>
+                    {arr.length + habs.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setImagenDe([persona, arr])}
+                    title="Generar imagen para WhatsApp"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white transition-all"
+                    style={{ background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY_2})`, boxShadow: '0 4px 12px -4px rgba(113,112,255,0.6)' }}
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" /> Imagen
+                  </button>
+                </div>
               </div>
 
               <div className="p-4 space-y-4">
@@ -353,6 +431,126 @@ export function ActividadView({
           )
         })}
       </div>
+
+      {/* ============ MODAL: IMAGEN PARA WHATSAPP ============ */}
+      {imagenDe && (
+        <div
+          onClick={() => setImagenDe(null)}
+          className="fixed inset-0 z-[1000] flex items-start sm:items-center justify-center p-3 sm:p-5 overflow-auto"
+          style={{ background: 'rgba(15,23,42,0.72)', backdropFilter: 'blur(4px)' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[400px] flex flex-col gap-3 my-auto">
+            <div className="flex items-center gap-2">
+              <button onClick={copiarImagen} disabled={!!imgBusy}
+                className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-semibold text-sm disabled:opacity-60"
+                style={{ background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY_2})` }}>
+                {imgBusy === 'copy' ? '⏳ Generando…' : <><CopyIcon className="w-4 h-4" /> Copiar imagen</>}
+              </button>
+              <button onClick={descargarImagen} disabled={!!imgBusy}
+                className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-xl bg-white text-foreground font-semibold text-sm border disabled:opacity-60">
+                {imgBusy === 'download' ? '⏳' : <><Download className="w-4 h-4" /> Bajar</>}
+              </button>
+              <button onClick={() => setImagenDe(null)} aria-label="Cerrar"
+                className="w-11 h-11 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors shrink-0">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <ReporteImagenCard
+              ref={cardRef}
+              persona={imagenDe[0]}
+              arr={imagenDe[1]}
+              habs={habitosPorPersona[imagenDe[0]] ?? []}
+              rol={rolMeta(imagenDe[1][0]?.rol ?? null)}
+              fecha={fecha}
+              marcaMap={marcaMap}
+            />
+          </div>
+        </div>
+      )}
     </main>
   )
 }
+
+/* ============ Tarjeta imagen (se captura con html-to-image) ============ */
+const ReporteImagenCard = forwardRef<HTMLDivElement, {
+  persona: string
+  arr: ActividadRow[]
+  habs: HabitoMini[]
+  rol: { label: string; color: string }
+  fecha: string
+  marcaMap: Map<string, MarcaMini>
+}>(function ReporteImagenCard({ persona, arr, habs, rol, fecha, marcaMap }, ref) {
+  const grupos = gruposDe(arr)
+  return (
+    <div ref={ref} style={{ width: 384, background: 'linear-gradient(160deg, #f5f3ff 0%, #fdf2f8 55%, #fff7ed 100%)', padding: 26, fontFamily: 'Inter Tight, system-ui, sans-serif', color: '#0f172a', boxSizing: 'border-box', borderRadius: 20 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY_2})`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, fontWeight: 800 }}>
+            {persona.slice(0, 1).toUpperCase()}
+          </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>{persona}</div>
+            <div style={{ fontSize: 11.5, color: rol.color, fontWeight: 700, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4 }}>{rol.label}</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.5, color: '#a1a1c9' }}>REPORTE</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: AGENCY }}>{fechaCorta(fecha)}</div>
+        </div>
+      </div>
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+        <div style={{ flex: 1, background: '#fff', borderRadius: 16, padding: '14px 10px', textAlign: 'center', boxShadow: '0 2px 8px rgba(16,24,40,0.05)' }}>
+          <div style={{ fontSize: 20 }}>✅</div>
+          <div style={{ fontSize: 25, fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{arr.length}</div>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: '#64748b', marginTop: 3 }}>HECHAS</div>
+        </div>
+        <div style={{ flex: 1, background: '#fff', borderRadius: 16, padding: '14px 10px', textAlign: 'center', boxShadow: '0 2px 8px rgba(16,24,40,0.05)' }}>
+          <div style={{ fontSize: 20 }}>🌱</div>
+          <div style={{ fontSize: 25, fontWeight: 800, color: AGENCY, lineHeight: 1 }}>{habs.length}</div>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: '#64748b', marginTop: 3 }}>HÁBITOS</div>
+        </div>
+      </div>
+      {/* Grupos */}
+      {grupos.map(([accion, items]) => {
+        const meta = accionMeta(accion)
+        return (
+          <div key={accion} style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase', color: meta.color, marginBottom: 8 }}>
+              {meta.emoji} {grupoLabel(accion)} · {items.length}
+            </div>
+            {items.map((r, i) => {
+              const marca = r.marca_slug ? marcaMap.get(r.marca_slug) : null
+              return (
+                <div key={i} style={{ background: '#fff', borderRadius: 12, padding: '9px 11px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(16,24,40,0.06)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: marca?.color ?? meta.color, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: 12.5, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detalle ?? grupoLabel(accion)}</span>
+                  {marca && <span style={{ fontSize: 10, fontWeight: 700, color: marca.color, background: `${marca.color}18`, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>{marca.nombre}</span>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+      {arr.length === 0 && (
+        <div style={{ fontSize: 12.5, color: '#94a3b8', fontStyle: 'italic', marginBottom: 12 }}>Sin tareas ni videos — pero cumplió sus hábitos 🌱</div>
+      )}
+      {/* Hábitos */}
+      {habs.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase', color: '#16a34a', marginBottom: 8 }}>🌱 Hábitos del día</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {habs.map((h, i) => (
+              <span key={i} style={{ fontSize: 11.5, background: `${h.color}18`, padding: '5px 10px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <span>{h.icono}</span><span style={{ fontWeight: 600 }}>{h.nombre}</span>{h.hora && <span style={{ color: '#94a3b8', fontSize: 10 }}>{h.hora}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Footer */}
+      <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(15,23,42,0.08)', textAlign: 'center', fontSize: 11, fontStyle: 'italic', color: '#94a3b8' }}>— vía Distinto Agencia</div>
+    </div>
+  )
+})
