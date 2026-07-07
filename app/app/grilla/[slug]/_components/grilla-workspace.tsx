@@ -21,6 +21,24 @@ type Marca = {
   grupo_nombre: string | null  // nombre humano del grupo destino real (para tooltip/UI)
 }
 
+/* Helpers de navegación por semana (Pedro 26-jun-2026: moverse entre semanas).
+   Cada vista es una semana estricta lun→domingo; las flechas mueven ±7 días. */
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(iso + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+function labelSemana(ini: string, fin: string): string {
+  const d1 = new Date(ini + 'T12:00:00Z')
+  const d2 = new Date(fin + 'T12:00:00Z')
+  const m1 = MESES_CORTOS[d1.getUTCMonth()]
+  const m2 = MESES_CORTOS[d2.getUTCMonth()]
+  return d1.getUTCMonth() === d2.getUTCMonth()
+    ? `${d1.getUTCDate()} al ${d2.getUTCDate()} ${m1}`
+    : `${d1.getUTCDate()} ${m1} al ${d2.getUTCDate()} ${m2}`
+}
+
 type PubLite = {
   id: string
   titulo: string
@@ -51,6 +69,16 @@ export function GrillaWorkspace({
   // preview" o al primer mount. Algunos navegadores ignoran Cache-Control:
   // no-store dentro de iframes, así que un param ?_v= rompe el cache HTTP.
   const [bust, setBust] = useState(() => Date.now())
+
+  /* Navegación por semana. Cada flecha mueve la semana ±7 días y recarga la
+     página con ?inicio&fin (el server trae las pubs de ESA semana). "Esta
+     semana" vuelve a la semana actual (sin params). */
+  function irASemana(nuevoInicio: string, nuevoFin: string) {
+    router.push(`/grilla/${marca.slug}?inicio=${nuevoInicio}&fin=${nuevoFin}`)
+  }
+  const semanaAnterior = () => irASemana(addDaysIso(semanaInicio, -7), addDaysIso(semanaFin, -7))
+  const semanaSiguiente = () => irASemana(addDaysIso(semanaInicio, 7), addDaysIso(semanaFin, 7))
+  const irEstaSemana = () => router.push(`/grilla/${marca.slug}`)
 
   // URL del iframe — el endpoint /api/render-grilla-html devuelve el HTML
   // de la grilla con las publicaciones reales. Se actualiza si cambia algo.
@@ -151,37 +179,59 @@ export function GrillaWorkspace({
     if (isCopyingImage) return
     setIsCopyingImage(true)
     toast.loading('Generando PNG (~10s)…', { id: 'copy-img' })
-    try {
+
+    /* Promesa del blob PNG. CLAVE del fix (15-jun-2026): el render del PNG
+       tarda ~10s, pero el navegador solo permite escribir al portapapeles
+       dentro de ~5s del clic ("activación transitoria"). Si hacemos
+       `await fetch` y DESPUÉS clipboard.write, se pierde el permiso →
+       "Write permission denied". Solución: pasarle esta PROMESA a
+       ClipboardItem; el navegador reserva la escritura en el momento del clic
+       y espera a que el PNG llegue, sin perder el permiso. */
+    const pngBlobPromise = (async () => {
       const res = await fetch(pngEndpointUrl)
       if (!res.ok) {
-        const errBody = await res.text().catch(() => '')
-        throw new Error(
-          `Servidor falló (${res.status})${errBody ? `: ${errBody.slice(0, 200)}` : ''}`,
-        )
+        const body = await res.text().catch(() => '')
+        throw new Error(`Servidor falló (${res.status})${body ? `: ${body.slice(0, 160)}` : ''}`)
       }
-      const contentType = res.headers.get('content-type') ?? ''
-      if (!contentType.startsWith('image/')) {
-        /* El endpoint devolvió texto/JSON (probablemente error de Chromium).
-           Mostrar el cuerpo para diagnóstico. */
-        const errBody = await res.text().catch(() => '')
-        throw new Error(
-          `Esperaba PNG pero recibí ${contentType || 'desconocido'}${errBody ? `: ${errBody.slice(0, 200)}` : ''}`,
-        )
+      const ct = res.headers.get('content-type') ?? ''
+      if (!ct.startsWith('image/')) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`Esperaba PNG pero recibí ${ct || 'desconocido'}${body ? `: ${body.slice(0, 160)}` : ''}`)
       }
-      /* Re-crear el blob con type forzado a image/png. Esto asegura que
-         coincida con la key del ClipboardItem aunque el server haya
-         devuelto image/jpeg o algo con sufijos. */
-      const buf = await res.arrayBuffer()
-      const pngBlob = new Blob([buf], { type: 'image/png' })
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': pngBlob }),
-      ])
-      toast.success('Imagen copiada al portapapeles ✓ — ya podés pegarla', {
-        id: 'copy-img',
-      })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      toast.error(`No se pudo copiar: ${msg}`, { id: 'copy-img' })
+      // Forzar type image/png para que coincida con la key del ClipboardItem.
+      return new Blob([await res.arrayBuffer()], { type: 'image/png' })
+    })()
+
+    try {
+      // Intento principal: copiar al portapapeles (ClipboardItem CON promesa).
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlobPromise })])
+        toast.success('Imagen copiada ✓ — ya puedes pegarla en WhatsApp', { id: 'copy-img' })
+        return
+      }
+      throw new Error('clipboard-no-soportado')
+    } catch {
+      /* Fallback: si el portapapeles falla (permiso denegado, navegador sin
+         soporte, ventana sin foco…), DESCARGAMOS el PNG para que igual puedas
+         enviarlo. Reusamos la misma promesa (ya está resolviéndose). */
+      try {
+        const blob = await pngBlobPromise
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `grilla-${marca.slug}-${semanaInicio}.png`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 4000)
+        toast.success('No se pudo copiar, pero descargué la imagen ✓ — adjúntala en WhatsApp', {
+          id: 'copy-img',
+          duration: 9000,
+        })
+      } catch (err2) {
+        const msg = err2 instanceof Error ? err2.message : String(err2)
+        toast.error(`No se pudo generar la imagen: ${msg}`, { id: 'copy-img', duration: 9000 })
+      }
     } finally {
       setIsCopyingImage(false)
     }
@@ -230,6 +280,30 @@ export function GrillaWorkspace({
             🔒 Envío real está deshabilitado para esta marca. <a href="/settings" className="underline">Configurá en Settings</a> antes de habilitarlo.
           </p>
         )}
+      </div>
+
+      {/* NAVEGACIÓN POR SEMANA — moverse entre semanas (lun→domingo).
+          Pedro 26-jun-2026: "navegar entre semanas, cada semana muestra solo
+          sus publicaciones". ◀ y ▶ mueven ±7 días; el centro indica la semana
+          y permite volver a la actual. */}
+      <div className="flex items-center justify-center gap-3 flex-wrap rounded-lg border bg-muted/30 px-3 py-2">
+        <Button variant="outline" size="sm" onClick={semanaAnterior} title="Ver la semana anterior">
+          ◀ Semana anterior
+        </Button>
+        <div className="text-center min-w-[160px]">
+          <div className="text-sm font-semibold leading-tight">Semana del {labelSemana(semanaInicio, semanaFin)}</div>
+          <button
+            type="button"
+            onClick={irEstaSemana}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            title="Volver a la semana actual"
+          >
+            Ir a esta semana
+          </button>
+        </div>
+        <Button variant="outline" size="sm" onClick={semanaSiguiente} title="Ver la semana siguiente">
+          Semana siguiente ▶
+        </Button>
       </div>
 
       {/* SPLIT: preview HTML iframe + caption */}

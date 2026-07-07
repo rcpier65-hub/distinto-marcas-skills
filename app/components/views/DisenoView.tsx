@@ -87,7 +87,38 @@ type Filters = {
   marcaSlug: string | 'todas'
   soloHoy: boolean
   mostrarArchivadas: boolean
+  /* Filtro por fecha (Pedro 23-jun-2026: "saber qué se hizo en tal fecha o
+     rangos"). Ambos en formato YYYY-MM-DD; '' = sin límite por ese lado.
+     desde===hasta ⇒ un solo día. Se filtra por la fecha "relevante" de la
+     tarea (ver fechaRelevante). */
+  desde: string
+  hasta: string
 }
+
+/* Fecha "relevante" de una tarea para el filtro de fechas: priorizamos la
+   fecha de diseño (la que se ve en las tarjetas del Kanban), con respaldo a
+   entrega y luego publicación, para no esconder tareas que solo tengan una
+   de esas. Si no tiene ninguna, devuelve null. */
+function fechaRelevante(e: DisenoEntry): string | null {
+  return e.fechaDiseno ?? e.fechaEntrega ?? e.fechaPublicacion ?? null
+}
+
+/* ¿La tarea cae dentro del rango [desde, hasta]? Las fechas YYYY-MM-DD se
+   comparan como strings (orden lexicográfico === orden cronológico). Una
+   tarea SIN fecha relevante NO entra cuando hay filtro de fechas activo. */
+function pasaRangoFecha(e: DisenoEntry, desde: string, hasta: string): boolean {
+  if (!desde && !hasta) return true
+  const f = fechaRelevante(e)
+  if (!f) return false
+  if (desde && f < desde) return false
+  if (hasta && f > hasta) return false
+  return true
+}
+
+/* Clave para recordar la vista/filtros entre navegaciones (sessionStorage).
+   Fix Pedro 15-jun-2026: en "Mi trabajo de hoy" entrabas a una tarea y al
+   volver se perdía el filtro. Ahora se restaura al montar. */
+const DISENO_VIEW_STATE_KEY = 'diseno-view-state-v1'
 
 type Props = {
   entries: DisenoEntry[]
@@ -120,9 +151,40 @@ export function DisenoView({
     marcaSlug: 'todas',
     soloHoy: false,
     mostrarArchivadas: false,
+    desde: '',
+    hasta: '',
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+
+  /* Restaurar vista/filtros guardados (al montar). Sobrevive a entrar a una
+     tarea y volver, al botón "Volver" y a re-entrar desde el menú. El flag
+     `restaurado` evita que el efecto de guardado pise el storage con los
+     valores por defecto antes de leerlos. */
+  const [restaurado, setRestaurado] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DISENO_VIEW_STATE_KEY)
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (s.vista === 'tabla' || s.vista === 'kanban') setVista(s.vista)
+        if (typeof s.search === 'string') setSearch(s.search)
+        if (s.filters && typeof s.filters === 'object') {
+          setFilters((f) => ({ ...f, ...s.filters }))
+        }
+      }
+    } catch {}
+    setRestaurado(true)
+  }, [])
+  useEffect(() => {
+    if (!restaurado) return
+    try {
+      sessionStorage.setItem(
+        DISENO_VIEW_STATE_KEY,
+        JSON.stringify({ vista, search, filters }),
+      )
+    } catch {}
+  }, [restaurado, vista, search, filters])
 
   /* Si la URL trajo ?nuevo=1 (desde el botón en /grilla), abrir el modal
      de creación inmediatamente. Solo la primera vez (luego lo cierra
@@ -155,7 +217,8 @@ export function DisenoView({
       if (!filters.mostrarArchivadas && e.subEstado === 'archivado') return false
       if (filters.soloHoy && e.fechaMarcadaParaDisenar !== hoy) return false
       if (filters.subEstado !== 'activas' && e.subEstado !== filters.subEstado) return false
-      if (filters.marcaSlug !== 'todas' && e.marcaSlug !== filters.marcaSlug) return false
+      if (filters.marcaSlug !== 'todas' && !e.marcasTags.some((t) => t.slug === filters.marcaSlug)) return false
+      if (!pasaRangoFecha(e, filters.desde, filters.hasta)) return false
       if (search) {
         const q = search.toLowerCase()
         if (
@@ -183,6 +246,8 @@ export function DisenoView({
     filters.marcaSlug !== 'todas' ||
     filters.soloHoy ||
     filters.mostrarArchivadas ||
+    !!filters.desde ||
+    !!filters.hasta ||
     !!search
 
   /* ============ Persist helper (optimistic + revert) ============ */
@@ -230,10 +295,12 @@ export function DisenoView({
     persist(id, { subEstado: newSub }, () => archivarTarea(id, archivar), archivar ? 'Archivada 📦' : 'Reactivada')
   }
   function toggleDisenarHoy(id: string, estaMarcada: boolean) {
-    if (migrationPendiente) {
-      toast.error('Migration pendiente. Aplicar 20260605200001_disenadores.sql.')
-      return
-    }
+    /* Bug (23-jun-2026): antes bloqueábamos con `migrationPendiente` + un mensaje
+       de disenadores.sql (migración YA aplicada). Pero ese flag se prende por
+       `marcas_extra` (OTRA migración, sin correr), NO por la columna que esto
+       necesita — `fecha_marcada_para_disenar`, que SÍ existe. Resultado: Ailyn
+       no podía marcar "hoy". Quitamos el guard: la acción solo toca esa columna
+       (existe) y si algo fallara, `persist` revierte + avisa con el error real. */
     if (estaMarcada) {
       persist(id, { fechaMarcadaParaDisenar: null }, () => desmarcarParaDisenarHoy(id), 'Quitada de "Hoy"')
     } else {
@@ -250,7 +317,7 @@ export function DisenoView({
   }
 
   function clearAll() {
-    setFilters({ subEstado: 'activas', marcaSlug: 'todas', soloHoy: false, mostrarArchivadas: false })
+    setFilters({ subEstado: 'activas', marcaSlug: 'todas', soloHoy: false, mostrarArchivadas: false, desde: '', hasta: '' })
     setSearch('')
     setSort(null)
   }
@@ -394,6 +461,12 @@ export function DisenoView({
           ]}
           onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
         />
+        <RangoFechasFilter
+          desde={filters.desde}
+          hasta={filters.hasta}
+          hoy={hoy}
+          onChange={(desde, hasta) => setFilters((f) => ({ ...f, desde, hasta }))}
+        />
         {hasActiveFilters && (
           <button onClick={clearAll} style={clearBtnStyle}>Limpiar</button>
         )}
@@ -474,7 +547,8 @@ export function DisenoView({
                las archivadas). En Kanban queremos ver TODOS los
                estados como columnas. */
             if (filters.soloHoy && e.fechaMarcadaParaDisenar !== hoy) return false
-            if (filters.marcaSlug !== 'todas' && e.marcaSlug !== filters.marcaSlug) return false
+            if (filters.marcaSlug !== 'todas' && !e.marcasTags.some((t) => t.slug === filters.marcaSlug)) return false
+            if (!pasaRangoFecha(e, filters.desde, filters.hasta)) return false
             if (search) {
               const q = search.toLowerCase()
               if (
@@ -915,6 +989,20 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, on
         }}>
           {entry.marcaNombre}
         </span>
+        {/* Etiquetas extra: puntitos de color (una sola tarea, varias marcas). */}
+        {entry.marcasTags.length > 1 && (
+          <span
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0 }}
+            title={`También: ${entry.marcasTags.slice(1).map((t) => t.nombre).join(', ')}`}
+          >
+            {entry.marcasTags.slice(1, 5).map((t) => (
+              <span key={t.slug} style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, boxShadow: `0 0 0 1px ${t.color}66` }} />
+            ))}
+            {entry.marcasTags.length > 5 && (
+              <span style={{ fontSize: 9, color: 'var(--mk-text-quaternary)' }}>+{entry.marcasTags.length - 5}</span>
+            )}
+          </span>
+        )}
         {/* Hacer HOY — solo en columnas que NO son archivado. Si ya
             está marcada, queda VISIBLE siempre (con look "activo" violeta
             para que Ailyn vea de un vistazo cuáles son sus de hoy). Si
@@ -1162,22 +1250,30 @@ function NuevaTareaModal({
     setSubmitting(false)
     if (!r.ok) { toast.error(r.error); return }
 
-    /* Si Ailyn replicó en marcas extras, mostramos toast confirmando.
-       Las extras no van al optimistic update; aparecerán cuando recargue
-       o se haga revalidatePath (que ya pasa en server). */
+    /* Una sola tarea etiquetada con varias marcas (no copias). */
     if (r.data!.extrasCreadas > 0) {
-      toast.success(`Tarea creada en ${r.data!.extrasCreadas + 1} marcas (principal + ${r.data!.extrasCreadas} replicada${r.data!.extrasCreadas > 1 ? 's' : ''})`)
+      toast.success(`Tarea etiquetada en ${r.data!.extrasCreadas + 1} marcas`)
     }
 
-    /* Para el optimistic update local, busco la marca que se eligió;
-       si quedó vacío, uso el placeholder "interno". */
+    /* Optimistic update: la tarea con la marca principal + las etiquetas extra. */
     const marca = marcaSlug ? marcas.find((m) => m.slug === marcaSlug) : null
+    const principalTag = {
+      slug: marca?.slug ?? 'interno',
+      nombre: marca?.nombre ?? 'Distinto · Interno',
+      color: marca?.color ?? '#a78bfa',
+      emoji: marca?.emoji ?? null,
+    }
+    const extrasTags = Array.from(marcasExtras)
+      .map((slug) => marcas.find((m) => m.slug === slug))
+      .filter(Boolean)
+      .map((m) => ({ slug: m!.slug, nombre: m!.nombre, color: m!.color, emoji: m!.emoji ?? null }))
     onCreated({
       id: r.data!.id,
       marcaSlug: marca?.slug ?? 'interno',
       marcaNombre: marca?.nombre ?? 'Distinto · Interno',
       marcaColor: marca?.color ?? '#a78bfa',
       marcaEmoji: marca?.emoji ?? null,
+      marcasTags: [principalTag, ...extrasTags],
       esInterno: !marca,
       nombreTarea: nombre.trim(),
       descripcion: descripcion.trim() || null,
@@ -1299,7 +1395,7 @@ function NuevaTareaModal({
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
             }}>
               <span>
-                ¿Replicar en más marcas? <span style={{ color: '#9ca3af' }}>(opcional)</span>
+                ¿Etiquetar más marcas? <span style={{ color: '#9ca3af' }}>(opcional · una sola tarea)</span>
               </span>
               {marcasExtras.size > 0 && (
                 <button
@@ -1361,8 +1457,8 @@ function NuevaTareaModal({
                 border: '1px solid #bbf7d0',
                 borderRadius: 8,
               }}>
-                ✓ Se crearán <strong>{marcasExtras.size + 1}</strong> tareas idénticas
-                (principal + {marcasExtras.size} replicada{marcasExtras.size > 1 ? 's' : ''})
+                ✓ Una sola tarea etiquetada en <strong>{marcasExtras.size + 1}</strong> marcas
+                (principal + {marcasExtras.size} más)
               </div>
             )}
           </div>
@@ -1945,6 +2041,225 @@ function FilterPill({ label, value, dotColor, options, onSelect }: { label: stri
             </PopoverItem>
           ))}
         </Popover>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+   RangoFechasFilter — filtro por fecha/rango (Pedro 23-jun-2026)
+   ============================================================ */
+
+const MESES_LARGOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const DOW_MIN = ['L', 'M', 'M', 'J', 'V', 'S', 'D']  // semana empieza en lunes
+
+/* Helpers de fecha timezone-safe: armamos/leemos YYYY-MM-DD con enteros
+   locales (new Date(y, m-1, d)) para evitar el corrimiento de día que
+   produce parsear/serializar en UTC. */
+function isoYMD(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+function addDiasISO(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + n)
+  return isoYMD(dt.getFullYear(), dt.getMonth() + 1, dt.getDate())
+}
+function rangoFechasLabel(desde: string, hasta: string): string | null {
+  if (!desde && !hasta) return null
+  if (desde && hasta) return desde === hasta ? formatDateES(desde) : `${formatDateES(desde)} – ${formatDateES(hasta)}`
+  if (desde) return `Desde ${formatDateES(desde)}`
+  return `Hasta ${formatDateES(hasta)}`
+}
+
+function RangoFechasFilter({ desde, hasta, hoy, onChange }: {
+  desde: string; hasta: string; hoy: string; onChange: (desde: string, hasta: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  /* Mes mostrado (YYYY-MM): arranca en el mes del 'desde' o, si no hay, en hoy. */
+  const [verMes, setVerMes] = useState(() => (desde || hoy).slice(0, 7))
+  /* Tras el 1er clic en un día queda true → el siguiente clic CIERRA el rango.
+     Un clic = un solo día; dos clics = rango. */
+  const [eligiendoFin, setEligiendoFin] = useState(false)
+
+  const activo = !!(desde || hasta)
+  const label = rangoFechasLabel(desde, hasta)
+
+  /* Grilla del mes visible (lunes primero). */
+  const [vy, vm] = verMes.split('-').map(Number)
+  const primerDiaSemana = (new Date(vy, vm - 1, 1).getDay() + 6) % 7  // 0=lunes
+  const diasEnMes = new Date(vy, vm, 0).getDate()
+  const celdas: (string | null)[] = []
+  for (let i = 0; i < primerDiaSemana; i++) celdas.push(null)
+  for (let d = 1; d <= diasEnMes; d++) celdas.push(isoYMD(vy, vm, d))
+
+  function cambiarMes(delta: number) {
+    const dt = new Date(vy, vm - 1 + delta, 1)
+    setVerMes(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`)
+  }
+  function clickDia(iso: string) {
+    if (!eligiendoFin) {
+      onChange(iso, iso)
+      setEligiendoFin(true)
+    } else {
+      const a = desde || iso
+      const lo = iso < a ? iso : a
+      const hi = iso < a ? a : iso
+      onChange(lo, hi)
+      setEligiendoFin(false)
+    }
+  }
+  function aplicarPreset(d: string, h: string) {
+    onChange(d, h)
+    setEligiendoFin(false)
+    setVerMes(d.slice(0, 7))
+    setOpen(false)
+  }
+  function limpiar() {
+    onChange('', '')
+    setEligiendoFin(false)
+  }
+
+  /* Presets calculados desde hoy. */
+  const [hy, hm, hd] = hoy.split('-').map(Number)
+  const dowHoy = (new Date(hy, hm - 1, hd).getDay() + 6) % 7
+  const lunesEstaSem = addDiasISO(hoy, -dowHoy)
+  const mesPasadoY = hm === 1 ? hy - 1 : hy
+  const mesPasadoM = hm === 1 ? 12 : hm - 1
+  const presets = [
+    { label: 'Hoy', d: hoy, h: hoy },
+    { label: 'Ayer', d: addDiasISO(hoy, -1), h: addDiasISO(hoy, -1) },
+    { label: 'Últimos 7 días', d: addDiasISO(hoy, -6), h: hoy },
+    { label: 'Esta semana', d: lunesEstaSem, h: addDiasISO(lunesEstaSem, 6) },
+    { label: 'Este mes', d: isoYMD(hy, hm, 1), h: isoYMD(hy, hm, new Date(hy, hm, 0).getDate()) },
+    { label: 'Mes pasado', d: isoYMD(mesPasadoY, mesPasadoM, 1), h: isoYMD(mesPasadoY, mesPasadoM, new Date(mesPasadoY, mesPasadoM, 0).getDate()) },
+  ]
+
+  const chipStyle = (sel: boolean): React.CSSProperties => ({
+    padding: '4px 9px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit', fontWeight: 500,
+    background: sel ? 'var(--mk-accent)' : 'rgba(255, 255, 255, 0.04)',
+    color: sel ? '#fff' : 'var(--mk-text-secondary)',
+    border: `1px solid ${sel ? 'var(--mk-accent)' : 'var(--mk-border-subtle)'}`,
+    borderRadius: 999, cursor: 'pointer',
+  })
+  const navBtnStyle: React.CSSProperties = {
+    width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: 'transparent', border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-sm)',
+    color: 'var(--mk-text-secondary)', cursor: 'pointer', fontSize: 14, lineHeight: 1,
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => { if (!open) setEligiendoFin(false); setOpen((o) => !o) }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px',
+          background: activo ? 'var(--mk-accent-bg)' : 'rgba(255, 255, 255, 0.03)',
+          border: `1px solid ${activo ? 'var(--mk-border-accent)' : 'var(--mk-border-subtle)'}`,
+          borderRadius: 'var(--mk-radius-md)',
+          color: activo ? 'var(--mk-text-primary)' : 'var(--mk-text-secondary)',
+          fontFamily: 'inherit', fontSize: 'var(--mk-text-xs)', fontWeight: 500, cursor: 'pointer',
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.8 }}>
+          <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span style={{ opacity: 0.7 }}>Fechas:</span>
+        <span>{label ?? 'Todas'}</span>
+        {activo ? (
+          <span
+            role="button"
+            aria-label="Limpiar fechas"
+            onClick={(e) => { e.stopPropagation(); limpiar() }}
+            style={{ marginLeft: 2, padding: '0 2px', opacity: 0.6, fontSize: 13, lineHeight: 1 }}
+          >×</span>
+        ) : (
+          <span style={{ opacity: 0.4, fontSize: 8 }}>▼</span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
+          <div
+            className="mk-anim-scale-in"
+            style={{
+              position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 51, width: 290,
+              background: 'var(--mk-bg-overlay)', border: '1px solid var(--mk-border-default)',
+              borderRadius: 'var(--mk-radius-md)', boxShadow: 'var(--mk-shadow-lg)', padding: 12,
+            }}
+          >
+            {/* Atajos rápidos */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {presets.map((p) => (
+                <button key={p.label} onClick={() => aplicarPreset(p.d, p.h)} style={chipStyle(desde === p.d && hasta === p.h)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Navegación de mes */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <button onClick={() => cambiarMes(-1)} style={navBtnStyle} aria-label="Mes anterior">‹</button>
+              <span style={{ fontSize: 'var(--mk-text-sm)', fontWeight: 600, color: 'var(--mk-text-primary)' }}>
+                {MESES_LARGOS[vm - 1]} {vy}
+              </span>
+              <button onClick={() => cambiarMes(1)} style={navBtnStyle} aria-label="Mes siguiente">›</button>
+            </div>
+
+            {/* Cabecera días de la semana */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+              {DOW_MIN.map((d, i) => (
+                <span key={i} style={{ textAlign: 'center', fontSize: 10, color: 'var(--mk-text-quaternary)', fontWeight: 600 }}>{d}</span>
+              ))}
+            </div>
+
+            {/* Grilla de días */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+              {celdas.map((iso, i) => {
+                if (!iso) return <span key={i} />
+                const dNum = Number(iso.slice(8, 10))
+                const enRango = !!desde && !!hasta && iso >= desde && iso <= hasta
+                const esExtremo = iso === desde || iso === hasta
+                const esHoy = iso === hoy
+                return (
+                  <button
+                    key={i}
+                    onClick={() => clickDia(iso)}
+                    style={{
+                      height: 30, borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
+                      background: esExtremo ? 'var(--mk-accent)' : enRango ? 'var(--mk-accent-bg)' : 'transparent',
+                      color: esExtremo ? '#fff' : 'var(--mk-text-primary)',
+                      fontWeight: esExtremo ? 700 : 400,
+                      boxShadow: esHoy && !esExtremo ? 'inset 0 0 0 1px var(--mk-border-accent)' : 'none',
+                    }}
+                    onMouseEnter={(e) => { if (!esExtremo && !enRango) e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
+                    onMouseLeave={(e) => { if (!esExtremo && !enRango) e.currentTarget.style.background = 'transparent' }}
+                  >
+                    {dNum}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Footer: estado + acciones */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--mk-border-subtle)', gap: 8 }}>
+              <span style={{ fontSize: 'var(--mk-text-xs)', color: eligiendoFin ? 'var(--mk-accent)' : 'var(--mk-text-tertiary)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {eligiendoFin ? 'Elige el fin del rango…' : (label ?? 'Sin filtro de fecha')}
+              </span>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                {activo && <button onClick={limpiar} style={clearBtnStyle}>Limpiar</button>}
+                <button
+                  onClick={() => setOpen(false)}
+                  style={{
+                    padding: '4px 12px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit', fontWeight: 500,
+                    background: 'var(--mk-accent)', color: '#fff', border: '1px solid var(--mk-accent)',
+                    borderRadius: 'var(--mk-radius-md)', cursor: 'pointer',
+                  }}
+                >Listo</button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

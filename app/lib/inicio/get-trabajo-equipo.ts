@@ -162,15 +162,33 @@ export async function getTrabajoEquipo(service: Service): Promise<MiembroTrabajo
           }
         })
       } else if (m.rol_base === 'editor') {
-        const { data } = await service
+        /* El sync de Notion guarda editor_nombre como NOMBRE DE PILA ("PIEER"),
+           pero team_members.nombre es el nombre completo ("PIEER MEDINA"). Por eso
+           matcheamos por el PRIMER nombre con prefijo (case-insensitive) en vez de
+           exacto — si no, las tareas de Pieer nunca salían. Ordenamos por fecha de
+           edición (la fecha de "editar hoy"), con fallback a fecha de publicación. */
+        const primerNombre = m.nombre.trim().split(/\s+/)[0] || m.nombre
+        // % en ilike = comodín de prefijo. Escapamos %/_ por si el nombre los trae.
+        const patron = `${primerNombre.replace(/[%_]/g, '\\$&')}%`
+        let res = await service
           .from('publicaciones')
-          .select('id, nombre, fecha_publicacion, marca:marcas(nombre, color_primario_hex)')
+          .select('id, nombre, fecha_publicacion, fecha_edicion, marca:marcas(nombre, color_primario_hex)')
           .eq('estado', 'editar')
-          .ilike('editor_nombre', m.nombre)
-          .order('fecha_publicacion', { ascending: true, nullsFirst: false })
+          .ilike('editor_nombre', patron)
+          .order('fecha_edicion', { ascending: true, nullsFirst: false })
           .limit(20)
+        /* Defensive: si fecha_edicion no existe en este entorno, reintenta sin ella. */
+        if (res.error) {
+          res = await service
+            .from('publicaciones')
+            .select('id, nombre, fecha_publicacion, marca:marcas(nombre, color_primario_hex)')
+            .eq('estado', 'editar')
+            .ilike('editor_nombre', patron)
+            .order('fecha_publicacion', { ascending: true, nullsFirst: false })
+            .limit(20)
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tareas = ((data ?? []) as any[]).map((r) => {
+        tareas = ((res.data ?? []) as any[]).map((r) => {
           const mk = marcaDe(r)
           return {
             id: r.id as string,
@@ -178,7 +196,7 @@ export async function getTrabajoEquipo(service: Service): Promise<MiembroTrabajo
             marcaNombre: mk.nombre,
             marcaColor: mk.color,
             estadoLabel: 'Por editar',
-            fechaLabel: fechaCorta(r.fecha_publicacion),
+            fechaLabel: fechaCorta(r.fecha_edicion ?? r.fecha_publicacion),
             href: `/publicaciones/${r.id}`,
           }
         })

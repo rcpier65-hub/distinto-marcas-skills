@@ -35,16 +35,12 @@ const MESES_UP = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP',
 // Theme-builder usa SIEMPRE las mismas 2 clases de card. Alternamos para variedad.
 const CARD_CLASSES = ['is-white', 'is-alt']
 
-// Logo file: usamos PNG si existe el archivo local, sino SVG placeholder.
-const LOGO_EXTENSIONS_BY_SLUG: Record<string, 'svg' | 'png'> = {
-  manrique: 'png',  // Manrique tiene PNG real
-  lozano: 'svg',
-  'distribuidora-fitness': 'svg',
-  'little-joe': 'png',  // Typhouse rebrand (22 may 2026) — PNG recortado 771×253
-  kintu: 'svg',
-  novalamps: 'svg',
-  'la-victoria': 'svg',
-}
+// Extensión del logo local por marca. SOLO little-joe y vid-natur tienen .png;
+// el resto usa .svg. DEBE coincidir con render-grilla-html (el preview) para que
+// el PNG copiado/enviado muestre el MISMO logo que el preview.
+// Bug (15-jun-2026): este mapa decía manrique:'png' pero el archivo real es
+// logo.svg → el render pedía logo.png (404) y el logo NO salía en la imagen copiada.
+const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas'])
 
 // SVG icon de "video" — para publicaciones tipo REEL/Video
 const VIDEO_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="34" rx="3"/><path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/><path d="M22 52h20"/><path d="M32 46v6"/></svg>`
@@ -133,7 +129,7 @@ export async function GET(request: Request) {
   if (logoOverride) {
     logoUrl = normalizeDriveUrl(logoOverride)
   } else {
-    const logoExt = LOGO_EXTENSIONS_BY_SLUG[slug] ?? 'png'
+    const logoExt = PNG_ONLY_LOGOS.has(slug) ? 'png' : 'svg'
     logoUrl = `${proto}//${host}/marcas/${slug}/logo.${logoExt}`
   }
 
@@ -224,18 +220,25 @@ export async function GET(request: Request) {
 function buildDatePill(inicio: string, fin: string): string {
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
-  const mes = MESES_UP[d1.getUTCMonth()]
   const año = d1.getUTCFullYear()
-  return `${d1.getUTCDate()} — ${d2.getUTCDate()} ${mes} · ${año}`
+  // Cross-month: "22 JUN — 2 JUL · 2026". Mismo mes: "22 — 28 JUN · 2026".
+  if (d1.getUTCMonth() !== d2.getUTCMonth()) {
+    return `${d1.getUTCDate()} ${MESES_UP[d1.getUTCMonth()]} — ${d2.getUTCDate()} ${MESES_UP[d2.getUTCMonth()]} · ${año}`
+  }
+  return `${d1.getUTCDate()} — ${d2.getUTCDate()} ${MESES_UP[d1.getUTCMonth()]} · ${año}`
 }
 
 function buildDateSub(inicio: string, fin: string): string {
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
-  const mes = MESES_LONG[d1.getUTCMonth()]
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
   const diaIni = DIAS_LONG[d1.getUTCDay()].toLowerCase()
   const diaFin = DIAS_LONG[d2.getUTCDay()].toLowerCase()
-  return `${mes.charAt(0).toUpperCase() + mes.slice(1)} · Del ${diaIni} ${d1.getUTCDate()} al ${diaFin} ${d2.getUTCDate()}`
+  // Cross-month: incluir el mes en ambos extremos.
+  if (d1.getUTCMonth() !== d2.getUTCMonth()) {
+    return `Del ${diaIni} ${d1.getUTCDate()} de ${MESES_LONG[d1.getUTCMonth()]} al ${diaFin} ${d2.getUTCDate()} de ${MESES_LONG[d2.getUTCMonth()]}`
+  }
+  return `${cap(MESES_LONG[d1.getUTCMonth()])} · Del ${diaIni} ${d1.getUTCDate()} al ${diaFin} ${d2.getUTCDate()}`
 }
 
 function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[]): string {
@@ -244,6 +247,12 @@ function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
   const numDays = Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)) + 1
+  // Cuando la grilla cubre más de una semana (rango extendido para incluir
+  // publicaciones futuras), omitimos los días vacíos: el poster mide 1620px
+  // fijos y 11+ tarjetas se desbordarían. En semana normal (≤7 días) SÍ se
+  // muestran los vacíos para conservar el ritmo visual. DEBE coincidir con
+  // render-grilla-html (el preview) para que el PNG salga igual.
+  const skipEmpty = numDays > 7
 
   // Indexar publicaciones por fecha
   const pubsByFecha = new Map<string, Publicacion[]>()
@@ -265,6 +274,7 @@ function buildCardsHtml(inicio: string, fin: string, publicaciones: Publicacion[
     const pubs = pubsByFecha.get(iso) ?? []
 
     if (pubs.length === 0) {
+      if (skipEmpty) continue
       cards.push(`
     <article class="card empty">
       <div class="date"><div class="day">${day}</div><div class="month">${dayShort}</div></div>

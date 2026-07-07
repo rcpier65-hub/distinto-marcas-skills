@@ -26,7 +26,14 @@ export type ReporteTareaCompletada = {
   marca: string
   marcaColor: string
   marcaEmoji: string | null
-  tipo: 'editada' | 'disenada' | 'aprobada' | 'grabada' | 'comentario'
+  tipo: 'editada' | 'disenada' | 'aprobada' | 'grabada' | 'comentario' | 'tarea' | 'asignada'
+  /* Duración editando→aprobar en minutos (solo videos editados con ambos
+     timestamps iniciado_edicion_at + editado_at). Pieer: "calcula el tiempo
+     que pasa de editando a aprobar". */
+  duracionMin?: number | null
+  /* Si la tarea fue delegada por OTRA persona, su nombre. Para que en el
+     reporte de Pieer salga "delegada por Lorena". */
+  delegadaPor?: string | null
 }
 
 export type ReporteHabitoCumplido = {
@@ -34,6 +41,17 @@ export type ReporteHabitoCumplido = {
   nombre: string
   icono: string
   color: string
+  /* Hora local Lima HH:MM en que se marcó el hábito (de completado_at).
+     Pedro: "los hábitos que salgan con la hora que hicieron clic". */
+  hora?: string | null
+}
+
+/* Una tarea que YO delegué a otra persona (vista del que delega, ej. Lorena). */
+export type ReporteDelegacion = {
+  id: string
+  titulo: string
+  asignadoA: string       // nombre de a quién se la delegó
+  completada: boolean
 }
 
 export type ReporteDelDiaData = {
@@ -42,8 +60,14 @@ export type ReporteDelDiaData = {
   usuarioNombre: string              // "Pedro" (primer nombre)
   usuarioNombreCompleto: string      // "Pedro Reyes"
   usuarioAvatarUrl: string | null
-  usuarioRol: string                 // "Editor de video", "CEO", etc.
+  usuarioRol: string                 // "Editor de video", "CEO", etc. (display)
+  rolBase: string                    // 'disenador' | 'editor' | 'community_manager' | ... — para gatear qué métricas se muestran
   tareasCompletadas: ReporteTareaCompletada[]
+  /* Trabajo delegado/asignado A MÍ que está pendiente: tareas que me asignaron
+     + (para diseño) publicaciones que llegaron a diseño y aún no termino. */
+  tareasAsignadas: ReporteTareaCompletada[]
+  /* Lo que YO delegué a otros hoy (para el reporte de quien delega, ej. Lorena). */
+  tareasDelegadas: ReporteDelegacion[]
   habitosCumplidos: ReporteHabitoCumplido[]
   habitosTotal: number               // total de hábitos activos del día
   pubsEditadasCount: number          // = tareasCompletadas.length filtrado a tipo='editada'
@@ -66,6 +90,22 @@ function formatFechaLargo(iso: string): string {
   return `${dias[fecha.getDay()]} ${d} de ${meses[fecha.getMonth()]}`
 }
 
+/** Hora local Lima (UTC-5) "HH:MM" a partir de un timestamptz ISO. */
+function horaLimaHM(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return null
+  return new Date(t - 5 * 60 * 60_000).toISOString().slice(11, 16)
+}
+
+/** Minutos entre dos timestamps (fin - inicio); null si falta alguno. */
+function durMin(inicioIso: string | null | undefined, finIso: string | null | undefined): number | null {
+  if (!inicioIso || !finIso) return null
+  const a = new Date(inicioIso).getTime(), b = new Date(finIso).getTime()
+  if (isNaN(a) || isNaN(b) || b < a) return null
+  return Math.round((b - a) / 60_000)
+}
+
 export async function loadReporteDelDia(
   service: Service,
   opts: {
@@ -86,21 +126,28 @@ export async function loadReporteDelDia(
   const inicioDiaIso = `${hoy}T00:00:00.000-05:00`
   const finDiaIso = `${hoy}T23:59:59.999-05:00`
 
-  // Seis queries en paralelo — la idea es que el reporte cargue rápido.
-  const [pubsEditadasRes, pubsDisenoRes, habitosRes, habitosCompletadosRes, grabacionesRes, comentariosRes] =
+  const SEL_PUB = 'id, nombre, editor_nombre, iniciado_edicion_at, editado_at, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)'
+
+  // Queries en paralelo — la idea es que el reporte cargue rápido.
+  const [
+    pubsEditadasRes, pubsDisenoRes, habitosRes, habitosCompletadosRes, grabacionesRes, comentariosRes,
+    tareasHechasRes, tareasAsignadasRes, tareasDelegadasRes, disenoPendienteRes, miembrosRes,
+  ] =
     await Promise.all([
       // 1. Pubs editadas hoy por el usuario (editor_nombre match + editado_at).
       //    Para CEO traemos todas, sin filtro de editor_nombre.
+      //    Traemos iniciado_edicion_at + editado_at para calcular la duración
+      //    editando→aprobar (pedido de Pedro para Pieer).
       opts.esCEO
         ? service
             .from('publicaciones')
-            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
+            .select(SEL_PUB)
             .gte('editado_at', inicioDiaIso)
             .lte('editado_at', finDiaIso)
             .limit(20)
         : service
             .from('publicaciones')
-            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
+            .select(SEL_PUB)
             .ilike('editor_nombre', opts.usuarioNombre)
             .gte('editado_at', inicioDiaIso)
             .lte('editado_at', finDiaIso)
@@ -146,16 +193,16 @@ export async function loadReporteDelDia(
             .select('id, nombre, icono, color, dias_activos')
             .eq('activo', true),
 
-      // 4. Hábitos completados hoy del usuario.
+      // 4. Hábitos completados hoy del usuario (con completado_at para la hora).
       opts.teamMemberId
         ? service
             .from('habitos_completados')
-            .select('habito_id, habitos!inner(id, nombre, icono, color, team_member_id)')
+            .select('habito_id, completado_at, habitos!inner(id, nombre, icono, color, team_member_id)')
             .eq('fecha', hoy)
             .eq('habitos.team_member_id', opts.teamMemberId)
         : service
             .from('habitos_completados')
-            .select('habito_id, habitos(id, nombre, icono, color)')
+            .select('habito_id, completado_at, habitos(id, nombre, icono, color)')
             .eq('fecha', hoy),
 
       // 5. Grabaciones del día (workspace-wide en iter 1).
@@ -171,14 +218,74 @@ export async function loadReporteDelDia(
         .select('id', { count: 'exact', head: true })
         .gte('responded_at', inicioDiaIso)
         .lte('responded_at', finDiaIso),
+
+      // 7. Tareas del tablero personal COMPLETADAS hoy por el usuario.
+      //    Fuente universal de "lo que terminé" — clave para Lorena (CM), cuyo
+      //    trabajo NO está en publicaciones y por eso salía "0 tareas".
+      opts.teamMemberId
+        ? service
+            .from('tareas')
+            .select('id, texto, categoria, color, completada_at, created_by')
+            .eq('team_member_id', opts.teamMemberId)
+            .eq('completada', true)
+            .gte('completada_at', inicioDiaIso)
+            .lte('completada_at', finDiaIso)
+            .limit(30)
+        : Promise.resolve({ data: [] }),
+
+      // 8. Tareas asignadas A MÍ que siguen PENDIENTES (trabajo delegado).
+      //    Pieer: "que salgan algunas tareas que se le delegan". Si Lorena le
+      //    delega a Pieer (created_by=Lorena, team_member_id=Pieer), sale acá.
+      opts.teamMemberId
+        ? service
+            .from('tareas')
+            .select('id, texto, categoria, color, created_by, team_member_id')
+            .eq('team_member_id', opts.teamMemberId)
+            .eq('completada', false)
+            .limit(30)
+        : Promise.resolve({ data: [] }),
+
+      // 9. Tareas que YO delegué a otros hoy (vista del que delega — Lorena).
+      opts.teamMemberId
+        ? service
+            .from('tareas')
+            .select('id, texto, team_member_id, completada')
+            .eq('created_by', opts.teamMemberId)
+            .neq('team_member_id', opts.teamMemberId)
+            .gte('created_at', inicioDiaIso)
+            .lte('created_at', finDiaIso)
+            .limit(30)
+        : Promise.resolve({ data: [] }),
+
+      // 10. Cola de DISEÑO entrante/pendiente (lo que "llegó a diseño" y aún no
+      //     se termina) — para Ailyn. Pedro: mostrar las tareas que se le
+      //     delegaron / llegaron a diseño, no solo las terminadas.
+      (opts.esCEO || opts.rolBase === 'disenador')
+        ? service
+            .from('publicaciones')
+            .select('id, nombre, marca:marcas(slug, nombre, color_primario_hex, emoji_marca)')
+            .eq('es_tarea_diseno', true)
+            .neq('estado_tarea', 'listo')
+            .is('archived_at', null)
+            .limit(20)
+        : Promise.resolve({ data: [] }),
+
+      // 11. Miembros (id→nombre) para resolver "delegada por X" / "delegué a Y".
+      service.from('team_members').select('id, nombre'),
     ])
 
-  // Construir tareasCompletadas (mezcla editadas + diseñadas, dedup por id).
+  // Mapa id→nombre de miembros para resolver delegaciones.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nombrePorId = new Map<string, string>(((miembrosRes?.data ?? []) as any[]).map((m) => [m.id as string, m.nombre as string]))
+
+  // Construir tareasCompletadas (mezcla editadas + diseñadas + tareas, dedup por id).
   const tareasMap = new Map<string, ReporteTareaCompletada>()
 
   type PubRow = {
     id: string
     nombre: string | null
+    iniciado_edicion_at?: string | null
+    editado_at?: string | null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     marca: any
   }
@@ -192,6 +299,8 @@ export async function loadReporteDelDia(
       marcaColor: m?.color_primario_hex ?? '#737373',
       marcaEmoji: m?.emoji_marca ?? null,
       tipo,
+      // Duración editando→aprobar solo para videos editados.
+      duracionMin: tipo === 'editada' ? durMin(r.iniciado_edicion_at, r.editado_at) : null,
     }
   }
 
@@ -209,6 +318,56 @@ export async function loadReporteDelDia(
     }
   }
 
+  // Tareas del tablero personal terminadas hoy → "lo que terminé" (todos los
+  // roles; clave para Lorena). Si la creó otra persona, marcamos delegadaPor.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const t of (tareasHechasRes?.data ?? []) as any[]) {
+    if (tareasMap.has(t.id)) continue
+    const delegadaPor = t.created_by && t.created_by !== opts.teamMemberId
+      ? (nombrePorId.get(t.created_by) ?? null) : null
+    tareasMap.set(t.id, {
+      id: t.id,
+      titulo: t.texto ?? '(sin título)',
+      marca: t.categoria ?? 'General',
+      marcaColor: t.color ?? '#737373',
+      marcaEmoji: null,
+      tipo: 'tarea',
+      duracionMin: null,
+      delegadaPor,
+    })
+  }
+
+  // Trabajo asignado A MÍ, pendiente: (a) tareas que me delegó OTRO + (b) cola
+  // de diseño entrante (Ailyn). Dedup contra lo ya terminado.
+  const tareasAsignadas: ReporteTareaCompletada[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const t of (tareasAsignadasRes?.data ?? []) as any[]) {
+    if (!t.created_by || t.created_by === opts.teamMemberId) continue  // propias, no "delegadas"
+    tareasAsignadas.push({
+      id: t.id,
+      titulo: t.texto ?? '(sin título)',
+      marca: t.categoria ?? 'General',
+      marcaColor: t.color ?? '#737373',
+      marcaEmoji: null,
+      tipo: 'asignada',
+      duracionMin: null,
+      delegadaPor: nombrePorId.get(t.created_by) ?? null,
+    })
+  }
+  for (const r of (disenoPendienteRes?.data ?? []) as PubRow[]) {
+    if (tareasMap.has(r.id)) continue
+    tareasAsignadas.push(mapearPub(r, 'asignada'))
+  }
+
+  // Lo que YO delegué a otros hoy (vista del delegador — Lorena).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tareasDelegadas: ReporteDelegacion[] = ((tareasDelegadasRes?.data ?? []) as any[]).map((t) => ({
+    id: t.id as string,
+    titulo: (t.texto ?? '(sin título)') as string,
+    asignadoA: nombrePorId.get(t.team_member_id) ?? '—',
+    completada: !!t.completada,
+  }))
+
   // Hábitos: total activos para hoy (filtrar por dias_activos)
   const diaSemana = (() => {
     // 1=lunes, 7=domingo (compatible con el seed de habitos)
@@ -222,7 +381,7 @@ export async function loadReporteDelDia(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const habitosCumplidos: ReporteHabitoCumplido[] = ((habitosCompletadosRes?.data ?? []) as any[])
-    .map((r) => {
+    .map((r): ReporteHabitoCumplido | null => {
       const h = Array.isArray(r.habitos) ? r.habitos[0] : r.habitos
       if (!h) return null
       return {
@@ -230,9 +389,12 @@ export async function loadReporteDelDia(
         nombre: h.nombre as string,
         icono: (h.icono ?? '✅') as string,
         color: (h.color ?? '#6366F1') as string,
+        hora: horaLimaHM(r.completado_at),
       }
     })
     .filter((x): x is ReporteHabitoCumplido => x !== null)
+    /* Orden cronológico por hora de completado (las sin hora al final). */
+    .sort((a, b) => (a.hora ?? '99').localeCompare(b.hora ?? '99'))
 
   const tareasCompletadas = Array.from(tareasMap.values())
   const pubsEditadasCount = tareasCompletadas.filter((t) => t.tipo === 'editada').length
@@ -244,7 +406,10 @@ export async function loadReporteDelDia(
     usuarioNombreCompleto: opts.usuarioNombreCompleto,
     usuarioAvatarUrl: opts.usuarioAvatarUrl,
     usuarioRol: opts.usuarioRol,
+    rolBase: opts.rolBase ?? '',
     tareasCompletadas,
+    tareasAsignadas,
+    tareasDelegadas,
     habitosCumplidos,
     habitosTotal: habitosDia.length,
     pubsEditadasCount,

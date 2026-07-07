@@ -12,10 +12,10 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   DndContext, useDraggable, useDroppable, DragOverlay,
-  PointerSensor, TouchSensor, useSensor, useSensors,
+  PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core'
-import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer } from 'lucide-react'
+import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane } from '../_actions'
@@ -26,18 +26,34 @@ const LANE_META: Record<FocusLane, { label: string; color: string; Icon: typeof 
   delegar: { label: 'Delegar', color: '#039BE5', Icon: SendIcon },
 }
 
+type Flyer = { key: string; texto: string; color: string; from: { x: number; y: number; w: number }; to: { x: number; y: number } }
+
 export function TareasView({
-  tareasIniciales, esCEO, meId, equipo,
+  tareasIniciales, completadasIniciales = [], esCEO, meId, equipo,
 }: {
   tareasIniciales: Tarea[]
+  completadasIniciales?: Tarea[]
   esCEO: boolean
   meId: string | null
   equipo: { id: string; nombre: string }[]
 }) {
   const isMobile = useIsMobile()
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales)
+  const [completadas, setCompletadas] = useState<Tarea[]>(completadasIniciales)
   const [dragId, setDragId] = useState<string | null>(null)
   const [focusModeActive, setFocusModeActive] = useState(false)
+  /* Archivo (historial) + filtro por persona (Pedro 20-jun-2026). */
+  const [archivoOpen, setArchivoOpen] = useState(false)
+  const [filtroUser, setFiltroUser] = useState<string | 'todos'>('todos')
+  /* Animación "vuela al archivo" al completar. */
+  const [flyers, setFlyers] = useState<Flyer[]>([])
+  const [archivoPulse, setArchivoPulse] = useState(false)
+  const archivoBtnRef = useRef<HTMLButtonElement>(null)
+  /* Orden ESTABLE de columnas: se fija en el 1er render (por cantidad) y NO se
+     reordena al completar/mover tareas → el tablero no "salta". Antes el re-sort
+     por cantidad hacía que completar UNA tarea reacomodara TODAS las columnas,
+     y Pedro lo percibía como "se desaparece todo". */
+  const ordenColsRef = useRef<string[]>([])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -45,8 +61,17 @@ export function TareasView({
   )
 
   const activas = useMemo(() => tareas.filter((t) => !t.completada), [tareas])
-  const enFocus = useMemo(() => activas.filter((t) => t.focusLane), [activas])
-  const enBoard = useMemo(() => activas.filter((t) => !t.focusLane), [activas])
+  /* Filtro por persona (solo CEO lo usa; un miembro ya ve solo lo suyo). */
+  const activasVis = useMemo(
+    () => (filtroUser === 'todos' ? activas : activas.filter((t) => t.teamMemberId === filtroUser)),
+    [activas, filtroUser],
+  )
+  const completadasVis = useMemo(
+    () => (filtroUser === 'todos' ? completadas : completadas.filter((t) => t.teamMemberId === filtroUser)),
+    [completadas, filtroUser],
+  )
+  const enFocus = useMemo(() => activasVis.filter((t) => t.focusLane), [activasVis])
+  const enBoard = useMemo(() => activasVis.filter((t) => !t.focusLane), [activasVis])
 
   /* Columnas por categoría (orden: más tareas primero). */
   const columnas = useMemo(() => {
@@ -56,10 +81,39 @@ export function TareasView({
       g.items.push(t)
       m.set(t.categoria, g)
     }
-    return [...m.values()].sort((a, b) => b.items.length - a.items.length)
+    const cols = [...m.values()]
+    /* Orden estable: respeta el orden previo (memorizado); las categorías que
+       aún no estaban se ubican por cantidad (más grande primero) al final. */
+    const orden = ordenColsRef.current
+    cols.sort((a, b) => {
+      const ia = orden.indexOf(a.categoria)
+      const ib = orden.indexOf(b.categoria)
+      if (ia === -1 && ib === -1) return b.items.length - a.items.length
+      if (ia === -1) return 1
+      if (ib === -1) return -1
+      return ia - ib
+    })
+    ordenColsRef.current = cols.map((c) => c.categoria)
+    return cols
   }, [enBoard])
 
-  const todasCategorias = useMemo(() => [...new Set(activas.map((t) => t.categoria))], [activas])
+  const todasCategorias = useMemo(() => [...new Set(activasVis.map((t) => t.categoria))], [activasVis])
+
+  /* Lanza la animación de la card volando hacia el ícono de Archivo. */
+  const triggerFly = useCallback((from: DOMRect, tarea: Tarea) => {
+    const btn = archivoBtnRef.current
+    if (!btn) return
+    const to = btn.getBoundingClientRect()
+    const key = `${tarea.id}-${from.top}-${from.left}`
+    setFlyers((f) => [...f, {
+      key, texto: tarea.texto, color: tarea.color,
+      from: { x: from.left, y: from.top, w: from.width },
+      to: { x: to.left + to.width / 2, y: to.top + to.height / 2 },
+    }])
+    setArchivoPulse(true)
+    setTimeout(() => setFlyers((f) => f.filter((x) => x.key !== key)), 700)
+    setTimeout(() => setArchivoPulse(false), 700)
+  }, [])
 
   /* ───────── acciones (optimistas) ───────── */
 
@@ -67,11 +121,23 @@ export function TareasView({
     setTareas((cur) => [tarea, ...cur])
   }, [])
 
-  const onCompletar = useCallback(async (id: string) => {
+  const onCompletar = useCallback(async (id: string, fromRect?: DOMRect) => {
+    const tarea = tareas.find((t) => t.id === id)
+    if (fromRect && tarea) triggerFly(fromRect, tarea)
     setTareas((cur) => cur.filter((t) => t.id !== id))
+    if (tarea) setCompletadas((cur) => [{ ...tarea, completada: true, completadaAt: new Date().toISOString() }, ...cur])
     const r = await completarTarea(id, true)
     if (!r.ok) { toast.error(r.error ?? 'No se pudo completar'); window.location.reload() }
-  }, [])
+  }, [tareas, triggerFly])
+
+  /* Restaurar (des-completar) una tarea desde el archivo → vuelve al tablero. */
+  const onRestaurar = useCallback(async (id: string) => {
+    const tarea = completadas.find((t) => t.id === id)
+    setCompletadas((cur) => cur.filter((t) => t.id !== id))
+    if (tarea) setTareas((cur) => [{ ...tarea, completada: false, completadaAt: null, focusLane: null }, ...cur])
+    const r = await completarTarea(id, false)
+    if (!r.ok) { toast.error(r.error ?? 'No se pudo restaurar'); window.location.reload() }
+  }, [completadas])
 
   const onEliminar = useCallback(async (id: string) => {
     const prev = tareas
@@ -81,7 +147,14 @@ export function TareasView({
   }, [tareas])
 
   const onMover = useCallback(async (id: string, categoria: string) => {
-    setTareas((cur) => cur.map((t) => t.id === id ? { ...t, categoria } : t))
+    /* Optimista: además de la categoría, adopta el COLOR de la columna destino
+       (Pedro: "no se pone el color a donde le arrastro"). Si la categoría es
+       nueva (sin tareas previas), conserva el color hasta que el server asigne
+       uno al recargar. */
+    setTareas((cur) => {
+      const destColor = cur.find((t) => t.categoria === categoria && t.id !== id)?.color
+      return cur.map((t) => t.id === id ? { ...t, categoria, ...(destColor ? { color: destColor } : {}) } : t)
+    })
     const r = await moverTareaCategoria(id, categoria)
     if (!r.ok) { toast.error(r.error ?? 'No se pudo mover'); window.location.reload() }
   }, [])
@@ -118,10 +191,26 @@ export function TareasView({
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#111827' }}>Tareas</h1>
           <p style={{ margin: '2px 0 0', fontSize: 11.5, color: '#6b7280' }}>
-            {esCEO ? 'Ves todo el equipo · ' : ''}{activas.length} activa{activas.length === 1 ? '' : 's'}
+            {esCEO ? 'Ves todo el equipo · ' : ''}{activasVis.length} activa{activasVis.length === 1 ? '' : 's'}
             {' · escribe @Nombre para asignar'}
           </p>
         </div>
+
+        {/* Filtro por persona — solo para el CEO (un miembro ya ve solo lo suyo). */}
+        {esCEO && equipo.length > 0 && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 999, padding: '4px 10px', flexShrink: 0 }}>
+            <Filter size={13} color="#6b7280" />
+            <select
+              value={filtroUser}
+              onChange={(e) => setFiltroUser(e.target.value)}
+              style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, fontWeight: 600, color: '#374151', cursor: 'pointer' }}
+            >
+              <option value="todos">Todo el equipo</option>
+              {equipo.map((m) => <option key={m.id} value={m.id}>{m.nombre.split(' ')[0]}</option>)}
+            </select>
+          </div>
+        )}
+
         {enFocus.length > 0 && (
           <button
             onClick={() => setFocusModeActive((v) => !v)}
@@ -137,9 +226,27 @@ export function TareasView({
             {focusModeActive ? 'Salir de Focus' : `Entrar en Focus · ${enFocus.length}`}
           </button>
         )}
+
+        {/* Archivo / historial de tareas terminadas — las cards "vuelan" aquí. */}
+        <button
+          ref={archivoBtnRef}
+          onClick={() => setArchivoOpen(true)}
+          title="Historial de tareas terminadas"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+            padding: '6px 12px', borderRadius: 999, border: '1px solid #e5e7eb', cursor: 'pointer',
+            fontSize: 12.5, fontWeight: 700, background: '#fff', color: '#6d28d9',
+            transform: archivoPulse ? 'scale(1.14)' : 'scale(1)',
+            boxShadow: archivoPulse ? '0 0 0 6px rgba(109,40,217,0.18)' : 'none',
+            transition: 'transform 220ms cubic-bezier(.34,1.56,.64,1), box-shadow 220ms ease',
+          }}
+        >
+          <Archive size={15} strokeWidth={2.2} />
+          {completadasVis.length > 0 && <span style={{ fontVariantNumeric: 'tabular-nums' }}>{completadasVis.length}</span>}
+        </button>
       </header>
 
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         {/* Zona Focus (en el mismo tablero) */}
         {(focusModeActive || enFocus.length > 0) && (
           <FocusZona
@@ -150,14 +257,15 @@ export function TareasView({
           />
         )}
 
-        {/* Tablero de columnas */}
-        <div style={{ flex: 1, overflowX: 'auto', padding: isMobile ? '8px 12px 140px' : '8px 24px 140px' }}>
+        {/* Tablero de columnas — WRAP: las columnas bajan a la siguiente fila
+            cuando se llena el ancho (sin scroll horizontal). Scroll vertical. */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: isMobile ? '8px 12px 140px' : '8px 20px 140px' }}>
           {columnas.length === 0 ? (
             <div style={{ padding: '48px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
               {enFocus.length > 0 ? 'Todo lo demás está en Focus 🎯' : 'No hay tareas todavía. Escribe una abajo 👇'}
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 'min-content' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
               {columnas.map((c) => (
                 <Columna key={c.categoria} columna={c} esCEO={esCEO} todasCategorias={todasCategorias}
                   onComplete={onCompletar} onDelete={onEliminar} onMover={onMover} />
@@ -176,8 +284,130 @@ export function TareasView({
 
       {/* Composer */}
       <Composer onCrear={onCrear} equipo={equipo} isMobile={isMobile} />
+
+      {/* Cards volando hacia el ícono de Archivo al completarse. */}
+      {flyers.map((f) => <FlyerEl key={f.key} flyer={f} />)}
+
+      {/* Drawer de Archivo / historial de tareas terminadas. */}
+      {archivoOpen && (
+        <ArchivoDrawer
+          completadas={completadasVis}
+          esCEO={esCEO}
+          onClose={() => setArchivoOpen(false)}
+          onRestaurar={onRestaurar}
+        />
+      )}
     </main>
   )
+}
+
+/* ============================ Flyer (animación al archivo) ============================ */
+function FlyerEl({ flyer }: { flyer: Flyer }) {
+  const [moved, setMoved] = useState(false)
+  useEffect(() => {
+    const r = requestAnimationFrame(() => requestAnimationFrame(() => setMoved(true)))
+    return () => cancelAnimationFrame(r)
+  }, [])
+  const dx = flyer.to.x - (flyer.from.x + flyer.from.w / 2)
+  const dy = flyer.to.y - (flyer.from.y + 16)
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'fixed', left: flyer.from.x, top: flyer.from.y, width: flyer.from.w,
+        background: flyer.color, color: '#fff', borderRadius: 8, padding: '6px 8px',
+        fontSize: 11.5, lineHeight: 1.3, zIndex: 2000, pointerEvents: 'none',
+        boxShadow: '0 10px 28px rgba(0,0,0,0.28)',
+        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+        transform: moved ? `translate(${dx}px, ${dy}px) scale(0.06)` : 'translate(0,0) scale(1)',
+        opacity: moved ? 0 : 1,
+        transition: 'transform 600ms cubic-bezier(.5,0,.75,0), opacity 560ms ease-in 60ms',
+      }}
+    >
+      {flyer.texto}
+    </div>
+  )
+}
+
+/* ============================ Archivo (historial) ============================ */
+function ArchivoDrawer({ completadas, esCEO, onClose, onRestaurar }: {
+  completadas: Tarea[]
+  esCEO: boolean
+  onClose: () => void
+  onRestaurar: (id: string) => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', display: 'flex', justifyContent: 'flex-end' }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 'min(420px, 92vw)', height: '100%', background: '#fff', boxShadow: '-8px 0 30px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', animation: 'mk-drawer-in 220ms cubic-bezier(.22,1,.36,1)' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 18px', borderBottom: '1px solid #eef0f2' }}>
+          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(109,40,217,0.1)', color: '#6d28d9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Archive size={15} strokeWidth={2.2} />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>Archivo</div>
+            <div style={{ fontSize: 11.5, color: '#6b7280' }}>{completadas.length} tarea{completadas.length === 1 ? '' : 's'} terminada{completadas.length === 1 ? '' : 's'}</div>
+          </div>
+          <button onClick={onClose} title="Cerrar" style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: '#f3f4f6', color: '#6b7280', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+          {completadas.length === 0 ? (
+            <div style={{ padding: '48px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+              Aún no hay tareas terminadas. Cuando completes una, aparecerá aquí.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {completadas.map((t) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: '#f9fafb', border: '1px solid #eef0f2', borderRadius: 10, padding: '9px 11px' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: '#374151', lineHeight: 1.35, textDecoration: 'line-through', textDecorationColor: '#c4b5fd' }}>{t.texto}</div>
+                    <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, color: '#6b7280' }}>{t.categoria}</span>
+                      {esCEO && t.teamMemberNombre && <span>· {t.teamMemberNombre.split(' ')[0]}</span>}
+                      {t.completadaAt && <span>· {fechaRelativa(t.completadaAt)}</span>}
+                    </div>
+                  </div>
+                  <button onClick={() => onRestaurar(t.id)} title="Devolver al tablero" style={{ width: 26, height: 26, borderRadius: 7, border: 'none', background: '#fff', color: '#6d28d9', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+                    <RotateCcw size={13} strokeWidth={2.2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes mk-drawer-in{from{transform:translateX(24px);opacity:.4}to{transform:translateX(0);opacity:1}}`}</style>
+    </div>
+  )
+}
+
+/* "hoy 14:30" / "ayer" / "12 jun" a partir de un ISO. */
+function fechaRelativa(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const lima = new Date(d.getTime() - 5 * 60 * 60_000)
+  const hoy = new Date(Date.now() - 5 * 60 * 60_000)
+  const ymd = (x: Date) => x.toISOString().slice(0, 10)
+  const hhmm = lima.toISOString().slice(11, 16)
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  if (ymd(lima) === ymd(hoy)) return `hoy ${hhmm}`
+  const ayer = new Date(hoy.getTime() - 86_400_000)
+  if (ymd(lima) === ymd(ayer)) return `ayer ${hhmm}`
+  return `${lima.getUTCDate()} ${meses[lima.getUTCMonth()]}`
 }
 
 /* ============================ Columna ============================ */
@@ -185,24 +415,24 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
   columna: { categoria: string; color: string; items: Tarea[] }
   esCEO: boolean
   todasCategorias: string[]
-  onComplete: (id: string) => void
+  onComplete: (id: string, fromRect?: DOMRect) => void
   onDelete: (id: string) => void
   onMover: (id: string, cat: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${columna.categoria}` })
   return (
     <section ref={setNodeRef} style={{
-      flex: '0 0 220px', width: 220,
-      borderRadius: 10, padding: 6,
+      flex: '0 0 184px', width: 184,
+      borderRadius: 10, padding: 5,
       background: isOver ? `${columna.color}14` : 'transparent',
       transition: 'background 120ms',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 6px 8px', borderLeft: `3px solid ${columna.color}`, paddingLeft: 8, marginBottom: 4 }}>
-        <span style={{ width: 9, height: 9, borderRadius: '50%', background: columna.color, flexShrink: 0 }} />
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#111827', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{columna.categoria}</span>
-        <span style={{ fontSize: 11, color: '#9ca3af' }}>{columna.items.length}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 4px 6px', borderLeft: `3px solid ${columna.color}`, paddingLeft: 7, marginBottom: 3 }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: columna.color, flexShrink: 0 }} />
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: '#111827', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{columna.categoria}</span>
+        <span style={{ fontSize: 10.5, color: '#9ca3af', fontWeight: 600 }}>{columna.items.length}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {columna.items.map((t) => (
           <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} otras={todasCategorias.filter((c) => c !== t.categoria)}
             onComplete={onComplete} onDelete={onDelete} onMover={onMover} />
@@ -215,31 +445,32 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
 /* ============================ Card ============================ */
 function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }: {
   tarea: Tarea; esCEO: boolean; otras: string[]
-  onComplete: (id: string) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
+  onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: tarea.id })
   const [menu, setMenu] = useState(false)
   const [nueva, setNueva] = useState('')
+  const cardRef = useRef<HTMLDivElement>(null)
 
   return (
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1, position: 'relative' }}>
-      <div style={{ background: tarea.color, borderRadius: 9, padding: '9px 10px', color: '#fff' }}>
+      <div ref={cardRef} style={{ background: tarea.color, borderRadius: 8, padding: '6px 8px', color: '#fff' }}>
         {/* zona arrastrable = el texto */}
-        <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 12.5, lineHeight: 1.35, cursor: 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
+        <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 11.5, lineHeight: 1.3, cursor: 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
           {tarea.texto}
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5 }}>
           {esCEO && tarea.teamMemberNombre && (
-            <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, background: 'rgba(255,255,255,0.22)', padding: '1px 6px', borderRadius: 5 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, background: 'rgba(255,255,255,0.22)', padding: '1px 5px', borderRadius: 4 }}>
               {tarea.teamMemberNombre.split(' ')[0]}
             </span>
           )}
           <div style={{ flex: 1 }} />
           <button onClick={() => setMenu((v) => !v)} title="Mover de columna" style={iconBtn}>
-            <ArrowRight size={13} strokeWidth={2.4} />
+            <ArrowRight size={12} strokeWidth={2.4} />
           </button>
-          <button onClick={() => onComplete(tarea.id)} title="Completar" style={iconBtn}>
-            <Check size={13} strokeWidth={2.6} />
+          <button onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Completar" style={iconBtn}>
+            <Check size={12} strokeWidth={2.6} />
           </button>
         </div>
       </div>
@@ -262,8 +493,8 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }:
 
 function CardVisual({ tarea, overlay }: { tarea: Tarea; overlay?: boolean }) {
   return (
-    <div style={{ background: tarea.color, borderRadius: 9, padding: '9px 10px', color: '#fff', width: 208, boxShadow: overlay ? '0 10px 28px rgba(0,0,0,0.28)' : 'none', cursor: 'grabbing' }}>
-      <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.35, wordBreak: 'break-word' }}>{tarea.texto}</p>
+    <div style={{ background: tarea.color, borderRadius: 8, padding: '6px 8px', color: '#fff', width: 172, boxShadow: overlay ? '0 10px 28px rgba(0,0,0,0.28)' : 'none', cursor: 'grabbing' }}>
+      <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.3, wordBreak: 'break-word' }}>{tarea.texto}</p>
     </div>
   )
 }
@@ -438,6 +669,6 @@ function Composer({ onCrear, equipo, isMobile }: {
   )
 }
 
-const iconBtn: React.CSSProperties = { width: 24, height: 24, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.22)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
+const iconBtn: React.CSSProperties = { width: 20, height: 20, borderRadius: 5, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.22)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
 const iconBtnDark: React.CSSProperties = { width: 20, height: 20, borderRadius: 5, border: 'none', cursor: 'pointer', background: 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
 const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: 12.5, color: '#111827', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer' }

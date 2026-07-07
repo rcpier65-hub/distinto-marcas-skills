@@ -27,11 +27,18 @@ export async function getMarcasNav(): Promise<MarcaNav[]> {
     const service = createServiceClient() as any
     const { data, error } = await service
       .from('marcas')
-      .select('slug, nombre, emoji_marca, color_primario_hex')
+      .select('id, slug, nombre, emoji_marca, color_primario_hex')
       .eq('activa', true)
       .order('slug')
 
     if (error || !data || data.length === 0) return MARCAS_NAV
+
+    // Pendientes REALES del inbox: contamos las filas de comentarios_inbox
+    // con status='pending' agrupadas por marca. Antes el badge usaba números
+    // de mock (de ahí el "73" fantasma que no coincidía con el inbox vacío).
+    // Fix Pedro 15-jun-2026: "el inbox dice 73 y no hay nada, debe estar
+    // conectado". Defensivo: si la query falla, todos arrancan en 0 (no mock).
+    const pendientesPorMarca = await contarPendientesPorMarca(service)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data as any[]).map((m): MarcaNav => {
@@ -45,12 +52,37 @@ export async function getMarcasNav(): Promise<MarcaNav[]> {
         // Color: marca histórica conserva su CSS var temática; marca nueva usa su hex.
         color: meta?.color ?? m.color_primario_hex ?? '#ba41f7',
         industria: meta?.industria ?? 'Marca',
-        // Los "pendientes" reales aún no se agregan acá; las históricas mantienen
-        // su badge de referencia, las nuevas arrancan en 0 (sin badge).
-        pendientes: meta?.pendientes ?? 0,
+        // Pendientes REALES (status='pending' en comentarios_inbox). 0 = sin badge.
+        pendientes: pendientesPorMarca[m.id] ?? 0,
       }
     })
   } catch {
     return MARCAS_NAV
+  }
+}
+
+/**
+ * Cuenta comentarios con status='pending' por marca_id. Una sola query (solo
+ * trae las filas pendientes, que normalmente son pocas) y agrupamos en JS.
+ * Si la tabla no existe o la query falla, devolvemos {} → todos 0 (sin badge).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function contarPendientesPorMarca(service: any): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await service
+      .from('comentarios_inbox')
+      .select('marca_id')
+      .eq('status', 'pending')
+    if (error || !data) return {}
+    const counts: Record<string, number> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const row of data as any[]) {
+      const id = row.marca_id
+      if (!id) continue
+      counts[id] = (counts[id] ?? 0) + 1
+    }
+    return counts
+  } catch {
+    return {}
   }
 }

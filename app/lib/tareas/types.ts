@@ -13,4 +13,5 @@ export type Tarea = {
   completada: boolean
   focusLane: FocusLane | null      // null = en el board
   createdAt: string
+  completadaAt: string | null      // cuándo se marcó lista (para el historial/archivo)
 }

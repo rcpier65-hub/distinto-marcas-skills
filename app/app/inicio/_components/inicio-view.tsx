@@ -14,7 +14,8 @@ import {
   Palette, Flame, User, Scissors, Calendar, MessageCircle,
   Target, Users, DollarSign, Zap, Sparkles, CalendarClock,
   ClipboardList, Image as LucideImage, FolderOpen, Megaphone,
-  Search, Save, BarChart3, Lightbulb, Smile, Mic, Plus,
+  Search, Save, BarChart3, Lightbulb, Smile, Mic, Plus, Rocket,
+  Bell,
   type LucideIcon,
 } from 'lucide-react'
 import { toggleHabitoHoy, toggleHabitoFecha } from '@/app/habitos/_actions'
@@ -23,7 +24,9 @@ import {
   togglePendienteRapido,
   eliminarPendienteRapido,
   convertirEnTarea,
+  obtenerDatosBannerRealtime,
 } from '../_actions'
+import { createClient } from '@/lib/supabase/client'
 import { CockpitView, type CockpitData } from '@/components/views/CockpitView'
 import { AvisoGrabaciones } from './aviso-grabaciones'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
@@ -448,6 +451,11 @@ export function InicioView({ data }: { data: InicioData }) {
             )}
           </div>
         </header>
+
+        {/* Banner de recordatorios — Erick y Lorena (Operaciones) */}
+        {(data.nombre === 'Erick' || data.nombre === 'Lorena') && (
+          <BannerRecordatorioErick nombre={data.nombre} tareas={data.tareasMias} pendientes={data.pendientes} />
+        )}
 
         {/* Frase del día — banner con cita elegante.
             Color sutil acorde al rol, animada con fade-up retardado para
@@ -1386,6 +1394,9 @@ function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }
     }
     if (rolBase === 'community_manager' || rolBase === 'social_media_manager') {
       return [
+        /* Acceso directo a "Publicar hoy" — quien publica manualmente (Ruth)
+           arranca el día acá: video, portada, copy y música paso a paso. */
+        { titulo: 'Publicar hoy', subtitulo: 'Lo que toca publicar hoy, paso a paso', href: '/publicaciones/publicar-hoy', Icon: Rocket, color: '#16a34a' },
         { titulo: 'Atender comentarios', subtitulo: 'Inbox y respuestas pendientes', href: '/comentarios', Icon: MessageCircle, color: '#22c55e' },
         { titulo: 'Publicaciones de la semana', subtitulo: 'Qué sale, cuándo y dónde', href: '/publicaciones', Icon: Calendar, color: '#06b6d4' },
         COMUNES.habitos,
@@ -1783,4 +1794,301 @@ const tituloHabitosStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
+}
+
+/* ====================================================================
+   BannerRecordatorioErick
+   --------------------------------------------------------------------
+   Banner prominente de recordatorios para Erick y Lorena (Operaciones).
+   Datos en TIEMPO REAL vía Supabase Realtime: se actualiza solo cuando
+   cambia algo en pendientes_rapidos, publicaciones o comentarios_inbox.
+   Descartable por sesión (reaparece en el próximo login).
+   ==================================================================== */
+function BannerRecordatorioErick({
+  nombre,
+  tareas: tareasIniciales,
+  pendientes: pendientesIniciales,
+}: {
+  nombre: string
+  tareas: InicioData['tareasMias']
+  pendientes: InicioData['pendientes']
+}) {
+  const storageKey = `recordatorio-cerrado-${nombre.toLowerCase()}`
+  const [cerrado, setCerrado] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return sessionStorage.getItem(storageKey) === '1'
+  })
+  const [tareas, setTareas] = useState(tareasIniciales)
+  const [pendientes, setPendientes] = useState(pendientesIniciales)
+  const [actualizando, setActualizando] = useState(false)
+
+  /* Suscripción Supabase Realtime — actualiza el banner sin refrescar la
+     página cuando hay INSERT/UPDATE/DELETE en las tablas relevantes. */
+  useEffect(() => {
+    if (cerrado) return
+
+    async function refrescar() {
+      setActualizando(true)
+      try {
+        const datos = await obtenerDatosBannerRealtime()
+        setTareas(datos.tareas)
+        setPendientes(datos.pendientes)
+      } finally {
+        setActualizando(false)
+      }
+    }
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`banner-realtime-${nombre.toLowerCase()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pendientes_rapidos' }, refrescar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'publicaciones' }, refrescar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comentarios_inbox' }, refrescar)
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [cerrado, nombre])
+
+  if (cerrado) return null
+
+  const pendientesActivos = pendientes.filter((p) => !p.completado)
+
+  return (
+    <div
+      style={{
+        marginBottom: 24,
+        borderRadius: 16,
+        overflow: 'hidden',
+        boxShadow: '0 4px 24px rgba(249,115,22,0.15)',
+        animation: 'mk-fade-up 0.5s cubic-bezier(.22,1,.36,1) forwards',
+      }}
+    >
+      {/* Cabecera naranja sólida */}
+      <div style={{
+        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 60%, #fb923c 100%)',
+        padding: '18px 22px 16px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 14,
+        position: 'relative',
+      }}>
+        {/* Ícono */}
+        <div style={{
+          width: 44, height: 44, borderRadius: 12,
+          background: 'rgba(255,255,255,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          color: '#fff',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <Bell size={22} strokeWidth={2.2} />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)',
+            marginBottom: 5,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            Recordatorio · {nombre}
+            {actualizando && (
+              <span style={{
+                display: 'inline-block',
+                width: 6, height: 6, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.9)',
+                animation: 'mk-mic-pulse 1s ease-in-out infinite',
+              }} />
+            )}
+            {!actualizando && (
+              <span style={{ fontSize: 9, opacity: 0.55, fontWeight: 500, letterSpacing: '0.05em' }}>
+                · TIEMPO REAL
+              </span>
+            )}
+          </div>
+          {/* Mensaje principal grande */}
+          <p style={{
+            margin: 0,
+            fontSize: 20, fontWeight: 700,
+            color: '#fff',
+            lineHeight: 1.25,
+            letterSpacing: '-0.01em',
+          }}>
+            No olvidar coordinar la salida del mes
+          </p>
+        </div>
+
+        {/* Cerrar */}
+        <button
+          onClick={() => {
+            sessionStorage.setItem(storageKey, '1')
+            setCerrado(true)
+          }}
+          title="Cerrar"
+          style={{
+            background: 'rgba(255,255,255,0.15)', border: 'none',
+            color: '#fff', cursor: 'pointer',
+            width: 28, height: 28,
+            borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, fontWeight: 700,
+            flexShrink: 0,
+            transition: 'background 120ms',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.28)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)' }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Cuerpo: tareas pendientes reales */}
+      <div style={{
+        background: '#fff7ed',
+        border: '1px solid #fed7aa',
+        borderTop: 'none',
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+        padding: '14px 20px 16px',
+      }}>
+        {/* Tareas reales de publicaciones */}
+        {tareas.length > 0 && (
+          <div style={{ marginBottom: pendientesActivos.length > 0 ? 14 : 0 }}>
+            <div style={{
+              fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: '#c2410c',
+              marginBottom: 8,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 18, height: 18, borderRadius: '50%',
+                background: '#ea580c', color: '#fff',
+                fontSize: 10, fontWeight: 800,
+              }}>
+                {tareas.length}
+              </span>
+              Publicaciones pendientes
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {tareas.map((t) => (
+                <a
+                  key={t.id}
+                  href={`/publicaciones/${t.id}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px',
+                    background: '#fff',
+                    border: '1px solid #fed7aa',
+                    borderRadius: 10,
+                    textDecoration: 'none',
+                    transition: 'all 120ms',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fff7ed'
+                    e.currentTarget.style.borderColor = '#fb923c'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.borderColor = '#fed7aa'
+                  }}
+                >
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: t.marcaColor, flexShrink: 0,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 600, color: '#7c2d12',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {t.nombre}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#c2410c', marginTop: 1 }}>
+                      {t.marca} · {t.meta}
+                    </div>
+                  </div>
+                  {t.marcadaHoy && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 800, padding: '2px 6px',
+                      borderRadius: 4, background: '#fef2f2', color: '#dc2626',
+                      letterSpacing: '0.05em', flexShrink: 0,
+                    }}>
+                      HOY
+                    </span>
+                  )}
+                  <span style={{ color: '#f97316', fontSize: 13, flexShrink: 0 }}>→</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pendientes rápidos activos */}
+        {pendientesActivos.length > 0 && (
+          <div>
+            <div style={{
+              fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: '#c2410c',
+              marginBottom: 8,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 18, height: 18, borderRadius: '50%',
+                background: '#f97316', color: '#fff',
+                fontSize: 10, fontWeight: 800,
+              }}>
+                {pendientesActivos.length}
+              </span>
+              Tareas rápidas sin completar
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {pendientesActivos.slice(0, 5).map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    fontSize: 12.5, color: '#7c2d12',
+                    padding: '5px 10px',
+                    background: '#fff',
+                    border: '1px solid #fed7aa',
+                    borderRadius: 8,
+                  }}
+                >
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: p.prioridad === 1 ? '#dc2626' : p.prioridad === 2 ? '#f97316' : '#d1d5db',
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.titulo}
+                  </span>
+                  <span style={{
+                    fontSize: 10, color: '#c2410c', fontWeight: 600,
+                    background: `${p.categoria === 'Urgente' ? '#fef2f2' : '#fff7ed'}`,
+                    padding: '1px 6px', borderRadius: 4, flexShrink: 0,
+                  }}>
+                    {p.categoria}
+                  </span>
+                </div>
+              ))}
+              {pendientesActivos.length > 5 && (
+                <div style={{ fontSize: 11.5, color: '#c2410c', padding: '2px 10px', fontWeight: 500 }}>
+                  +{pendientesActivos.length - 5} más en tus tareas rápidas
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Si no hay nada pendiente */}
+        {tareas.length === 0 && pendientesActivos.length === 0 && (
+          <div style={{ fontSize: 13, color: '#c2410c', fontStyle: 'italic', padding: '4px 0' }}>
+            Sin tareas pendientes asignadas por ahora. ¡Al día!
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

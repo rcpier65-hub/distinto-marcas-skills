@@ -107,7 +107,7 @@ function formatCierre(m: MarcaCaptionInfo): string {
     return `¡A romperla esta semana! ${emoji}`
   }
   if (tono.includes('profesional') || tono.includes('rigurosa') || tono.includes('clínica')) {
-    return `Cualquier consulta, atento. ${emoji}`
+    return `Cualquier consulta quedo atento ${emoji}`
   }
   return `Cualquier consulta, atento. ${emoji}`
 }

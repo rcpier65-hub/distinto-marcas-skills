@@ -34,6 +34,19 @@ export default async function TareasPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tareas: Tarea[] = ((data ?? []) as any[]).map(rowToTarea)
 
+  /* Historial: tareas YA terminadas (las últimas 200). Alimentan el panel de
+     "Archivo" del tablero. Mismo gate por persona que las activas. */
+  let qc = service
+    .from('tareas')
+    .select(TAREA_SELECT)
+    .eq('completada', true)
+    .order('completada_at', { ascending: false, nullsFirst: false })
+    .limit(200)
+  if (!esCEO && meId) qc = qc.eq('team_member_id', meId)
+  const { data: dataC } = await qc
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
+
   /* Equipo (para sugerir @menciones). Excluye al director. */
   const { data: members } = await service
     .from('team_members')
@@ -44,5 +57,5 @@ export default async function TareasPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
 
-  return <TareasView tareasIniciales={tareas} esCEO={esCEO} meId={meId} equipo={equipo} />
+  return <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esCEO} meId={meId} equipo={equipo} />
 }

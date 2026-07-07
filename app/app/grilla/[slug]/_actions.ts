@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { registrarActividad } from '@/lib/actividad/registrar'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
 import {
@@ -363,6 +364,13 @@ export async function enviarGrillaAlGrupo(
     revalidatePath(`/marca/${slug}`)
     revalidatePath('/dashboard')
   }
+
+  await registrarActividad({
+    accion: modo === 'test' ? 'Probó el envío de una grilla' : 'Envió la grilla al grupo',
+    entidad_tipo: 'grilla',
+    marca_slug: slug,
+    detalle: grupo ? `Grupo: ${grupo}` : undefined,
+  })
 
   return { ok: true, grupo, modo }
 }

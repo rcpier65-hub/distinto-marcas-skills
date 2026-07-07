@@ -16,6 +16,7 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { syncMarcaPublicaciones } from '@/lib/publicaciones/sync'
+import { registrarActividad } from '@/lib/actividad/registrar'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -50,6 +51,7 @@ export async function marcarParaEditarHoy(id: string): Promise<ActionResult> {
     return { ok: false, error: error.message }
   }
 
+  await registrarActividad({ accion: 'Marcó un video para editar hoy', entidad_tipo: 'publicacion', entidad_id: id })
   revalidatePath('/editor')
   return { ok: true }
 }
@@ -130,6 +132,9 @@ export async function updateEditorEntry(
      Sólo aplicamos si patch.estado viene definido y es estado avanzado. */
   const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
   if (patch.estado !== undefined && ESTADOS_AVANZADOS.includes(patch.estado)) {
+    /* Terminó de editar (pasó a un estado avanzado) → encender el flag
+       `editado` para que la tijereta del calendario se ponga verde sola. */
+    update.editado = true
     const { data: actual } = await service
       .from('publicaciones')
       .select('estado, editado_at')
@@ -158,6 +163,21 @@ export async function updateEditorEntry(
   if (error) {
     console.error('[updateEditorEntry] error:', error)
     return { ok: false, error: error.message }
+  }
+
+  // Historial: registramos el cambio de estado (lo más relevante del editor).
+  if (patch.estado) {
+    const accion = patch.estado === 'aprobar'
+      ? 'Mandó a aprobar'
+      : ESTADOS_AVANZADOS.includes(patch.estado)
+      ? `Terminó la edición (estado "${patch.estado}")`
+      : `Cambió estado a "${patch.estado}"`
+    await registrarActividad({
+      accion,
+      entidad_tipo: 'publicacion',
+      entidad_id: id,
+      detalle: patch.nombre ? `"${patch.nombre}"` : undefined,
+    })
   }
 
   revalidatePath('/editor')

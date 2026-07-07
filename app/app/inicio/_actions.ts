@@ -5,6 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { parsePendiente, type Categoria } from '@/lib/pendientes/parse-pendiente'
+import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { tieneAcceso } from '@/lib/team/types'
+import type { InicioData } from './_components/inicio-view'
 
 export type PendienteRapido = {
   id: string
@@ -214,6 +217,114 @@ export async function convertirEnTarea(id: string): Promise<
   revalidatePath('/publicaciones')
 
   return { ok: true, publicacionId: pub.id, estado }
+}
+
+/**
+ * Devuelve tareas y pendientes del usuario actual para el banner realtime.
+ * Replica la lógica de page.tsx pero como server action para que el cliente
+ * pueda llamarlo cada vez que Supabase Realtime detecte un cambio.
+ */
+export async function obtenerDatosBannerRealtime(): Promise<{
+  tareas: InicioData['tareasMias']
+  pendientes: InicioData['pendientes']
+}> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const p = await getCurrentMemberPermisos()
+  const esAdmin = !p
+  const esCEO = esAdmin || (p?.member.rol_base === 'director')
+  const hoy = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const memberData = esAdmin ? {
+    id: null as string | null,
+    nombre: (user.user_metadata?.nombre as string | undefined) ?? user.email?.split('@')[0] ?? 'Admin',
+    rol_base: 'director',
+  } : {
+    id: p!.member.id,
+    nombre: p!.member.nombre,
+    rol_base: p!.member.rol_base,
+  }
+
+  let tareas: InicioData['tareasMias'] = []
+  if (esCEO) {
+    const { data } = await service
+      .from('publicaciones')
+      .select(`id, nombre, fecha_publicacion, estado, marca:marcas(slug, nombre, color_primario_hex)`)
+      .in('estado', ['tareas', 'idear', 'disenar', 'editar', 'aprobar', 'programar'])
+      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
+      .limit(5)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareas = ((data ?? []) as any[]).map((r) => {
+      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      return { id: r.id as string, nombre: (r.nombre ?? '—') as string, marca: (m?.nombre ?? m?.slug ?? 'Marca') as string, marcaColor: (m?.color_primario_hex ?? '#737373') as string, meta: r.estado as string, marcadaHoy: false, modulo: 'editor' as const }
+    })
+  } else if (tieneAcceso(p!.permisos, 'editor')) {
+    const { data } = await service
+      .from('publicaciones')
+      .select(`id, nombre, fecha_publicacion, fecha_marcada_para_editar, editor_nombre, marca:marcas(slug, nombre, color_primario_hex)`)
+      .ilike('editor_nombre', memberData.nombre)
+      .eq('estado', 'editar')
+      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
+      .limit(5)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareas = ((data ?? []) as any[]).map((r) => {
+      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      return { id: r.id as string, nombre: (r.nombre ?? '—') as string, marca: (m?.nombre ?? m?.slug ?? 'Marca') as string, marcaColor: (m?.color_primario_hex ?? '#737373') as string, meta: r.fecha_publicacion ? `Publica ${new Date(r.fecha_publicacion + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}` : 'Sin fecha', marcadaHoy: r.fecha_marcada_para_editar === hoy, modulo: 'editor' as const }
+    })
+  } else if (tieneAcceso(p!.permisos, 'diseno')) {
+    const { data } = await service
+      .from('publicaciones')
+      .select(`id, nombre, fecha_diseno, estado_tarea, marca:marcas(slug, nombre, color_primario_hex)`)
+      .eq('es_tarea_diseno', true)
+      .not('estado_tarea', 'in', '(listo,archivado)')
+      .order('fecha_diseno', { ascending: true, nullsFirst: false })
+      .limit(5)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareas = ((data ?? []) as any[]).map((r) => {
+      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      return { id: r.id as string, nombre: (r.nombre ?? '—') as string, marca: (m?.nombre ?? m?.slug ?? 'Marca') as string, marcaColor: (m?.color_primario_hex ?? '#737373') as string, meta: r.fecha_diseno ? `Entrega ${new Date(r.fecha_diseno + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}` : 'Sin fecha', marcadaHoy: false, modulo: 'diseno' as const }
+    })
+  } else if (tieneAcceso(p!.permisos, 'comentarios') || tieneAcceso(p!.permisos, 'inbox')) {
+    const { data } = await service
+      .from('comentarios_inbox')
+      .select(`id, author_username, author_display_name, comment_text, marca:marcas(slug, nombre, color_primario_hex)`)
+      .eq('status', 'pending')
+      .order('comment_created_at', { ascending: false })
+      .limit(5)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareas = ((data ?? []) as any[]).map((r) => {
+      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
+      return { id: r.id as string, nombre: ((r.comment_text ?? '').substring(0, 60) || '—') as string, marca: (m?.nombre ?? m?.slug ?? 'Marca') as string, marcaColor: (m?.color_primario_hex ?? '#737373') as string, meta: `@${r.author_display_name || r.author_username || 'anon'}`, marcadaHoy: false, modulo: 'comentarios' as const }
+    })
+  }
+
+  let pendientesQuery = service
+    .from('pendientes_rapidos')
+    .select('id, titulo, descripcion, categoria, prioridad, completado, created_at')
+    .eq('completado', false)
+    .order('prioridad', { ascending: true })
+    .order('created_at', { ascending: false })
+    .limit(30)
+  if (memberData.id) {
+    pendientesQuery = pendientesQuery.eq('team_member_id', memberData.id)
+  } else {
+    pendientesQuery = pendientesQuery.is('team_member_id', null)
+  }
+  const { data: pendientesRaw } = await pendientesQuery
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pendientes: InicioData['pendientes'] = ((pendientesRaw ?? []) as any[]).map((row) => ({
+    id: row.id as string,
+    titulo: row.titulo as string,
+    descripcion: (row.descripcion ?? null) as string | null,
+    categoria: row.categoria as string,
+    prioridad: row.prioridad as 1 | 2 | 3,
+    completado: row.completado as boolean,
+    created_at: row.created_at as string,
+  }))
+
+  return { tareas, pendientes }
 }
 
 /** Eliminar un pendiente (hard delete con ownership check). */

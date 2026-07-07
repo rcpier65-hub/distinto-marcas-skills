@@ -1,0 +1,80 @@
+// app/app/actividad/page.tsx
+//
+// Reporte de actividad por persona. Cada miembro ve SU historial del día;
+// el admin/owner (Pedro) ve el de TODOS, con filtro por persona y fecha.
+// Pedro 15-jun-2026: "saber qué hizo cada persona y cuánto".
+
+import { requireUser } from '@/lib/auth/get-user'
+import { createServiceClient } from '@/lib/supabase/service'
+import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { loadActividadDerivada } from '@/lib/actividad/derivar'
+import { ActividadView, type ActividadRow } from './_components/actividad-view'
+
+export const dynamic = 'force-dynamic'
+
+const TZ = 'America/Lima'
+
+function hoyLima(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+}
+
+type SP = { fecha?: string; persona?: string }
+
+export default async function ActividadPage({ searchParams }: { searchParams: Promise<SP> }) {
+  await requireUser()
+  const sp = await searchParams
+  const fecha = sp.fecha && /^\d{4}-\d{2}-\d{2}$/.test(sp.fecha) ? sp.fecha : hoyLima()
+
+  // ¿Es admin/owner? (sin team_member o rol director). Solo el admin ve a todos.
+  const permisos = await getCurrentMemberPermisos()
+  const esAdmin = !permisos || permisos.member.rol_base === 'director'
+  const miNombre = permisos?.member?.nombre ?? 'Pedro (Admin)'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  // Ventana del día en hora Lima (UTC-5, sin horario de verano).
+  const desde = `${fecha}T00:00:00-05:00`
+  const hasta = `${fecha}T23:59:59-05:00`
+
+  let query = service
+    .from('actividad')
+    .select('actor_nombre, rol, accion, entidad_tipo, marca_slug, detalle, created_at')
+    .gte('created_at', desde)
+    .lte('created_at', hasta)
+    .order('created_at', { ascending: false })
+    .limit(1000)
+
+  // Un miembro normal solo ve SU actividad.
+  if (!esAdmin) query = query.eq('actor_nombre', miNombre)
+  // El admin puede filtrar por una persona puntual.
+  else if (sp.persona) query = query.eq('actor_nombre', sp.persona)
+
+  const { data } = await query
+  const tablaRows = (data ?? []) as ActividadRow[]
+
+  // Si la tabla `actividad` está vacía o ausente para este día (la migración
+  // no está corrida, o nadie tenía logging cuando trabajó), DERIVAMOS la
+  // actividad de las tablas fuente (videos editados + tareas completadas).
+  // Así Pieer ve su trabajo de hoy aunque la tabla no exista (Pedro 23-jun-2026:
+  // "edité 6 videos y sale como si no hubiera hecho nada"). Cuando la tabla SÍ
+  // tenga registros, esa es la fuente (más rica) y no derivamos → sin duplicar.
+  const rows: ActividadRow[] = tablaRows.length > 0
+    ? tablaRows
+    : await loadActividadDerivada(service, {
+        desde,
+        hasta,
+        esAdmin,
+        soloActorNombre: !esAdmin ? miNombre : (sp.persona ?? null),
+      })
+
+  return (
+    <ActividadView
+      rows={rows}
+      fecha={fecha}
+      esAdmin={esAdmin}
+      miNombre={miNombre}
+      migracionPendiente={false}
+    />
+  )
+}

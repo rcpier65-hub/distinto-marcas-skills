@@ -105,6 +105,11 @@ type Filters = {
   vistaRapida: VistaRapida
 }
 
+/* Recordar filtros del editor entre navegaciones (sessionStorage). Fix Pedro
+   15-jun-2026: "cuando filtro por editor PIEER y vuelvo, sale otra vez todos".
+   Los filtros ahora son permanentes hasta que el editor los cambie. */
+const EDITOR_VIEW_STATE_KEY = 'editor-view-state-v1'
+
 type Props = {
   entries: EditorEntry[]
   editores: EditorOption[]
@@ -128,6 +133,31 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     soloHoy: false,
     vistaRapida: 'todas',
   })
+
+  /* Restaurar filtros guardados al montar + persistirlos al cambiar. Así, si el
+     editor filtra por su nombre (PIEER) y entra a una tarea, al volver sigue
+     filtrado. `restaurado` evita pisar el storage con defaults antes de leerlo. */
+  const [restaurado, setRestaurado] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(EDITOR_VIEW_STATE_KEY)
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (typeof s.search === 'string') setSearch(s.search)
+        if (s.filters && typeof s.filters === 'object') {
+          setFilters((f) => ({ ...f, ...s.filters }))
+        }
+      }
+    } catch {}
+    setRestaurado(true)
+  }, [])
+  useEffect(() => {
+    if (!restaurado) return
+    try {
+      sessionStorage.setItem(EDITOR_VIEW_STATE_KEY, JSON.stringify({ search, filters }))
+    } catch {}
+  }, [restaurado, search, filters])
+
   const [reporteOpen, setReporteOpen] = useState(false)
   const [nuevaTareaOpen, setNuevaTareaOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)

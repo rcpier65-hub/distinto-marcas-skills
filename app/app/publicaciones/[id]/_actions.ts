@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generarCopysIA } from '@/lib/copys/generar'
+import { promptSeedPorSlug } from '@/lib/copys/seeds'
+import { registrarActividad } from '@/lib/actividad/registrar'
 import type { EstadoPublicacion, EstadoTarea } from '@/lib/types/database'
 
 export type UpdatePublicacionInput = {
@@ -20,10 +22,13 @@ export type UpdatePublicacionInput = {
   objetivos?: string[]
   copy?: string | null
   guion?: string | null
+  frase?: string | null                   // frase en pantalla del video (TikTok)
   enlace_tomas?: string | null
   enlace_musica?: string | null
   portada_cruda_url?: string | null
   portada_editada_url?: string | null
+  drive_resultado_url?: string | null    // enlace del diseño terminado (Ailyn)
+  es_tarea_diseno?: boolean               // flag "Para diseño" → tablero de Ailyn
   video_sin_musica_url?: string | null  // Migration 025
   video_con_musica_url?: string | null  // Migration 025
   copy_listo?: boolean
@@ -82,24 +87,75 @@ export async function updatePublicacion(
     }
   }
 
+  // AUTO: cambiar el ESTADO a "Diseñar" manualmente (desde el dropdown del
+  // detalle) ahora envía la tarea al tablero de Ailyn automáticamente. Antes
+  // había que cambiar el estado Y ADEMÁS tocar el botón "Mandar a diseño" — un
+  // doble paso que Lorena no hacía ("le asigné a diseño pero no le sale",
+  // 27-jun-2026). Solo aplica a ediciones HUMANAS (updatePublicacion); el sync
+  // de Notion usa su propio update en lib/publicaciones/sync.ts, así que NO se
+  // re-inunda el tablero (la decisión anti-inundación de Pedro sigue intacta).
+  // Solo encendemos en la transición (si ya estaba en diseño, no tocamos el
+  // sub-estado para no pisar el avance de la diseñadora).
+  let activoParaDiseno = false
+  if (input.estado === 'disenar' && input.es_tarea_diseno === undefined) {
+    const { data: ctxD } = await service
+      .from('publicaciones')
+      .select('es_tarea_diseno')
+      .eq('id', id)
+      .maybeSingle()
+    if (ctxD?.es_tarea_diseno !== true) {
+      update.es_tarea_diseno = true
+      activoParaDiseno = true
+      if (input.estado_tarea === undefined) update.estado_tarea = 'sin_empezar'
+    }
+  }
+
+  // AUTO: marcar la tarea como 'listo' enciende el flag de workflow que pinta
+  // el icono del calendario en verde solo — Pedro: "la tijereta debe teñirse
+  // verde ni bien Pieer termina de editar, sin entrar manualmente". Diseño →
+  // disenado; edición → editado. Respetamos un valor explícito si vino en input.
+  if (input.estado_tarea === 'listo' && input.editado === undefined && input.disenado === undefined) {
+    const { data: ctx } = await service
+      .from('publicaciones')
+      .select('es_tarea_diseno, estado')
+      .eq('id', id)
+      .maybeSingle()
+    const esDiseno = ctx?.es_tarea_diseno === true || ctx?.estado === 'disenar'
+    if (esDiseno) update.disenado = true
+    else update.editado = true
+  }
+
   let { error } = await service.from('publicaciones').update(update).eq('id', id)
 
-  // DEFENSIVO contra migraciones pendientes: si el UPDATE falla porque una
-  // columna no existe (Postgres error 42703 = undefined_column), quitamos
-  // las columnas "opcionales" (features nuevas sin migración aplicada todavía)
-  // y reintentamos. Sin esto, una columna faltante bloqueaba TODO el guardado
-  // — incluido el editor (bug que Pedro detectó: cambiaba editor, no persistía,
-  // porque el form mandaba video_*_url sin que existieran esas columnas).
-  if (error && (error.code === '42703' || /column .* does not exist/i.test(error.message ?? ''))) {
-    const OPTIONAL_COLS = ['video_sin_musica_url', 'video_con_musica_url']
-    let removedAny = false
-    for (const col of OPTIONAL_COLS) {
-      if (col in update) { delete update[col]; removedAny = true }
-    }
-    if (removedAny) {
-      const retry = await service.from('publicaciones').update(update).eq('id', id)
-      error = retry.error
-    }
+  // DEFENSIVO contra columnas faltantes (migración pendiente). Una columna que
+  // no existe puede dar DOS errores: Postgres `42703 column ... does not exist`
+  // o PostgREST `PGRST204 Could not find the '...' column ... in the schema
+  // cache` (supabase-js al validar el payload). Atrapamos ambos.
+  // ⚠️ CRÍTICO (Pedro 23-jun-2026): quitamos SOLO la columna que el error
+  // NOMBRA — NO todas las opcionales. Bug previo: al faltar `frase`, el retry
+  // podaba TAMBIÉN `video_*_url` (que SÍ existen) → los enlaces de video NO se
+  // guardaban (se "guardaba" pero al recargar no salían). Iteramos por si
+  // faltara más de una columna. Mismo patrón que ya nos mordió: un fallback
+  // NUNCA debe tirar datos válidos, solo la columna realmente ausente.
+  const OPTIONAL_COLS = ['video_sin_musica_url', 'video_con_musica_url', 'drive_resultado_url', 'es_tarea_diseno', 'frase']
+  let intentos = 0
+  while (
+    error && intentos < OPTIONAL_COLS.length && (
+      error.code === '42703' ||
+      error.code === 'PGRST204' ||
+      /does not exist/i.test(error.message ?? '') ||
+      /could not find the .*column.* in the schema cache/i.test(error.message ?? '')
+    )
+  ) {
+    intentos++
+    const msg = error.message ?? ''
+    /* Las columnas opcionales no son substring unas de otras, así que
+       includes() identifica sin ambigüedad cuál menciona el error. */
+    const offending = OPTIONAL_COLS.find((c) => (c in update) && msg.includes(c))
+    if (!offending) break  // el error no es por una columna opcional → no podar a ciegas
+    delete update[offending]
+    const retry = await service.from('publicaciones').update(update).eq('id', id)
+    error = retry.error
   }
 
   if (error) {
@@ -107,9 +163,24 @@ export async function updatePublicacion(
     return { ok: false, error: error.message }
   }
 
+  // Historial de actividad (best-effort).
+  const accion = input.estado === 'aprobar'
+    ? 'Mandó a aprobar'
+    : input.estado
+    ? `Cambió estado a "${input.estado}"`
+    : 'Editó una publicación'
+  await registrarActividad({
+    accion,
+    entidad_tipo: 'publicacion',
+    entidad_id: id,
+    detalle: input.nombre ? `"${input.nombre}"` : undefined,
+  })
+
   revalidatePath(`/publicaciones/${id}`)
   revalidatePath('/publicaciones')
   revalidatePath('/publicaciones/tabla')
+  /* Si esta edición mandó la tarea a diseño, refrescar el tablero de Ailyn. */
+  if (activoParaDiseno || input.es_tarea_diseno !== undefined) revalidatePath('/diseno')
   return { ok: true }
 }
 
@@ -119,7 +190,7 @@ export async function updatePublicacion(
  */
 export async function togglePublicacionField(
   id: string,
-  field: 'copy_listo' | 'musica_lista' | 'portada_lista' | 'disenado' | 'editado' | 'video_aprobado',
+  field: 'copy_listo' | 'musica_lista' | 'portada_lista' | 'disenado' | 'editado' | 'video_aprobado' | 'es_tarea_diseno',
   value: boolean,
 ): Promise<ActionResult> {
   const user = await requireUser()
@@ -133,6 +204,44 @@ export async function togglePublicacionField(
 
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/publicaciones/${id}`)
+  /* El flag "Para diseño" cambia qué ve Ailyn → revalidar su tablero. */
+  if (field === 'es_tarea_diseno') revalidatePath('/diseno')
+  return { ok: true }
+}
+
+/**
+ * "Mandar a diseño" — enciende/apaga el flag es_tarea_diseno y, al ENVIAR
+ * (value=true), resetea el sub-estado a 'sin_empezar' para que la tarea
+ * caiga en la columna "Sin empezar" del tablero de Ailyn como trabajo NUEVO.
+ *
+ * Bug que resuelve (19-jun-2026): una publicación que ya pasó por el pipeline
+ * suele tener estado_tarea='listo' (27 de 37 en prod). Si solo encendíamos el
+ * flag, aparecía en la columna "Listo" del tablero de diseño y Ailyn no la veía
+ * como pendiente → "marqué mandar a diseño y no le aparece". El tablero agrupa
+ * por estado_tarea, así que enviar a diseño DEBE nacer en 'sin_empezar'.
+ */
+export async function marcarParaDiseno(
+  id: string,
+  value: boolean,
+): Promise<ActionResult> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const update: Record<string, unknown> = { es_tarea_diseno: value, updated_by: user.id }
+  if (value) update.estado_tarea = 'sin_empezar'
+
+  const { error } = await service.from('publicaciones').update(update).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+
+  await registrarActividad({
+    accion: value ? 'Mandó a diseño' : 'Quitó de diseño',
+    entidad_tipo: 'publicacion',
+    entidad_id: id,
+  })
+
+  revalidatePath(`/publicaciones/${id}`)
+  revalidatePath('/diseno')
   return { ok: true }
 }
 
@@ -178,6 +287,8 @@ export async function generarCopysConIA(input: {
   tipoContenido: string[]
   plataformas: string[]
   copyActual?: string
+  /* Transcripción de audio (modo "generar en base a audio"). */
+  transcript?: string
 }): Promise<{ ok: true; opciones: string[] } | { ok: false; error: string }> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,14 +306,22 @@ export async function generarCopysConIA(input: {
 
   // Voz de marca + facts canon en paralelo
   const [{ data: marca }, { data: facts }] = await Promise.all([
-    service.from('marcas').select('nombre, tono_voz').eq('id', pub.marca_id).maybeSingle(),
+    service.from('marcas').select('nombre, slug, tono_voz').eq('id', pub.marca_id).maybeSingle(),
     service.from('marca_facts').select('*').eq('marca_id', pub.marca_id).maybeSingle(),
   ])
   if (!marca) return { ok: false, error: 'Marca no encontrada.' }
 
-  return generarCopysIA({
+  /* Prompt editable de la marca: lo guardado en tono_voz.prompt_copy, o el seed
+     por defecto del slug (ej. Manrique) si aún no se guardó nada. */
+  const tonoVoz = (marca.tono_voz && typeof marca.tono_voz === 'object') ? marca.tono_voz as Record<string, unknown> : {}
+  const promptGuardado = typeof tonoVoz.prompt_copy === 'string' ? tonoVoz.prompt_copy.trim() : ''
+  const promptMarca = promptGuardado || promptSeedPorSlug(marca.slug as string | null) || null
+
+  const res = await generarCopysIA({
     marcaNombre: marca.nombre as string,
     tonoVoz: marca.tono_voz,
+    promptMarca,
+    transcript: input.transcript ?? null,
     facts: facts
       ? {
           nombre_comercial: facts.nombre_comercial,
@@ -222,6 +341,47 @@ export async function generarCopysConIA(input: {
     plataformas: input.plataformas ?? [],
     copyActual: input.copyActual,
   })
+  if (res.ok) {
+    await registrarActividad({
+      accion: 'Generó copy con IA',
+      entidad_tipo: 'publicacion',
+      entidad_id: input.publicacionId,
+      marca_slug: (marca.slug as string | null) ?? undefined,
+      detalle: input.transcript ? 'desde un audio' : 'desde el guion / contexto',
+    })
+  }
+  return res
+}
+
+/**
+ * Guarda el prompt de copy de una marca (lo edita Pedro desde /publicaciones).
+ * Se guarda en marcas.tono_voz.prompt_copy (jsonb) para no requerir migración.
+ * Merge: conserva el resto de tono_voz (tono, arquetipo, instrucciones…).
+ */
+export async function guardarPromptMarca(
+  marcaId: string,
+  prompt: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  if (!marcaId) return { ok: false, error: 'Falta la marca.' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const { data: marca, error: readErr } = await service
+    .from('marcas')
+    .select('tono_voz')
+    .eq('id', marcaId)
+    .maybeSingle()
+  if (readErr) return { ok: false, error: readErr.message }
+
+  const tonoVoz = (marca?.tono_voz && typeof marca.tono_voz === 'object')
+    ? { ...(marca.tono_voz as Record<string, unknown>) }
+    : {}
+  tonoVoz.prompt_copy = prompt
+
+  const { error } = await service.from('marcas').update({ tono_voz: tonoVoz }).eq('id', marcaId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 /**

@@ -8,7 +8,7 @@
 
 import { CalendarClock } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
-import { formatHora12, sufijoAmPm } from '@/lib/utils/format-hora'
+import { formatHora12 } from '@/lib/utils/format-hora'
 
 export type ProximaGrabacion = {
   id: string
@@ -83,7 +83,7 @@ export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[17px] tracking-tight leading-tight">Próximas grabaciones</h2>
             <p className="text-[12px] text-muted-foreground">
-              Próximos 7 días ·{' '}
+              Lo que viene ·{' '}
               <strong className="text-foreground">{total}</strong> agendada{total === 1 ? '' : 's'}
             </p>
           </div>
@@ -93,9 +93,9 @@ export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
         {grabaciones.length === 0 ? (
           <div className="text-center py-8 px-4">
             <div className="text-4xl mb-2" aria-hidden>🌤️</div>
-            <p className="text-[13px] font-semibold text-foreground">Semana tranquila</p>
+            <p className="text-[13px] font-semibold text-foreground">Todo despejado</p>
             <p className="text-[11.5px] text-muted-foreground mt-1">
-              No hay grabaciones planeadas en los próximos 7 días
+              No hay grabaciones planeadas por venir
             </p>
           </div>
         ) : (
@@ -125,9 +125,10 @@ export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
                     <div className="flex-1 min-w-0">
                       <p className="text-[12.5px] font-semibold truncate leading-tight">{g.marca_nombre}</p>
                       <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                        {g.hora
-                          ? <>{formatHora12(g.hora)} <span className="opacity-70">{sufijoAmPm(g.hora)}</span></>
-                          : 'Sin hora'}
+                        {/* formatHora12 YA incluye AM/PM. Antes se le sumaba
+                            sufijoAmPm() → salía "2:00 PM PM" (Pedro: "la hora
+                            sale mal en algunas"). */}
+                        {g.hora ? formatHora12(g.hora) : 'Sin hora'}
                       </p>
                     </div>
                     {distancia && (
@@ -148,7 +149,7 @@ export function ProximasGrabacionesCard({ grabaciones, hoyIso }: Props) {
 
         {restantes > 0 && (
           <p className="text-[11px] text-muted-foreground mt-3 text-center font-medium">
-            +{restantes} grabación{restantes === 1 ? '' : 'es'} más esta semana
+            +{restantes} grabación{restantes === 1 ? '' : 'es'} más por venir
           </p>
         )}
       </div>

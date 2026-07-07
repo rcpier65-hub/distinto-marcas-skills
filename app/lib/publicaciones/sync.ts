@@ -267,9 +267,30 @@ export async function syncMarcaPublicaciones(args: {
       .maybeSingle()
 
     if (existing) {
+      /* Sync NO destructivo para los campos de asset/enlace que el equipo
+         carga EN LA APP (el editor pega los videos, el diseñador la portada,
+         etc.). Si Notion los trae vacíos NO los pisamos con null — si no, cada
+         sync borraba lo cargado y "Publicar hoy" mostraba "(no hay)" aunque el
+         video ya estuviera. Notion gana solo cuando trae un valor. Fix Pedro
+         15-jun-2026. (En INSERT sí van como null: la fila es nueva.) */
+      const CAMPOS_ASSET_PRESERVAR = [
+        'video_con_musica_url', 'video_sin_musica_url',
+        'portada_cruda_url', 'portada_editada_url',
+        'enlace_tomas', 'enlace_musica',
+        /* Asignación del editor + fecha de edición: Lore las setea EN LA APP.
+           Si Notion las trae vacías NO las pisamos → si no, el sync borraba la
+           asignación y el video "desaparecía" del editor. Fix Pedro 15-jun-2026.
+           opcion_2 = referencias de video (también se carga en la app). */
+        'editor_nombre', 'editor_id', 'fecha_edicion', 'opcion_2',
+      ]
+      const updatePatch: Record<string, unknown> = { ...patch }
+      for (const f of CAMPOS_ASSET_PRESERVAR) {
+        const v = updatePatch[f]
+        if (v === null || v === undefined || v === '') delete updatePatch[f]
+      }
       const { error } = await args.service
         .from('publicaciones')
-        .update(patch)
+        .update(updatePatch)
         .eq('id', existing.id)
       if (error) {
         failed++

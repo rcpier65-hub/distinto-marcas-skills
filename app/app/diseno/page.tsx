@@ -21,7 +21,7 @@ const HASTA = '2026-06-30'
 
 function normalizeEstado(estadoBD: string | null | undefined): EstadoPub {
   const s = (estadoBD ?? '').toLowerCase().trim()
-  if (s.includes('disenar') || s.includes('diseñar') || s === 'diseno') return 'disenar'
+  if (s.startsWith('disen') || s.startsWith('diseñ')) return 'disenar'  // disenar, disenando, diseñar…
   if (s.includes('editar') || s === 'edicion' || s === 'editando') return 'editar'
   if (s.includes('aprobar') || s === 'revisar') return 'aprobar'
   if (s.includes('programar') || s === 'agendar') return 'programar'
@@ -70,7 +70,7 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     fecha_publicacion, fecha_diseno, fecha_entrega,
     estado, estado_tarea,
     plataformas, tipo_contenido,
-    fecha_marcada_para_disenar,
+    fecha_marcada_para_disenar, marcas_extra,
     started_at, archived_at,
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
@@ -93,14 +93,13 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
      las tareas "desaparecerían" al archivarlas.
      La tabla las oculta cliente-side con filters.mostrarArchivadas
      (default false); el Kanban las muestra siempre. */
-  /* MODELO PEDRO (como su Notion): Diseño es una BASE DE DATOS APARTE.
-     Solo muestra tareas creadas en este módulo (es_tarea_diseno=true).
-     Las publicaciones del pipeline que pasan por etapa 'disenar'
-     (sincronizadas de Notion) NO aparecen acá — antes contaminaban el
-     tablero de Ailyn con ~110 pubs que no eran suyas.
-     La tarea de diseño 'para publicar' SÍ está vinculada al pipeline
-     (tiene fecha_publicacion) pero sigue viva acá aunque avance de
-     estado — su ciclo en Diseño lo maneja estado_tarea (sub-estado). */
+  /* MODELO PEDRO (19-jun-2026): opt-in EXPLÍCITO. Antes una tarea entraba si
+     estado='disenar' → cualquier campaña entera (los 6 "Día del Padre")
+     inundaba el tablero de Ailyn apenas pasaba a esa etapa. Pedro: "pon un
+     botón 'Para diseño' y cuando esté activo le aparece a Ailyn, NO todas".
+     Ahora SOLO entran las publicaciones con el flag es_tarea_diseno=true
+     (lo prende Lorena con el botón "Para diseño", o lo trae una tarea creada
+     en el propio módulo Diseño). Desacopla "etapa diseñar" de "Ailyn la trabaja". */
   let res = await service
     .from('publicaciones')
     .select(SELECT)
@@ -110,18 +109,23 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     .limit(1000)
 
   let migrationPendiente = false
-  /* Defensive: si descripcion/fecha_entrega/es_tarea_diseno no existen,
-     reintentamos con el filtro viejo para no romper la página. */
+  /* Defensive: si alguna columna nueva del SELECT no existe todavía
+     (típicamente `marcas_extra`, cuya migración Pedro corre a mano),
+     reintentamos con un SELECT mínimo.
+     CRÍTICO (19-jun-2026): el fallback DEBE conservar la MISMA semántica
+     que el primario — opt-in explícito por `es_tarea_diseno`. Antes filtraba
+     por `estado='disenar'` y eso reactivaba la INUNDACIÓN del tablero de
+     Ailyn apenas faltaba `marcas_extra` (un fallback nunca debe cambiar QUIÉN
+     ve la tarea, solo degradar capacidades como mostrar etiquetas). */
   if (
     res.error?.code === '42703' ||
-    /descripcion|fecha_entrega|fecha_marcada_para_disenar|es_tarea_diseno/i.test(res.error?.message ?? '')
+    /descripcion|fecha_entrega|fecha_marcada_para_disenar|es_tarea_diseno|marcas_extra/i.test(res.error?.message ?? '')
   ) {
     migrationPendiente = true
     res = await service
       .from('publicaciones')
       .select(FALLBACK_SELECT)
-      .eq('estado', 'disenar')
-      .eq('portada_lista', false)
+      .eq('es_tarea_diseno', true)
       .order('fecha_diseno', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(1000)
@@ -148,16 +152,35 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     return true
   })
 
+  /* Lookup de marca por id, para resolver las etiquetas extra (marcas_extra). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcaById = new Map<string, { slug: string; nombre: string; color: string; emoji: string | null }>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const m of ((marcasResult.data ?? []) as any[])) {
+    marcaById.set(m.id, {
+      slug: m.slug, nombre: m.nombre,
+      color: m.color_primario_hex ?? '#737373', emoji: m.emoji_marca ?? null,
+    })
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const entries: DisenoEntry[] = allRows.map((r: any) => {
     const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
     const slug = marca?.slug ?? 'unknown'
+    const primaryTag = {
+      slug, nombre: marca?.nombre ?? slug,
+      color: marca?.color_primario_hex ?? '#737373', emoji: marca?.emoji_marca ?? null,
+    }
+    // Etiquetas extra (marcas_extra = uuid[]) resueltas a info de marca.
+    const extrasIds: string[] = Array.isArray(r.marcas_extra) ? r.marcas_extra : []
+    const extrasTags = extrasIds.map((eid) => marcaById.get(eid)).filter(Boolean) as { slug: string; nombre: string; color: string; emoji: string | null }[]
     return {
       id: r.id,
       marcaSlug: slug,
       marcaNombre: marca?.nombre ?? slug,
       marcaColor: marca?.color_primario_hex ?? '#737373',
       marcaEmoji: marca?.emoji_marca ?? null,
+      marcasTags: [primaryTag, ...extrasTags],
       esInterno: slug === 'interno',
       nombreTarea: r.nombre,
       descripcion: r.descripcion ?? null,

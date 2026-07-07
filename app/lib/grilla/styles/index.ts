@@ -14,6 +14,11 @@ import { playfulItalian } from './playful-italian'
 import { wellnessOrganic } from './wellness-organic'
 import { ledTechnical } from './led-technical'
 import { woodIndustrial } from './wood-industrial'
+import { natureVitality } from './vid-natur'
+import { artisanBoutique } from './mil-ideas'
+import { agencyBold } from './distinto-agencia'
+import { studioTech } from './distinto-studio'
+import { industrialPractical } from './praktico'
 
 export function getStyleBuilder(style: StyleName): StyleBuilder {
   switch (style) {
@@ -24,6 +29,11 @@ export function getStyleBuilder(style: StyleName): StyleBuilder {
     case 'wellness-organic': return wellnessOrganic
     case 'led-technical':    return ledTechnical
     case 'wood-industrial':  return woodIndustrial
+    case 'nature-vitality':  return natureVitality
+    case 'artisan-boutique': return artisanBoutique
+    case 'agency-bold':      return agencyBold
+    case 'studio-tech':            return studioTech
+    case 'industrial-practical':   return industrialPractical
     default: {
       // Exhaustiveness check — TS error si se agrega un StyleName sin caso
       const _exhaustive: never = style

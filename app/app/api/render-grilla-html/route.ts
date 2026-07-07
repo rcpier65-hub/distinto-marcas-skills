@@ -42,10 +42,11 @@ export async function GET(request: Request) {
 
   // Logo URL — usa override si vino, sino el archivo local oficial.
   // Por default usamos SVG (vector, escala perfecto al render Chromium 1080×1620).
-  // Little Joe es excepción: solo hay PNG blanco oficial (sin SVG vector aún).
+  // Excepciones: marcas que solo tienen PNG oficial (sin SVG vector aún).
   const proto = url.protocol
   const host = url.host
-  const ext = slug === 'little-joe' ? 'png' : 'svg'
+  const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas'])
+  const ext = PNG_ONLY_LOGOS.has(slug) ? 'png' : 'svg'
   const logoUrl = logoOverride
     ? normalizeDriveUrl(logoOverride)
     : `${proto}//${host}/marcas/${slug}/logo.${ext}`
@@ -77,13 +78,25 @@ function normalizeDriveUrl(rawUrl: string): string {
 function buildDatePill(inicio: string, fin: string): string {
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
-  return `${d1.getUTCDate()} — ${d2.getUTCDate()} ${MESES_UP[d1.getUTCMonth()]} · ${d1.getUTCFullYear()}`
+  const año = d1.getUTCFullYear()
+  // Cross-month: "22 JUN — 2 JUL · 2026". Mismo mes: "22 — 28 JUN · 2026".
+  if (d1.getUTCMonth() !== d2.getUTCMonth()) {
+    return `${d1.getUTCDate()} ${MESES_UP[d1.getUTCMonth()]} — ${d2.getUTCDate()} ${MESES_UP[d2.getUTCMonth()]} · ${año}`
+  }
+  return `${d1.getUTCDate()} — ${d2.getUTCDate()} ${MESES_UP[d1.getUTCMonth()]} · ${año}`
 }
 
 function buildDateSub(inicio: string, fin: string): string {
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
-  return `${MESES_LONG[d1.getUTCMonth()].charAt(0).toUpperCase() + MESES_LONG[d1.getUTCMonth()].slice(1)} · Del ${DIAS_LONG[d1.getUTCDay()].toLowerCase()} ${d1.getUTCDate()} al ${DIAS_LONG[d2.getUTCDay()].toLowerCase()} ${d2.getUTCDate()}`
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+  const dia1 = DIAS_LONG[d1.getUTCDay()].toLowerCase()
+  const dia2 = DIAS_LONG[d2.getUTCDay()].toLowerCase()
+  // Cross-month: incluir el mes en ambos extremos.
+  if (d1.getUTCMonth() !== d2.getUTCMonth()) {
+    return `Del ${dia1} ${d1.getUTCDate()} de ${MESES_LONG[d1.getUTCMonth()]} al ${dia2} ${d2.getUTCDate()} de ${MESES_LONG[d2.getUTCMonth()]}`
+  }
+  return `${cap(MESES_LONG[d1.getUTCMonth()])} · Del ${dia1} ${d1.getUTCDate()} al ${dia2} ${d2.getUTCDate()}`
 }
 
 function buildCardsHtml(inicio: string, fin: string, publicaciones: Pub[]): string {
@@ -91,6 +104,11 @@ function buildCardsHtml(inicio: string, fin: string, publicaciones: Pub[]): stri
   const d1 = new Date(inicio + 'T12:00:00Z')
   const d2 = new Date(fin + 'T12:00:00Z')
   const numDays = Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1
+  // Cuando la grilla cubre más de una semana (rango extendido para incluir
+  // publicaciones de la siguiente semana/mes), omitimos los días vacíos: el
+  // poster mide 1620px fijos y 11+ tarjetas se desbordarían. En una semana
+  // normal (≤7 días) SÍ mostramos los vacíos para conservar el ritmo visual.
+  const skipEmpty = numDays > 7
   const pubsByFecha = new Map<string, Pub[]>()
   for (const p of publicaciones) {
     const arr = pubsByFecha.get(p.fecha) ?? []
@@ -106,6 +124,7 @@ function buildCardsHtml(inicio: string, fin: string, publicaciones: Pub[]): stri
     const dayShort = DIAS_SHORT[d.getUTCDay()]
     const pubs = pubsByFecha.get(iso) ?? []
     if (pubs.length === 0) {
+      if (skipEmpty) continue
       cards.push(`<article class="card empty"><div class="date"><div class="day">${day}</div><div class="month">${dayShort}</div></div><div class="bar"></div><div class="body"><div class="title">Sin publicación programada</div><div class="meta">— Día sin contenido en grilla —</div></div><div class="icon">${EMPTY_ICON_SVG}</div></article>`)
     } else {
       for (const pub of pubs) {

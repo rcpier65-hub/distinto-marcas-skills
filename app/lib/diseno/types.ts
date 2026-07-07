@@ -19,6 +19,9 @@ export type DisenoEntry = {
   marcaNombre: string             // para el chip del kanban sin lookup
   marcaColor: string              // ditto
   marcaEmoji: string | null
+  /* Todas las marcas etiquetadas (principal + extras de marcas_extra), para
+     mostrar varios chips por tarjeta y filtrar por cualquiera. La 1ra = principal. */
+  marcasTags: { slug: string; nombre: string; color: string; emoji: string | null }[]
   esInterno: boolean              // marca='interno' = tarea standalone
                                   // (Manual de marca, Banner web, etc.)
   nombreTarea: string

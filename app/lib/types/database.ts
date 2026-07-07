@@ -40,6 +40,7 @@ export type EstadoPublicacion =
   | 'editando'
   | 'editar'
   | 'disenar'
+  | 'disenando'
   | 'enviado'
   | 'aprobar'
   | 'programar'
@@ -62,6 +63,7 @@ export const ESTADO_PUBLICACION_LABEL: Record<EstadoPublicacion, string> = {
   editando: 'Editando',
   editar: 'Editar',
   disenar: 'Diseñar',
+  disenando: 'Diseñando',
   enviado: 'Enviado',
   aprobar: 'Aprobar',
   programar: 'Programar',
@@ -292,10 +294,20 @@ export interface PublicacionRow {
   objetivos: string[]
   copy: string | null
   guion: string | null
+  /* Frase en pantalla del video (TikTok). Opcional acá por compatibilidad
+     defensiva (requiere migración). Aparece como paso 6 en "Publicar hoy". */
+  frase?: string | null
   enlace_tomas: string | null
   enlace_musica: string | null
   portada_cruda_url: string | null
   portada_editada_url: string | null
+  /* Enlace al diseño terminado que sube Ailyn (Drive). Existe como columna
+     desde el módulo Diseño; opcional acá por compatibilidad defensiva. */
+  drive_resultado_url?: string | null
+  /* Flag explícito "Para diseño": cuando true, la publicación aparece como
+     tarea en el tablero de Ailyn (Pedro 19-jun-2026). Desacopla "está en
+     etapa diseñar" de "Ailyn debe trabajarla". */
+  es_tarea_diseno?: boolean
   video_sin_musica_url: string | null   // Migration 025 — editor pega URL Drive
   video_con_musica_url: string | null   // Migration 025 — versión final
   copy_listo: boolean

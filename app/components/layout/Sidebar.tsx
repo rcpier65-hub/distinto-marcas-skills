@@ -46,6 +46,12 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
      eran 'solo admin sin team_member' (!permisos), ahora también
      los ve el director. */
   const esCEO = !permisos || permisos.rolBase === 'director'
+  /* Gestión de marcas ("Ver todas" + "Agregar marca"): además del director
+     (Pedro) y el owner sin team_member, también el ADMIN — Paolo/Erick es
+     admin y se encarga de tareas del sistema, debe poder ver todas las marcas
+     y crear una nueva. Los roles operativos (CM/editor/diseñador) NO. */
+  const puedeGestionarMarcas =
+    !permisos || permisos.rolBase === 'director' || permisos.rolBase === 'admin'
 
   /* Helper para mostrar/ocultar items según permisos. Si no hay
      permisos (= admin/owner), retorna true para todo. */
@@ -64,6 +70,10 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
         return id && permisos.marcasAcceso!.includes(id)
       })
     : marcas
+  /* Badge del "Inbox global" = suma de pendientes REALES de las marcas
+     visibles. Antes era un 73 hardcodeado que no coincidía con el inbox
+     (Pedro: "dice 73 y no hay nada"). 0 → sin badge. */
+  const inboxPendientes = marcasVisibles.reduce((acc, m) => acc + (m.pendientes ?? 0), 0)
   const pathname = usePathname()
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     workspace: true,
@@ -170,7 +180,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {/* Tareas: tablero personal de cada uno (estilo Notas). Todos lo ven. */}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
           {puede('inbox') && (
-            <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={73} />
+            <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={inboxPendientes > 0 ? inboxPendientes : undefined} />
           )}
           {puede('publicaciones') && (
             <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
@@ -202,8 +212,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
             open={openSections.marcas}
             onToggle={() => setOpenSections((s) => ({ ...s, marcas: !s.marcas }))}
           >
-            {/* "Ver todas": admin/CEO */}
-            {esCEO && (
+            {/* "Ver todas": director/admin/owner */}
+            {puedeGestionarMarcas && (
               <NavItem
                 href="/dashboard"
                 icon={
@@ -228,8 +238,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
                 badge={m.pendientes > 0 ? m.pendientes : undefined}
               />
             ))}
-            {/* "Agregar marca": admin/CEO */}
-            {esCEO && (
+            {/* "Agregar marca": director/admin/owner */}
+            {puedeGestionarMarcas && (
               <NavItem
                 href="/dashboard?nueva=1"
                 icon={
@@ -258,6 +268,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {/* Hábitos: cada user tiene los suyos (clonados al crear el
               team_member). Pedro pidió que aparezca para todos. */}
           <NavItem href="/habitos" icon={<CheckIcon />} label="Hábitos" active={isActive('/habitos')} />
+          {/* Reporte de actividad: cada miembro ve el suyo; el admin ve a todos. */}
+          <NavItem href="/actividad" icon={<NoteIcon />} label="Reporte del día" active={isActive('/actividad')} />
           {/* Historial: admin/CEO (incluye Pedro como director) */}
           {esCEO && (
             <NavItem href="/historial" icon={<NoteIcon />} label="Historial" active={isActive('/historial')} />

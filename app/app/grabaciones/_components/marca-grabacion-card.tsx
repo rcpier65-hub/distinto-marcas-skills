@@ -16,6 +16,7 @@ import { formatHora12 } from '@/lib/utils/format-hora'
 import { CalendarPlus, Check, X, Clock, Trash2, CalendarDays, Link2, Pencil, FileText, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarcaLogo } from '@/components/marca-logo'
+import { DateField, TimeField } from '@/components/datetime-fields'
 import { ObjetivoInput } from './objetivo-input'
 import {
   createGrabacion,
@@ -262,17 +263,20 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
     })
   }
 
-  function saveFecha() {
-    if (fecha === fechaInicial && hora === horaInicial && horaFin === horaFinInicial) return
+  /* Guarda con valores EXPLÍCITOS (los pickers custom disparan onChange al
+     elegir, no hay onBlur; y setState es async, así que pasamos los valores
+     nuevos directos en vez de leer el state). */
+  function saveFechaVals(f: string, h: string, hf: string) {
+    if (f === fechaInicial && h === horaInicial && hf === horaFinInicial) return
     startTransition(async () => {
       /* Si hay hora-inicio y hora-fin, calcula duración para que el
          evento de GCal salga con el bloque correcto. Si no hay hora,
-         null en ambos (evento all-day). */
-      const dur = (hora && horaFin) ? Math.max(5, diffMin(hora, horaFin)) : null
-      const r = await updateGrabacionFecha(grabacion.id, fecha, hora || null, dur)
+         null (evento all-day). */
+      const dur = (h && hf) ? Math.max(5, diffMin(h, hf)) : null
+      const r = await updateGrabacionFecha(grabacion.id, f, h || null, dur)
       if (r.ok) {
         if (r.gcalSynced) {
-          toast.success(hora ? `${hora}${horaFin ? '–' + horaFin : ''} guardado y sincronizado` : 'Fecha actualizada')
+          toast.success(h ? `${formatHora12(h)}${hf ? ' – ' + formatHora12(hf) : ''} guardado` : 'Fecha actualizada')
         } else {
           /* La fila local se guardó OK pero el evento de GCal NO se
              actualizó. Pedro debe saber para reabrir GCal y revisar. */
@@ -420,13 +424,10 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
         <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
           <CalendarDays className="w-3 h-3" /> Fecha
         </label>
-        <input
-          type="date"
+        <DateField
           value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          onBlur={saveFecha}
+          onChange={(v) => { setFecha(v); saveFechaVals(v, hora, horaFin) }}
           disabled={busy}
-          className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50"
         />
       </div>
 
@@ -436,35 +437,25 @@ function FechaRow({ grabacion, disabled }: { grabacion: GrabacionWithMarca; disa
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
             <Clock className="w-3 h-3" /> Inicio
           </label>
-          <input
-            type="time"
+          <TimeField
             value={hora}
-            onChange={(e) => {
-              const nuevaHora = e.target.value
-              setHora(nuevaHora)
-              if (nuevaHora && !horaFin) setHoraFin(horaPlus(nuevaHora, 60))
-              else if (nuevaHora && horaFin && nuevaHora >= horaFin) {
-                setHoraFin(horaPlus(nuevaHora, Math.max(15, diffMin(hora || '00:00', horaFin) || 60)))
-              }
+            onChange={(v) => {
+              let nf = horaFin
+              if (v && !horaFin) nf = horaPlus(v, 60)
+              else if (v && horaFin && v >= horaFin) nf = horaPlus(v, Math.max(15, diffMin(hora || '00:00', horaFin) || 60))
+              setHora(v); setHoraFin(nf); saveFechaVals(fecha, v, nf)
             }}
-            onBlur={saveFecha}
             disabled={busy}
-            step={300}
-            className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-50"
           />
         </div>
         <div>
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
             Fin {durMin > 0 && <span className="text-[#ba41f7] normal-case font-bold">· {duracionLabel(durMin)}</span>}
           </label>
-          <input
-            type="time"
+          <TimeField
             value={horaFin}
-            onChange={(e) => setHoraFin(e.target.value)}
-            onBlur={saveFecha}
+            onChange={(v) => { setHoraFin(v); saveFechaVals(fecha, hora, v) }}
             disabled={busy || !hora}
-            step={300}
-            className="h-9 w-full px-2.5 rounded-lg border border-input bg-white text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/40 disabled:opacity-40 disabled:cursor-not-allowed"
           />
         </div>
       </div>
@@ -535,59 +526,37 @@ function NuevaFechaInline({
 
   return (
     <div className="mt-1 p-2.5 rounded-lg border-2 border-dashed border-[#ba41f7]/40 bg-[#ba41f7]/5 space-y-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Mismo pill compacto que FechaRow */}
-        <div
-          className="inline-flex items-stretch h-9 rounded-lg bg-white border border-input shadow-sm focus-within:ring-2 focus-within:ring-[#ba41f7]/40 focus-within:border-[#ba41f7]/40 transition-all"
-        >
-          <div className="flex items-center gap-1 px-2 border-r border-input/60">
-            <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              disabled={busy}
-              autoFocus
-              className="h-7 w-[108px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
-            />
-          </div>
-          <div className="flex items-center gap-1 px-1.5 border-r border-input/60">
-            <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <input
-              type="time"
-              value={hora}
-              onChange={(e) => {
-                const v = e.target.value
-                setHora(v)
-                if (v && (!horaFin || v >= horaFin)) {
-                  setHoraFin(horaPlus(v, Math.max(15, diffMin(hora || '00:00', horaFin) || 60)))
-                }
-              }}
-              disabled={busy}
-              step={300}
-              className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
-            />
-          </div>
-          <div className="flex items-center gap-1 px-1.5">
-            <span className="text-[10px] font-semibold text-muted-foreground shrink-0">→</span>
-            <input
-              type="time"
-              value={horaFin}
-              onChange={(e) => setHoraFin(e.target.value)}
-              disabled={busy}
-              step={300}
-              className="h-7 w-[55px] bg-transparent text-[11.5px] font-mono focus:outline-none disabled:opacity-50"
-            />
-          </div>
+      {/* Fecha (picker moderno) */}
+      <DateField value={fecha} onChange={setFecha} disabled={busy} />
+      {/* Inicio + Fin */}
+      <div className="grid grid-cols-2 gap-2 items-start">
+        <div>
+          <label className="text-[9px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
+            <Clock className="w-3 h-3" /> Inicio
+          </label>
+          <TimeField
+            value={hora}
+            onChange={(v) => {
+              let nf = horaFin
+              if (v && (!horaFin || v >= horaFin)) nf = horaPlus(v, Math.max(15, diffMin(hora || '00:00', horaFin) || 60))
+              setHora(v); setHoraFin(nf)
+            }}
+            disabled={busy}
+          />
         </div>
-        {/* Chip duración */}
-        {hora && horaFin && (
-          <span className="text-[10px] font-semibold text-muted-foreground tabular-nums shrink-0 px-1.5 py-0.5 rounded bg-white/70">
-            {diffMin(hora, horaFin) >= 60
-              ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
-              : `${diffMin(hora, horaFin)}m`}
-          </span>
-        )}
+        <div>
+          <label className="text-[9px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 mb-1">
+            Fin
+            {hora && horaFin && (
+              <span className="text-[#ba41f7] normal-case font-bold">
+                · {diffMin(hora, horaFin) >= 60
+                  ? `${Math.floor(diffMin(hora, horaFin) / 60)}h${diffMin(hora, horaFin) % 60 ? ` ${diffMin(hora, horaFin) % 60}m` : ''}`
+                  : `${diffMin(hora, horaFin)}m`}
+              </span>
+            )}
+          </label>
+          <TimeField value={horaFin} onChange={setHoraFin} disabled={busy || !hora} />
+        </div>
       </div>
       {/* Acciones */}
       <div className="flex items-center gap-1.5 justify-end">

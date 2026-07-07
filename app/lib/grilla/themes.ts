@@ -11,6 +11,11 @@ export type StyleName =
   | 'wellness-organic'   // Kintu        — Cormorant + hojas SVG + gotas
   | 'led-technical'      // NovaLamps    — Dark canvas + LEDs lima con glow
   | 'wood-industrial'    // La Victoria  — Playfair + vetas madera + marrones
+  | 'nature-vitality'    // Vid Natur    — Poppins + hojas + naranja/verde wellness
+  | 'artisan-boutique'  // Mil Ideas   — Playfair + crema/coral/dorado + ornamentos cálidos
+  | 'agency-bold'       // Distinto     — Inter Tight + morado/amarillo + pétalos (isotipo)
+  | 'studio-tech'       // Distinto Studio — Poppins + azul profundo + verde + degradado
+  | 'industrial-practical' // Praktico    — Barlow Condensed + negro/madera + cuadrícula técnica
 
 export type GrillaTheme = {
   /** Discriminador: qué módulo de styles/ renderiza esta marca */
@@ -244,6 +249,141 @@ export const THEMES: Record<string, GrillaTheme> = {
     heroTitle: 'Esta semana',
     // Logo aspect 1.57:1 (stack vertical símbolo+wordmark). Sin wrapper.
     // El logo es verde bosque sobre dark → necesita filter para volverse crema.
+    logoBg: 'transparent',
+    logoPad: '0',
+  },
+  'vid-natur': {
+    style: 'nature-vitality',
+    // Suplementos naturales peruanos ("Extiende tu vitalidad"). Paleta oficial
+    // del manual: naranja #FF6B00 (Pantone 1505C) + verde #449647 + carbón
+    // #3B3F41 sobre crema cálido. Gotham (no libre) → Poppins; Rubik secundaria.
+    primary: '#3B3F41',        // Carbón — texto, títulos, hero
+    accent: '#FF6B00',         // Naranja Vid Natur (acento principal)
+    highlight: '#449647',      // Verde natural (acento secundario)
+    canvas: '#FBF7EF',         // Crema cálido natural
+    text: '#3B3F41',
+    cardBg: '#FFFFFF',
+    cardAltBg: '#FFFFFF',      // Ambas cards blancas; el acento es el borde izq.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Rubik:wght@400;500;600;700&display=swap',
+    fontSerif: "'Poppins', system-ui, -apple-system, sans-serif",
+    fontSans: "'Poppins', system-ui, -apple-system, sans-serif",
+    fontDisplay: "'Rubik', system-ui, sans-serif",
+    brandSmall: 'SUPLEMENTOS NATURALES',
+    brandBig: 'Vid Natur',
+    tagline: '',
+    footerUrl: 'vidnatur.pe',
+    heroTitle: 'Esta semana',
+    // Logo PNG (naranja + wordmark, casi cuadrado) sobre crema, sin wrapper.
+    logoBg: 'transparent',
+    logoPad: '0',
+  },
+  'mil-ideas': {
+    style: 'artisan-boutique',
+    // Importadora boutique de decoración para el hogar ("Creamos emociones
+    // visibles"). Paleta REAL muestreada del logo + milideas.pe (verificado
+    // 23-jun-2026): coral #D8480C dominante + dorados + crema cálido + espresso.
+    // Fuente de marca: Boston Angel (display) → fallback Playfair Display.
+    // El logo coral ya trae el wordmark → brand-name se oculta en el style.
+    primary: '#3D2E26',        // Espresso cálido (texto, titulares, hero) — legible y premium
+    accent: '#D8480C',         // Coral Mil Ideas (date pill, dots, acentos)
+    highlight: '#E2A23A',      // Dorado refinado (reglas finas, divisor)
+    canvas: '#FAF5EE',         // Crema lienzo
+    text: '#3D2E26',
+    cardBg: '#FFFFFF',
+    cardAltBg: '#FCEFE6',      // Durazno crema muy suave (card alterna)
+    // Playfair Display (serif elegante, eco de Boston Angel) + Poppins body.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600&family=Poppins:wght@300;400;500;600;700&display=swap',
+    fontSerif: "'Playfair Display', Georgia, serif",
+    fontSans: "'Poppins', system-ui, -apple-system, sans-serif",
+    fontDisplay: "'Playfair Display', Georgia, serif",
+    brandSmall: 'DECORACIÓN PARA EL HOGAR',
+    brandBig: 'MIL IDEAS',
+    tagline: '',                  // La firma va en el hero (CREAMOS EMOCIONES VISIBLES)
+    footerUrl: 'milideas.pe',
+    heroTitle: '¿Qué se viene?',
+    // Logo coral PNG (banner 3.3:1) sobre crema, sin wrapper.
+    logoBg: 'transparent',
+    logoPad: '0',
+  },
+  'distinto-agencia': {
+    style: 'agency-bold',
+    // La agencia (marca propia). Paleta REAL del Kit de Marca Distinto 2026
+    // (Drive, verificado 26-jun-2026): morado #ba41f7 + amarillo #f2cc2c.
+    // Fuente: Inter Tight (la misma que usa la app). Look limpio y moderno
+    // sobre lienzo lavanda muy claro, con pétalos (eco del isotipo) morado/amarillo.
+    primary: '#1A1330',        // Morado-negro profundo (texto, titulares, hero)
+    accent: '#BA41F7',         // Morado Distinto (date pill, acentos, dots)
+    highlight: '#F2CC2C',      // Amarillo Distinto (acentos secundarios, firma)
+    canvas: '#FAF8FF',         // Lavanda casi blanco
+    text: '#1A1330',
+    cardBg: '#FFFFFF',
+    cardAltBg: '#F4EEFC',      // Lavanda muy suave (card alterna)
+    // Inter Tight — la tipografía de la app Distinto.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500;1,700&display=swap',
+    fontSerif: "'Inter Tight', system-ui, -apple-system, sans-serif",
+    fontSans: "'Inter Tight', system-ui, -apple-system, sans-serif",
+    fontDisplay: "'Inter Tight', system-ui, sans-serif",
+    brandSmall: 'AGENCIA DE MARKETING',
+    brandBig: 'DISTINTO',
+    tagline: '',
+    footerUrl: 'agenciadistinto.com',
+    heroTitle: '¿Qué se viene?',
+    // Logo horizontal oficial (morado+amarillo) sobre lavanda, sin wrapper.
+    logoBg: 'transparent',
+    logoPad: '0',
+  },
+  praktico: {
+    style: 'industrial-practical',
+    // Distribuidor mayorista de productos prácticos. Guía visual (imagen 27-jun-2026):
+    // negro #000000 (fondo protagonista) + madera natural #C89A62 + blanco + gris #2D2D2D.
+    // Estética funcional/industrial: producto protagonista, textos claros y directos.
+    // Barlow Condensed (display) + DM Sans (body). Isotipo: anillos concéntricos dorados.
+    primary: '#FFFFFF',        // Texto blanco sobre negro
+    accent: '#C89A62',         // Madera natural / dorado (date pill, acentos)
+    highlight: '#DDB87A',      // Madera más clara (highlight sutil)
+    canvas: '#0A0A0A',         // Negro industrial profundo
+    text: '#FFFFFF',
+    cardBg: '#111111',         // Cards gris oscuro (panel industrial)
+    cardAltBg: '#161616',      // Gris alterno levemente más claro
+    // Nunito (redondeada geométrica) replica la tipografía del wordmark oficial.
+    // Barlow Condensed para hero/títulos de cards (estética industrial condensada).
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap',
+    fontSerif: "'Barlow Condensed', 'Nunito', system-ui, sans-serif",
+    fontSans: "'Nunito', 'DM Sans', system-ui, -apple-system, sans-serif",
+    fontDisplay: "'Barlow Condensed', system-ui, sans-serif",
+    brandSmall: 'DISTRIBUIDOR MAYORISTA DE PRODUCTOS PRACTICOS',
+    brandBig: 'Praktico',
+    tagline: '',
+    footerUrl: '@praktico.oficial',
+    heroTitle: 'Esta semana',
+    // Isotipo: anillos concéntricos dorados (anillos de árbol) sobre negro, sin wrapper.
+    logoBg: 'transparent',
+    logoPad: '0',
+  },
+  'distinto-studio': {
+    style: 'studio-tech',
+    // Distinto WEB STUDIO (sub-marca de la agencia). Manual oficial (Drive,
+    // verificado 27-jun-2026): azul profundo #132D46 + verde vibrante #4ADE80
+    // + degradado verde->azul como elemento clave. Tipografía: Poppins.
+    // Look dark, tech, digital studio. Lienzo azul, cards blancas, acentos verdes.
+    primary: '#FFFFFF',        // Texto blanco sobre azul oscuro
+    accent: '#4ADE80',         // Verde vibrante (date pill, acentos, degradado)
+    highlight: '#7DF0A6',      // Verde claro (divisor/highlight)
+    canvas: '#132D46',         // Azul profundo (fondo principal del manual)
+    text: '#FFFFFF',
+    cardBg: '#FFFFFF',         // Cards blancas para legibilidad sobre dark
+    cardAltBg: '#EAFBF1',      // Verde muy claro (card alterna)
+    // Manual: Poppins para todo el sistema tipografico web.
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap',
+    fontSerif: "'Poppins', system-ui, -apple-system, sans-serif",
+    fontSans: "'Poppins', system-ui, -apple-system, sans-serif",
+    fontDisplay: "'Poppins', system-ui, sans-serif",
+    brandSmall: 'STUDIO',
+    brandBig: 'DIST/NTO',
+    tagline: '',
+    footerUrl: 'agenciadistinto.com',
+    heroTitle: '¿Qué se viene?',
+    // Isotipo (degradado verde->azul) pequeno, sin wrapper.
     logoBg: 'transparent',
     logoPad: '0',
   },

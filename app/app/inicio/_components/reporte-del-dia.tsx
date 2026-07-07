@@ -19,6 +19,69 @@ type Props = {
   data: ReporteDelDiaData
 }
 
+/* Qué métricas EXTRA (más allá de Tareas + Hábitos) ve cada rol en su reporte.
+   Grabaciones y comentarios son conteos del workspace, así que solo tienen
+   sentido para quien hace ese trabajo:
+     - Grab.:  solo el CEO/director (nadie del equipo "graba" individualmente).
+     - Coments: community/social media manager + CEO.
+   Una diseñadora o editor NO ve grabaciones ni comentarios (no es su trabajo). */
+function metricasVisibles(rolBase: string): { grab: boolean; coments: boolean } {
+  const esCEO = rolBase === 'director'
+  return {
+    grab: esCEO,
+    coments: esCEO || rolBase === 'community_manager' || rolBase === 'social_media_manager',
+  }
+}
+
+/** "2h 37m" / "45m" a partir de minutos. null si no hay dato. */
+function fmtDur(min: number | null | undefined): string | null {
+  if (min == null || min < 0) return null
+  if (min < 60) return `${min}m`
+  const h = Math.floor(min / 60), m = min % 60
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
+
+/* Color/etiqueta por tipo de tarea (a nivel módulo para reusar en TareaRow). */
+const COLOR_TIPO: Record<ReporteTareaCompletada['tipo'], { bg: string; label: string; emoji: string }> = {
+  editada:    { bg: '#dbeafe', label: 'Editada',  emoji: '✂️' },
+  disenada:   { bg: '#fce7f3', label: 'Diseñada', emoji: '🎨' },
+  aprobada:   { bg: '#dcfce7', label: 'Aprobada', emoji: '✅' },
+  grabada:    { bg: '#fef3c7', label: 'Grabada',  emoji: '🎥' },
+  comentario: { bg: '#cffafe', label: 'Respondido', emoji: '💬' },
+  tarea:      { bg: '#ede9fe', label: 'Tarea',    emoji: '✅' },
+  asignada:   { bg: '#fef9c3', label: 'Pendiente', emoji: '📥' },
+}
+
+/* Fila de una tarea en el reporte: emoji + título + subtítulo (marca · ⏱ duración
+   · por delegador) + chip de tipo. Reusada en "Lo que terminé" y "Asignadas a mí". */
+function TareaRow({ t }: { t: ReporteTareaCompletada }) {
+  const dur = fmtDur(t.duracionMin)
+  const sub = [t.marca, dur ? `⏱ ${dur}` : null, t.delegadaPor ? `por ${t.delegadaPor}` : null]
+    .filter(Boolean).join(' · ')
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+      background: 'rgba(255,255,255,0.7)', borderRadius: 10, border: '1px solid rgba(0,0,0,0.04)',
+    }}>
+      <span style={{ fontSize: 17 }} aria-hidden>{t.marcaEmoji ?? COLOR_TIPO[t.tipo].emoji}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+          {t.titulo}
+        </div>
+        <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {sub}
+        </div>
+      </div>
+      <div style={{
+        fontSize: 9, fontWeight: 700, color: '#0f172a', background: COLOR_TIPO[t.tipo].bg,
+        padding: '3px 7px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: 0.5,
+      }}>
+        {COLOR_TIPO[t.tipo].label}
+      </div>
+    </div>
+  )
+}
+
 export function ReporteDelDiaCard({ data }: Props) {
   const [open, setOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -49,11 +112,12 @@ export function ReporteDelDiaCard({ data }: Props) {
     return () => { document.body.style.overflow = prev }
   }, [open])
 
+  const vis = metricasVisibles(data.rolBase)
   const total =
     data.tareasCompletadas.length +
     data.habitosCumplidos.length +
-    data.grabacionesHechasCount +
-    data.comentariosRespondidosCount
+    (vis.grab ? data.grabacionesHechasCount : 0) +
+    (vis.coments ? data.comentariosRespondidosCount : 0)
 
   async function copiarImagen() {
     if (!cardRef.current) return
@@ -106,12 +170,36 @@ export function ReporteDelDiaCard({ data }: Props) {
 
       if (data.tareasCompletadas.length > 0) {
         lineas.push(`✅ *Tareas terminadas (${data.tareasCompletadas.length})*`)
-        for (const t of data.tareasCompletadas.slice(0, 12)) {
+        for (const t of data.tareasCompletadas.slice(0, 14)) {
           const emoji = t.marcaEmoji ?? '•'
-          lineas.push(`${emoji} ${t.titulo} _(${t.marca})_`)
+          const dur = fmtDur(t.duracionMin)
+          const extra = [
+            dur ? `⏱ ${dur}` : null,                                  // editando→aprobar
+            t.delegadaPor ? `por ${t.delegadaPor}` : null,            // quién la delegó
+          ].filter(Boolean).join(' · ')
+          lineas.push(`${emoji} ${t.titulo} _(${t.marca})_${extra ? ` — ${extra}` : ''}`)
         }
-        if (data.tareasCompletadas.length > 12) {
-          lineas.push(`_…y ${data.tareasCompletadas.length - 12} más_`)
+        if (data.tareasCompletadas.length > 14) {
+          lineas.push(`_…y ${data.tareasCompletadas.length - 14} más_`)
+        }
+        lineas.push('')
+      }
+
+      // Trabajo asignado/delegado a mí, pendiente.
+      if (data.tareasAsignadas.length > 0) {
+        lineas.push(`📥 *Asignadas a mí / pendientes (${data.tareasAsignadas.length})*`)
+        for (const t of data.tareasAsignadas.slice(0, 12)) {
+          const emoji = t.marcaEmoji ?? (t.tipo === 'asignada' && t.delegadaPor ? '📌' : '🎨')
+          lineas.push(`${emoji} ${t.titulo} _(${t.marca})_${t.delegadaPor ? ` — por ${t.delegadaPor}` : ''}`)
+        }
+        lineas.push('')
+      }
+
+      // Lo que YO delegué a otros hoy.
+      if (data.tareasDelegadas.length > 0) {
+        lineas.push(`📤 *Delegué (${data.tareasDelegadas.length})*`)
+        for (const d of data.tareasDelegadas.slice(0, 12)) {
+          lineas.push(`→ ${d.titulo} _(a ${d.asignadoA})_${d.completada ? ' ✓' : ''}`)
         }
         lineas.push('')
       }
@@ -119,7 +207,10 @@ export function ReporteDelDiaCard({ data }: Props) {
       if (data.habitosTotal > 0) {
         lineas.push(`🌱 *Hábitos (${data.habitosCumplidos.length}/${data.habitosTotal})*`)
         if (data.habitosCumplidos.length > 0) {
-          lineas.push(data.habitosCumplidos.map((h) => `${h.icono} ${h.nombre}`).join(' · '))
+          // Uno por línea con la hora a la que se marcó (pedido de Pedro).
+          for (const h of data.habitosCumplidos) {
+            lineas.push(`${h.hora ? `🕘 ${h.hora} · ` : ''}${h.icono} ${h.nombre}`)
+          }
         } else {
           lineas.push('_Ninguno cumplido todavía_')
         }
@@ -128,8 +219,8 @@ export function ReporteDelDiaCard({ data }: Props) {
 
       const extras: string[] = []
       if (data.pubsEditadasCount > 0) extras.push(`✂️ ${data.pubsEditadasCount} pub${data.pubsEditadasCount === 1 ? '' : 's'} editada${data.pubsEditadasCount === 1 ? '' : 's'}`)
-      if (data.grabacionesHechasCount > 0) extras.push(`🎥 ${data.grabacionesHechasCount} grabación${data.grabacionesHechasCount === 1 ? '' : 'es'}`)
-      if (data.comentariosRespondidosCount > 0) extras.push(`💬 ${data.comentariosRespondidosCount} comentario${data.comentariosRespondidosCount === 1 ? '' : 's'} respondido${data.comentariosRespondidosCount === 1 ? '' : 's'}`)
+      if (vis.grab && data.grabacionesHechasCount > 0) extras.push(`🎥 ${data.grabacionesHechasCount} grabación${data.grabacionesHechasCount === 1 ? '' : 'es'}`)
+      if (vis.coments && data.comentariosRespondidosCount > 0) extras.push(`💬 ${data.comentariosRespondidosCount} comentario${data.comentariosRespondidosCount === 1 ? '' : 's'} respondido${data.comentariosRespondidosCount === 1 ? '' : 's'}`)
       if (extras.length > 0) {
         lineas.push(extras.join(' · '))
         lineas.push('')
@@ -412,14 +503,15 @@ function ReporteImage({
     .map((s) => s[0]?.toUpperCase() ?? '')
     .join('') || 'D'
 
-  /* Color por tipo de tarea */
-  const COLOR_TIPO: Record<ReporteTareaCompletada['tipo'], { bg: string; label: string; emoji: string }> = {
-    editada:    { bg: '#dbeafe', label: 'Editada',  emoji: '✂️' },
-    disenada:   { bg: '#fce7f3', label: 'Diseñada', emoji: '🎨' },
-    aprobada:   { bg: '#dcfce7', label: 'Aprobada', emoji: '✅' },
-    grabada:    { bg: '#fef3c7', label: 'Grabada',  emoji: '🎥' },
-    comentario: { bg: '#cffafe', label: 'Respondido', emoji: '💬' },
-  }
+  /* Stats según el rol: Tareas + Hábitos siempre; Grab./Coments solo a quien
+     le corresponde (una diseñadora NO ve grabaciones ni comentarios). */
+  const vis = metricasVisibles(data.rolBase)
+  const stats: { emoji: string; valor: number | string; label: string; color: string }[] = [
+    { emoji: '✅', valor: data.tareasCompletadas.length, label: 'Tareas', color: '#16a34a' },
+    { emoji: '🌱', valor: `${data.habitosCumplidos.length}/${data.habitosTotal || '—'}`, label: 'Hábitos', color: '#6366f1' },
+  ]
+  if (vis.grab) stats.push({ emoji: '🎥', valor: data.grabacionesHechasCount, label: 'Grab.', color: '#f59e0b' })
+  if (vis.coments) stats.push({ emoji: '💬', valor: data.comentariosRespondidosCount, label: 'Coments', color: '#06b6d4' })
 
   return (
     <div
@@ -517,15 +609,14 @@ function ReporteImage({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateColumns: `repeat(${stats.length}, 1fr)`,
             gap: 10,
             marginBottom: 22,
           }}
         >
-          <StatBox emoji="✅" valor={data.tareasCompletadas.length} label="Tareas" color="#16a34a" />
-          <StatBox emoji="🌱" valor={`${data.habitosCumplidos.length}/${data.habitosTotal || '—'}`} label="Hábitos" color="#6366f1" />
-          <StatBox emoji="🎥" valor={data.grabacionesHechasCount} label="Grab." color="#f59e0b" />
-          <StatBox emoji="💬" valor={data.comentariosRespondidosCount} label="Coments" color="#06b6d4" />
+          {stats.map((s) => (
+            <StatBox key={s.label} emoji={s.emoji} valor={s.valor} label={s.label} color={s.color} />
+          ))}
         </div>
 
         {/* ===== TAREAS LISTA ===== */}
@@ -536,50 +627,30 @@ function ReporteImage({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {data.tareasCompletadas.slice(0, 6).map((t) => (
-                <div
-                  key={t.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '8px 12px',
-                    background: 'rgba(255,255,255,0.7)',
-                    borderRadius: 10,
-                    border: '1px solid rgba(0,0,0,0.04)',
-                  }}
-                >
-                  <span style={{ fontSize: 17 }} aria-hidden>{t.marcaEmoji ?? COLOR_TIPO[t.tipo].emoji}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: '#0f172a',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      lineHeight: 1.3,
-                    }}>
-                      {t.titulo}
-                    </div>
-                    <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>{t.marca}</div>
-                  </div>
-                  <div style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: COLOR_TIPO[t.tipo].bg ? '#0f172a' : '#64748b',
-                    background: COLOR_TIPO[t.tipo].bg,
-                    padding: '3px 7px',
-                    borderRadius: 999,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                  }}>
-                    {COLOR_TIPO[t.tipo].label}
-                  </div>
-                </div>
+                <TareaRow key={t.id} t={t} />
               ))}
               {data.tareasCompletadas.length > 6 && (
                 <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: 2 }}>
                   …y {data.tareasCompletadas.length - 6} más
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== ASIGNADAS A MÍ / PENDIENTES (trabajo delegado + cola de diseño) ===== */}
+        {data.tareasAsignadas.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>
+              📥 Asignadas a mí
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {data.tareasAsignadas.slice(0, 5).map((t) => (
+                <TareaRow key={t.id} t={t} />
+              ))}
+              {data.tareasAsignadas.length > 5 && (
+                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: 2 }}>
+                  …y {data.tareasAsignadas.length - 5} más
                 </div>
               )}
             </div>
@@ -612,6 +683,11 @@ function ReporteImage({
                   >
                     <span aria-hidden>{h.icono}</span>
                     {h.nombre}
+                    {h.hora && (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: h.color, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
+                        · {h.hora}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

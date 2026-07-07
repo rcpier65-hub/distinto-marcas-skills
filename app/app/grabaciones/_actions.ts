@@ -304,9 +304,11 @@ export async function createGrabacion(args: {
     .filter((e) => /@/.test(e))
   const invitados = Array.from(new Set([...correosMarca, ...correosForm]))
 
-  // Intento 1: insert FULL (con todas las columnas nuevas).
+  // Insert con todas las columnas. Si alguna OPCIONAL no existe en prod
+  // (migraciones 028/029 sin aplicar), la PODAMOS y reintentamos — pero
+  // conservando SIEMPRE las columnas base, incluida hora_planeada.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const insertFull: Record<string, any> = {
+  const insert: Record<string, any> = {
     marca_id: marca.id,
     fecha_planeada: args.fecha_planeada,
     hora_planeada: args.hora_planeada ?? null,
@@ -317,26 +319,31 @@ export async function createGrabacion(args: {
     es_reunion_meet: esMeet,
     invitados_emails: invitados.length > 0 ? invitados : null,
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const insertBase: Record<string, any> = {
-    marca_id: marca.id,
-    fecha_planeada: args.fecha_planeada,
-    estado: 'planeada',
-    notas: descripcion,
-  }
+  /* BUG corregido (20-jun-2026): antes el fallback usaba un insert mínimo
+     hardcodeado que NO incluía hora_planeada. Como `titulo`/`duracion_min`/
+     `es_reunion_meet`/`invitados_emails` NO existen en prod, el insert FULL
+     siempre fallaba (42703) → caía al fallback → cada grabación nueva nacía
+     SIN hora ("Sin hora definida" aunque el user SÍ eligió la hora). Ahora
+     solo quitamos las columnas opcionales faltantes y preservamos hora_planeada. */
+  const OPCIONALES = ['titulo', 'duracion_min', 'es_reunion_meet', 'invitados_emails', 'meet_link']
 
   let inserted = await service
     .from('grabaciones')
-    .insert(insertFull)
+    .insert(insert)
     .select('id')
     .single()
 
-  // Si falla por columnas ausentes (42703 / "column does not exist"), reintentar
-  // con set mínimo de columnas que sabemos que siempre existen.
-  if (inserted.error && (inserted.error.code === '42703' || /column .* does not exist|titulo|duracion_min|es_reunion_meet|invitados_emails/i.test(inserted.error.message ?? ''))) {
+  if (inserted.error && (
+    inserted.error.code === '42703' ||
+    inserted.error.code === 'PGRST204' ||
+    /column .* does not exist|could not find the .*column.* in the schema cache|titulo|duracion_min|es_reunion_meet|invitados_emails/i.test(inserted.error.message ?? '')
+  )) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pruned: Record<string, any> = { ...insert }
+    for (const c of OPCIONALES) delete pruned[c]
     inserted = await service
       .from('grabaciones')
-      .insert(insertBase)
+      .insert(pruned)
       .select('id')
       .single()
   }

@@ -68,6 +68,12 @@ export async function updateDisenoEntry(
   patch: {
     nombre?: string
     descripcion?: string | null
+    /* Cambiar la marca de la tarea (Pedro 15-jun-2026: "a veces quiero cambiar
+       de marca y no se puede"). Resuelve el slug → marca_id. */
+    marcaSlug?: string | null
+    /* Etiquetas de marca extra (slugs). Reemplaza el conjunto actual de
+       marcas_extra. [] = limpiar todas las etiquetas. */
+    marcasExtras?: string[]
     subEstado?: SubEstadoDiseno
     fechaDiseno?: string | null
     fechaEntrega?: string | null
@@ -88,6 +94,23 @@ export async function updateDisenoEntry(
   const update: Record<string, unknown> = { updated_by: user.id }
   if (patch.nombre !== undefined) update.nombre = patch.nombre
   if (patch.descripcion !== undefined) update.descripcion = patch.descripcion
+  /* Cambio de marca: resolvemos slug → marca_id. '' / null → 'interno'. */
+  if (patch.marcaSlug !== undefined) {
+    const slug = patch.marcaSlug || 'interno'
+    const { data: m } = await service.from('marcas').select('id').eq('slug', slug).maybeSingle()
+    if (m?.id) update.marca_id = m.id
+  }
+  /* Etiquetas extra: reemplaza marcas_extra con los IDs de los slugs dados. */
+  if (patch.marcasExtras !== undefined) {
+    const slugs = patch.marcasExtras.map((s) => s.trim()).filter(Boolean)
+    if (slugs.length > 0) {
+      const { data: ms } = await service.from('marcas').select('id').in('slug', slugs)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      update.marcas_extra = ((ms ?? []) as any[]).map((m) => m.id as string)
+    } else {
+      update.marcas_extra = []
+    }
+  }
   if (patch.subEstado !== undefined) {
     update.estado_tarea = patch.subEstado
     /* Timeline auto-tracking:
@@ -110,6 +133,15 @@ export async function updateDisenoEntry(
          significa "no archivada" → limpiar archived_at. */
       update.archived_at = null
     }
+    /* SYNC con el estado de la PUBLICACIÓN (pedido de Pedro 15-jun-2026):
+       el sub-estado de diseño maneja el estado del pipeline, igual que el
+       editor. en_progreso → 'disenando'; listo → 'aprobar'; sin_empezar →
+       vuelve a 'disenar'. ('archivado' no toca el estado del pipeline.)
+       'disenando' es un valor de enum nuevo: si aún no se aplicó el SQL,
+       más abajo cae a 'disenar' (fallback) para no romper. */
+    if (patch.subEstado === 'en_progreso') update.estado = 'disenando'
+    else if (patch.subEstado === 'listo') update.estado = 'aprobar'
+    else if (patch.subEstado === 'sin_empezar') update.estado = 'disenar'
   }
   if (patch.fechaDiseno !== undefined) update.fecha_diseno = patch.fechaDiseno
   if (patch.fechaEntrega !== undefined) update.fecha_entrega = patch.fechaEntrega
@@ -124,9 +156,18 @@ export async function updateDisenoEntry(
   /* Defensive contra migration pendiente: si descripcion/fecha_entrega
      no existen aún, reintentamos sin esos campos. La UI seguirá
      funcionando en modo degradado hasta que se aplique. */
-  if (error && (error.code === '42703' || /descripcion|fecha_entrega/i.test(error.message ?? ''))) {
+  if (error && (error.code === '42703' || /descripcion|fecha_entrega|marcas_extra/i.test(error.message ?? ''))) {
     delete update.descripcion
     delete update.fecha_entrega
+    delete update.marcas_extra  // columna pendiente de migración
+    const retry = await service.from('publicaciones').update(update).eq('id', id)
+    error = retry.error
+  }
+
+  /* Fallback enum: si 'disenando' todavía no existe en el enum (SQL pendiente),
+     reintentamos con 'disenar' para no romper el cambio de sub-estado. */
+  if (error && (error.code === '22P02' || /invalid input value for enum|disenando/i.test(error.message ?? ''))) {
+    if (update.estado === 'disenando') update.estado = 'disenar'
     const retry = await service.from('publicaciones').update(update).eq('id', id)
     error = retry.error
   }
@@ -314,17 +355,32 @@ export async function crearDisenoTask(args: {
     insert.invitados_emails = args.invitadosEmails ?? []
   }
 
+  /* MULTI-MARCA = ETIQUETAS en la MISMA tarea (Pedro 15-jun-2026: "no replicar,
+     etiquetar varias marcas en una sola tarea"). Guardamos los IDs extra en la
+     columna marcas_extra uuid[]. NO se crean copias. */
+  const slugsExtras = (args.marcasExtras ?? [])
+    .map((s) => s.trim())
+    .filter((s) => s && s !== targetSlug)
+  let idsExtras: string[] = []
+  if (slugsExtras.length > 0) {
+    const { data: marcasExtrasData } = await service.from('marcas').select('id, slug').in('slug', slugsExtras)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    idsExtras = ((marcasExtrasData ?? []) as any[]).map((m) => m.id as string)
+    if (idsExtras.length > 0) insert.marcas_extra = idsExtras
+  }
+
   let { data, error } = await service
     .from('publicaciones')
     .insert(insert)
     .select('id')
     .single()
 
-  if (error && (error.code === '42703' || /descripcion|fecha_entrega|reunion_hora|invitados_emails/i.test(error.message ?? ''))) {
+  if (error && (error.code === '42703' || /descripcion|fecha_entrega|reunion_hora|invitados_emails|marcas_extra/i.test(error.message ?? ''))) {
     delete insert.descripcion
     delete insert.fecha_entrega
     delete insert.reunion_hora
     delete insert.invitados_emails
+    delete insert.marcas_extra  // columna marcas_extra pendiente de migración
     const retry = await service.from('publicaciones').insert(insert).select('id').single()
     data = retry.data; error = retry.error
   }
@@ -334,37 +390,10 @@ export async function crearDisenoTask(args: {
     return { ok: false, error: error.message }
   }
 
-  /* MULTI-MARCA: si vienen marcas extras, replicamos la tarea con
-     misma config pero distinto marca_id. Pedro pidió poder marcar
-     N marcas en el mismo flujo de creación.
-     - Resolvemos los IDs de cada slug extra en paralelo
-     - Si alguna no existe, la salteamos (no bloquea creación)
-     - INSERT en bulk con array — más eficiente que N inserts */
-  let extrasCreadas = 0
-  const slugsExtras = (args.marcasExtras ?? [])
-    .map((s) => s.trim())
-    .filter((s) => s && s !== targetSlug)  /* dedup con la principal */
-  if (slugsExtras.length > 0) {
-    const { data: marcasExtras } = await service
-      .from('marcas')
-      .select('id, slug')
-      .in('slug', slugsExtras)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idsExtras = ((marcasExtras ?? []) as any[]).map((m) => m.id as string)
-    if (idsExtras.length > 0) {
-      const insertsExtras = idsExtras.map((marcaIdExtra) => ({
-        ...insert,
-        marca_id: marcaIdExtra,
-      }))
-      const { error: errExtras } = await service.from('publicaciones').insert(insertsExtras)
-      if (errExtras) {
-        /* No fatal — el principal ya se creó. Logueamos y seguimos. */
-        console.error('[crearDisenoTask] error extras:', errExtras)
-      } else {
-        extrasCreadas = idsExtras.length
-      }
-    }
-  }
+  /* Las marcas extra ya quedaron etiquetadas en marcas_extra de ESTA tarea
+     (arriba, antes del insert). extrasCreadas = cuántas etiquetas se guardaron.
+     Si el insert cayó al fallback (columna pendiente), no se guardaron. */
+  const extrasCreadas = ('marcas_extra' in insert) ? idsExtras.length : 0
 
   /* Refresco TODAS las vistas afectadas. Si es para publicar, la
      tarea aparecerá en el calendario principal y la tabla — pedro

@@ -48,7 +48,12 @@ export async function crearTarea(textoOriginal: string): Promise<
     if (!colorByCat.has(r.categoria)) { colorByCat.set(r.categoria, r.color); usados.push(r.color) }
   }
 
-  const categoria = await categorizarTarea(texto, [...colorByCat.keys()])
+  /* Marcas del workspace → para que "mil ideas", "kintu", etc. caigan en su
+     categoría de marca de forma determinística (sin depender solo de la IA). */
+  const { data: marcasData } = await service.from('marcas').select('nombre, slug')
+  const marcas = ((marcasData ?? []) as { nombre: string; slug: string }[])
+
+  const categoria = await categorizarTarea(texto, [...colorByCat.keys()], marcas)
 
   /* Asignación: si la categoría es un miembro del equipo, la tarea es suya. */
   const catLower = categoria.toLowerCase().trim()

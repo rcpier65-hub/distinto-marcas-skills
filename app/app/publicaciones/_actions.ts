@@ -38,10 +38,66 @@ export async function cambiarEstadoPublicacion(
   return { ok: true }
 }
 
+/**
+ * Cambia SOLO la fecha de publicación (calendario drag-and-drop).
+ * Lorena 26-jun-2026: "si desde esa vista me dejara arrastrar sería más fácil"
+ * — antes había que entrar video por video a cambiar la fecha.
+ * Devuelve Result (no throw): el cliente hace optimistic move y rollback si falla.
+ *
+ * Preserva la HORA original si la pub la tenía (fecha_publicacion con tiempo):
+ * arrastrar al día X no debe resetear "20:00" a medianoche.
+ */
+export async function cambiarFechaPublicacion(
+  id: string,
+  nuevaFecha: string, // 'YYYY-MM-DD'
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nuevaFecha)) {
+    return { ok: false, error: 'Fecha inválida' }
+  }
+
+  /* Conservar la hora original. Leemos la fecha actual; si traía tiempo
+     (T...), se lo pegamos a la nueva fecha. Si no, guardamos solo el día. */
+  let valorFecha = nuevaFecha
+  const { data: actual } = await service
+    .from('publicaciones')
+    .select('fecha_publicacion')
+    .eq('id', id)
+    .maybeSingle()
+  const fpActual: string | null = actual?.fecha_publicacion ?? null
+  if (fpActual && fpActual.includes('T')) {
+    const horaParte = fpActual.split('T')[1]
+    if (horaParte) valorFecha = `${nuevaFecha}T${horaParte}`
+  }
+
+  const { error } = await service
+    .from('publicaciones')
+    .update({ fecha_publicacion: valorFecha, updated_by: user.id })
+    .eq('id', id)
+
+  if (error) {
+    console.error('[cambiarFechaPublicacion] error:', error)
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/publicaciones')
+  revalidatePath('/publicaciones/tabla')
+  revalidatePath('/publicaciones/calendario')
+  revalidatePath('/publicaciones/kanban')
+  revalidatePath(`/publicaciones/${id}`)
+  return { ok: true }
+}
+
 type CreatePublicacionInput = {
   marca_id: string
   nombre: string
   fecha_publicacion?: string | null
+  /* URL a la que debe volver el detalle al cerrar (ej. el calendario de la
+     marca de donde vino). Se propaga al redirect como ?volver=. Fix #3. */
+  volver?: string | null
 }
 
 /**
@@ -56,6 +112,34 @@ export async function createPublicacion(input: CreatePublicacionInput): Promise<
 
   if (!input.nombre?.trim()) throw new Error('El nombre es obligatorio')
   if (!input.marca_id) throw new Error('La marca es obligatoria')
+
+  const nombreLimpio = input.nombre.trim()
+
+  /* ANTI-DUPLICADO (Pedro 26-jun-2026): en mobile, con red lenta, el usuario
+     crea → no ve la navegación → toca otra vez → la fila ya se creó → DUPLICADO
+     (Lorena hizo 9 copias vacías de "1. COLÁGENO HIDROLIZADO" en ~30s así).
+     Si ya existe una pub IDÉNTICA (misma marca + nombre) creada hace <45s,
+     redirigimos a ESA en vez de crear otra. Match exacto + ventana corta →
+     no estorba creaciones legítimas (nadie crea 2 pubs con el MISMO nombre y
+     marca en 45s a propósito). */
+  const haceUnRato = new Date(Date.now() - 45_000).toISOString()
+  const { data: yaExiste } = await service
+    .from('publicaciones')
+    .select('id')
+    .eq('marca_id', input.marca_id)
+    .eq('nombre', nombreLimpio)
+    .gte('created_at', haceUnRato)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (yaExiste?.id) {
+    revalidatePath('/publicaciones')
+    redirect(
+      input.volver
+        ? `/publicaciones/${yaExiste.id}?volver=${encodeURIComponent(input.volver)}`
+        : `/publicaciones/${yaExiste.id}`,
+    )
+  }
 
   const { data, error } = await service
     .from('publicaciones')
@@ -81,8 +165,13 @@ export async function createPublicacion(input: CreatePublicacionInput): Promise<
   revalidatePath('/publicaciones')
   revalidatePath('/publicaciones/tabla')
 
-  // Redirect al detail para que llene el resto (plataformas, tipo, copy, etc.)
-  redirect(`/publicaciones/${data.id}`)
+  // Redirect al detail para que llene el resto (plataformas, tipo, copy, etc.).
+  // Propagamos ?volver= para que "Volver" regrese a la vista de origen. Fix #3.
+  redirect(
+    input.volver
+      ? `/publicaciones/${data.id}?volver=${encodeURIComponent(input.volver)}`
+      : `/publicaciones/${data.id}`,
+  )
 }
 
 /**
@@ -93,10 +182,12 @@ export async function createPublicacionFromForm(formData: FormData): Promise<voi
   const marca_id = String(formData.get('marca_id') ?? '').trim()
   const nombre = String(formData.get('nombre') ?? '').trim()
   const fecha = String(formData.get('fecha_publicacion') ?? '').trim()
+  const volver = String(formData.get('volver') ?? '').trim()
   await createPublicacion({
     marca_id,
     nombre,
     fecha_publicacion: fecha || null,
+    volver: volver || null,
   })
 }
 

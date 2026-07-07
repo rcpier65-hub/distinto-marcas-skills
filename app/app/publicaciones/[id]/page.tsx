@@ -5,7 +5,9 @@
 import Link from 'next/link'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { MarcaLogo } from '@/components/marca-logo'
 import { PublicacionDetailForm } from './_components/publicacion-detail-form'
+import { promptSeedPorSlug } from '@/lib/copys/seeds'
 import type { PublicacionRow, EditorRow, EscenaRow } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +25,7 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
       .from('publicaciones')
       .select(`
         *,
-        marca:marcas(id, slug, nombre, emoji_marca, color_primario_hex)
+        marca:marcas(id, slug, nombre, emoji_marca, color_primario_hex, tono_voz)
       `)
       .eq('id', id)
       .maybeSingle(),
@@ -50,9 +52,16 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
 
   const marca = Array.isArray(pub.marca) ? pub.marca[0] : pub.marca
 
+  /* Prompt de copy de la marca: lo guardado en tono_voz.prompt_copy, o el seed
+     por defecto del slug (Manrique) si aún no se guardó. Se lo pasamos al form
+     para mostrarlo/editarlo junto a "Generar con IA". */
+  const tonoVoz = (marca?.tono_voz && typeof marca.tono_voz === 'object') ? marca.tono_voz as Record<string, unknown> : {}
+  const promptGuardado = typeof tonoVoz.prompt_copy === 'string' ? tonoVoz.prompt_copy : ''
+  const promptMarca = promptGuardado || promptSeedPorSlug(marca?.slug ?? null) || ''
+
   return (
-    <main className="container mx-auto p-6 max-w-7xl">
-      <nav className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+    <main className="container mx-auto p-3 sm:p-6 max-w-7xl pb-24">
+      <nav className="mb-3 sm:mb-4 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
         <Link href="/publicaciones" className="hover:text-foreground">
           Publicaciones
         </Link>
@@ -61,9 +70,9 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
           <>
             <Link
               href={`/publicaciones?marca=${marca.slug}`}
-              className="hover:text-foreground flex items-center gap-1"
+              className="hover:text-foreground flex items-center gap-1.5"
             >
-              <span>{marca.emoji_marca}</span>
+              <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={18} />
               <span>{marca.nombre}</span>
             </Link>
             <span>/</span>
@@ -76,6 +85,7 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
         publicacion={pub as PublicacionRow}
         marca={marca}
         editores={editores}
+        promptMarca={promptMarca}
       />
 
       {/* GUION TÉCNICO movido adentro del PublicacionDetailForm, debajo

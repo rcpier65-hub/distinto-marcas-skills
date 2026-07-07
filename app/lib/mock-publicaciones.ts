@@ -23,6 +23,9 @@ export type PublicacionMock = {
   marcaSlug: string
   fecha: string             /* ISO 2026-06-10 */
   hora: string              /* 20:00 */
+  /* Título del video (columna `nombre` en BD). Lorena lo necesita visible en
+     el calendario para encontrar videos rápido (antes solo se veía el copy). */
+  titulo?: string
   caption: string
   thumbnail: string | null  /* path o null si no hay */
   redes: Red[]

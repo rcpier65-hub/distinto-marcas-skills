@@ -42,6 +42,11 @@ type PubLite = {
 
 export default async function GrillaPage({ params, searchParams }: PageProps) {
   await requireUser()
+  /* Guard de permisos (auditoría 26-jun-2026): sin esto, cualquier usuario
+     logueado podía entrar por URL a /grilla/[slug] y generar/enviar grillas
+     aunque no tuviera el módulo. Enforce el permiso que ya existe. */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('grilla')
   const { slug } = await params
   const sp = await searchParams
 
@@ -81,7 +86,12 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
 
   if (marcaErr || !marca) notFound()
 
-  // 2. Semana
+  // 2. Semana — SIEMPRE una semana estricta lunes→domingo (modelo "grilla
+  //    semanal"). Por default la semana actual; si vienen ?inicio&fin (el user
+  //    navegó con las flechas ◀ ▶), esa semana. Cada vista muestra SOLO las
+  //    publicaciones de esa semana — para ver otra semana se navega, no se
+  //    estira el rango. Pedro 26-jun-2026: eligió "navegar entre semanas, cada
+  //    semana muestra solo sus publicaciones (lun a dom)".
   const { inicio, fin } = sp.inicio && sp.fin
     ? { inicio: sp.inicio, fin: sp.fin }
     : calcularSemanaActual()

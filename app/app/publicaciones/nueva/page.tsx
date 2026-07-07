@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic'
 type SearchParams = {
   marca?: string  // pre-seleccionar marca via ?marca=manrique
   fecha?: string  // pre-llenar fecha via ?fecha=2026-05-22
+  volver?: string // URL a la que volver al cerrar (ej. el calendario de la marca)
 }
 
 export default async function NuevaPublicacionPage({
@@ -41,6 +42,9 @@ export default async function NuevaPublicacionPage({
     ? marcas?.find((m: { slug: string }) => m.slug === sp.marca)
     : null
 
+  // A dónde volver al cancelar: ?volver= explícito, sino la marca, sino todas.
+  const volver = sp.volver ?? (sp.marca ? `/publicaciones?marca=${sp.marca}` : '/publicaciones')
+
   return (
     <main className="container mx-auto p-6 max-w-2xl">
       <nav className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
@@ -59,6 +63,8 @@ export default async function NuevaPublicacionPage({
       <Card>
         <CardContent className="p-6">
           <form action={createPublicacionFromForm} className="space-y-5">
+            {/* Volver: se propaga al detalle para que "Volver" regrese acá. */}
+            <input type="hidden" name="volver" value={volver} />
             {/* Marca */}
             <div>
               <label htmlFor="marca_id" className="block text-sm font-medium mb-1.5">
@@ -127,7 +133,7 @@ export default async function NuevaPublicacionPage({
                 Crear y continuar →
               </button>
               <Link
-                href="/publicaciones"
+                href={volver}
                 className="h-10 px-4 rounded-md border text-sm font-medium hover:bg-muted flex items-center"
               >
                 Cancelar

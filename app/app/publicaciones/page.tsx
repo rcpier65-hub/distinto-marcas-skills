@@ -131,6 +131,9 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         marcaSlug: marca?.slug ?? 'unknown',
         fecha,
         hora,
+        /* Título real del video (nombre) — Lorena lo quiere visible en el
+           calendario para ubicar videos. El caption sigue siendo el copy. */
+        titulo: r.nombre ?? '(sin título)',
         caption: r.copy ?? r.nombre ?? '(sin título)',
         thumbnail: null,
         redes,

@@ -37,7 +37,7 @@ import { ESTADO_PUBLICACION_LABEL, type EstadoPublicacion } from '@/lib/types/da
 
 // 10 columnas — orden del workflow editorial
 const ESTADOS_ORDER: EstadoPublicacion[] = [
-  'tareas', 'idear', 'editando', 'editar', 'disenar',
+  'tareas', 'idear', 'editando', 'editar', 'disenar', 'disenando',
   'aprobar', 'programar', 'programar_anuncios', 'enviado', 'archivado',
 ]
 
@@ -48,6 +48,7 @@ const ESTADO_HEADER_STYLE: Record<EstadoPublicacion, string> = {
   editando: 'bg-orange-100 dark:bg-orange-900/30 border-orange-300',
   editar: 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-400',
   disenar: 'bg-pink-100 dark:bg-pink-900/30 border-pink-300',
+  disenando: 'bg-fuchsia-100 dark:bg-fuchsia-900/30 border-fuchsia-400',
   aprobar: 'bg-green-100 dark:bg-green-900/30 border-green-400',
   programar: 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-400',
   programar_anuncios: 'bg-teal-100 dark:bg-teal-900/30 border-teal-400',

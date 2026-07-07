@@ -45,6 +45,26 @@ export default async function DisenoDetailPage({ params }: PageProps) {
 
   const marca = Array.isArray(pub.marca) ? pub.marca[0] : pub.marca
 
+  /* Marcas activas para el selector "cambiar marca" + etiquetas extra. */
+  const { data: marcasData } = await service
+    .from('marcas')
+    .select('id, slug, nombre, emoji_marca')
+    .eq('activa', true)
+    .order('nombre')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcasRaw = (marcasData ?? []) as any[]
+  const marcas = marcasRaw.map((m) => ({
+    slug: m.slug as string,
+    nombre: m.nombre as string,
+    emoji: (m.emoji_marca ?? null) as string | null,
+  }))
+  /* Etiquetas extra actuales (marcas_extra = uuid[]) resueltas a slugs. */
+  const slugById = new Map<string, string>(marcasRaw.map((m) => [m.id as string, m.slug as string]))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcasExtraSlugs: string[] = ((Array.isArray(pub.marcas_extra) ? pub.marcas_extra : []) as string[])
+    .map((eid) => slugById.get(eid))
+    .filter(Boolean) as string[]
+
   /* Solo las tareas "para publicar" (con fecha de publicación) usan el form
      completo de publicación. Las standalone / reunión (sin fecha) se quedan en
      esta vista simple — AUNQUE tengan una marca elegida. */
@@ -76,11 +96,14 @@ export default async function DisenoDetailPage({ params }: PageProps) {
           archivedAt: pub.archived_at,
           createdAt: pub.created_at,
           updatedAt: pub.updated_at,
+          marcaSlug: marca?.slug ?? 'interno',
           marcaEmoji: marca?.emoji_marca ?? '🎨',
           marcaNombre: marca?.nombre ?? 'Distinto · Interno',
           marcaColor: marca?.color_primario_hex ?? '#a78bfa',
           reunionMeetLink: pub.reunion_meet_link ?? null,
         }}
+        marcas={marcas}
+        marcasExtraSlugs={marcasExtraSlugs}
       />
     </main>
   )

@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import {
   actualizarMiembro,
   crearMiembro,
+  duplicarMiembro,
   generarLinkInvitacion,
   resetearPasswordMiembro,
   setPasswordMiembro,
@@ -42,6 +43,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
   const [editando, setEditando] = useState<TeamMember | null>(null)
   const [tabInicial, setTabInicial] = useState<'info' | 'permisos' | 'seguridad'>('info')
   const [nuevoOpen, setNuevoOpen] = useState(false)
+  const [duplicando, setDuplicando] = useState<TeamMember | null>(null)
   const [search, setSearch] = useState('')
   const [rolFiltro, setRolFiltro] = useState<RolPredefinidoId | 'todos'>('todos')
 
@@ -194,6 +196,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
               totalMarcas={marcas.length}
               pubsEnEdicion={pubsEnEdicion}
               onOpen={(tab) => { setTabInicial(tab); setEditando(m) }}
+              onDuplicate={() => setDuplicando(m)}
             />
           )
         })}
@@ -238,6 +241,21 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
           }}
         />
       )}
+
+      {/* MODAL DUPLICAR MIEMBRO — copia los accesos de otro + (opcional) editor */}
+      {duplicando && (
+        <ModalDuplicarMiembro
+          source={duplicando}
+          onClose={() => setDuplicando(null)}
+          onCreated={(m) => {
+            handleCreate(m)
+            setDuplicando(null)
+            /* Igual que al crear: el paso siguiente es ponerle contraseña. */
+            setTabInicial('seguridad')
+            setEditando(m)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -247,7 +265,7 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
    ============================================================ */
 
 function MemberCard({
-  member, rol, modulosCount, marcasCount, totalMarcas, pubsEnEdicion, onOpen,
+  member, rol, modulosCount, marcasCount, totalMarcas, pubsEnEdicion, onOpen, onDuplicate,
 }: {
   member: TeamMember
   rol: RolPredefinido | undefined
@@ -256,6 +274,7 @@ function MemberCard({
   totalMarcas: number
   pubsEnEdicion: number
   onOpen: (tab: 'info' | 'permisos' | 'seguridad') => void
+  onDuplicate: () => void
 }) {
   const inicial = member.nombre.slice(0, 2).toUpperCase()
   const rolColor = rol ? ROL_COLOR[rol.id] : '#737373'
@@ -300,8 +319,28 @@ function MemberCard({
         e.currentTarget.style.transform = 'none'
       }}
     >
-      {/* HEADER: estado pill arriba derecha. No banda colorida — más limpio. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: 22 }}>
+      {/* HEADER: botón duplicar (izq) + estado pill (der). */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 22 }}>
+        <button
+          onClick={onDuplicate}
+          title="Crear otro miembro con estos mismos accesos"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            height: 22, padding: '0 8px',
+            background: 'transparent', border: '1px solid #e5e7eb',
+            borderRadius: 999, color: '#6b7280',
+            fontFamily: 'inherit', fontSize: 11, fontWeight: 500,
+            cursor: 'pointer', transition: 'all 150ms ease-out',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.color = '#374151' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = '#6b7280' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
+            <rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M2.5 9V3a.5.5 0 01.5-.5H8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          Duplicar
+        </button>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           fontSize: 11, fontWeight: 500,
@@ -1294,6 +1333,139 @@ function ModalNuevoMiembro({
           <button type="button" onClick={onClose} style={btnSecondaryStyle} disabled={saving}>Cancelar</button>
           <button type="submit" style={btnPrimaryStyle} disabled={saving}>
             {saving ? 'Creando…' : 'Crear miembro'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+/* ============================================================
+   MODAL: Duplicar miembro (copia accesos + opcional editor)
+   ============================================================ */
+
+function ModalDuplicarMiembro({
+  source, onClose, onCreated,
+}: {
+  source: TeamMember
+  onClose: () => void
+  onCreated: (m: TeamMember) => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [email, setEmail] = useState('')
+  const [emailEditadoManual, setEmailEditadoManual] = useState(false)
+  const [comoEditor, setComoEditor] = useState(true)
+  const [saving, startSaving] = useTransition()
+
+  function handleNombreChange(nuevo: string) {
+    setNombre(nuevo)
+    if (!emailEditadoManual) setEmail(nombreAEmail(nuevo))
+  }
+  function handleEmailChange(nuevo: string) {
+    setEmail(nuevo)
+    setEmailEditadoManual(nuevo !== '')
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose, saving])
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nombre.trim() || !email.trim()) {
+      toast.error('Nombre y email son obligatorios')
+      return
+    }
+    startSaving(async () => {
+      const r = await duplicarMiembro({
+        sourceId: source.id,
+        nombre: nombre.trim(),
+        email: email.trim(),
+        comoEditor,
+      })
+      if (r.ok) {
+        toast.success('Miembro creado con los mismos accesos — ahora ponle una contraseña', { duration: 5000 })
+        onCreated(r.member as TeamMember)
+      } else {
+        toast.error(r.error)
+      }
+    })
+  }
+
+  return (
+    <div onClick={onClose} style={modalBackdropStyle}>
+      <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()} style={{ ...modalCardStyle, maxWidth: 520 }}>
+        <div style={modalHeaderStyle}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mk-text-primary)' }}>Duplicar miembro</div>
+            <div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
+              Copia exactamente los accesos de <strong>{source.nombre}</strong>
+            </div>
+          </div>
+          <div style={{ flex: 1 }} />
+          <button type="button" onClick={onClose} style={iconBtnStyle}>✕</button>
+        </div>
+
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Campo label="Nombre del nuevo miembro *">
+            <input
+              required autoFocus value={nombre}
+              onChange={(e) => handleNombreChange(e.target.value)}
+              placeholder="Ej. Paolo"
+              style={fieldStyle}
+            />
+          </Campo>
+          <Campo label="Email *">
+            <input
+              required type="email" value={email}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              placeholder="paolo@agenciadistinto.com"
+              style={fieldStyle}
+            />
+            {nombre && !emailEditadoManual && (
+              <span style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>
+                Se auto-completa según el nombre. Edítalo si necesitas otro.
+              </span>
+            )}
+          </Campo>
+
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            padding: 12, borderRadius: 10,
+            background: comoEditor ? 'var(--mk-accent-bg, #eef2ff)' : 'rgba(0,0,0,0.02)',
+            border: `1px solid ${comoEditor ? '#c7d2fe' : 'var(--mk-border-subtle)'}`,
+            cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox" checked={comoEditor}
+              onChange={(e) => setComoEditor(e.target.checked)}
+              style={{ marginTop: 2 }}
+            />
+            <span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--mk-text-primary)' }}>
+                También editor (conectado a publicaciones)
+              </span>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--mk-text-tertiary)', marginTop: 2, lineHeight: 1.5 }}>
+                Le suma acceso al módulo Editor y aparece en el desplegable de “Editor” de cada
+                publicación para delegarle edición — igual que Pieer.
+              </span>
+            </span>
+          </label>
+
+          <div style={{ fontSize: 11.5, color: 'var(--mk-text-tertiary)', lineHeight: 1.6 }}>
+            Hereda el rol, los permisos y las marcas de <strong>{source.nombre}</strong>.
+            Después del paso siguiente le pones una contraseña para que pueda entrar.
+          </div>
+        </div>
+
+        <div style={modalFooterStyle}>
+          <button type="button" onClick={onClose} style={btnSecondaryStyle} disabled={saving}>Cancelar</button>
+          <button type="submit" style={btnPrimaryStyle} disabled={saving}>
+            {saving ? 'Creando…' : 'Crear con estos accesos'}
           </button>
         </div>
       </form>

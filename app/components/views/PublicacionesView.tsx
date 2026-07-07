@@ -8,9 +8,11 @@
    Default tab: Listado (porque Pedro pidió "listado ayuda a entender mejor").
    Iter 1: read-only. Iter 2: bulk actions + crear/editar inline. */
 
-import { createContext, useContext, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Scissors, FileText, Image as ImageIcon, Rocket } from 'lucide-react'
+import { toast } from 'sonner'
+import { cambiarFechaPublicacion } from '@/app/publicaciones/_actions'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import {
   PUBLICACIONES_MOCK,
@@ -52,7 +54,15 @@ type Filters = {
   marcaSlug: string | 'todas'
   estado: EstadoPubMetricool | 'todos'
   red: Red | 'todas'
+  /* Filtro por editor: 'todos' | '_sin' (sin asignar) | nombre del editor. */
+  editor: string | 'todos'
 }
+
+/* Recordar vista + filtros + búsqueda entre navegaciones (sessionStorage).
+   Fix Pedro 15-jun-2026: entrar a una publicación y volver perdía la vista
+   (mensual) y el filtro → volvía a la vista general. Ahora regresa EXACTO a
+   donde estaba (vista + marca + estado + red + editor). */
+const PUBLICACIONES_VIEW_STATE_KEY = 'publicaciones-view-state-v1'
 
 type Props = {
   publicaciones?: PublicacionMock[]
@@ -66,28 +76,117 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
   /* router para que el botón "Nueva publicación" navegue a
      /publicaciones/nueva. Antes el botón era fantasma (sin onClick). */
   const router = useRouter()
+  const searchParams = useSearchParams()
   const isMobile = useIsMobile()
   const [view, setView] = useState<ViewMode>('semana')  /* default: semana — más útil día a día */
-  const [filters, setFilters] = useState<Filters>({
-    marcaSlug: 'todas',
+  /* Filtro de marca arranca desde la URL (?marca=vid-natur). Así la vista
+     filtrada es "linkeable" y, sobre todo, cuando Pedro crea/edita una pub y
+     vuelve, regresa a la marca donde estaba (no a "todas"). Fix #3. */
+  const [filters, setFilters] = useState<Filters>(() => ({
+    marcaSlug: searchParams.get('marca') ?? 'todas',
     estado: 'todos',
     red: 'todas',
-  })
+    editor: 'todos',
+  }))
+
+  /* Editores presentes en las publicaciones (para poblar el filtro). Únicos +
+     ordenados. El '_sin' (sin asignar) y 'todos' se agregan aparte en el pill. */
+  const editoresDisponibles = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of publicaciones) if (p.editorNombre) set.add(p.editorNombre)
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [publicaciones])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
+  /* Copia local de las publicaciones para MOVER por drag-and-drop con feedback
+     inmediato (optimistic). Lorena 26-jun-2026: arrastrar el video al nuevo día
+     en el calendario en vez de entrar uno por uno a cambiar la fecha.
+     Se re-sincroniza si el server manda datos nuevos (router.refresh). */
+  const [localPubs, setLocalPubs] = useState(publicaciones)
+  useEffect(() => { setLocalPubs(publicaciones) }, [publicaciones])
+
+  async function handleMoveDate(id: string, nuevaFecha: string) {
+    const prev = localPubs
+    const target = prev.find((p) => p.id === id)
+    if (!target || target.fecha === nuevaFecha) return
+    // Optimistic: mover ya en pantalla
+    setLocalPubs(prev.map((p) => (p.id === id ? { ...p, fecha: nuevaFecha } : p)))
+    const res = await cambiarFechaPublicacion(id, nuevaFecha)
+    if (!res.ok) {
+      setLocalPubs(prev) // rollback
+      toast.error(`No se pudo mover: ${res.error}`)
+    } else {
+      toast.success('Fecha actualizada ✓')
+      router.refresh()
+    }
+  }
+
+  /* Cambiar la marca del filtro Y reflejarlo en la URL, para que el estado
+     sobreviva a navegaciones (crear pub → volver) y a un refresh. */
+  function setMarcaFilter(id: string) {
+    setFilters((f) => ({ ...f, marcaSlug: id }))
+    const params = new URLSearchParams(Array.from(searchParams.entries()))
+    if (id === 'todas') params.delete('marca')
+    else params.set('marca', id)
+    const qs = params.toString()
+    router.replace(qs ? `/publicaciones?${qs}` : '/publicaciones', { scroll: false })
+  }
+
+  /* Restaurar vista/filtros guardados al montar. Si la URL trae ?marca
+     explícito (link directo desde el menú/grilla), ese gana para la marca;
+     el resto (vista, estado, red, editor, búsqueda) vuelve de sessionStorage.
+     `restaurado` evita pisar el storage con defaults antes de leerlo. */
+  const [restaurado, setRestaurado] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(PUBLICACIONES_VIEW_STATE_KEY)
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (s.view === 'listado' || s.view === 'mes' || s.view === 'semana') setView(s.view)
+        if (typeof s.search === 'string') setSearch(s.search)
+        const urlMarca = searchParams.get('marca')
+        setFilters((f) => ({
+          ...f,
+          marcaSlug: urlMarca ?? s.filters?.marcaSlug ?? f.marcaSlug,
+          estado: s.filters?.estado ?? f.estado,
+          red: s.filters?.red ?? f.red,
+          editor: s.filters?.editor ?? f.editor,
+        }))
+      }
+    } catch {}
+    setRestaurado(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (!restaurado) return
+    try {
+      sessionStorage.setItem(PUBLICACIONES_VIEW_STATE_KEY, JSON.stringify({ view, search, filters }))
+    } catch {}
+  }, [restaurado, view, search, filters])
+
   const filtered = useMemo(() => {
-    return publicaciones.filter((p) => {
+    return localPubs.filter((p) => {
       if (filters.marcaSlug !== 'todas' && p.marcaSlug !== filters.marcaSlug) return false
       if (filters.estado !== 'todos' && p.estado !== filters.estado) return false
       if (filters.red !== 'todas' && !p.redes.includes(filters.red)) return false
-      if (search && !p.caption.toLowerCase().includes(search.toLowerCase())) return false
+      /* Editor: '_sin' = sin asignar; cualquier otro = match exacto por nombre. */
+      if (filters.editor === '_sin') { if (p.editorNombre) return false }
+      else if (filters.editor !== 'todos' && p.editorNombre !== filters.editor) return false
+      /* Búsqueda: matchea título (nombre del video) Y caption (copy) — Lorena
+         busca por el título para encontrar videos. */
+      if (search) {
+        const q = search.toLowerCase()
+        const enTitulo = (p.titulo ?? '').toLowerCase().includes(q)
+        const enCaption = p.caption.toLowerCase().includes(q)
+        if (!enTitulo && !enCaption) return false
+      }
       return true
     })
-  }, [publicaciones, filters, search])
+  }, [localPubs, filters, search])
 
   const hasFilters =
-    filters.marcaSlug !== 'todas' || filters.estado !== 'todos' || filters.red !== 'todas' || !!search
+    filters.marcaSlug !== 'todas' || filters.estado !== 'todos' || filters.red !== 'todas' || filters.editor !== 'todos' || !!search
 
   return (
    <MarcasNavContext.Provider value={marcas}>
@@ -147,7 +246,15 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
         <button
           className="mk-focusable"
           style={{ ...btnPrimaryStyle, order: isMobile ? 1 : 0, flexShrink: 0 }}
-          onClick={() => router.push('/publicaciones/nueva')}
+          onClick={() => {
+            const m = filters.marcaSlug
+            if (m && m !== 'todas') {
+              const volver = `/publicaciones?marca=${m}`
+              router.push(`/publicaciones/nueva?marca=${m}&volver=${encodeURIComponent(volver)}`)
+            } else {
+              router.push('/publicaciones/nueva')
+            }
+          }}
         >
           <IconPlus /> {isMobile ? 'Nueva' : 'Nueva publicación'}
           {!isMobile && <span className="mk-kbd" style={{ marginLeft: 4 }}>C</span>}
@@ -202,7 +309,7 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
                creadas en /dashboard aparecen acá automáticamente. */
             ...marcas.map((m) => ({ id: m.slug, label: m.nombreCorto, color: m.color, emoji: m.emoji })),
           ]}
-          onSelect={(id) => setFilters((f) => ({ ...f, marcaSlug: id }))}
+          onSelect={(id) => setMarcaFilter(id)}
         />
 
         <FilterPill
@@ -231,9 +338,21 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
           onSelect={(id) => setFilters((f) => ({ ...f, red: id as Red | 'todas' }))}
         />
 
+        <FilterPill
+          label="Editor"
+          value={filters.editor === 'todos' ? null : filters.editor === '_sin' ? 'Sin asignar' : filters.editor}
+          dotColor={filters.editor === 'todos' || filters.editor === '_sin' ? null : editorColor(filters.editor)}
+          options={[
+            { id: 'todos', label: 'Todos' },
+            { id: '_sin', label: 'Sin asignar' },
+            ...editoresDisponibles.map((n) => ({ id: n, label: n, color: editorColor(n) })),
+          ]}
+          onSelect={(id) => setFilters((f) => ({ ...f, editor: id }))}
+        />
+
         {hasFilters && (
           <button
-            onClick={() => { setFilters({ marcaSlug: 'todas', estado: 'todos', red: 'todas' }); setSearch('') }}
+            onClick={() => { setFilters({ marcaSlug: 'todas', estado: 'todos', red: 'todas', editor: 'todos' }); setSearch(''); setMarcaFilter('todas') }}
             style={{
               padding: '4px 10px', fontSize: 'var(--mk-text-xs)', fontFamily: 'inherit',
               background: 'transparent', border: 'none',
@@ -272,8 +391,8 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
             }}
           />
         )}
-        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} />}
-        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} />}
+        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} />}
+        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} />}
       </div>
     </div>
    </MarcasNavContext.Provider>
@@ -576,16 +695,30 @@ function StatusIcons({ pub, size = 13 }: { pub: PublicacionMock; size?: number }
 
 /* PubChip — strip clickeable de publicación usado en celdas calendario.
    Variantes: compact (mes con muchas pubs) y full (semana / mes pocas pubs). */
-function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 'full' }) {
+function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; variant: 'compact' | 'full'; canDrag?: boolean }) {
   const router = useRouter()
   const marca = useMarcasNav().find((m) => m.slug === pub.marcaSlug)
   const editor = editorFromPub(pub)
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
+  /* Drag-and-drop: el chip es la fuente. Al soltarlo sobre otro día, la celda
+     lee este id y llama la action que cambia la fecha. */
+  const [dragging, setDragging] = useState(false)
+  /* Título visible (nombre del video). Si está vacío o es igual al caption,
+     mostramos el caption como respaldo para no dejar el chip sin texto. */
+  const titulo = pub.titulo && pub.titulo !== '(sin título)' ? pub.titulo : pub.caption
+  const mostrarCaption = pub.caption && pub.caption !== titulo
 
   return (
     <button
+      draggable={canDrag}
+      onDragStart={canDrag ? (e) => {
+        e.dataTransfer.setData('text/plain', pub.id)
+        e.dataTransfer.effectAllowed = 'move'
+        setDragging(true)
+      } : undefined}
+      onDragEnd={canDrag ? () => setDragging(false) : undefined}
       onClick={(e) => { e.stopPropagation(); router.push(`/publicaciones/${pub.id}`) }}
-      title={`${pub.hora} · ${marca?.nombreCorto} — ${pub.caption}`}
+      title={`${pub.hora} · ${marca?.nombreCorto} — ${titulo}${mostrarCaption ? `\n${pub.caption}` : ''}${canDrag ? '\n\n(Arrastra para cambiar la fecha)' : ''}`}
       style={{
         display: 'block',
         width: '100%',
@@ -598,7 +731,8 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
         borderRight: '1px solid transparent',
         borderBottom: '1px solid transparent',
         borderRadius: 'var(--mk-radius-sm)',
-        cursor: 'pointer',
+        cursor: canDrag ? 'grab' : 'pointer',
+        opacity: dragging ? 0.4 : 1,
         fontFamily: 'inherit',
         color: 'var(--mk-text-secondary)',
         transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
@@ -646,11 +780,17 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
               {marca?.nombreCorto ?? pub.marcaSlug}
             </span>
           </div>
-          {/* Línea 2: caption (texto del copy) */}
-          <span style={{ fontSize: 11, color: 'var(--mk-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.3 }}>
-            {pub.caption}
+          {/* Línea 2: TÍTULO del video (lo que Lorena necesita para ubicarlos) */}
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.3 }}>
+            {titulo}
           </span>
-          {/* Línea 3: indicadores de workflow (copy / portada / editado) */}
+          {/* Línea 3: caption (copy) como apoyo, atenuado — solo si aporta algo */}
+          {mostrarCaption && (
+            <span style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.25 }}>
+              {pub.caption}
+            </span>
+          )}
+          {/* Línea 4: indicadores de workflow (copy / portada / editado) */}
           <StatusIcons pub={pub} size={11} />
         </div>
       ) : (
@@ -679,17 +819,27 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
               <span className="mk-dot" style={{ background: estadoCfg.color, width: 4, height: 4 }} />
             </span>
           </div>
-          <div style={{ fontSize: 11.5, color: 'var(--mk-text-primary)', lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
-            {pub.caption}
+          {/* TÍTULO del video (bold) — Lorena lo usa para ubicar videos */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mk-text-primary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
+            {titulo}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Caption (copy) como apoyo, atenuado — solo si aporta algo distinto */}
+          {mostrarCaption && (
+            <div style={{ fontSize: 10.5, color: 'var(--mk-text-tertiary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
+              {pub.caption}
+            </div>
+          )}
+          {/* Fila de íconos: redes + workflow + editor. flexWrap evita que se
+              CORTEN cuando la columna es angosta (semana) — antes se salían del
+              chip y quedaban recortados. Fix Pedro 15-jun-2026. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', rowGap: 4 }}>
             {pub.redes.map((r) => <RedIcon key={r} red={r} />)}
             {pub.redes.length > 0 && (
               <span style={{ width: 1, height: 11, background: 'var(--mk-border-subtle)', flexShrink: 0 }} />
             )}
             <StatusIcons pub={pub} size={13} />
             {editor && (
-              <span style={{ marginLeft: 'auto', width: 14, height: 14, borderRadius: '50%', background: editor.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700 }}>
+              <span style={{ marginLeft: 'auto', width: 14, height: 14, borderRadius: '50%', background: editor.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, flexShrink: 0 }}>
                 {editor.nombre.slice(0, 1).toUpperCase()}
               </span>
             )}
@@ -704,9 +854,11 @@ function PubChip({ pub, variant }: { pub: PublicacionMock; variant: 'compact' | 
    MES VIEW — grid mensual mejorado, todas las pubs clickeables
    ============================================================ */
 
-function MesView({ entries, isMobile = false }: { entries: PublicacionMock[]; isMobile?: boolean }) {
+function MesView({ entries, isMobile = false, onMoveDate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void }) {
   const today = new Date()
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  /* Día sobre el que se está arrastrando un video (para resaltar el destino). */
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const firstOfMonth = new Date(year, month, 1)
@@ -783,19 +935,34 @@ function MesView({ entries, isMobile = false }: { entries: PublicacionMock[]; is
           const k = dayKey(c.date)
           const pubs = byDay.get(k) ?? []
           const isToday = k === todayKey
+          const isDropTarget = dragOverKey === k
 
           return (
             <div
               key={i}
+              onDragOver={onMoveDate ? (e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                if (dragOverKey !== k) setDragOverKey(k)
+              } : undefined}
+              onDragLeave={onMoveDate ? () => setDragOverKey((cur) => (cur === k ? null : cur)) : undefined}
+              onDrop={onMoveDate ? (e) => {
+                e.preventDefault()
+                setDragOverKey(null)
+                const id = e.dataTransfer.getData('text/plain')
+                if (id) onMoveDate(id, k)
+              } : undefined}
               style={{
-                background: isToday ? 'var(--mk-bg-selected)' : 'var(--mk-bg-elevated)',
+                background: isDropTarget ? 'var(--mk-bg-selected)' : isToday ? 'var(--mk-bg-selected)' : 'var(--mk-bg-elevated)',
                 display: 'flex',
                 flexDirection: 'column',
                 padding: '6px 6px 6px',
                 opacity: c.thisMonth ? 1 : 0.42,
                 position: 'relative',
                 transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
-                boxShadow: isToday ? `inset 0 0 0 1px var(--mk-accent-glow)` : undefined,
+                boxShadow: isDropTarget
+                  ? 'inset 0 0 0 2px var(--mk-accent)'
+                  : isToday ? `inset 0 0 0 1px var(--mk-accent-glow)` : undefined,
                 /* min-width 0 + overflow hidden: respetar ancho del grid
                    cell y no estirarlo por el contenido (nowrap del caption). */
                 minWidth: 0,
@@ -843,7 +1010,7 @@ function MesView({ entries, isMobile = false }: { entries: PublicacionMock[]; is
                   scrollbarWidth: 'thin',
                 }}
               >
-                {pubs.map((p) => <PubChip key={p.id} pub={p} variant="compact" />)}
+                {pubs.map((p) => <PubChip key={p.id} pub={p} variant="compact" canDrag={!!onMoveDate && !isMobile} />)}
               </div>
             </div>
           )
@@ -859,8 +1026,10 @@ function MesView({ entries, isMobile = false }: { entries: PublicacionMock[]; is
    SEMANA VIEW — 7 columnas con detalle completo por publicación
    ============================================================ */
 
-function SemanaView({ entries, isMobile = false }: { entries: PublicacionMock[]; isMobile?: boolean }) {
+function SemanaView({ entries, isMobile = false, onMoveDate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void }) {
   const today = new Date()
+  /* Día sobre el que se arrastra un video (resaltar destino). */
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   /* Cursor apunta al lunes de la semana actual */
   function startOfWeek(d: Date): Date {
     const day = (d.getDay() + 6) % 7  /* lunes = 0 */
@@ -918,7 +1087,11 @@ function SemanaView({ entries, isMobile = false }: { entries: PublicacionMock[];
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? undefined : 'repeat(7, 1fr)',
+          /* minmax(0, 1fr) (no '1fr' = minmax(auto,1fr)) para que las 7 columnas
+             SIEMPRE quepan en el ancho del contenedor. Con '1fr', el contenido de
+             las cards forzaba columnas más anchas → la grilla se desbordaba y el
+             DOMINGO quedaba cortado sin poder scrollear (overflow oculto). */
+          gridTemplateColumns: isMobile ? undefined : 'repeat(7, minmax(0, 1fr))',
           gridAutoFlow: isMobile ? 'column' : undefined,
           gridAutoColumns: isMobile ? '82vw' : undefined,
           gap: 1,
@@ -935,13 +1108,31 @@ function SemanaView({ entries, isMobile = false }: { entries: PublicacionMock[];
           const k = dayKey(d)
           const pubs = byDay.get(k) ?? []
           const isToday = k === todayKey
+          const isDropTarget = dragOverKey === k
           return (
             <div
               key={i}
+              onDragOver={onMoveDate ? (e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                if (dragOverKey !== k) setDragOverKey(k)
+              } : undefined}
+              onDragLeave={onMoveDate ? () => setDragOverKey((cur) => (cur === k ? null : cur)) : undefined}
+              onDrop={onMoveDate ? (e) => {
+                e.preventDefault()
+                setDragOverKey(null)
+                const id = e.dataTransfer.getData('text/plain')
+                if (id) onMoveDate(id, k)
+              } : undefined}
               style={{
-                background: 'var(--mk-bg-elevated)',
+                background: isDropTarget ? 'var(--mk-bg-selected)' : 'var(--mk-bg-elevated)',
                 display: 'flex', flexDirection: 'column',
                 minHeight: '100%',
+                boxShadow: isDropTarget ? 'inset 0 0 0 2px var(--mk-accent)' : undefined,
+                transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
+                /* minWidth:0 deja que la columna se encoja por debajo del ancho
+                   de su contenido (si no, las cards la fuerzan a crecer). */
+                minWidth: 0,
                 scrollSnapAlign: isMobile ? 'start' : undefined,
               }}
             >
@@ -996,7 +1187,7 @@ function SemanaView({ entries, isMobile = false }: { entries: PublicacionMock[];
                     Sin publicaciones
                   </div>
                 ) : (
-                  pubs.map((p) => <PubChip key={p.id} pub={p} variant="full" />)
+                  pubs.map((p) => <PubChip key={p.id} pub={p} variant="full" canDrag={!!onMoveDate && !isMobile} />)
                 )}
               </div>
             </div>

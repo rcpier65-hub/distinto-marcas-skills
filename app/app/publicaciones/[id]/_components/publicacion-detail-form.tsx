@@ -7,7 +7,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Globe, MessageCircle, Pin,
@@ -16,12 +16,16 @@ import {
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
   Download, Video as VideoIcon, Check, Pencil, ChevronDown,
   Volume2, VolumeX, Maximize2, X, Table2, Type as TypeIcon,
+  Link as LinkIcon, Mic, SlidersHorizontal,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { updatePublicacion, deletePublicacion, togglePublicacionField, generarCopysConIA } from '../_actions'
+import { MarcaLogo } from '@/components/marca-logo'
+import { updatePublicacion, deletePublicacion, togglePublicacionField, marcarParaDiseno, generarCopysConIA, guardarPromptMarca } from '../_actions'
 import { duplicarPublicacion } from '../../_actions'
+import { esRedireccion } from '@/lib/utils/is-redirect-error'
+import { marcarParaEditarHoy } from '@/app/editor/_actions'
 import {
   ESTADO_PUBLICACION_LABEL,
   ESTADO_TAREA_LABEL,
@@ -32,7 +36,7 @@ import {
 } from '@/lib/types/database'
 
 const ESTADOS: EstadoPublicacion[] = [
-  'tareas', 'idear', 'editando', 'editar', 'disenar',
+  'tareas', 'idear', 'editando', 'editar', 'disenar', 'disenando',
   'enviado', 'aprobar', 'programar', 'programar_anuncios', 'archivado',
 ]
 
@@ -118,7 +122,7 @@ const EMOJI_PICKER = [
 ]
 
 // Tipos de popover (solo uno abierto a la vez)
-type PopoverKey = 'tipo' | 'objetivos' | 'portada' | 'musica' | 'tomas' | 'emoji' | 'videos' | null
+type PopoverKey = 'tipo' | 'objetivos' | 'portada' | 'musica' | 'tomas' | 'diseno' | 'emoji' | 'videos' | null
 
 function extractDriveFolderId(url: string): string | null {
   if (!url) return null
@@ -141,17 +145,41 @@ type Props = {
   publicacion: PublicacionRow
   marca: Marca
   editores: EditorRow[]
+  /* Prompt de copy de la marca (guardado o seed). Pedro lo edita acá. */
+  promptMarca?: string
 }
 
-export function PublicacionDetailForm({ publicacion: initial, marca, editores }: Props) {
+export function PublicacionDetailForm({ publicacion: initial, marca, editores, promptMarca = '' }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  /* A dónde vuelve "Volver": ?volver=… si vino del flujo de creación,
+     sino a la vista de la marca de esta publicación, sino a todas. Fix #3. */
+  const volverUrl =
+    searchParams.get('volver') ||
+    (marca?.slug ? `/publicaciones?marca=${marca.slug}` : '/publicaciones')
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDelete] = useTransition()
   const [isDuplicating, startDuplicate] = useTransition()
+  const [isMarcandoHoy, startMarcarHoy] = useTransition()
+  const [isAprobando, startAprobar] = useTransition()
   // Copys generados por IA (Claude). null = panel cerrado. Pedro elige uno y
   // se carga en el textarea; no se guarda hasta que toca "Guardar cambios".
   const [iaOpciones, setIaOpciones] = useState<string[] | null>(null)
   const [isGenerando, startGenerar] = useTransition()
+  // Menú de "Generar con IA" (contexto / guion / audio) + editor del prompt de marca.
+  const [genMenuOpen, setGenMenuOpen] = useState(false)
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [promptValue, setPromptValue] = useState(promptMarca)
+  const [isSavingPrompt, startSavePrompt] = useTransition()
+  // Grabación de audio en vivo (modo "generar en base a audio")
+  const [audioModalOpen, setAudioModalOpen] = useState(false)
+  const [grabando, setGrabando] = useState(false)
+  const [segGrab, setSegGrab] = useState(0)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const audioStreamRef = useRef<MediaStream | null>(null)
+  const segTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const canceladoGrabRef = useRef(false)
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null)
   // Plataforma custom inline: cuando el equipo necesita marcar la pub
   // para un canal que no es Instagram/Facebook/TikTok/YouTube (banner,
@@ -210,10 +238,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     objetivos: initial.objetivos ?? [],
     copy: initial.copy ?? '',
     guion: initial.guion ?? '',
+    frase: initial.frase ?? '',   // frase en pantalla del video (TikTok) — paso 6 de Publicar hoy
     enlace_tomas: initial.enlace_tomas ?? '',
     enlace_musica: initial.enlace_musica ?? '',
     portada_cruda_url: initial.portada_cruda_url ?? '',
     portada_editada_url: initial.portada_editada_url ?? '',
+    drive_resultado_url: initial.drive_resultado_url ?? '',  // enlace diseño terminado (Ailyn)
     video_sin_musica_url: initial.video_sin_musica_url ?? '',  // Migration 025
     video_con_musica_url: initial.video_con_musica_url ?? '',  // Migration 025
     editor_id: initial.editor_id ?? '',
@@ -229,6 +259,28 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     editado: initial.editado,
     video_aprobado: initial.video_aprobado,
   })
+
+  /* Flag "Para diseño": cuando está activo, esta publicación le aparece a
+     Ailyn como tarea en /diseno (Pedro 19-jun-2026). Toggle inmediato. */
+  const [paraDiseno, setParaDiseno] = useState<boolean>(initial.es_tarea_diseno ?? false)
+  function toggleParaDiseno() {
+    const next = !paraDiseno
+    setParaDiseno(next)
+    /* Al enviar a diseño, es trabajo NUEVO → reflejamos el sub-estado en
+       'sin_empezar' localmente para que coincida con lo que guarda el server
+       (así cae en la columna "Sin empezar" del tablero de Ailyn). */
+    if (next) setForm((s) => ({ ...s, estado_tarea: 'sin_empezar' }))
+    startTransition(async () => {
+      const result = await marcarParaDiseno(initial.id, next)
+      if (result.ok) {
+        toast.success(next ? '🎨 Enviado a diseño — le aparece a Ailyn en "Sin empezar"' : 'Quitado de diseño')
+        router.refresh()
+      } else {
+        toast.error(`Error: ${result.error}`)
+        setParaDiseno(!next)
+      }
+    })
+  }
 
   function toggleArrayItem(key: 'plataformas' | 'tipo_contenido' | 'objetivos', value: string) {
     setForm((s) => {
@@ -275,10 +327,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         fecha_diseno: form.fecha_diseno || null,
         copy: form.copy || null,
         guion: form.guion || null,
+        frase: form.frase || null,
         enlace_tomas: form.enlace_tomas || null,
         enlace_musica: form.enlace_musica || null,
         portada_cruda_url: form.portada_cruda_url || null,
         portada_editada_url: form.portada_editada_url || null,
+        drive_resultado_url: form.drive_resultado_url || null,
         video_sin_musica_url: form.video_sin_musica_url || null,  // Migration 025
         video_con_musica_url: form.video_con_musica_url || null,  // Migration 025
         editor_id: form.editor_id || null,
@@ -294,25 +348,78 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
     })
   }
 
+  /* "Mandar a aprobar" — cambia el estado a 'aprobar' y guarda de una, SIN que
+     el editor tenga que volver al módulo Editor a cambiar el estado fila por
+     fila (pedido del editor, "igual que en Notion"). Guarda el form completo
+     con estado override (mismo payload que handleSave). */
+  function handleMandarAprobar() {
+    startAprobar(async () => {
+      const result = await updatePublicacion(initial.id, {
+        ...form,
+        estado: 'aprobar',
+        fecha_publicacion: form.fecha_publicacion || null,
+        fecha_edicion: form.fecha_edicion || null,
+        fecha_diseno: form.fecha_diseno || null,
+        copy: form.copy || null,
+        guion: form.guion || null,
+        frase: form.frase || null,
+        enlace_tomas: form.enlace_tomas || null,
+        enlace_musica: form.enlace_musica || null,
+        portada_cruda_url: form.portada_cruda_url || null,
+        portada_editada_url: form.portada_editada_url || null,
+        drive_resultado_url: form.drive_resultado_url || null,
+        video_sin_musica_url: form.video_sin_musica_url || null,
+        video_con_musica_url: form.video_con_musica_url || null,
+        editor_id: form.editor_id || null,
+        opcion_2: form.opcion_2 || null,
+        notas: form.notas || null,
+      })
+      if (result.ok) {
+        setForm((s) => ({ ...s, estado: 'aprobar' }))
+        toast.success('✅ Enviado a aprobar')
+        router.refresh()
+      } else {
+        toast.error(`Error: ${result.error}`)
+      }
+    })
+  }
+
+  /* #4 — "Enviar a editar hoy": marca esta pub con fecha_marcada_para_editar
+     = hoy. Así aparece al toque en el editor bajo el filtro "Mi trabajo para
+     hoy", sin que Pedro tenga que ir al módulo editor a buscarla. Reusa la
+     MISMA acción que el botón del editor (una sola fuente de verdad). */
+  function handleEditarHoy() {
+    startMarcarHoy(async () => {
+      const result = await marcarParaEditarHoy(initial.id)
+      if (result.ok) {
+        toast.success('📹 Enviado al editor · aparece en "Mi trabajo para hoy"')
+        router.refresh()
+      } else {
+        toast.error(`Error: ${result.error}`)
+      }
+    })
+  }
+
   function handleDelete() {
     if (!confirm(`¿Eliminar "${initial.nombre}"? Esta acción no se puede deshacer.`)) return
     startDelete(async () => {
       try { await deletePublicacion(initial.id) }
-      catch (e) { toast.error(`Error: ${(e as Error).message}`) }
+      catch (e) { if (esRedireccion(e)) throw e; toast.error(`Error: ${(e as Error).message}`) }
     })
   }
 
   function handleDuplicate() {
     startDuplicate(async () => {
       try { await duplicarPublicacion(initial.id) }
-      catch (e) { toast.error(`Error: ${(e as Error).message}`) }
+      catch (e) { if (esRedireccion(e)) throw e; toast.error(`Error: ${(e as Error).message}`) }
     })
   }
 
   // Genera 3 copys con Claude a partir del guion + voz de marca. Usa los
   // valores ACTUALES del form (aunque no estén guardados) para que Pedro pueda
   // pegar un guion y generar al toque.
-  function handleGenerarCopy() {
+  function handleGenerarCopy(transcript?: string) {
+    setGenMenuOpen(false)
     startGenerar(async () => {
       const r = await generarCopysConIA({
         publicacionId: initial.id,
@@ -321,12 +428,118 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         tipoContenido: form.tipo_contenido,
         plataformas: form.plataformas,
         copyActual: form.copy,
+        transcript: transcript || undefined,
       })
       if (r.ok) {
         setIaOpciones(r.opciones)
-        toast.success(`Claude generó ${r.opciones.length} opciones ✨`)
+        toast.success(`OpenAI generó ${r.opciones.length} opciones ✨`)
       } else {
         toast.error(r.error, { duration: 9000 })
+      }
+    })
+  }
+
+  /* Modo "generar en base a audio" = GRABAR con el micrófono (no subir archivo).
+     Pedro: "debe salir un microfonito y hablarle". Flujo: getUserMedia →
+     MediaRecorder → al detener, manda el audio a /api/copys/transcribir
+     (Whisper) y con la transcripción genera el copy con el contexto de marca. */
+  async function iniciarGrabacion() {
+    setGenMenuOpen(false)
+    canceladoGrabRef.current = false
+    setSegGrab(0)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStreamRef.current = stream
+      audioChunksRef.current = []
+      const mr = new MediaRecorder(stream)
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.onstop = () => {
+        const tipo = mr.mimeType || 'audio/webm'
+        const blob = new Blob(audioChunksRef.current, { type: tipo })
+        limpiarGrabacion()
+        if (canceladoGrabRef.current) return
+        if (blob.size === 0) { toast.error('No se grabó audio. Intenta de nuevo.'); return }
+        transcribirBlobYGenerar(blob, tipo.includes('mp4') || tipo.includes('mp4a') ? 'grabacion.mp4' : 'grabacion.webm')
+      }
+      mediaRecorderRef.current = mr
+      mr.start()
+      setGrabando(true)
+      setAudioModalOpen(true)
+      segTimerRef.current = setInterval(() => setSegGrab((s) => s + 1), 1000)
+    } catch {
+      limpiarGrabacion()
+      setAudioModalOpen(false)
+      toast.error('No pude acceder al micrófono. Revisa los permisos del navegador.', { duration: 9000 })
+    }
+  }
+
+  function limpiarGrabacion() {
+    if (segTimerRef.current) { clearInterval(segTimerRef.current); segTimerRef.current = null }
+    audioStreamRef.current?.getTracks().forEach((t) => t.stop())
+    audioStreamRef.current = null
+    setGrabando(false)
+  }
+
+  function detenerYGenerar() {
+    setAudioModalOpen(false)
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state !== 'inactive') mr.stop()  // dispara onstop → transcribe
+  }
+
+  function cancelarGrabacion() {
+    canceladoGrabRef.current = true
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state !== 'inactive') mr.stop()
+    limpiarGrabacion()
+    audioChunksRef.current = []
+    setAudioModalOpen(false)
+  }
+
+  function transcribirBlobYGenerar(blob: Blob, filename: string) {
+    startGenerar(async () => {
+      const toastId = toast.loading('Transcribiendo tu audio…')
+      try {
+        const fd = new FormData()
+        fd.append('audio', blob, filename)
+        const res = await fetch('/api/copys/transcribir', { method: 'POST', body: fd })
+        const data = await res.json().catch(() => null)
+        if (!res.ok || !data?.ok) {
+          toast.error(`No pude transcribir: ${data?.error ?? `HTTP ${res.status}`}`, { id: toastId, duration: 9000 })
+          return
+        }
+        toast.loading('Generando copy desde lo que dijiste…', { id: toastId })
+        const r = await generarCopysConIA({
+          publicacionId: initial.id,
+          guion: form.guion,
+          nombre: form.nombre,
+          tipoContenido: form.tipo_contenido,
+          plataformas: form.plataformas,
+          copyActual: form.copy,
+          transcript: data.text,
+        })
+        if (r.ok) {
+          setIaOpciones(r.opciones)
+          toast.success(`OpenAI generó ${r.opciones.length} opciones desde tu audio ✨`, { id: toastId })
+        } else {
+          toast.error(r.error, { id: toastId, duration: 9000 })
+        }
+      } catch (e) {
+        toast.error(`Error: ${(e as Error).message}`, { id: toastId, duration: 9000 })
+      }
+    })
+  }
+
+  /* Guardar el prompt de la marca (lo usa la generación de copy). */
+  function handleSavePrompt() {
+    if (!marca?.id) return
+    startSavePrompt(async () => {
+      const r = await guardarPromptMarca(marca.id, promptValue)
+      if (r.ok) {
+        toast.success('Prompt de la marca guardado ✓')
+        setPromptOpen(false)
+        router.refresh()
+      } else {
+        toast.error(`Error: ${r.error}`, { duration: 9000 })
       }
     })
   }
@@ -369,7 +582,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: marca?.color_primario_hex ?? '#283B6F' }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            {marca && <span className="text-2xl">{marca.emoji_marca ?? '📊'}</span>}
+            {marca && (
+              <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={32} />
+            )}
             <Badge variant="outline" className="font-mono text-xs">{marca?.slug}</Badge>
             <Badge variant={form.estado === 'programar' || form.estado === 'enviado' ? 'default' : 'secondary'}>
               {ESTADO_PUBLICACION_LABEL[form.estado]}
@@ -518,12 +733,16 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           y eso recortaba los popovers del toolbar que se abren arriba
           (Pedro hacía clic en "Tipo" y no veía la info). */}
         <Card className="overflow-visible">
-          <div className="flex">
+          {/* Mobile: apila (workflow/propiedades arriba, copy abajo) para que el
+              editor de copy use TODO el ancho. Desktop: lado a lado. Fix Pedro. */}
+          <div className="flex flex-col lg:flex-row">
             {/* Sidebar lateral — workflow + propiedades.
                 Pedro pidió tener WORKFLOW y PROPIEDADES en el mismo
                 bloque vertical al costado del copy, para no scrollear
-                buscando estado/editor/fechas mientras edita el texto. */}
-            <aside className="w-[240px] shrink-0 border-r border-border bg-muted/30 p-3 space-y-4">
+                buscando estado/editor/fechas mientras edita el texto.
+                En mobile va full-width arriba; en mobile el workflow y las
+                propiedades se reparten en 2 columnas para no ocupar tanto alto. */}
+            <aside className="w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-muted/30 p-3 grid grid-cols-2 gap-x-4 gap-y-4 lg:block lg:space-y-4">
               {/* Workflow checklist */}
               <div className="space-y-2">
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -566,6 +785,41 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                     </select>
                     <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                   </div>
+                  {/* Atajo "Mandar a aprobar" — el editor lo pidió: cuando la
+                      tarea está en edición, un click la pasa a 'aprobar' SIN
+                      volver al módulo Editor (como en Notion). Solo aparece si
+                      el estado actual es editar/editando. */}
+                  {(form.estado === 'editar' || form.estado === 'editando') && (
+                    <button
+                      type="button"
+                      onClick={handleMandarAprobar}
+                      disabled={isAprobando}
+                      className="mt-1.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-[12px] font-semibold text-white bg-[#4cb782] hover:bg-[#43a474] disabled:opacity-60 transition-colors"
+                      title="Marca este video como listo para revisión: pasa el estado a 'Aprobar' y guarda."
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {isAprobando ? 'Enviando…' : 'Mandar a aprobar'}
+                    </button>
+                  )}
+
+                  {/* "Para diseño" — opt-in explícito (Pedro 19-jun-2026). Cuando
+                      está activo, esta publicación le aparece a Ailyn como tarea
+                      en /diseno. Sin esto, NO le aparece (evita la inundación). */}
+                  <button
+                    type="button"
+                    onClick={toggleParaDiseno}
+                    className={`mt-1.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                      paraDiseno
+                        ? 'text-white bg-[#ba41f7] hover:bg-[#a52fe0]'
+                        : 'text-foreground bg-background/70 border border-border/60 hover:bg-muted'
+                    }`}
+                    title={paraDiseno
+                      ? 'Activo: esta publicación le aparece a Ailyn en el módulo Diseño. Click para quitarla.'
+                      : 'Click para enviarla al módulo Diseño (le aparece a Ailyn como tarea).'}
+                  >
+                    <Palette className="w-4 h-4" />
+                    {paraDiseno ? '✓ En diseño (Ailyn)' : 'Mandar a diseño'}
+                  </button>
                 </div>
 
                 {/* Editor */}
@@ -651,19 +905,56 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {/* Generar copy con IA (Claude): analiza el guion + voz de marca
-                    y devuelve 3 opciones. Mismo flujo que Pedro hacía en Notion. */}
+                {/* Prompt de la marca (contexto + reglas + ejemplos). Pedro lo
+                    edita acá; se usa para generar el copy. */}
                 <button
                   type="button"
-                  onClick={handleGenerarCopy}
-                  disabled={isGenerando}
-                  title="Genera 3 copys con Claude a partir del guion y la voz de la marca"
-                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                  style={{ background: 'linear-gradient(135deg, #ba41f7, #7c3aed)' }}
+                  onClick={() => { setPromptValue(promptMarca); setPromptOpen(true) }}
+                  title="Editar el prompt de la marca (contexto, reglas y ejemplos para generar copys)"
+                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted transition-colors"
                 >
-                  <Sparkles className={`w-3 h-3 ${isGenerando ? 'animate-pulse' : ''}`} />
-                  {isGenerando ? 'Generando…' : 'Generar con IA'}
+                  <SlidersHorizontal className="w-3 h-3" />
+                  Prompt
                 </button>
+                {/* Generar copy con IA (OpenAI) usando el prompt de la marca.
+                    Menú con modos: en base al guion / en base a un audio. */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setGenMenuOpen((v) => !v)}
+                    disabled={isGenerando}
+                    title="Genera 3 copys con OpenAI usando el prompt de la marca"
+                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    style={{ background: 'linear-gradient(135deg, #ba41f7, #7c3aed)' }}
+                  >
+                    <Sparkles className={`w-3 h-3 ${isGenerando ? 'animate-pulse' : ''}`} />
+                    {isGenerando ? 'Generando…' : 'Generar con IA'}
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {genMenuOpen && (
+                    <>
+                      <button type="button" aria-hidden className="fixed inset-0 z-20 cursor-default" onClick={() => setGenMenuOpen(false)} />
+                      <div className="absolute right-0 mt-1 z-30 w-60 rounded-lg border bg-background shadow-lg p-1">
+                        <button
+                          type="button"
+                          onClick={() => handleGenerarCopy()}
+                          className="w-full text-left px-2.5 py-2 rounded-md hover:bg-muted text-[12px] flex items-center gap-2"
+                        >
+                          <Film className="w-3.5 h-3.5 text-[#ba41f7] shrink-0" />
+                          <span>En base al <b>guion</b> de esta pieza</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => iniciarGrabacion()}
+                          className="w-full text-left px-2.5 py-2 rounded-md hover:bg-muted text-[12px] flex items-center gap-2"
+                        >
+                          <Mic className="w-3.5 h-3.5 text-[#ba41f7] shrink-0" />
+                          <span>Grabar un <b>audio</b> 🎤</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={async () => {
@@ -692,7 +983,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 <div className="flex items-center justify-between px-3 py-2 border-b border-[#ba41f7]/20">
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#7c3aed]">
                     <Sparkles className={`w-3.5 h-3.5 ${isGenerando ? 'animate-pulse' : ''}`} />
-                    {isGenerando ? 'Claude está escribiendo copys…' : 'Elige una opción'}
+                    {isGenerando ? 'OpenAI está escribiendo copys…' : 'Elige una opción'}
                   </div>
                   {iaOpciones && !isGenerando && (
                     <button
@@ -732,7 +1023,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                     <div className="flex justify-end pt-1">
                       <button
                         type="button"
-                        onClick={handleGenerarCopy}
+                        onClick={() => handleGenerarCopy()}
                         disabled={isGenerando}
                         className="text-[10px] text-[#7c3aed] hover:underline disabled:opacity-50"
                       >
@@ -777,7 +1068,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 en desktop normal no hace falta scroll. Si en mobile no
                 caben, flex-wrap los pasa a 2 filas (mejor que clipear). */}
             <div ref={toolbarRef} className="border-t bg-muted/20 px-3 py-2 relative">
-              <div className="flex items-end justify-start gap-2 flex-wrap">
+              <div className="flex items-end justify-start gap-1 flex-wrap">
                 {/* Tipo de contenido */}
                 <ToolbarBtnPopover
                   icon={<Film className="w-5 h-5" />}
@@ -961,6 +1252,35 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                   </div>
                 </ToolbarBtnPopover>
 
+                {/* Diseño — enlace del diseño TERMINADO que sube Ailyn (Drive),
+                    igual que Portada/Tomas (Pedro 19-jun-2026). Badge ✓ cuando
+                    ya hay enlace = "diseño listo". */}
+                <ToolbarBtnPopover
+                  icon={<Palette className="w-5 h-5" />}
+                  label="Diseño"
+                  title="Enlace del diseño terminado"
+                  active={openPopover === 'diseno'}
+                  onClick={() => setOpenPopover(openPopover === 'diseno' ? null : 'diseno')}
+                  badge={form.drive_resultado_url ? '✓' : undefined}
+                >
+                  <div className="space-y-2 w-[280px]">
+                    <div className="font-semibold text-xs text-muted-foreground">Diseño terminado</div>
+                    <LinkInput
+                      value={form.drive_resultado_url}
+                      onChange={(v) => setForm((s) => ({ ...s, drive_resultado_url: v }))}
+                      placeholder="https://drive.google.com/… o Canva"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Ailyn pega acá el enlace del diseño ya listo.
+                    </p>
+                    {form.drive_resultado_url && (
+                      <a href={form.drive_resultado_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                        ↗ Abrir diseño
+                      </a>
+                    )}
+                  </div>
+                </ToolbarBtnPopover>
+
                 {/* Removidos por pedido de Pedro (2026-06-05):
                     Hashtag, Enlace, Emoji, IA — no se usan en el flujo
                     operativo y agregan ruido al toolbar. */}
@@ -998,7 +1318,18 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
               <textarea
                 value={form.guion ?? ''}
                 onChange={(e) => setForm((s) => ({ ...s, guion: e.target.value }))}
-                placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion, o texto plano."
+                onPaste={(e) => {
+                  const html = e.clipboardData.getData('text/html')
+                  const pipes = html ? htmlTableToPipes(html) : null
+                  if (!pipes) return // paste normal (texto plano / tabs)
+                  e.preventDefault()
+                  const ta = e.currentTarget
+                  const cur = form.guion ?? ''
+                  const start = ta.selectionStart ?? cur.length
+                  const end = ta.selectionEnd ?? cur.length
+                  setForm((s) => ({ ...s, guion: cur.slice(0, start) + pipes + cur.slice(end) }))
+                }}
+                placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Google Docs/Drive, Notion, o texto plano."
                 rows={4}
                 /* Textarea inline siempre 4 filas. La vista "completa"
                    ahora abre en modal (ver GuionModal abajo) en lugar
@@ -1008,8 +1339,78 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
                 spellCheck={false}
               />
             </div>
+
+            {/* FRASE — el texto que aparece EN PANTALLA del video (TikTok),
+                debajo del guion. Aparece como "Paso 6: Frase de video" en
+                /publicaciones/publicar-hoy SOLO si tiene contenido. */}
+            <div className="border-t bg-background">
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
+                <TypeIcon className="w-3.5 h-3.5 text-[#ba41f7]" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Frase</span>
+                <span className="text-[10px] text-muted-foreground/60 normal-case">· la que va en pantalla del video (opcional)</span>
+              </div>
+              <textarea
+                value={form.frase ?? ''}
+                onChange={(e) => setForm((s) => ({ ...s, frase: e.target.value }))}
+                placeholder="Ej. ¿Mi hijo también podría tener TEA o TDAH? — la frase que aparece sobre el video. Si no tiene, déjalo vacío."
+                rows={2}
+                className="w-full px-4 pt-1 pb-3 text-[13px] leading-snug bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
+                spellCheck={false}
+              />
+            </div>
             </div>{/* Fin contenido del Card del copy (sidebar workflow al lado) */}
           </div>{/* Fin flex wrapper Card del copy */}
+        </Card>
+
+        {/* REFERENCIAS DE VIDEO — links a videos de ejemplo/inspiración para
+            que el editor sepa qué estilo o referencia seguir. Pedro 15-jun-2026:
+            "en cada tarea una opción para poner referencias de videos". Se
+            guarda en la columna `opcion_2` (estaba libre). */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 px-4 py-3 border-b">
+              <Film className="w-4 h-4 text-[#ba41f7]" />
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide">Referencias de video</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Links de videos de ejemplo o inspiración para el editor (uno por línea).
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={form.opcion_2 ?? ''}
+              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
+              placeholder="Pega aquí links de referencia (TikTok, Drive, YouTube…), uno por línea. Ej: https://www.tiktok.com/@…"
+              rows={3}
+              className="w-full px-4 py-3 text-[13px] leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
+              spellCheck={false}
+            />
+          </CardContent>
+        </Card>
+
+        {/* INDICACIONES DE PUBLICACIÓN — Lorena escribe acá las notas/
+            recomendaciones para quien publica (Ruth). Aparecen como "Paso 5"
+            en /publicaciones/publicar-hoy. Se guarda en la columna `notas`
+            (estaba libre). Pedro 15-jun-2026. */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 px-4 py-3 border-b">
+              <StickyNote className="w-4 h-4 text-[#16a34a]" />
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide">Indicaciones de publicación</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Notas para quien publica (Ruth): horario sugerido, primer comentario, cuidados, etc.
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={form.notas ?? ''}
+              onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
+              placeholder="Ej: Publicar a las 7 pm. Fijar el primer comentario con los hashtags. Etiquetar a @cliente en la story…"
+              rows={4}
+              className="w-full px-4 py-3 text-[13px] leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
+            />
+          </CardContent>
         </Card>
 
         {/* PROPIEDADES movido al sidebar lateral izquierdo del Card del
@@ -1034,19 +1435,20 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
 
         {/* COLUMNA DERECHA — Preview sticky. Solo el preview, lo demás
             quedó apilado en la columna izquierda según pedido de Pedro. */}
-        <div className="lg:sticky lg:top-4 lg:self-start space-y-3">
+        {/* Preview — en mobile lo limitamos a un ancho tipo teléfono y centrado
+            (un 9/16 a pantalla completa se veía gigante). Desktop: sticky 340px. */}
+        <div className="w-full max-w-[300px] mx-auto lg:max-w-none lg:mx-0 lg:sticky lg:top-4 lg:self-start space-y-3">
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="flex items-center gap-2 px-3 py-2 border-b bg-background">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-                  style={{
-                    backgroundColor: (marca?.color_primario_hex ?? '#283B6F') + '20',
-                    color: marca?.color_primario_hex ?? '#283B6F',
-                  }}
-                >
-                  {marca?.emoji_marca ?? '📊'}
-                </div>
+                {marca ? (
+                  <MarcaLogo slug={marca.slug} nombre={marca.nombre} emoji={marca.emoji_marca} size={32} className="!rounded-full" />
+                ) : (
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                    style={{ backgroundColor: '#283B6F20', color: '#283B6F' }}
+                  >📊</div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold truncate">{brandHandle}</div>
                   <div className="text-[10px] text-muted-foreground">
@@ -1180,11 +1582,27 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
         )}
       </div>
 
-      {/* STICKY save bar */}
-      <div className="fixed bottom-0 left-0 right-0 px-6 py-3 bg-background/95 backdrop-blur border-t flex items-center justify-end gap-2 z-30">
-        <Button variant="ghost" onClick={() => router.push('/publicaciones')}>Cancelar</Button>
-        <Button onClick={handleSave} disabled={isPending} size="lg">
-          {isPending ? 'Guardando…' : '💾 Guardar cambios'}
+      {/* STICKY save bar
+          "Volver" regresa a la vista de la MARCA de esta publicación (no a
+          "todas las marcas"). Así, si Pedro entró desde el calendario de Vid
+          Natur y crea/edita una pub, al cerrar vuelve a Vid Natur. Fix #3. */}
+      <div className="fixed bottom-0 left-0 right-0 px-3 sm:px-6 py-2.5 sm:py-3 bg-background/95 backdrop-blur border-t flex items-center justify-end gap-2 z-30">
+        <Button
+          variant="outline"
+          onClick={handleEditarHoy}
+          disabled={isMarcandoHoy}
+          className="mr-auto gap-1.5 px-2.5 sm:px-4"
+          title='Marca este video para editar HOY — aparece en el editor bajo "Mi trabajo para hoy", sin ir al módulo editor'
+        >
+          <Scissors className="w-4 h-4 shrink-0" />
+          {/* En mobile solo el ícono (la tijera) para no saturar la barra. */}
+          <span className="hidden sm:inline">{isMarcandoHoy ? 'Enviando…' : 'Enviar a editar hoy'}</span>
+        </Button>
+        <Button variant="ghost" onClick={() => router.push(volverUrl)} className="px-2.5 sm:px-4">
+          ← Volver<span className="hidden sm:inline">{marca?.nombre ? ` a ${marca.nombre}` : ''}</span>
+        </Button>
+        <Button onClick={handleSave} disabled={isPending} className="shrink-0">
+          {isPending ? 'Guardando…' : <>💾 Guardar<span className="hidden sm:inline">&nbsp;cambios</span></>}
         </Button>
       </div>
 
@@ -1200,6 +1618,85 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
           onChange={(v) => setForm((s) => ({ ...s, guion: v }))}
           onClose={() => setGuionModalOpen(false)}
         />
+      )}
+
+      {/* MODAL PROMPT DE MARCA — Pedro edita el contexto/reglas/ejemplos que usa
+          la IA para generar el copy de ESTA marca. Se guarda por marca. */}
+      {promptOpen && (
+        <div
+          onClick={() => setPromptOpen(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-background rounded-2xl shadow-2xl w-full max-w-3xl h-[90vh] flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b">
+              <div className="flex items-center gap-2 min-w-0">
+                <SlidersHorizontal className="w-4 h-4 text-[#ba41f7] shrink-0" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground truncate">
+                  Prompt de {marca?.nombre ?? 'la marca'}
+                </span>
+              </div>
+              <button type="button" onClick={() => setPromptOpen(false)} aria-label="Cerrar"
+                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="px-5 pt-3 text-[11px] text-muted-foreground">
+              Contexto, reglas y ejemplos que la IA usa para escribir el copy de esta marca.
+              Edita lo que necesites (precios, teléfono, ejemplos…) y guarda. Aplica a TODAS
+              las publicaciones de la marca.
+            </p>
+            <textarea
+              value={promptValue}
+              onChange={(e) => setPromptValue(e.target.value)}
+              placeholder="Pega aquí el contexto de la marca: descripción, tono, datos de contacto, reglas y ejemplos de copy…"
+              className="flex-1 w-full px-5 py-4 text-[13px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-none"
+              spellCheck={false}
+            />
+            <div className="px-5 py-3 border-t bg-muted/30 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">{promptValue.length} caracteres</span>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={() => setPromptOpen(false)}>Cancelar</Button>
+                <Button onClick={handleSavePrompt} disabled={isSavingPrompt || !marca?.id}>
+                  {isSavingPrompt ? 'Guardando…' : '💾 Guardar prompt'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GRABAR AUDIO — Pedro habla por el micrófono; al detener se
+          transcribe (Whisper) y se genera el copy con el contexto de la marca. */}
+      {audioModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-3 ${grabando ? 'bg-red-500/15' : 'bg-[#ba41f7]/12'}`}>
+              <Mic className={`w-7 h-7 ${grabando ? 'text-red-500 animate-pulse' : 'text-[#ba41f7]'}`} />
+            </div>
+            <h3 className="text-sm font-semibold">
+              {grabando ? '🔴 Grabando… habla ahora' : 'Preparando micrófono…'}
+            </h3>
+            <p className="text-3xl font-mono mt-1 tabular-nums">
+              {`${Math.floor(segGrab / 60)}:${String(segGrab % 60).padStart(2, '0')}`}
+            </p>
+            <p className="text-[12px] text-muted-foreground mt-2 leading-relaxed">
+              Di lo que quieres que comunique el copy. Al terminar, toca <b>“Detener y generar”</b> y la IA escribirá el copy con la voz de la marca.
+            </p>
+            <div className="flex gap-2 mt-5 justify-center">
+              <Button variant="ghost" onClick={cancelarGrabacion}>Cancelar</Button>
+              <Button
+                onClick={detenerYGenerar}
+                disabled={!grabando}
+                className="bg-[#ba41f7] hover:bg-[#a020e0] text-white gap-1.5"
+              >
+                ⏹ Detener y generar
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1220,24 +1717,75 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores }:
  *    cae a `\t` si pegaron desde Word o Google Docs.
  *  - Todas las filas deben dividirse en >= 2 columnas con ese separador.
  */
-function parseGuionAsTable(text: string): { headers: string[]; rows: string[][] } | null {
+function parseGuionAsTable(
+  text: string,
+): { headers: string[]; rows: string[][]; looseLines: string[] } | null {
   const raw = text.split('\n').map((l) => l.trim()).filter(Boolean)
   if (raw.length < 2) return null
 
-  const usePipe = raw[0].includes('|')
-  const useTab = !usePipe && raw[0].includes('\t')
+  // Detectar separador dominante mirando TODAS las líneas (no solo la 1ra:
+  // a veces la 1ra línea es un título o un enlace de referencia).
+  const usePipe = raw.some((l) => l.includes('|'))
+  const useTab = !usePipe && raw.some((l) => l.includes('\t'))
   if (!usePipe && !useTab) return null
 
   const sep = usePipe ? /\s*\|\s*/ : /\t+/
+  const sepChar = usePipe ? '|' : '\t'
   // .filter(Boolean) elimina celdas vacías que aparecen si el texto
   // tiene un `|` al inicio o al final ("| a | b |" → ['', 'a', 'b', '']).
   const split = (l: string) => l.split(sep).filter((c) => c.length > 0)
 
-  const rows = raw.map(split)
-  if (!rows.every((r) => r.length >= 2)) return null
+  // TOLERANTE (15-jun-2026, fix Pedro: "poner un enlace de referencia me
+  // cambia la tabla a texto"). Las líneas SIN separador (ej. un enlace de
+  // referencia, una nota) se guardan aparte como `looseLines` en vez de
+  // anular toda la tabla. Mientras haya ≥2 filas de tabla (header + 1),
+  // seguimos mostrando la tabla y los enlaces debajo.
+  const tableRows: string[][] = []
+  const looseLines: string[] = []
+  for (const l of raw) {
+    if (l.includes(sepChar)) {
+      const cells = split(l)
+      if (cells.length >= 2) {
+        tableRows.push(cells)
+        continue
+      }
+    }
+    looseLines.push(l)
+  }
+  if (tableRows.length < 2) return null
 
-  const [headers, ...body] = rows
-  return { headers, rows: body }
+  const [headers, ...body] = tableRows
+  return { headers, rows: body, looseLines }
+}
+
+/**
+ * Convierte una tabla HTML (la que mandan Word / Google Docs / Drive al
+ * portapapeles como `text/html`) a texto con columnas separadas por ` | `,
+ * que es lo que entiende parseGuionAsTable. Devuelve null si el HTML no
+ * contiene una tabla → el paste sigue su curso normal (texto plano).
+ *
+ * Fix Pedro (15-jun-2026): "no deja pegar tablas de Word/Drive". Antes el
+ * textarea recibía la tabla como texto suelto (a veces con espacios en vez
+ * de tabs) y no se reconocía como tabla.
+ */
+function htmlTableToPipes(html: string): string | null {
+  if (typeof window === 'undefined' || !/<table[\s>]/i.test(html)) return null
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const table = doc.querySelector('table')
+    if (!table) return null
+    const lines: string[] = []
+    for (const tr of Array.from(table.querySelectorAll('tr'))) {
+      const cells = Array.from(tr.querySelectorAll('th,td')).map((c) =>
+        (c.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      )
+      if (cells.length === 0) continue
+      lines.push(cells.join(' | '))
+    }
+    return lines.length >= 1 ? lines.join('\n') : null
+  } catch {
+    return null
+  }
 }
 
 function GuionModal({
@@ -1378,6 +1926,32 @@ function GuionModal({
                 </tbody>
               </table>
             </div>
+            {/* Líneas sueltas (enlaces de referencia, notas) — se muestran
+                debajo de la tabla en vez de romperla. Fix Pedro #2. */}
+            {tableData.looseLines.length > 0 && (
+              <div className="max-w-4xl mx-auto mt-4 space-y-1.5">
+                {tableData.looseLines.map((line, i) => {
+                  const urlMatch = line.match(/https?:\/\/\S+/)
+                  return (
+                    <div key={i} className="text-[12px] text-muted-foreground flex items-start gap-2">
+                      <LinkIcon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#ba41f7]" />
+                      {urlMatch ? (
+                        <a
+                          href={urlMatch[0]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#ba41f7] hover:underline break-all"
+                        >
+                          {line}
+                        </a>
+                      ) : (
+                        <span className="break-words">{line}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground text-center mt-4">
               Modo lectura. Para editar, cambia a <span className="font-medium">Texto</span>.
             </p>
@@ -1387,7 +1961,17 @@ function GuionModal({
             autoFocus
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Notion (con | o tabs entre columnas), o texto plano."
+            onPaste={(e) => {
+              const html = e.clipboardData.getData('text/html')
+              const pipes = html ? htmlTableToPipes(html) : null
+              if (!pipes) return // paste normal (texto plano / tabs)
+              e.preventDefault()
+              const ta = e.currentTarget
+              const start = ta.selectionStart ?? value.length
+              const end = ta.selectionEnd ?? value.length
+              onChange(value.slice(0, start) + pipes + value.slice(end))
+            }}
+            placeholder="Pega el guion técnico aquí. Acepta tablas de Word, Google Docs/Drive, Notion (con | o tabs entre columnas), o texto plano."
             className="flex-1 w-full px-6 py-5 text-[13px] font-mono leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/40 placeholder:font-sans"
             spellCheck={false}
           />
@@ -1471,24 +2055,23 @@ function ToolbarBtnPopover({
         type="button"
         onClick={onClick}
         aria-label={title}
-        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[68px] px-2.5 pt-5 pb-2 rounded-lg transition-colors ${
+        className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[46px] px-1.5 pt-5 pb-2 rounded-lg transition-colors ${
           active
             ? 'bg-[#ba41f7]/12 text-[#ba41f7]'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         }`}
       >
         <span className="leading-none">{icon}</span>
-        <span className="text-[11px] font-medium leading-none whitespace-nowrap">{label}</span>
+        <span className="text-[10px] font-medium leading-none whitespace-nowrap">{label}</span>
         {badge && (
-          /* Badge pegado al borde superior del botón (top-0) en lugar
-             de superpuesto. Antes "-top-2" + "py-2.5" hacían que el
-             badge cubriera los primeros 10px del icono (Pedro vio que
-             "REEL FRASE" tapaba el film icon, "Normal" tapaba la
-             diana, etc.). Ahora con pt-5 el botón tiene 20px de
-             padding-top y el badge en top-0 h-[18px] queda íntegro
-             arriba del icono SIN solaparlo. */
-          <span className="absolute top-0.5 right-1 h-[18px] px-2 rounded-full bg-[#ba41f7] text-white text-[10px] font-bold flex items-center justify-center leading-none whitespace-nowrap shadow-sm">
-            {badge.length > 14 ? badge.slice(0, 13) + '…' : badge}
+          /* Badge ANCLADO al ancho del botón (inset-x-0.5) en vez de
+             `right-1`. Antes valores largos como "REEL FRASE" se anclaban a
+             la derecha y se desbordaban hacia la IZQUIERDA, invadiendo la
+             columna del workflow (el botón "En diseño") → colisión que Pedro
+             reportó. Ahora el badge nunca excede el botón: ocupa su ancho y
+             trunca con … si el texto no entra. */
+          <span className="absolute top-0.5 right-1 max-w-[calc(100%-8px)] h-[18px] px-1.5 rounded-full bg-[#ba41f7] text-white text-[9px] font-bold flex items-center justify-center leading-none shadow-sm overflow-hidden">
+            <span className="truncate">{badge}</span>
           </span>
         )}
       </button>

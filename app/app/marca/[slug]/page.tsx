@@ -35,6 +35,11 @@ export default async function MarcaDetailPage({
   params: Promise<{ slug: string }>
 }) {
   await requireUser()
+  /* Guard de permisos (auditoría 26-jun-2026): /marca/[slug] expone contactos,
+     decisores y grupos de WhatsApp de la marca. Sin guard, cualquier logueado
+     entraba por URL. Enforce el módulo 'marcas'. */
+  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  await ensureAccesoModulo('marcas')
   const { slug } = await params
   const supabase = await createClient()
 

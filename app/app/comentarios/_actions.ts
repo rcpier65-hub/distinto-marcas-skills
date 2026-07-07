@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { registrarActividad } from '@/lib/actividad/registrar'
 import { listComentarios, responderComentario, eliminarComentario as eliminarComentarioMetricool } from '@/lib/integrations/metricool'
 import { clasificarComentario } from '@/lib/comentarios/clasificador'
 import { sendWhatsAppImage } from '@/lib/integrations/whatsapp-router'
@@ -579,6 +580,24 @@ export async function skipComentario(id: string): Promise<{ ok: true } | { ok: f
  * 'skipped' → 'pending', pero nunca toca 'deleted'. Así el hate no
  * reaparece en la próxima carga. Ver migración 20260615140001.
  */
+/**
+ * Traduce un error técnico de Metricool a un mensaje claro y accionable en
+ * español (Pedro 23-jun-2026: salían "¿respuesta vacía?" engañoso o JSON crudo).
+ * El error más común: la marca perdió la conexión con la red en Metricool
+ * ("Brand no connected to facebook ...") → hay que reconectarla en Metricool.
+ */
+function humanizarErrorMetricool(err: string | null | undefined): string {
+  const e = err ?? ''
+  const net = e.match(/connected to (facebook|instagram|tiktok|linkedin|twitter|youtube)/i)?.[1]
+  if (net && /no[t]? connected/i.test(e)) {
+    const red = net.charAt(0).toUpperCase() + net.slice(1)
+    return `La marca no está conectada a ${red} en Metricool. Reconéctala en Metricool → Conexiones (vuelve a vincular la página) y reintenta.`
+  }
+  if (/sin texto de respuesta/i.test(e)) return 'La respuesta está vacía — escribe un texto antes de responder.'
+  if (/sin metricool_blog_id/i.test(e)) return 'Esta marca no tiene Metricool configurado todavía.'
+  return e
+}
+
 export async function eliminarComentario(
   id: string,
 ): Promise<{ ok: true; remoto: boolean; warning?: string } | { ok: false; error: string }> {
@@ -611,7 +630,7 @@ export async function eliminarComentario(
     if (del.ok) {
       remoto = true
     } else {
-      warning = `Se quitó del inbox, pero NO se pudo borrar de la red: ${del.error}. Bórralo a mano en la publicación.`
+      warning = `Se quitó del inbox. ${humanizarErrorMetricool(del.error)} (En la red puede seguir visible — bórralo a mano si hace falta.)`
     }
   } else {
     warning = 'Se quitó del inbox. No tenía datos de red (blogId/commentId) para borrarlo de la publicación.'
@@ -675,7 +694,7 @@ export async function responderBatch(
   ids: string[],
   enviarInforme: boolean = true,
 ): Promise<
-  | { ok: true; respondidos: number; fallidos: number; informe_enviado: boolean }
+  | { ok: true; respondidos: number; fallidos: number; informe_enviado: boolean; motivos: string[] }
   | { ok: false; error: string }
 > {
   const user = await requireUser()
@@ -683,6 +702,10 @@ export async function responderBatch(
   const service = createServiceClient() as any
 
   if (ids.length === 0) return { ok: false, error: 'Sin IDs para responder' }
+
+  /* Motivos REALES de los fallos (humanizados, sin duplicar) para que el
+     cliente muestre la causa en vez de adivinar "¿respuesta vacía?". */
+  const motivos = new Set<string>()
 
   // Cargar todos los rows + la marca + grupo configurado
   const { data: rows, error } = await service
@@ -708,6 +731,7 @@ export async function responderBatch(
     if (r.status === 'responded') continue  // skip ya respondidos
     if (!r.marcas?.metricool_blog_id) {
       fallidos++
+      motivos.add(humanizarErrorMetricool('sin metricool_blog_id'))
       await service
         .from('comentarios_inbox')
         .update({ status: 'failed', failed_reason: 'marca sin metricool_blog_id' })
@@ -718,6 +742,7 @@ export async function responderBatch(
     const textoFinal = (r.respuesta_final?.trim() || r.respuesta_sugerida?.trim() || '')
     if (!textoFinal) {
       fallidos++
+      motivos.add(humanizarErrorMetricool('sin texto de respuesta'))
       await service
         .from('comentarios_inbox')
         .update({ status: 'failed', failed_reason: 'sin texto de respuesta' })
@@ -735,6 +760,7 @@ export async function responderBatch(
 
     if (!sendResult.ok) {
       fallidos++
+      motivos.add(humanizarErrorMetricool(sendResult.error))
       await service
         .from('comentarios_inbox')
         .update({ status: 'failed', failed_reason: sendResult.error.slice(0, 200) })
@@ -771,8 +797,15 @@ export async function responderBatch(
     }
   }
 
+  if (respondidos > 0) {
+    await registrarActividad({
+      accion: `Respondió ${respondidos} ${respondidos === 1 ? 'comentario' : 'comentarios'}`,
+      entidad_tipo: 'comentario',
+      detalle: fallidos > 0 ? `${fallidos} fallaron` : undefined,
+    })
+  }
   revalidatePath('/comentarios')
-  return { ok: true, respondidos, fallidos, informe_enviado }
+  return { ok: true, respondidos, fallidos, informe_enviado, motivos: Array.from(motivos) }
 }
 
 // ============================================================

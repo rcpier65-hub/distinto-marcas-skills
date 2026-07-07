@@ -136,17 +136,17 @@ export default async function EditorPage() {
      Defensive: si la columna no existe (fallback query), r.es_tarea_diseno
      es undefined y no se filtra nada.
 
-     NOTION MIRROR (2026-06-15): la vista del editor en Notion filtra
-     por `estado='editar' AND fecha_edicion IS NOT NULL`. Replicamos
-     ese filtro acá para que la app muestre EXACTO lo mismo que Notion.
-     Pubs en estado 'editar' sin fecha de edición son "fantasma" —
-     trabajo no asignado a un día concreto — y ensucian el listado.
-     Pubs en otros estados (aprobar, publicado, etc.) pasan sin filtro
-     porque las usan los KPIs de "editados este mes" y agregados. */
+     ⚠️ REVERTIDO el filtro "estado='editar' AND fecha_edicion IS NOT NULL"
+     (15-jun-2026, bug Pedro: "videos que Lore me asignó desaparecieron solos").
+     Causa: ese filtro ocultaba CUALQUIER video en 'editar' sin fecha_edicion;
+     y el sync de Notion puede vaciar fecha_edicion → el video se esfumaba del
+     editor automáticamente. Para un editor, perder de vista trabajo asignado es
+     peor que ver una tarea sin fecha. Regla: NUNCA ocultar trabajo en 'editar'
+     por un campo opcional faltante. (Solo seguimos excluyendo las tareas de
+     diseño standalone, que no son del pipeline de video.) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pubsFiltradas = (pubs ?? []).filter((r: any) => {
     if (r.es_tarea_diseno === true && !r.fecha_publicacion) return false
-    if (r.estado === 'editar' && !r.fecha_edicion) return false
     return true
   })
 

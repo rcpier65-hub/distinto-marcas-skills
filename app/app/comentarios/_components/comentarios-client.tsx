@@ -26,7 +26,8 @@ import {
   enviarInformeResueltos,
   reconciliarInbox,
 } from '../_actions'
-import { ComentarioRow } from './comentario-row'
+import { ComentarioRow, ComentarioCard } from './comentario-row'
+import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { ComentarioInboxRow, ComentarioCategoria } from '@/lib/types/database'
 
 type MarcaOption = {
@@ -48,6 +49,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
+  const isMobile = useIsMobile()
 
   // Estado local de ediciones por row (key = row.id)
   // Inicializa con respuesta_sugerida pre-cargada — no hace falta apretar
@@ -335,12 +337,15 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
 
       toast.loading(`Respondiendo ${seleccionados.size} comentarios via Metricool…`, { id: 'batch' })
       const r = await responderBatch(Array.from(seleccionados), conInforme)
-      if (r.ok) {
+      if (r.ok && r.respondidos === 0 && r.fallidos > 0) {
+        // Ninguno se respondió → mostrar el motivo real, no un "✅ Respondidos 0".
+        toast.error(`No se respondió ninguno. ${r.motivos?.[0] ?? ''}`.trim(), { id: 'batch', duration: 9000 })
+      } else if (r.ok) {
         toast.success(
           `✅ Respondidos ${r.respondidos}` +
-            (r.fallidos > 0 ? ` · ⚠️ ${r.fallidos} fallaron` : '') +
+            (r.fallidos > 0 ? ` · ⚠️ ${r.fallidos} fallaron${r.motivos?.[0] ? ` (${r.motivos[0]})` : ''}` : '') +
             (r.informe_enviado ? ` · 📲 informe WhatsApp enviado` : ''),
-          { id: 'batch', duration: 6000 },
+          { id: 'batch', duration: 8000 },
         )
         setSeleccionados(new Set())
         router.refresh()
@@ -362,7 +367,9 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
         setSeleccionados((prev) => { const n = new Set(prev); n.delete(id); return n })
         router.refresh()
       } else if (r.ok) {
-        toast.error('No se pudo responder (¿la respuesta está vacía?)', { id: toastId, duration: 6000 })
+        // Mostrar el motivo REAL (Metricool desconectado, vacío, etc.) en vez de adivinar.
+        const motivo = r.motivos?.[0]
+        toast.error(motivo ? `No se pudo responder. ${motivo}` : 'No se pudo responder (¿la respuesta está vacía?)', { id: toastId, duration: 9000 })
       } else {
         toast.error(`Error: ${r.error}`, { id: toastId, duration: 8000 })
       }
@@ -381,7 +388,7 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
     <div className="space-y-4 pb-32">
       {/* HEADER con selector marca + KPIs */}
       <header className="flex items-end justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <MarcaLogo slug={marcaActual} nombre={marcaInfo?.nombre} emoji={marcaInfo?.emoji_marca} size={36} />
           <select
             value={marcaActual}
@@ -484,6 +491,30 @@ export function ComentariosClient({ marcas, marcaActual, rowsIniciales, resumen 
           ) : (
             <>Esta marca no tiene <code>metricool_blog_id</code> configurado. Configurá en /settings.</>
           )}
+        </div>
+      ) : isMobile ? (
+        /* MOBILE: tarjetas apiladas, sin scroll horizontal */
+        <div className="space-y-3">
+          {rowsIniciales.map((r) => {
+            const edit = ediciones.get(r.id) ?? { texto: '', categoria: 'otro' as ComentarioCategoria }
+            return (
+              <ComentarioCard
+                key={r.id}
+                row={r}
+                selected={seleccionados.has(r.id)}
+                textoEditado={edit.texto}
+                categoriaEditada={edit.categoria}
+                onToggleSelect={() => toggleSelect(r.id)}
+                onChangeTexto={(t) => updateEdicion(r.id, { texto: t })}
+                onChangeCategoria={(c) => updateEdicion(r.id, { categoria: c })}
+                onSkip={() => handleSkip(r.id)}
+                onEliminar={() => handleEliminar(r.id)}
+                onResponder={() => handleResponderIndividual(r.id)}
+                responding={respondiendoId === r.id}
+                eliminando={eliminandoId === r.id}
+              />
+            )
+          })}
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-x-auto">

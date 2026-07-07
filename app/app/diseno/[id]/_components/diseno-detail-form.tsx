@@ -17,7 +17,9 @@ import {
 } from 'lucide-react'
 import { updateDisenoEntry, archivarTarea } from '../../_actions'
 import { deletePublicacion } from '@/app/publicaciones/[id]/_actions'
+import { esRedireccion } from '@/lib/utils/is-redirect-error'
 import { sincronizarReunion } from '../_reunion-actions'
+import { MarcaSelect } from '@/components/marca-select'
 import {
   formatDateTimeES,
   formatDuracion,
@@ -46,15 +48,29 @@ type Publicacion = {
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+  marcaSlug: string
   marcaEmoji: string | null
   marcaNombre: string
   marcaColor: string
   reunionMeetLink: string | null
 }
 
-export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) {
+type MarcaOpt = { slug: string; nombre: string; emoji?: string | null }
+
+export function DisenoDetailForm({
+  publicacion,
+  marcas = [],
+  marcasExtraSlugs = [],
+}: {
+  publicacion: Publicacion
+  marcas?: MarcaOpt[]
+  marcasExtraSlugs?: string[]
+}) {
   const router = useRouter()
   const [form, setForm] = useState(publicacion)
+  /* Etiquetas de marca extra (slugs). Pedro: "en una sola tarea etiquetar
+     varias marcas". La principal NO va acá (se cambia con el selector). */
+  const [extras, setExtras] = useState<Set<string>>(() => new Set(marcasExtraSlugs))
   const [, startTransition] = useTransition()
   const [isSaving, setIsSaving] = useState(false)
   const [meetLink, setMeetLink] = useState<string | null>(publicacion.reunionMeetLink)
@@ -98,6 +114,37 @@ export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) 
     setForm((s) => ({ ...s, descripcion: v }))
     save({ descripcion: v || null }, '✓ Descripción guardada')
   }
+  /* Cambiar la marca de la tarea (Pedro: "a veces quiero cambiar de marca"). */
+  function setMarca(slug: string) {
+    const m = marcas.find((x) => x.slug === slug)
+    setForm((s) => ({
+      ...s,
+      marcaSlug: slug || 'interno',
+      marcaNombre: m?.nombre ?? 'Distinto · Interno',
+      marcaEmoji: m?.emoji ?? '🎨',
+    }))
+    /* Si la nueva principal estaba como etiqueta extra, la quitamos de extras
+       (no tiene sentido etiquetar dos veces la misma marca). */
+    if (slug && extras.has(slug)) {
+      const next = new Set(extras)
+      next.delete(slug)
+      setExtras(next)
+      save({ marcaSlug: slug, marcasExtras: Array.from(next) }, '✓ Marca actualizada')
+    } else {
+      save({ marcaSlug: slug || null }, '✓ Marca actualizada')
+    }
+    // Refresca para traer el color real de la marca nueva en el header.
+    setTimeout(() => router.refresh(), 400)
+  }
+  /* Agrega/quita una etiqueta de marca extra. Guarda el conjunto completo. */
+  function toggleExtra(slug: string) {
+    const next = new Set(extras)
+    if (next.has(slug)) next.delete(slug)
+    else next.add(slug)
+    setExtras(next)
+    save({ marcasExtras: Array.from(next) }, '✓ Etiquetas actualizadas')
+    setTimeout(() => router.refresh(), 400)
+  }
   function setFecha(field: 'fechaDiseno' | 'fechaEntrega', v: string) {
     setForm((s) => ({ ...s, [field]: v || null }))
     save({ [field]: v || null }, '✓ Fecha guardada')
@@ -138,6 +185,7 @@ export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) 
            tiene acceso a publicaciones y la veía como página rara. */
         await deletePublicacion(form.id, '/diseno')
       } catch (e) {
+        if (esRedireccion(e)) throw e
         toast.error(`Error al eliminar: ${(e as Error).message}`)
       }
     })
@@ -207,6 +255,44 @@ export function DisenoDetailForm({ publicacion }: { publicacion: Publicacion }) 
             className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring resize-y"
           />
         </Field>
+        {/* Cambiar marca de la tarea (Pedro 15-jun-2026). */}
+        {marcas.length > 0 && (
+          <Field label="Marca / cliente">
+            <MarcaSelect
+              marcas={marcas}
+              value={form.marcaSlug === 'interno' ? '' : form.marcaSlug}
+              onChange={setMarca}
+            />
+          </Field>
+        )}
+        {/* Etiquetas extra: una sola tarea para varias marcas. Excluye la
+            principal (esa se cambia arriba). */}
+        {marcas.length > 1 && (
+          <Field label="También para estas marcas (opcional)">
+            <div className="flex flex-wrap gap-1.5">
+              {marcas
+                .filter((m) => m.slug !== form.marcaSlug)
+                .map((m) => {
+                  const on = extras.has(m.slug)
+                  return (
+                    <button
+                      key={m.slug}
+                      type="button"
+                      onClick={() => toggleExtra(m.slug)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                        on
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background border-border hover:bg-muted'
+                      }`}
+                    >
+                      <span>{m.emoji ?? '🏷️'}</span>
+                      <span>{m.nombre}</span>
+                    </button>
+                  )
+                })}
+            </div>
+          </Field>
+        )}
       </Section>
 
       {/* CARD: Fechas */}

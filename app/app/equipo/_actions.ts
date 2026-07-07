@@ -132,6 +132,112 @@ export async function crearMiembro(args: {
 }
 
 /**
+ * Duplica un miembro EXISTENTE en uno nuevo, copiando exactamente sus
+ * accesos (rol_base + permisos_override + marcas_acceso + cargo). Útil
+ * cuando Pedro quiere "otro usuario con los mismos accesos que Lorena".
+ *
+ * Si `comoEditor` = true, además:
+ *   - Le suma acceso al módulo Editor (editor.acceso=true, ve todas las
+ *     tareas) y a Publicaciones con permiso de editar (como Pieer).
+ *   - Crea/reusa una fila en `editores` con su nombre y la enlaza vía
+ *     `editor_legacy_id`, para que aparezca en el dropdown "Editor" del
+ *     detalle de publicación y se le pueda asignar trabajo de edición.
+ *
+ * Queda como "pendiente" (sin auth) hasta que Pedro le asigne contraseña
+ * desde la tab Seguridad — igual que crearMiembro.
+ */
+export async function duplicarMiembro(args: {
+  sourceId: string
+  nombre: string
+  email: string
+  cargo?: string | null
+  comoEditor?: boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}): Promise<{ ok: true; member: any } | { ok: false; error: string }> {
+  const user = await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+
+  const nombre = args.nombre.trim()
+  const email = args.email.trim().toLowerCase()
+  if (!nombre || !email) return { ok: false, error: 'Nombre y email son obligatorios' }
+  if (!email.includes('@')) return { ok: false, error: 'Email inválido' }
+
+  /* 1. Leer el miembro fuente — sus accesos exactos. */
+  const { data: src, error: eSrc } = await service
+    .from('team_members')
+    .select('rol_base, cargo_personalizado, permisos_override, marcas_acceso')
+    .eq('id', args.sourceId)
+    .maybeSingle()
+  if (eSrc || !src) return { ok: false, error: 'No encontré el miembro a duplicar' }
+
+  /* 2. Clonar permisos_override y, si va como editor, sumarle el módulo
+        Editor + edición de publicaciones ENCIMA de lo de la fuente. */
+  const override: Permisos = { ...(src.permisos_override ?? {}) }
+  if (args.comoEditor) {
+    override.editor = { acceso: true, solo_propias: false }
+    override.publicaciones = { ...(override.publicaciones ?? {}), acceso: true, puede_editar: true }
+  }
+
+  /* 3. Insertar el nuevo miembro (mismo rol_base + marcas + cargo). */
+  const { data: nuevo, error: eIns } = await service
+    .from('team_members')
+    .insert({
+      nombre,
+      email,
+      rol_base: src.rol_base,
+      cargo_personalizado: args.cargo ?? src.cargo_personalizado ?? null,
+      permisos_override: override,
+      marcas_acceso: src.marcas_acceso ?? null,
+      activo: true,
+      created_by: user.id,
+    })
+    .select('*')
+    .maybeSingle()
+
+  if (eIns || !nuevo) {
+    if (eIns?.code === '23505') return { ok: false, error: 'Ya existe un miembro activo con ese email' }
+    return { ok: false, error: eIns?.message ?? 'No se pudo duplicar' }
+  }
+
+  /* 4. Clonar hábitos del rol (best-effort, no bloquea). */
+  const habitosTemplate = getHabitosParaRol(src.rol_base)
+  if (habitosTemplate.length > 0) {
+    const habitosInsert = habitosTemplate.map((h) => ({
+      nombre: h.nombre, icono: h.icono, color: h.color,
+      dias_activos: h.dias_activos, orden: h.orden, activo: true,
+      team_member_id: nuevo.id,
+    }))
+    const { error: errHab } = await service.from('habitos').insert(habitosInsert)
+    if (errHab) console.error('[duplicarMiembro] hábitos:', errHab.message)
+  }
+
+  /* 5. Si va como editor: crear/reusar fila en `editores` y enlazarla,
+        para que aparezca en el dropdown de publicaciones como Pieer. */
+  if (args.comoEditor) {
+    let editorId: string | null = null
+    const { data: edExist } = await service
+      .from('editores').select('id').eq('nombre', nombre).maybeSingle()
+    if (edExist?.id) {
+      editorId = edExist.id
+    } else {
+      const { data: edNuevo, error: eEd } = await service
+        .from('editores').insert({ nombre, activo: true }).select('id').maybeSingle()
+      if (eEd) console.error('[duplicarMiembro] editores:', eEd.message)
+      editorId = edNuevo?.id ?? null
+    }
+    if (editorId) {
+      await service.from('team_members').update({ editor_legacy_id: editorId }).eq('id', nuevo.id)
+      nuevo.editor_legacy_id = editorId
+    }
+  }
+
+  revalidatePath('/equipo')
+  revalidatePath('/habitos')
+  return { ok: true, member: nuevo }
+}
+
+/**
  * Genera un link de invitación para un miembro YA creado. Devuelve la
  * URL completa que Pedro le pasa a la persona por WhatsApp / email
  * manual. El miembro hace clic, ingresa al endpoint /aceptar-invitacion

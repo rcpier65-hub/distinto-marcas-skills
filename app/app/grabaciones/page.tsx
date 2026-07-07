@@ -70,9 +70,9 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
   // Deriva de `desde` o del mes actual.
   const mesDefault = (desde ?? new Date().toISOString().slice(0, 10)).slice(0, 7)
 
-  /* Próximas grabaciones (7 días desde hoy). Pedro: "que diga próximas
-     grabaciones para ver qué viene la semana ... 7 días desde el día en
-     que estamos".
+  /* Próximas grabaciones: TODAS las planeadas a futuro (no solo 7 días), para
+     que una agendada para el mes siguiente igual sea visible en la vista del
+     mes actual.
 
      BUG FIX: antes usaba `new Date().toISOString()` (UTC). En la
      tarde-noche de Lima eso ya marca el día siguiente → "hoy" se corría
@@ -87,17 +87,21 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
       timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(d)
   const hoyIso = ymdLima(new Date())
-  const en7Dias = ymdLima(new Date(Date.now() + 7 * 86_400_000))
 
   let proximas: ProximaGrabacion[] = []
   try {
+    /* "Próximas grabaciones" = TODAS las planeadas a futuro (desde hoy),
+       ordenadas por fecha. Antes había tope de 7 días → una grabación
+       agendada para el mes siguiente NO aparecía en ninguna parte de la vista
+       del mes actual (Pedro: "agendé para Manrique y no sale"). La card las
+       muestra ordenadas, las 6 más cercanas + "+N más". */
     const proxRes = await service
       .from('grabaciones')
       .select('id, fecha_planeada, hora_planeada, estado, marcas:marca_id (slug, nombre, emoji_marca, color_primario_hex)')
       .eq('estado', 'planeada')
       .gte('fecha_planeada', hoyIso)
-      .lte('fecha_planeada', en7Dias)
       .order('fecha_planeada', { ascending: true })
+      .limit(24)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     proximas = ((proxRes.data ?? []) as any[])
       .map((g) => {
