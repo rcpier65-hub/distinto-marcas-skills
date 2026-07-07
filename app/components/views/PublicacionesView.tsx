@@ -122,6 +122,21 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
     }
   }
 
+  /* Crear una publicación directo desde una fecha del calendario (botón "+"
+     en la celda del día). Pre-llena la fecha, y la marca si hay filtro activo,
+     con ?volver= para regresar al calendario. Erick pidió poder crear haciendo
+     click en la fecha, sin ir al botón "Nueva publicación" de arriba. */
+  function handleCreateEnFecha(fecha: string) {
+    const m = filters.marcaSlug
+    const params = new URLSearchParams()
+    params.set('fecha', fecha)
+    if (m && m !== 'todas') {
+      params.set('marca', m)
+      params.set('volver', `/publicaciones?marca=${m}`)
+    }
+    router.push(`/publicaciones/nueva?${params.toString()}`)
+  }
+
   /* Cambiar la marca del filtro Y reflejarlo en la URL, para que el estado
      sobreviva a navegaciones (crear pub → volver) y a un refresh. */
   function setMarcaFilter(id: string) {
@@ -391,8 +406,8 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
             }}
           />
         )}
-        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} />}
-        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} />}
+        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} onCreate={handleCreateEnFecha} />}
+        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} onCreate={handleCreateEnFecha} />}
       </div>
     </div>
    </MarcasNavContext.Provider>
@@ -602,6 +617,15 @@ const DAY_NAMES_LONG  = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', '
 
 function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/* "Hoy" en hora de Lima (UTC-5), determinista en server y cliente. Evita que
+   el calendario abra en el mes equivocado por la zona horaria del servidor
+   (SSR corre en UTC). Erick: "me sale Agosto cuando aún es Julio". */
+function hoyLima(): Date {
+  const s = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 function indexByDay(entries: PublicacionMock[]): Map<string, PublicacionMock[]> {
@@ -854,11 +878,13 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
    MES VIEW — grid mensual mejorado, todas las pubs clickeables
    ============================================================ */
 
-function MesView({ entries, isMobile = false, onMoveDate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void }) {
-  const today = new Date()
+function MesView({ entries, isMobile = false, onMoveDate, onCreate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void; onCreate?: (fecha: string) => void }) {
+  const today = hoyLima()
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   /* Día sobre el que se está arrastrando un video (para resaltar el destino). */
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  /* Día sobre el que está el mouse (para mostrar el botón "+" de crear). */
+  const [hoverKey, setHoverKey] = useState<string | null>(null)
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const firstOfMonth = new Date(year, month, 1)
@@ -936,10 +962,13 @@ function MesView({ entries, isMobile = false, onMoveDate }: { entries: Publicaci
           const pubs = byDay.get(k) ?? []
           const isToday = k === todayKey
           const isDropTarget = dragOverKey === k
+          const isHover = hoverKey === k
 
           return (
             <div
               key={i}
+              onMouseEnter={onCreate ? () => setHoverKey(k) : undefined}
+              onMouseLeave={onCreate ? () => setHoverKey((cur) => (cur === k ? null : cur)) : undefined}
               onDragOver={onMoveDate ? (e) => {
                 e.preventDefault()
                 e.dataTransfer.dropEffect = 'move'
@@ -988,11 +1017,37 @@ function MesView({ entries, isMobile = false, onMoveDate }: { entries: Publicaci
                 >
                   {c.date.getDate()}
                 </span>
-                {pubs.length > 0 && (
-                  <span style={{ fontSize: 9, color: 'var(--mk-text-tertiary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: 'rgba(0,0,0,0.05)', padding: '1px 4px', borderRadius: 3 }}>
-                    {pubs.length}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {pubs.length > 0 && (
+                    <span style={{ fontSize: 9, color: 'var(--mk-text-tertiary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: 'rgba(0,0,0,0.05)', padding: '1px 4px', borderRadius: 3 }}>
+                      {pubs.length}
+                    </span>
+                  )}
+                  {/* Botón "+" para crear una publicación en este día. En desktop
+                      aparece al pasar el mouse; en mobile queda tenue siempre.
+                      Erick: crear haciendo click en la fecha, sin ir arriba. */}
+                  {onCreate && c.thisMonth && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onCreate(k) }}
+                      title="Nueva publicación este día"
+                      aria-label="Nueva publicación este día"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: 18, height: 18, borderRadius: 'var(--mk-radius-full)',
+                        border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1,
+                        fontSize: 14, fontWeight: 700,
+                        color: '#fff', background: 'var(--mk-accent)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                        opacity: isHover ? 1 : (isMobile ? 0.55 : 0),
+                        transform: isHover ? 'scale(1)' : 'scale(0.9)',
+                        transition: 'opacity var(--mk-dur-fast) var(--mk-ease-out), transform var(--mk-dur-fast) var(--mk-ease-out)',
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Pubs con scroll vertical si la celda se llena.
@@ -1026,8 +1081,8 @@ function MesView({ entries, isMobile = false, onMoveDate }: { entries: Publicaci
    SEMANA VIEW — 7 columnas con detalle completo por publicación
    ============================================================ */
 
-function SemanaView({ entries, isMobile = false, onMoveDate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void }) {
-  const today = new Date()
+function SemanaView({ entries, isMobile = false, onMoveDate, onCreate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void; onCreate?: (fecha: string) => void }) {
+  const today = hoyLima()
   /* Día sobre el que se arrastra un video (resaltar destino). */
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   /* Cursor apunta al lunes de la semana actual */
@@ -1173,19 +1228,58 @@ function SemanaView({ entries, isMobile = false, onMoveDate }: { entries: Public
                     </span>
                   </div>
                 </div>
-                {pubs.length > 0 && (
-                  <span style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', fontWeight: 600, background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4 }}>
-                    {pubs.length}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {pubs.length > 0 && (
+                    <span style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', fontWeight: 600, background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4 }}>
+                      {pubs.length}
+                    </span>
+                  )}
+                  {/* "+" para crear una publicación en este día. */}
+                  {onCreate && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onCreate(k) }}
+                      title="Nueva publicación este día"
+                      aria-label="Nueva publicación este día"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: 22, height: 22, borderRadius: 'var(--mk-radius-full)',
+                        border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1,
+                        fontSize: 16, fontWeight: 700, color: '#fff', background: 'var(--mk-accent)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Pubs (column scroll) */}
               <div style={{ flex: 1, padding: '8px 6px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {pubs.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, color: 'var(--mk-text-quaternary)', fontSize: 11 }}>
-                    Sin publicaciones
-                  </div>
+                  onCreate ? (
+                    <button
+                      type="button"
+                      onClick={() => onCreate(k)}
+                      style={{
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        gap: 6, padding: 20, minHeight: 80,
+                        color: 'var(--mk-text-quaternary)', fontSize: 11,
+                        background: 'transparent', border: '1px dashed transparent',
+                        borderRadius: 'var(--mk-radius-md)', cursor: 'pointer',
+                        transition: 'border-color var(--mk-dur-fast) var(--mk-ease-out), color var(--mk-dur-fast) var(--mk-ease-out)',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'; e.currentTarget.style.color = 'var(--mk-text-tertiary)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--mk-text-quaternary)' }}
+                    >
+                      + Nueva publicación
+                    </button>
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, color: 'var(--mk-text-quaternary)', fontSize: 11 }}>
+                      Sin publicaciones
+                    </div>
+                  )
                 ) : (
                   pubs.map((p) => <PubChip key={p.id} pub={p} variant="full" canDrag={!!onMoveDate && !isMobile} />)
                 )}

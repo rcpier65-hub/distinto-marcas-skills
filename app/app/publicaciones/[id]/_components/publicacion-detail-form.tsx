@@ -152,11 +152,21 @@ type Props = {
 export function PublicacionDetailForm({ publicacion: initial, marca, editores, promptMarca = '' }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  /* A dónde vuelve "Volver": ?volver=… si vino del flujo de creación,
-     sino a la vista de la marca de esta publicación, sino a todas. Fix #3. */
-  const volverUrl =
-    searchParams.get('volver') ||
-    (marca?.slug ? `/publicaciones?marca=${marca.slug}` : '/publicaciones')
+  /* A dónde vuelve "Volver":
+     1) ?volver=… explícito (flujo de creación, "publicar hoy") → va ahí.
+     2) Sino, REGRESA A DONDE ESTABAS con el historial del navegador
+        (router.back): editor, diseño, calendario, cockpit… Erick pidió
+        "cuando abro una tarea desde edición y pongo regresar, que me
+        regrese a la página de edición, no a la grilla de la marca".
+     3) Si no hay historial (link abierto directo / pestaña nueva),
+        cae a la grilla de la marca como último recurso. */
+  const volverParam = searchParams.get('volver')
+  const volverFallback = marca?.slug ? `/publicaciones?marca=${marca.slug}` : '/publicaciones'
+  function handleVolver() {
+    if (volverParam) { router.push(volverParam); return }
+    if (typeof window !== 'undefined' && window.history.length > 1) { router.back(); return }
+    router.push(volverFallback)
+  }
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDelete] = useTransition()
   const [isDuplicating, startDuplicate] = useTransition()
@@ -1583,9 +1593,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
       </div>
 
       {/* STICKY save bar
-          "Volver" regresa a la vista de la MARCA de esta publicación (no a
-          "todas las marcas"). Así, si Pedro entró desde el calendario de Vid
-          Natur y crea/edita una pub, al cerrar vuelve a Vid Natur. Fix #3. */}
+          "Volver" regresa A DONDE ESTABAS (editor, diseño, calendario…) usando
+          el historial del navegador, salvo que haya un ?volver= explícito. */}
       <div className="fixed bottom-0 left-0 right-0 px-3 sm:px-6 py-2.5 sm:py-3 bg-background/95 backdrop-blur border-t flex items-center justify-end gap-2 z-30">
         <Button
           variant="outline"
@@ -1598,8 +1607,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
           {/* En mobile solo el ícono (la tijera) para no saturar la barra. */}
           <span className="hidden sm:inline">{isMarcandoHoy ? 'Enviando…' : 'Enviar a editar hoy'}</span>
         </Button>
-        <Button variant="ghost" onClick={() => router.push(volverUrl)} className="px-2.5 sm:px-4">
-          ← Volver<span className="hidden sm:inline">{marca?.nombre ? ` a ${marca.nombre}` : ''}</span>
+        <Button variant="ghost" onClick={handleVolver} className="px-2.5 sm:px-4">
+          ← Volver
         </Button>
         <Button onClick={handleSave} disabled={isPending} className="shrink-0">
           {isPending ? 'Guardando…' : <>💾 Guardar<span className="hidden sm:inline">&nbsp;cambios</span></>}
