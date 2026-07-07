@@ -68,6 +68,45 @@ export default async function ActividadPage({ searchParams }: { searchParams: Pr
         soloActorNombre: !esAdmin ? miNombre : (sp.persona ?? null),
       })
 
+  /* Enriquecer la vista: colores/emojis de marca + hábitos completados del día
+     por persona (para que el reporte sea "completo" como el del inicio).
+     Defensivo: si algo falla, la vista igual muestra la actividad. */
+  const [marcasRes, habitosRes] = await Promise.all([
+    service.from('marcas').select('slug, nombre, color_primario_hex, emoji_marca'),
+    service
+      .from('habitos_completados')
+      .select('completado_at, habito:habitos!inner(nombre, icono, color, miembro:team_members(nombre))')
+      .eq('fecha', fecha)
+      .then((r: unknown) => r, () => ({ data: [] })),
+  ])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcas = ((marcasRes?.data ?? []) as any[]).map((m) => ({
+    slug: m.slug as string,
+    nombre: m.nombre as string,
+    color: (m.color_primario_hex ?? '#94a3b8') as string,
+    emoji: (m.emoji_marca ?? null) as string | null,
+  }))
+
+  const habitosPorPersona: Record<string, { nombre: string; icono: string; color: string; hora: string | null }[]> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of ((habitosRes?.data ?? []) as any[])) {
+    const h = Array.isArray(r.habito) ? r.habito[0] : r.habito
+    if (!h) continue
+    const miembro = Array.isArray(h.miembro) ? h.miembro[0] : h.miembro
+    const nombre = miembro?.nombre as string | undefined
+    if (!nombre) continue
+    const horaLima = r.completado_at
+      ? new Date(new Date(r.completado_at as string).getTime() - 5 * 3600 * 1000).toISOString().slice(11, 16)
+      : null
+    ;(habitosPorPersona[nombre] ??= []).push({
+      nombre: (h.nombre ?? 'Hábito') as string,
+      icono: (h.icono ?? '🌱') as string,
+      color: (h.color ?? '#16a34a') as string,
+      hora: horaLima,
+    })
+  }
+
   return (
     <ActividadView
       rows={rows}
@@ -75,6 +114,8 @@ export default async function ActividadPage({ searchParams }: { searchParams: Pr
       esAdmin={esAdmin}
       miNombre={miNombre}
       migracionPendiente={false}
+      marcas={marcas}
+      habitosPorPersona={habitosPorPersona}
     />
   )
 }
