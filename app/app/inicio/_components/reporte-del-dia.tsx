@@ -240,6 +240,39 @@ export function ReporteDelDiaCard({ data }: Props) {
 
   return (
     <>
+      {/* ============= LISTA VISIBLE "lo que completaste hoy" =============
+          Pedro 07-jul-2026: "cuando Erick completa una tarea no le sale nada
+          en su reporte". El reporte era SOLO el botón "Generar" (las tareas
+          quedaban escondidas en el modal). Ahora se muestran directo en el
+          inicio para que cada quien vea lo que terminó hoy. */}
+      {data.tareasCompletadas.length > 0 && (
+        <div
+          style={{
+            marginTop: 32,
+            padding: '18px 22px',
+            background: '#fff',
+            border: '1px solid #dcfce7',
+            borderRadius: 16,
+            boxShadow: '0 4px 16px rgba(16,24,40,0.05)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#16a34a' }}>
+            <span style={{ fontSize: 15 }}>✅</span> Completaste hoy · {data.tareasCompletadas.length}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {data.tareasCompletadas.map((t) => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#0f172a', lineHeight: 1.3 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.marcaColor, flexShrink: 0, boxShadow: `0 0 0 3px ${t.marcaColor}22` }} />
+                <span style={{ fontWeight: 600, flex: 1, minWidth: 0 }}>{t.titulo}</span>
+                <span style={{ color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  {t.marcaEmoji ? `${t.marcaEmoji} ` : ''}{t.marca}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ============= CARD CTA en /inicio ============= */}
       <div
         style={{
