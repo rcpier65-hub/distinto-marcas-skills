@@ -874,6 +874,21 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                     onChange={(e) => setForm((s) => ({ ...s, fecha_edicion: e.target.value }))}
                     className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] font-medium transition-all hover:bg-background hover:border-border focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30 focus:border-[#ba41f7]/50 focus:bg-background"
                   />
+                  {/* Asignar a EDITAR HOY sin salir a Edición. Lorena: "cuando
+                      armo la grilla hay videos que necesito que se editen hoy y
+                      no puedo asignarlos hasta ir a edición; recién ahí le
+                      aparece a Pieer". Reusa la misma acción que el editor. */}
+                  <button
+                    type="button"
+                    onClick={handleEditarHoy}
+                    disabled={isMarcandoHoy}
+                    title='Marca este video para editar HOY — le aparece a Pieer en el editor bajo "Mi trabajo para hoy"'
+                    className="w-full h-9 px-3 mt-1.5 rounded-lg text-[12px] font-semibold text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 hover:brightness-110"
+                    style={{ background: 'linear-gradient(135deg, #7170ff, #ba41f7)', boxShadow: '0 4px 12px -4px rgba(113,112,255,0.6)' }}
+                  >
+                    <Scissors className="w-3.5 h-3.5 shrink-0" />
+                    {isMarcandoHoy ? 'Asignando…' : 'Asignar a editar hoy'}
+                  </button>
                 </div>
 
                 {/* Sub-estado tarea — segmented control estilo iOS.
