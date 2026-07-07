@@ -777,8 +777,13 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
       }}
     >
       {variant === 'compact' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Línea 1: hora + nombre de la marca (badge con color) */}
+        /* Chip compacto de ALTURA UNIFORME (2 líneas fijas) para que varias
+           publicaciones del mismo día encajen parejas y ordenadas, sin scroll
+           feo ni recortes. Pedro: "si hay 2 publicaciones que encajen perfecto,
+           que no se vea desordenado". Sin caption acá (va en semana/detalle);
+           en el mes lo que importa es hora + marca + título. */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Línea 1: hora + marca */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ fontSize: 10.5, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, flexShrink: 0 }}>
               {pub.hora}
@@ -797,25 +802,23 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                maxWidth: '70%',
+                minWidth: 0,
                 flexShrink: 1,
               }}
             >
               {marca?.nombreCorto ?? pub.marcaSlug}
             </span>
           </div>
-          {/* Línea 2: TÍTULO del video (lo que Lorena necesita para ubicarlos) */}
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.3 }}>
-            {titulo}
-          </span>
-          {/* Línea 3: caption (copy) como apoyo, atenuado — solo si aporta algo */}
-          {mostrarCaption && (
-            <span style={{ fontSize: 10, color: 'var(--mk-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, lineHeight: 1.25 }}>
-              {pub.caption}
+          {/* Línea 2: TÍTULO (truncado) + íconos de estado a la derecha.
+              Ambos en una sola fila → el chip queda SIEMPRE en 2 líneas. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 700, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+              {titulo}
             </span>
-          )}
-          {/* Línea 4: indicadores de workflow (copy / portada / editado) */}
-          <StatusIcons pub={pub} size={11} />
+            <div style={{ flexShrink: 0, display: 'flex' }}>
+              <StatusIcons pub={pub} size={10} />
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
