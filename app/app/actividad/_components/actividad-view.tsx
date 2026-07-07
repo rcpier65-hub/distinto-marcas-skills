@@ -1,11 +1,11 @@
 'use client'
 
-/* Reporte de actividad por persona — versión RICA (Pedro 07-jul-2026:
-   "que sea dinámico, con emojis, colorido con los colores de la agencia,
-   tareas/hábitos, más completo y con más opciones").
-   Resumido = stat-pills coloridas por tipo de acción · Detallado = timeline.
-   Agency colors: violeta #7170ff + morado #ba41f7. Cada acción tiene emoji
-   y color por tipo; cada marca su color/emoji; hábitos con su hora. */
+/* Reporte de actividad por persona — versión RICA y SIGNIFICATIVA.
+   Pedro 07-jul-2026: "no muestres 'mandó a aprobar' (se ve básico); muestra
+   las tareas que realmente importan + hábitos". Los datos vienen derivados de
+   las tablas fuente (tareas completadas + videos editados) — NO del log crudo
+   de cambios de estado. Agrupado por tipo (✅ Tareas terminadas · N) con los
+   NOMBRES, colores/emojis por marca, hábitos del día, colores de la agencia. */
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -42,28 +42,44 @@ function fechaBonita(fecha: string): string {
   } catch { return fecha }
 }
 
-/* Suma/resta días a una fecha YYYY-MM-DD (sin líos de timezone). */
 function shiftFecha(fecha: string, dias: number): string {
   const [y, m, d] = fecha.split('-').map(Number)
   const dt = new Date(y, m - 1, d + dias)
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 
-/* Emoji + color por TIPO de acción (heurística por palabras clave). */
+/* Emoji + color por TIPO de acción. */
 function accionMeta(accion: string): { emoji: string; color: string } {
   const a = accion.toLowerCase()
   if (a.includes('editó') || a.includes('editar') || a.includes('edición') || a.includes('video')) return { emoji: '✂️', color: '#8b5cf6' }
   if (a.includes('completó') || a.includes('terminó') || a.includes('tarea')) return { emoji: '✅', color: '#16a34a' }
-  if (a.includes('aprob')) return { emoji: '👍', color: '#3b82f6' }
   if (a.includes('diseñ') || a.includes('disen')) return { emoji: '🎨', color: '#ec4899' }
-  if (a.includes('envi') || a.includes('enviado')) return { emoji: '📤', color: '#06b6d4' }
-  if (a.includes('public')) return { emoji: '🚀', color: '#f59e0b' }
   if (a.includes('grab')) return { emoji: '🎥', color: '#f43f5e' }
   if (a.includes('coment') || a.includes('respond')) return { emoji: '💬', color: '#14b8a6' }
   if (a.includes('portada')) return { emoji: '🖼️', color: '#a855f7' }
-  if (a.includes('estado')) return { emoji: '🔄', color: AGENCY }
-  if (a.includes('cre') || a.includes('agreg') || a.includes('nueva')) return { emoji: '✨', color: '#a855f7' }
   return { emoji: '⚡', color: AGENCY }
+}
+
+/* Etiqueta bonita del grupo (para el encabezado de cada bloque). */
+function grupoLabel(accion: string): string {
+  const a = accion.toLowerCase()
+  if (a.includes('tarea')) return 'Tareas terminadas'
+  if (a.includes('video') || a.includes('editó') || a.includes('edición')) return 'Videos editados'
+  if (a.includes('diseñ') || a.includes('disen')) return 'Diseños terminados'
+  if (a.includes('grab')) return 'Grabaciones'
+  if (a.includes('coment') || a.includes('respond')) return 'Comentarios respondidos'
+  return accion
+}
+
+/* Agrupa las filas por tipo de acción, más items primero. */
+function gruposDe(arr: ActividadRow[]): [string, ActividadRow[]][] {
+  const m = new Map<string, ActividadRow[]>()
+  for (const r of arr) {
+    const a = m.get(r.accion) ?? []
+    a.push(r)
+    m.set(r.accion, a)
+  }
+  return Array.from(m.entries()).sort((a, b) => b[1].length - a[1].length)
 }
 
 /* Etiqueta + color por rol. */
@@ -100,7 +116,7 @@ export function ActividadView({
     return m
   }, [marcas])
 
-  // Agrupar por persona, más activos primero.
+  // Personas con actividad (tareas/videos) O con hábitos ese día.
   const porPersona = useMemo(() => {
     const m = new Map<string, ActividadRow[]>()
     for (const r of rows) {
@@ -108,42 +124,36 @@ export function ActividadView({
       arr.push(r)
       m.set(r.actor_nombre, arr)
     }
-    return Array.from(m.entries()).sort((a, b) => b[1].length - a[1].length)
-  }, [rows])
+    // Incluir personas que solo hicieron hábitos (sin tareas/videos ese día).
+    for (const nombre of Object.keys(habitosPorPersona)) {
+      if (!m.has(nombre) && (habitosPorPersona[nombre]?.length ?? 0) > 0) m.set(nombre, [])
+    }
+    return Array.from(m.entries()).sort((a, b) => {
+      const na = a[1].length + (habitosPorPersona[a[0]]?.length ?? 0)
+      const nb = b[1].length + (habitosPorPersona[b[0]]?.length ?? 0)
+      return nb - na
+    })
+  }, [rows, habitosPorPersona])
 
-  const totalAcciones = rows.length
-
-  function resumen(arr: ActividadRow[]): { accion: string; n: number }[] {
-    const c = new Map<string, number>()
-    for (const r of arr) c.set(r.accion, (c.get(r.accion) ?? 0) + 1)
-    return Array.from(c.entries()).map(([accion, n]) => ({ accion, n })).sort((a, b) => b.n - a.n)
-  }
-
-  /* Marcas tocadas por una persona (con conteo) — para el "breakdown" por marca. */
-  function marcasDe(arr: ActividadRow[]): { m: MarcaMini; n: number }[] {
-    const c = new Map<string, number>()
-    for (const r of arr) if (r.marca_slug) c.set(r.marca_slug, (c.get(r.marca_slug) ?? 0) + 1)
-    return Array.from(c.entries())
-      .map(([slug, n]) => ({ m: marcaMap.get(slug) ?? { slug, nombre: slug, color: '#94a3b8', emoji: null }, n }))
-      .sort((a, b) => b.n - a.n)
-  }
+  const totalTareas = rows.length
 
   function textoReporte(): string {
-    const L: string[] = [`📋 *Reporte de actividad — ${fechaBonita(fecha)}*`, '']
+    const L: string[] = [`📋 *Reporte del día — ${fechaBonita(fecha)}*`, '']
     if (porPersona.length === 0) L.push('Sin actividad registrada.')
     for (const [persona, arr] of porPersona) {
-      L.push(`👤 *${persona}* · ${arr.length} ${arr.length === 1 ? 'acción' : 'acciones'}`)
-      if (detallado) {
-        for (const r of arr.slice().reverse()) {
-          const { emoji } = accionMeta(r.accion)
-          const marca = r.marca_slug ? marcaMap.get(r.marca_slug) : null
-          L.push(`   ${hora(r.created_at)} · ${emoji} ${r.accion}${r.detalle ? ` — ${r.detalle}` : ''}${marca ? ` (${marca.emoji ?? ''} ${marca.nombre})` : (r.marca_slug ? ` (${r.marca_slug})` : '')}`)
-        }
-      } else {
-        for (const { accion, n } of resumen(arr)) L.push(`   ${accionMeta(accion).emoji} ${accion}: ${n}`)
-      }
       const habs = habitosPorPersona[persona] ?? []
-      if (habs.length > 0) L.push(`   🌱 Hábitos: ${habs.map((h) => `${h.icono} ${h.nombre}`).join(', ')}`)
+      L.push(`👤 *${persona}*`)
+      for (const [accion, items] of gruposDe(arr)) {
+        L.push(`${accionMeta(accion).emoji} *${grupoLabel(accion)} (${items.length})*`)
+        for (const r of items) {
+          const marca = r.marca_slug ? marcaMap.get(r.marca_slug) : null
+          L.push(`   • ${r.detalle ?? grupoLabel(accion)}${marca ? ` (${marca.nombre})` : ''}${detallado ? ` · ${hora(r.created_at)}` : ''}`)
+        }
+      }
+      if (habs.length > 0) {
+        L.push(`🌱 *Hábitos (${habs.length})*`)
+        for (const h of habs) L.push(`   • ${h.icono} ${h.nombre}${h.hora ? ` · ${h.hora}` : ''}`)
+      }
       L.push('')
     }
     L.push('— vía Distinto Agencia')
@@ -175,27 +185,25 @@ export function ActividadView({
         className="rounded-3xl p-5 sm:p-6 text-white relative overflow-hidden"
         style={{ background: `linear-gradient(135deg, ${AGENCY} 0%, ${AGENCY_2} 55%, #ec4899 100%)`, boxShadow: '0 12px 34px -10px rgba(113,112,255,0.45)' }}
       >
-        {/* Brillos decorativos */}
         <div aria-hidden style={{ position: 'absolute', top: -60, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.14)', filter: 'blur(6px)' }} />
         <div aria-hidden style={{ position: 'absolute', bottom: -70, left: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.10)' }} />
         <div className="relative">
           <div className="flex items-center gap-2 text-white/85 text-[12px] font-semibold uppercase tracking-[0.14em] mb-1.5">
-            <ClipboardList className="w-4 h-4" /> Reporte de actividad
+            <ClipboardList className="w-4 h-4" /> Reporte del día
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight capitalize leading-tight">
             {fechaBonita(fecha)}
           </h1>
           <p className="text-white/85 text-sm mt-1">
             {esAdmin
-              ? <>Equipo Distinto · <strong className="text-white">{porPersona.length}</strong> {porPersona.length === 1 ? 'persona' : 'personas'} · <strong className="text-white">{totalAcciones}</strong> {totalAcciones === 1 ? 'acción' : 'acciones'}</>
-              : <>{miNombre} · <strong className="text-white">{totalAcciones}</strong> {totalAcciones === 1 ? 'acción' : 'acciones'} hoy</>}
+              ? <>Equipo Distinto · <strong className="text-white">{porPersona.length}</strong> {porPersona.length === 1 ? 'persona' : 'personas'} · <strong className="text-white">{totalTareas}</strong> {totalTareas === 1 ? 'cosa hecha' : 'cosas hechas'}</>
+              : <>{miNombre} · <strong className="text-white">{totalTareas}</strong> {totalTareas === 1 ? 'tarea hecha' : 'tareas hechas'} hoy</>}
           </p>
         </div>
       </header>
 
       {/* ============ CONTROLES ============ */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Navegación de fecha */}
         <div className="flex items-center gap-1">
           <button onClick={() => irAFecha(shiftFecha(fecha, -1))} title="Día anterior"
             className="w-9 h-9 rounded-lg border border-input bg-background hover:bg-muted flex items-center justify-center transition-colors">
@@ -217,15 +225,14 @@ export function ActividadView({
           </button>
         )}
 
-        {/* Toggle Resumido / Detallado */}
-        <div className="flex items-center bg-muted/60 p-0.5 rounded-lg text-[12px]">
+        <div className="flex items-center bg-muted/60 p-0.5 rounded-lg text-[12px]" title="Detallado agrega la hora de cada cosa">
           <button onClick={() => setDetallado(false)}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md font-medium transition-all ${!detallado ? 'bg-white text-foreground shadow-sm ring-1 ring-black/[0.04]' : 'text-muted-foreground'}`}>
             <ListChecks className="w-3.5 h-3.5" /> Resumido
           </button>
           <button onClick={() => setDetallado(true)}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md font-medium transition-all ${detallado ? 'bg-white text-foreground shadow-sm ring-1 ring-black/[0.04]' : 'text-muted-foreground'}`}>
-            <AlignLeft className="w-3.5 h-3.5" /> Detallado
+            <AlignLeft className="w-3.5 h-3.5" /> Con hora
           </button>
         </div>
 
@@ -239,8 +246,7 @@ export function ActividadView({
 
       {migracionPendiente && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 p-4 text-sm">
-          ⚙️ El historial todavía no está activado. Falta crear la tabla <code>actividad</code> en
-          Supabase. Una vez activado, acá empezará a salir todo lo que hace cada persona.
+          ⚙️ El historial todavía no está activado. Una vez activado, acá saldrá todo lo que hizo cada persona.
         </div>
       )}
 
@@ -248,7 +254,7 @@ export function ActividadView({
         <div className="rounded-2xl border bg-white p-12 text-center">
           <div className="text-5xl mb-3">🌙</div>
           <p className="font-semibold text-foreground text-lg">Sin actividad este día</p>
-          <p className="text-sm text-muted-foreground mt-1">Cuando el equipo trabaje, sus acciones aparecerán acá con todo el detalle.</p>
+          <p className="text-sm text-muted-foreground mt-1">Cuando el equipo termine tareas o edite videos, aparecerá acá.</p>
         </div>
       )}
 
@@ -257,7 +263,7 @@ export function ActividadView({
         {porPersona.map(([persona, arr], idx) => {
           const rol = rolMeta(arr[0]?.rol ?? null)
           const habs = habitosPorPersona[persona] ?? []
-          const brk = marcasDe(arr)
+          const grupos = gruposDe(arr)
           return (
             <section
               key={persona}
@@ -283,85 +289,52 @@ export function ActividadView({
                     </span>
                   </div>
                 </div>
-                <span
-                  className="text-[13px] font-bold shrink-0 px-3 py-1.5 rounded-xl"
-                  style={{ color: AGENCY, background: `${AGENCY}12` }}
-                >
-                  {arr.length} {arr.length === 1 ? 'acción' : 'acciones'}
+                <span className="text-[13px] font-bold shrink-0 px-3 py-1.5 rounded-xl" style={{ color: AGENCY, background: `${AGENCY}12` }}>
+                  {arr.length + habs.length} {arr.length + habs.length === 1 ? 'cosa' : 'cosas'}
                 </span>
               </div>
 
               <div className="p-4 space-y-4">
-                {/* --- ACCIONES --- */}
-                {detallado ? (
-                  <ol className="relative space-y-3 pl-1">
-                    {arr.map((r, i) => {
-                      const meta = accionMeta(r.accion)
-                      const marca = r.marca_slug ? (marcaMap.get(r.marca_slug) ?? null) : null
-                      return (
-                        <li key={i} className="flex items-start gap-3">
-                          <span
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[15px] shrink-0"
-                            style={{ background: `${meta.color}16` }}
-                          >
-                            {meta.emoji}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{hora(r.created_at)}</span>
-                              <span className="text-[13.5px] font-medium text-foreground">{r.accion}</span>
+                {/* --- Grupos: Tareas terminadas / Videos editados / … --- */}
+                {grupos.map(([accion, items]) => {
+                  const meta = accionMeta(accion)
+                  return (
+                    <div key={accion}>
+                      <div className="flex items-center gap-2 mb-2 text-[12px] font-bold uppercase tracking-[0.04em]" style={{ color: meta.color }}>
+                        <span className="text-[15px]">{meta.emoji}</span>
+                        {grupoLabel(accion)} · {items.length}
+                      </div>
+                      <ul className="space-y-1.5">
+                        {items.map((r, i) => {
+                          const marca = r.marca_slug ? (marcaMap.get(r.marca_slug) ?? null) : null
+                          return (
+                            <li key={i} className="flex items-center gap-2.5">
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: marca?.color ?? meta.color }} />
+                              <span className="text-[13.5px] font-medium text-foreground flex-1 min-w-0 truncate">
+                                {r.detalle ?? grupoLabel(accion)}
+                              </span>
                               {marca && (
-                                <span
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-md"
-                                  style={{ color: marca.color, background: `${marca.color}16` }}
-                                >
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-md shrink-0" style={{ color: marca.color, background: `${marca.color}16` }}>
                                   {marca.emoji ? `${marca.emoji} ` : ''}{marca.nombre}
                                 </span>
                               )}
-                            </div>
-                            {r.detalle && <p className="text-[12.5px] text-muted-foreground truncate">{r.detalle}</p>}
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ol>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {resumen(arr).map(({ accion, n }) => {
-                      const meta = accionMeta(accion)
-                      return (
-                        <span
-                          key={accion}
-                          className="inline-flex items-center gap-2 text-[12.5px] font-medium pl-2 pr-1 py-1 rounded-full"
-                          style={{ background: `${meta.color}12`, color: '#0f172a', border: `1px solid ${meta.color}28` }}
-                        >
-                          <span>{meta.emoji}</span>
-                          <span>{accion}</span>
-                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full text-white text-[11px] font-bold" style={{ background: meta.color }}>{n}</span>
-                        </span>
-                      )
-                    })}
-                  </div>
+                              {detallado && <span className="font-mono text-[11px] text-muted-foreground tabular-nums shrink-0">{hora(r.created_at)}</span>}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  )
+                })}
+
+                {arr.length === 0 && habs.length > 0 && (
+                  <p className="text-[12.5px] text-muted-foreground italic">Sin tareas ni videos hoy — pero cumplió sus hábitos 👇</p>
                 )}
 
-                {/* --- BREAKDOWN POR MARCA --- */}
-                {brk.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap pt-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Marcas</span>
-                    {brk.map(({ m, n }) => (
-                      <span key={m.slug} className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2 py-1 rounded-lg" style={{ background: `${m.color}12`, color: m.color }}>
-                        <span className="w-2 h-2 rounded-full" style={{ background: m.color }} />
-                        {m.emoji ? `${m.emoji} ` : ''}{m.nombre}
-                        <span className="opacity-70">· {n}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* --- HÁBITOS --- */}
+                {/* --- Hábitos --- */}
                 {habs.length > 0 && (
-                  <div className="pt-1 border-t border-border/50">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#16a34a] mt-3 mb-2">
+                  <div className="pt-3 border-t border-border/50">
+                    <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.04em] text-[#16a34a] mb-2">
                       🌱 Hábitos del día · {habs.length}
                     </div>
                     <div className="flex flex-wrap gap-2">

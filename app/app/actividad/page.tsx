@@ -37,36 +37,17 @@ export default async function ActividadPage({ searchParams }: { searchParams: Pr
   const desde = `${fecha}T00:00:00-05:00`
   const hasta = `${fecha}T23:59:59-05:00`
 
-  let query = service
-    .from('actividad')
-    .select('actor_nombre, rol, accion, entidad_tipo, marca_slug, detalle, created_at')
-    .gte('created_at', desde)
-    .lte('created_at', hasta)
-    .order('created_at', { ascending: false })
-    .limit(1000)
-
-  // Un miembro normal solo ve SU actividad.
-  if (!esAdmin) query = query.eq('actor_nombre', miNombre)
-  // El admin puede filtrar por una persona puntual.
-  else if (sp.persona) query = query.eq('actor_nombre', sp.persona)
-
-  const { data } = await query
-  const tablaRows = (data ?? []) as ActividadRow[]
-
-  // Si la tabla `actividad` está vacía o ausente para este día (la migración
-  // no está corrida, o nadie tenía logging cuando trabajó), DERIVAMOS la
-  // actividad de las tablas fuente (videos editados + tareas completadas).
-  // Así Pieer ve su trabajo de hoy aunque la tabla no exista (Pedro 23-jun-2026:
-  // "edité 6 videos y sale como si no hubiera hecho nada"). Cuando la tabla SÍ
-  // tenga registros, esa es la fuente (más rica) y no derivamos → sin duplicar.
-  const rows: ActividadRow[] = tablaRows.length > 0
-    ? tablaRows
-    : await loadActividadDerivada(service, {
-        desde,
-        hasta,
-        esAdmin,
-        soloActorNombre: !esAdmin ? miNombre : (sp.persona ?? null),
-      })
+  /* Mostramos la actividad SIGNIFICATIVA — tareas completadas + videos
+     editados — derivada de las tablas fuente, NO el log crudo de la tabla
+     `actividad` (cambios de estado, "mandó a aprobar", etc.).
+     Pedro 07-jul-2026: "no muestres las actividades de 'mandó a aprobar', se
+     ve muy básico; muestra las tareas que realmente importan". */
+  const rows: ActividadRow[] = await loadActividadDerivada(service, {
+    desde,
+    hasta,
+    esAdmin,
+    soloActorNombre: !esAdmin ? miNombre : (sp.persona ?? null),
+  })
 
   /* Enriquecer la vista: colores/emojis de marca + hábitos completados del día
      por persona (para que el reporte sea "completo" como el del inicio).
