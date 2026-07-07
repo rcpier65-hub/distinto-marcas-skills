@@ -133,10 +133,25 @@ export async function updateDisenoEntry(
     if (patch.subEstado === 'listo' || patch.subEstado === 'enviado') {
       const { data: prev } = await service
         .from('publicaciones')
-        .select('diseno_terminado_at')
+        .select('diseno_terminado_at, disenador_nombre')
         .eq('id', id)
         .maybeSingle()
       if (!prev?.diseno_terminado_at) update.diseno_terminado_at = new Date().toISOString()
+      /* Atribución para el Reporte del día: si la tarea no tiene diseñador
+         asignado, se la atribuimos a QUIEN la completa. Sin esto, los diseños
+         de Aylin no salían en su reporte (disenador_nombre venía null). */
+      if (!prev?.disenador_nombre) {
+        const { data: me } = await service
+          .from('team_members')
+          .select('id, nombre')
+          .eq('auth_user_id', user.id)
+          .maybeSingle()
+        if (me?.nombre) {
+          update.disenador_nombre = me.nombre
+          const { data: d } = await service.from('disenadores').select('id').ilike('nombre', me.nombre).limit(1)
+          if (d && d[0]?.id) update.disenador_id = d[0].id
+        }
+      }
     } else if (patch.subEstado === 'sin_empezar' || patch.subEstado === 'en_progreso' || patch.subEstado === 'pausada') {
       update.diseno_terminado_at = null
     }
