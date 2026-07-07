@@ -88,6 +88,15 @@ export default async function ActividadPage({ searchParams }: { searchParams: Pr
     })
   }
 
+  /* Un miembro normal (o el admin filtrando por una persona) solo ve SUS
+     hábitos — no los del resto del equipo. Fix Pedro 07-jul: a Erick (no admin)
+     se le colaban PIEER y Ailyn porque los hábitos venían de todo el equipo,
+     aunque sus tareas sí estaban filtradas a él. */
+  const scopePersona = !esAdmin ? miNombre : (sp.persona ?? null)
+  const habitosVista = scopePersona
+    ? (habitosPorPersona[scopePersona] ? { [scopePersona]: habitosPorPersona[scopePersona] } : {})
+    : habitosPorPersona
+
   return (
     <ActividadView
       rows={rows}
@@ -96,7 +105,7 @@ export default async function ActividadPage({ searchParams }: { searchParams: Pr
       miNombre={miNombre}
       migracionPendiente={false}
       marcas={marcas}
-      habitosPorPersona={habitosPorPersona}
+      habitosPorPersona={habitosVista}
     />
   )
 }
