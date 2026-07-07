@@ -145,27 +145,35 @@ export function ActividadView({
 
   const totalTareas = rows.length
 
+  /* Líneas de texto (estilo WhatsApp, con emojis) del reporte de UNA persona. */
+  function lineasPersona(persona: string, arr: ActividadRow[]): string[] {
+    const L: string[] = []
+    const habs = habitosPorPersona[persona] ?? []
+    L.push(`👤 *${persona}*`)
+    for (const [accion, items] of gruposDe(arr)) {
+      L.push(`${accionMeta(accion).emoji} *${grupoLabel(accion)} (${items.length})*`)
+      for (const r of items) {
+        const marca = r.marca_slug ? marcaMap.get(r.marca_slug) : null
+        L.push(`   • ${r.detalle ?? grupoLabel(accion)}${marca ? ` (${marca.nombre})` : ''}${detallado ? ` · ${hora(r.created_at)}` : ''}`)
+      }
+    }
+    if (habs.length > 0) {
+      L.push(`🌱 *Hábitos (${habs.length})*`)
+      for (const h of habs) L.push(`   • ${h.icono} ${h.nombre}${h.hora ? ` · ${h.hora}` : ''}`)
+    }
+    return L
+  }
+
   function textoReporte(): string {
     const L: string[] = [`📋 *Reporte del día — ${fechaBonita(fecha)}*`, '']
     if (porPersona.length === 0) L.push('Sin actividad registrada.')
-    for (const [persona, arr] of porPersona) {
-      const habs = habitosPorPersona[persona] ?? []
-      L.push(`👤 *${persona}*`)
-      for (const [accion, items] of gruposDe(arr)) {
-        L.push(`${accionMeta(accion).emoji} *${grupoLabel(accion)} (${items.length})*`)
-        for (const r of items) {
-          const marca = r.marca_slug ? marcaMap.get(r.marca_slug) : null
-          L.push(`   • ${r.detalle ?? grupoLabel(accion)}${marca ? ` (${marca.nombre})` : ''}${detallado ? ` · ${hora(r.created_at)}` : ''}`)
-        }
-      }
-      if (habs.length > 0) {
-        L.push(`🌱 *Hábitos (${habs.length})*`)
-        for (const h of habs) L.push(`   • ${h.icono} ${h.nombre}${h.hora ? ` · ${h.hora}` : ''}`)
-      }
-      L.push('')
-    }
+    for (const [persona, arr] of porPersona) { L.push(...lineasPersona(persona, arr), '') }
     L.push('— vía Distinto Agencia')
     return L.join('\n')
+  }
+
+  function textoReportePersona(persona: string, arr: ActividadRow[]): string {
+    return [`📋 *Reporte del día — ${fechaBonita(fecha)}*`, '', ...lineasPersona(persona, arr), '', '— vía Distinto Agencia'].join('\n')
   }
 
   async function copiar() {
@@ -175,6 +183,13 @@ export function ActividadView({
       toast.success('Reporte copiado ✓ — pégalo en WhatsApp')
       setTimeout(() => setCopiado(false), 2500)
     } catch { toast.error('No se pudo copiar') }
+  }
+
+  async function copiarTexto(persona: string, arr: ActividadRow[]) {
+    try {
+      await navigator.clipboard.writeText(textoReportePersona(persona, arr))
+      toast.success('Texto del reporte copiado ✓ — pégalo en WhatsApp')
+    } catch { toast.error('No se pudo copiar el texto') }
   }
 
   function irAFecha(nueva: string) {
@@ -356,14 +371,22 @@ export function ActividadView({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[13px] font-bold px-3 py-1.5 rounded-xl" style={{ color: AGENCY, background: `${AGENCY}12` }}>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="hidden sm:inline text-[13px] font-bold px-2.5 py-1.5 rounded-xl" style={{ color: AGENCY, background: `${AGENCY}12` }}>
                     {arr.length + habs.length}
                   </span>
                   <button
                     type="button"
+                    onClick={() => copiarTexto(persona, arr)}
+                    title="Copiar el texto del reporte para WhatsApp"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                  >
+                    <CopyIcon className="w-3.5 h-3.5" /> Texto
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setImagenDe([persona, arr])}
-                    title="Generar imagen para WhatsApp"
+                    title="Generar la imagen del reporte para WhatsApp"
                     className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white transition-all"
                     style={{ background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY_2})`, boxShadow: '0 4px 12px -4px rgba(113,112,255,0.6)' }}
                   >
@@ -444,7 +467,7 @@ export function ActividadView({
               <button onClick={copiarImagen} disabled={!!imgBusy}
                 className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-semibold text-sm disabled:opacity-60"
                 style={{ background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY_2})` }}>
-                {imgBusy === 'copy' ? '⏳ Generando…' : <><CopyIcon className="w-4 h-4" /> Copiar imagen</>}
+                {imgBusy === 'copy' ? '⏳ Generando…' : <><ImageIcon className="w-4 h-4" /> Copiar imagen</>}
               </button>
               <button onClick={descargarImagen} disabled={!!imgBusy}
                 className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-xl bg-white text-foreground font-semibold text-sm border disabled:opacity-60">
