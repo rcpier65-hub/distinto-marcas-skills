@@ -85,14 +85,18 @@ export async function crearTarea(textoOriginal: string): Promise<
   return { ok: true, tarea: rowToTarea(data) }
 }
 
-/* Verifica que el usuario pueda tocar esta tarea (dueño o CEO). */
+/* Verifica que el usuario pueda tocar esta tarea (dueño, CREADOR o CEO). */
 async function puedeEditar(service: Service, authUserId: string, tareaId: string): Promise<
   { ok: true } | { ok: false; error: string }
 > {
   const me = await currentMember(service, authUserId)
-  const { data: t } = await service.from('tareas').select('team_member_id').eq('id', tareaId).maybeSingle()
+  const { data: t } = await service.from('tareas').select('team_member_id, created_by').eq('id', tareaId).maybeSingle()
   if (!t) return { ok: false, error: 'Tarea no encontrada' }
-  if (me.esCEO || t.team_member_id === me.id) return { ok: true }
+  /* Puede tocarla: el CEO, el dueño (a quien está asignada), o el CREADOR —
+     aunque la haya asignado a otra persona con una @mención. Fix Pedro 07-jul:
+     Erick creaba tareas que se asignaban a otro (Pedro/Ruth) y luego no las
+     podía borrar ("Esta tarea no es tuya"). */
+  if (me.esCEO || t.team_member_id === me.id || t.created_by === me.id) return { ok: true }
   return { ok: false, error: 'Esta tarea no es tuya' }
 }
 
