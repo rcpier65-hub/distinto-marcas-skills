@@ -15,10 +15,10 @@ import {
   PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core'
-import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Palette } from 'lucide-react'
+import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
-import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane, enviarTareaADiseno } from '../_actions'
+import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane } from '../_actions'
 
 const LANE_META: Record<FocusLane, { label: string; color: string; Icon: typeof Bot }> = {
   ia: { label: 'Focus IA', color: '#8E24AA', Icon: Bot },
@@ -166,22 +166,6 @@ export function TareasView({
     if (!r.ok) { toast.error(r.error ?? 'No se pudo'); setTareas(prev) }
   }, [tareas])
 
-  /* Puente: manda la nota a "Mis diseños para hoy" (marca + flujo completo).
-     Optimista: marca la nota como "en diseños" al toque. */
-  const onEnviarDiseno = useCallback(async (id: string) => {
-    const t = tareas.find((x) => x.id === id)
-    if (t?.disenoId) { toast('Esta nota ya está en Mis diseños para hoy 🎨'); return }
-    toast.loading('Enviando a Diseños…', { id: `dis-${id}` })
-    const r = await enviarTareaADiseno(id)
-    if (r.ok && r.disenoId) {
-      const nuevoId = r.disenoId
-      setTareas((cur) => cur.map((x) => x.id === id ? { ...x, disenoId: nuevoId } : x))
-      toast.success('🎨 En "Mis diseños para hoy" · con marca, estados y tiempo', { id: `dis-${id}` })
-    } else {
-      toast.error(r.error ?? 'No se pudo enviar a Diseños', { id: `dis-${id}` })
-    }
-  }, [tareas])
-
   /* ───────── drag & drop ───────── */
 
   function onDragStart(e: DragStartEvent) { setDragId(String(e.active.id)) }
@@ -284,7 +268,7 @@ export function TareasView({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
               {columnas.map((c) => (
                 <Columna key={c.categoria} columna={c} esCEO={esCEO} todasCategorias={todasCategorias}
-                  onComplete={onCompletar} onDelete={onEliminar} onMover={onMover} onEnviarDiseno={onEnviarDiseno} />
+                  onComplete={onCompletar} onDelete={onEliminar} onMover={onMover} />
               ))}
             </div>
           )}
@@ -427,14 +411,13 @@ function fechaRelativa(iso: string): string {
 }
 
 /* ============================ Columna ============================ */
-function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMover, onEnviarDiseno }: {
+function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMover }: {
   columna: { categoria: string; color: string; items: Tarea[] }
   esCEO: boolean
   todasCategorias: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void
   onDelete: (id: string) => void
   onMover: (id: string, cat: string) => void
-  onEnviarDiseno: (id: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${columna.categoria}` })
   return (
@@ -452,7 +435,7 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {columna.items.map((t) => (
           <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} otras={todasCategorias.filter((c) => c !== t.categoria)}
-            onComplete={onComplete} onDelete={onDelete} onMover={onMover} onEnviarDiseno={onEnviarDiseno} />
+            onComplete={onComplete} onDelete={onDelete} onMover={onMover} />
         ))}
       </div>
     </section>
@@ -460,10 +443,9 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
 }
 
 /* ============================ Card ============================ */
-function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, onEnviarDiseno }: {
+function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }: {
   tarea: Tarea; esCEO: boolean; otras: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
-  onEnviarDiseno: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: tarea.id })
   const [menu, setMenu] = useState(false)
@@ -484,17 +466,6 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, o
             </span>
           )}
           <div style={{ flex: 1 }} />
-          {/* Puente a "Mis diseños para hoy". Si ya se mandó, queda el ícono
-              teal fijo (indica "en diseños"); si no, es un botón para enviarla. */}
-          {tarea.disenoId ? (
-            <span title="Ya está en Mis diseños para hoy 🎨" style={{ ...iconBtn, background: 'rgba(20,184,166,0.28)', color: '#99f6e4', cursor: 'default' }}>
-              <Palette size={12} strokeWidth={2.6} />
-            </span>
-          ) : (
-            <button onClick={() => onEnviarDiseno(tarea.id)} title="Enviar a Mis diseños para hoy" style={iconBtn}>
-              <Palette size={12} strokeWidth={2.4} />
-            </button>
-          )}
           <button onClick={() => setMenu((v) => !v)} title="Mover de columna" style={iconBtn}>
             <ArrowRight size={12} strokeWidth={2.4} />
           </button>
