@@ -9,6 +9,7 @@
 
 import { useState, useTransition, useRef, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Palette, Flame, User, Scissors, Calendar, MessageCircle,
@@ -450,6 +451,24 @@ export function InicioView({ data }: { data: InicioData }) {
               </div>
             )}
           </div>
+          {/* Botón "Checklist de video" — SOLO Erick (arriba a la derecha de su
+              inicio). Abre su interfaz propia para organizar/verificar videos.
+              Pedro 07-jul-2026: "solo del usuario erick". */}
+          {data.nombre === 'Erick' && (
+            <Link
+              href="/checklist-video"
+              style={{
+                flexShrink: 0, marginLeft: 'auto', alignSelf: 'flex-start',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: 'linear-gradient(135deg, #7170ff, #ba41f7)',
+                color: '#fff', fontWeight: 600, fontSize: 13,
+                padding: '10px 15px', borderRadius: 12, textDecoration: 'none',
+                boxShadow: '0 6px 18px -6px rgba(113,112,255,0.7)', whiteSpace: 'nowrap',
+              }}
+            >
+              🎬 <span style={{ display: 'inline' }}>Checklist de video</span>
+            </Link>
+          )}
         </header>
 
         {/* Banner de recordatorios — solo Lorena (Operaciones).
