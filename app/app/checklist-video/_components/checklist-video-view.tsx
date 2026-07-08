@@ -33,6 +33,13 @@ function fechaBonita(iso: string | null): string {
   const d = new Date(iso + 'T12:00:00')
   return new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }).format(d)
 }
+function hoyLimaStr(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+}
+function mananaLimaStr(): string {
+  const [y, m, d] = hoyLimaStr().split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d) + 86400000).toISOString().slice(0, 10)
+}
 
 export function ChecklistVideoView({ videos: initial, marcas }: { videos: VideoErick[]; marcas: { slug: string; nombre: string }[] }) {
   const router = useRouter()
@@ -83,13 +90,13 @@ export function ChecklistVideoView({ videos: initial, marcas }: { videos: VideoE
     })
   }
 
-  async function aprobar(id: string) {
+  async function aprobar(id: string, fecha: string) {
     const v = videos.find((x) => x.id === id)
     if (!v) return
     const done = CHECKLIST_KEYS.filter((k) => v.checklist[k]).length
     if (done < 12) { toast.error(`Faltan ${12 - done} requisitos`); return }
     toast.loading('Aprobando y agendando…', { id: `apr-${id}` })
-    const r = await aprobarVideo(id, v.checklist)
+    const r = await aprobarVideo(id, v.checklist, fecha)
     if (!r.ok) { toast.error(r.error, { id: `apr-${id}` }); return }
     setVideos((cur) => cur.map((x) => x.id === id ? { ...x, estado: 'aprobado', fechaPublicacion: r.data!.fecha, publicacionId: r.data!.publicacionId } : x))
     toast.success(`✅ Aprobado · se publica el ${fechaBonita(r.data!.fecha)}`, { id: `apr-${id}`, duration: 6000 })
@@ -222,13 +229,15 @@ export function ChecklistVideoView({ videos: initial, marcas }: { videos: VideoE
 function ChecklistCard({ v, onToggle, onAprobar, onReabrir, onEliminar }: {
   v: VideoErick
   onToggle: (id: string, key: string) => void
-  onAprobar: (id: string) => void
+  onAprobar: (id: string, fecha: string) => void
   onReabrir: () => void
   onEliminar: () => void
 }) {
   const done = CHECKLIST.filter((c) => v.checklist[c.key]).length
   const pct = Math.round((done / 12) * 100)
   const listo = done === 12
+  const [pickOpen, setPickOpen] = useState(false)
+  const [fecha, setFecha] = useState(mananaLimaStr())
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="flex items-center gap-3 mb-3">
@@ -258,14 +267,34 @@ function ChecklistCard({ v, onToggle, onAprobar, onReabrir, onEliminar }: {
         })}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-          {listo ? <><Sparkles className="w-3.5 h-3.5" style={{ color: '#14b8a6' }} /> ¡Listo! Cumple los 12 requisitos.</> : <>Completa los 12 requisitos para aprobar.</>}
+      {!listo ? (
+        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-xs text-muted-foreground">Completa los 12 requisitos para aprobar.</div>
+          <button disabled className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-white font-semibold text-sm opacity-40 cursor-not-allowed" style={{ background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY2})` }}>
+            <CalendarCheck className="w-4 h-4" /> Aprobar y agendar
+          </button>
         </div>
-        <button onClick={() => onAprobar(v.id)} disabled={!listo} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: listo ? '#14b8a6' : `linear-gradient(135deg, ${AGENCY}, ${AGENCY2})` }}>
-          <CalendarCheck className="w-4 h-4" /> Aprobar y agendar
-        </button>
-      </div>
+      ) : !pickOpen ? (
+        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-xs flex items-center gap-1.5" style={{ color: '#0f766e' }}><Sparkles className="w-3.5 h-3.5" /> ¡Listo! Cumple los 12 requisitos.</div>
+          <button onClick={() => setPickOpen(true)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-white font-semibold text-sm" style={{ background: '#14b8a6' }}>
+            <CalendarCheck className="w-4 h-4" /> Aprobar y agendar
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border p-3" style={{ background: 'rgba(20,184,166,0.07)', borderColor: 'rgba(20,184,166,0.35)' }}>
+          <div className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: '#0f766e' }}>
+            <CalendarCheck className="w-4 h-4" /> ¿Qué día se publica en {v.cuentaNombre}?
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input type="date" value={fecha} min={hoyLimaStr()} onChange={(e) => setFecha(e.target.value)} className="h-10 px-3 rounded-lg border bg-background text-sm" />
+            <button onClick={() => onAprobar(v.id, fecha)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-white font-semibold text-sm" style={{ background: '#14b8a6' }}>
+              <Check className="w-4 h-4" /> Confirmar y agendar
+            </button>
+            <button onClick={() => setPickOpen(false)} className="h-10 px-3 rounded-lg border text-sm font-medium">Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

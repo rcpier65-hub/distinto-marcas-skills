@@ -75,32 +75,14 @@ export async function guardarChecklist(id: string, checklist: Record<string, boo
   return { ok: true }
 }
 
-/* Encuentra la primera fecha libre (>= mañana) para esa marca en la grilla,
-   para que los videos no se apilen el mismo día. Busca hasta 45 días. */
-async function primeraFechaLibre(service: Service, marcaId: string): Promise<string> {
-  const manana = new Date(hoyLimaUTC().getTime() + 86400000)
-  const fin = new Date(manana.getTime() + 45 * 86400000)
-  const { data } = await service
-    .from('publicaciones')
-    .select('fecha_publicacion')
-    .eq('marca_id', marcaId)
-    .gte('fecha_publicacion', ymd(manana))
-    .lte('fecha_publicacion', ymd(fin))
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tomadas = new Set(((data ?? []) as any[]).map((r) => r.fecha_publicacion))
-  for (let i = 0; i < 45; i++) {
-    const cand = ymd(new Date(manana.getTime() + i * 86400000))
-    if (!tomadas.has(cand)) return cand
-  }
-  return ymd(manana)
-}
-
-/* APROBAR: solo si los 12 puntos están ✓. Agenda una fecha libre y crea la
-   publicacion en la grilla de la cuenta (Distinto Agencia por defecto). */
-export async function aprobarVideo(id: string, checklist: Record<string, boolean>): Promise<Result<{ fecha: string; publicacionId: string }>> {
+/* APROBAR: solo si los 12 puntos están ✓. Agenda en la fecha que Erick elige
+   y crea la publicacion en la grilla de la cuenta (marca) del video. */
+export async function aprobarVideo(id: string, checklist: Record<string, boolean>, fecha: string): Promise<Result<{ fecha: string; publicacionId: string }>> {
   const user = await requireUser()
   const service = createServiceClient() as Service
-  const memberId = await miTeamMemberId(service, user.id)
+
+  // Fecha de publicación elegida por Erick en el calendario.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha ?? '')) return { ok: false, error: 'Elige la fecha de publicación en el calendario' }
 
   // La checklist que manda el cliente es la fuente de verdad: se valida y se
   // guarda junto con la aprobación (así no depende de si cada toggle alcanzó a
@@ -126,8 +108,6 @@ export async function aprobarVideo(id: string, checklist: Record<string, boolean
   const { data: marca } = await service.from('marcas').select('id').eq('slug', slug).maybeSingle()
   if (!marca) return { ok: false, error: `No existe la cuenta "${slug}"` }
 
-  const fecha = await primeraFechaLibre(service, marca.id)
-
   const { data: pub, error: pubErr } = await service
     .from('publicaciones')
     .insert({
@@ -140,8 +120,8 @@ export async function aprobarVideo(id: string, checklist: Record<string, boolean
       objetivos: [],
       editado: true,
       video_aprobado: true,
-      created_by: memberId,
-      updated_by: memberId,
+      created_by: user.id,
+      updated_by: user.id,
     })
     .select('id')
     .single()
