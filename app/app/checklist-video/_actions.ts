@@ -61,16 +61,15 @@ export async function marcarVideoEstado(id: string, estado: 'por_editar' | 'edit
   return { ok: true }
 }
 
-/* Marca / desmarca un punto de la checklist (r1..r12) en el jsonb. */
-export async function toggleChecklistItem(id: string, key: string, on: boolean): Promise<Result> {
+/* Guarda la checklist COMPLETA (el cliente manda el objeto entero, que es la
+   fuente de verdad). Evita la carrera de leer-modificar-escribir el jsonb.
+   Solo se persisten las claves válidas en true. */
+export async function guardarChecklist(id: string, checklist: Record<string, boolean>): Promise<Result> {
   await requireUser()
   const service = createServiceClient() as Service
-  if (!CHECKLIST_KEYS.includes(key)) return { ok: false, error: 'Ítem inválido' }
-  const { data: row } = await service.from('videos_erick').select('checklist').eq('id', id).maybeSingle()
-  const checklist = { ...(row?.checklist ?? {}) } as Record<string, boolean>
-  if (on) checklist[key] = true
-  else delete checklist[key]
-  const { error } = await service.from('videos_erick').update({ checklist }).eq('id', id)
+  const limpio: Record<string, boolean> = {}
+  for (const k of CHECKLIST_KEYS) if (checklist?.[k]) limpio[k] = true
+  const { error } = await service.from('videos_erick').update({ checklist: limpio }).eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/checklist-video')
   return { ok: true }
@@ -98,21 +97,25 @@ async function primeraFechaLibre(service: Service, marcaId: string): Promise<str
 
 /* APROBAR: solo si los 12 puntos están ✓. Agenda una fecha libre y crea la
    publicacion en la grilla de la cuenta (Distinto Agencia por defecto). */
-export async function aprobarVideo(id: string): Promise<Result<{ fecha: string; publicacionId: string }>> {
+export async function aprobarVideo(id: string, checklist: Record<string, boolean>): Promise<Result<{ fecha: string; publicacionId: string }>> {
   const user = await requireUser()
   const service = createServiceClient() as Service
   const memberId = await miTeamMemberId(service, user.id)
 
+  // La checklist que manda el cliente es la fuente de verdad: se valida y se
+  // guarda junto con la aprobación (así no depende de si cada toggle alcanzó a
+  // persistir). Solo claves válidas en true.
+  const limpio: Record<string, boolean> = {}
+  for (const k of CHECKLIST_KEYS) if (checklist?.[k]) limpio[k] = true
+  const faltan = CHECKLIST_KEYS.filter((k) => !limpio[k])
+  if (faltan.length > 0) return { ok: false, error: `Faltan ${faltan.length} requisitos de la checklist` }
+
   const { data: v } = await service
     .from('videos_erick')
-    .select('titulo, cuenta_slug, checklist, estado, publicacion_id, fecha_publicacion')
+    .select('titulo, cuenta_slug, publicacion_id, fecha_publicacion')
     .eq('id', id)
     .maybeSingle()
   if (!v) return { ok: false, error: 'Video no encontrado' }
-
-  const checklist = (v.checklist ?? {}) as Record<string, boolean>
-  const faltan = CHECKLIST_KEYS.filter((k) => !checklist[k])
-  if (faltan.length > 0) return { ok: false, error: `Faltan ${faltan.length} requisitos de la checklist` }
 
   // Idempotente: si ya se aprobó, devolver lo existente.
   if (v.publicacion_id && v.fecha_publicacion) {
@@ -146,7 +149,7 @@ export async function aprobarVideo(id: string): Promise<Result<{ fecha: string; 
 
   const { error: upErr } = await service
     .from('videos_erick')
-    .update({ estado: 'aprobado', aprobado_at: new Date().toISOString(), fecha_publicacion: fecha, publicacion_id: pub.id })
+    .update({ estado: 'aprobado', checklist: limpio, aprobado_at: new Date().toISOString(), fecha_publicacion: fecha, publicacion_id: pub.id })
     .eq('id', id)
   if (upErr) return { ok: false, error: upErr.message }
 

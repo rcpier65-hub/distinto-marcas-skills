@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { Plus, Scissors, Check, Circle, CheckCircle2, CalendarCheck, BookOpen, ChevronDown, Trash2, Film, Sparkles, RotateCcw } from 'lucide-react'
 import { GUIA, CHECKLIST, CHECKLIST_KEYS, type Bloque } from '@/lib/checklist-video/guia'
 import {
-  crearVideoErick, marcarVideoEstado, toggleChecklistItem, aprobarVideo, eliminarVideoErick,
+  crearVideoErick, marcarVideoEstado, guardarChecklist, aprobarVideo, eliminarVideoErick,
 } from '../_actions'
 
 const AGENCY = '#7170ff'
@@ -70,17 +70,15 @@ export function ChecklistVideoView({ videos: initial, marcas }: { videos: VideoE
   }
 
   function toggle(id: string, key: string) {
-    let nuevoValor = false
-    setVideos((cur) => cur.map((v) => {
-      if (v.id !== id) return v
-      const on = !v.checklist[key]
-      nuevoValor = on
-      const checklist = { ...v.checklist }
-      if (on) checklist[key] = true; else delete checklist[key]
-      return { ...v, checklist }
-    }))
+    const actual = videos.find((x) => x.id === id)
+    if (!actual) return
+    const on = !actual.checklist[key]
+    const nuevoChecklist = { ...actual.checklist }
+    if (on) nuevoChecklist[key] = true; else delete nuevoChecklist[key]
+    setVideos((cur) => cur.map((v) => v.id === id ? { ...v, checklist: nuevoChecklist } : v))
+    // Guardamos la checklist COMPLETA (no un solo ítem) → sin carreras.
     startTransition(async () => {
-      const r = await toggleChecklistItem(id, key, nuevoValor)
+      const r = await guardarChecklist(id, nuevoChecklist)
       if (!r.ok) { toast.error(r.error); router.refresh() }
     })
   }
@@ -91,7 +89,7 @@ export function ChecklistVideoView({ videos: initial, marcas }: { videos: VideoE
     const done = CHECKLIST_KEYS.filter((k) => v.checklist[k]).length
     if (done < 12) { toast.error(`Faltan ${12 - done} requisitos`); return }
     toast.loading('Aprobando y agendando…', { id: `apr-${id}` })
-    const r = await aprobarVideo(id)
+    const r = await aprobarVideo(id, v.checklist)
     if (!r.ok) { toast.error(r.error, { id: `apr-${id}` }); return }
     setVideos((cur) => cur.map((x) => x.id === id ? { ...x, estado: 'aprobado', fechaPublicacion: r.data!.fecha, publicacionId: r.data!.publicacionId } : x))
     toast.success(`✅ Aprobado · se publica el ${fechaBonita(r.data!.fecha)}`, { id: `apr-${id}`, duration: 6000 })
