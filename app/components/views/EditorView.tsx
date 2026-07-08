@@ -26,8 +26,9 @@ import {
   desmarcarEnEdicion,
   crearPublicacion,
   sincronizarNotionDirecto,
+  eliminarPublicaciones,
 } from '@/app/editor/_actions'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2, Trash2, X, CheckSquare } from 'lucide-react'
 import {
   type EditorEntry,
   type EditorOption,
@@ -347,6 +348,36 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     return list
   }, [entries, filters, search, sort, marcaBySlug, editorById, hoy])
 
+  /* ===== Selección múltiple para borrar en lote =====
+     Lorena 08-jul: seleccionar varios videos y eliminarlos (ej. duplicados). */
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [borrando, setBorrando] = useState(false)
+  const todosVisiblesSel = visible.length > 0 && visible.every((e) => sel.has(e.id))
+  function toggleSel(id: string) {
+    setSel((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function toggleSelTodos() {
+    setSel((cur) => {
+      const n = new Set(cur)
+      if (todosVisiblesSel) visible.forEach((e) => n.delete(e.id))
+      else visible.forEach((e) => n.add(e.id))
+      return n
+    })
+  }
+  async function borrarSeleccionados() {
+    const ids = Array.from(sel)
+    if (ids.length === 0) return
+    if (!confirm(`¿Eliminar ${ids.length} video${ids.length > 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return
+    setBorrando(true)
+    const prev = entries
+    setEntries((cur) => cur.filter((e) => !sel.has(e.id)))
+    const r = await eliminarPublicaciones(ids)
+    setBorrando(false)
+    if (!r.ok) { setEntries(prev); toast.error(r.error); return }
+    setSel(new Set())
+    toast.success(`${r.eliminadas} video${r.eliminadas > 1 ? 's' : ''} eliminado${r.eliminadas > 1 ? 's' : ''} 🗑️`)
+  }
+
   const hasActiveFilters =
     filters.estado !== 'editar' ||  /* default es editar, no todos */
     filters.editorId !== 'todos' ||
@@ -608,6 +639,9 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 'var(--mk-text-sm)' }}>
           <thead>
             <tr>
+              <th style={{ width: 36, padding: '0 4px 0 14px', background: 'var(--mk-bg-elevated)', borderBottom: '1px solid var(--mk-border-subtle)' }}>
+                <input type="checkbox" checked={todosVisiblesSel} onChange={toggleSelTodos} aria-label="Seleccionar todos" style={{ cursor: 'pointer', width: 15, height: 15, accentColor: 'var(--mk-accent)' }} />
+              </th>
               <Th width="160px" sortable field="marca"        sort={sort} onSort={toggleSort}>Proyecto</Th>
               <Th              sortable field="nombre"        sort={sort} onSort={toggleSort}>Nombre de la tarea</Th>
               <Th width="150px" sortable field="editor"       sort={sort} onSort={toggleSort}>Editor</Th>
@@ -629,6 +663,8 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
                 editores={editores}
                 hoy={hoy}
                 mostrarHoy={filters.soloHoy}
+                selected={sel.has(e.id)}
+                onToggleSelect={() => toggleSel(e.id)}
                 onOpenDetail={() => openRow(e.id)}
                 onSetEstado={(s) => setEstado(e.id, s)}
                 onSetEditor={(eid) => setEditor(e.id, eid)}
@@ -640,7 +676,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
               />
             ))}
             {visible.length === 0 && (
-              <tr><td colSpan={9} style={{ padding: '40px 20px' }}>
+              <tr><td colSpan={10} style={{ padding: '40px 20px' }}>
                 {filters.soloHoy ? (
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 'var(--mk-text-base)', color: 'var(--mk-text-secondary)', fontWeight: 500, marginBottom: 4 }}>
@@ -671,6 +707,30 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
           </tbody>
         </table>
       </div>
+
+      {/* Barra flotante de acción en lote (aparece al seleccionar videos). */}
+      {sel.size > 0 && (
+        <div style={{
+          position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)',
+          zIndex: 60, display: 'flex', alignItems: 'center', gap: 12,
+          background: 'var(--mk-bg-elevated)', border: '1px solid var(--mk-border)',
+          borderRadius: 14, padding: '10px 14px',
+          boxShadow: '0 12px 32px -8px rgba(0,0,0,0.35)',
+        }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 'var(--mk-text-sm)', fontWeight: 600, color: 'var(--mk-text-primary)' }}>
+            <CheckSquare size={16} style={{ color: 'var(--mk-accent)' }} />
+            {sel.size} seleccionado{sel.size > 1 ? 's' : ''}
+          </span>
+          <button onClick={borrarSeleccionados} disabled={borrando}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 10, border: 'none', cursor: borrando ? 'default' : 'pointer', background: '#e5326b', color: '#fff', fontWeight: 600, fontSize: 'var(--mk-text-sm)', opacity: borrando ? 0.6 : 1 }}>
+            <Trash2 size={15} /> {borrando ? 'Eliminando…' : 'Eliminar'}
+          </button>
+          <button onClick={() => setSel(new Set())} title="Cancelar selección" aria-label="Cancelar selección"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, border: '1px solid var(--mk-border)', cursor: 'pointer', background: 'transparent', color: 'var(--mk-text-secondary)' }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {reporteOpen && (
         <ReporteEdicion
@@ -893,7 +953,7 @@ function MetricaCard({
    ============================================================ */
 
 function Row({
-  entry, marcaInfo, editorInfo, editores, hoy, mostrarHoy,
+  entry, marcaInfo, editorInfo, editores, hoy, mostrarHoy, selected, onToggleSelect,
   onOpenDetail, onSetEstado, onSetEditor, onSetNombre, onSetGrilla, onSetFechaEd, onToggleHoy, onToggleEnEdicion,
 }: {
   entry: EditorEntry
@@ -902,6 +962,8 @@ function Row({
   editores: EditorOption[]
   hoy: string
   mostrarHoy: boolean
+  selected: boolean
+  onToggleSelect: () => void
   onOpenDetail: () => void
   onSetEstado: (s: EstadoPub) => void
   onSetEditor: (eid: string | null) => void
@@ -921,18 +983,25 @@ function Row({
   const bgDefault = enEdicion ? 'rgba(34, 211, 238, 0.08)'  /* cyan tenue para "editando" */
     : estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent'
 
+  const bgRow = selected ? 'rgba(113, 112, 255, 0.14)' : bgDefault
   return (
     <tr
       style={{
         height: 'var(--mk-row-height)',
         transition: 'background var(--mk-dur-fast) var(--mk-ease-out)',
         cursor: 'pointer',
-        background: bgDefault,
+        background: bgRow,
       }}
       onClick={onOpenDetail}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = bgDefault }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = bgRow }}
     >
+      {/* Checkbox de selección (para borrar en lote). stopPropagation para no
+          abrir el detalle al marcar. */}
+      <td style={{ width: 36, padding: '0 4px 0 14px', borderBottom: '1px solid var(--mk-border-subtle)' }} onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={selected} onChange={onToggleSelect} aria-label="Seleccionar video" style={{ cursor: 'pointer', width: 15, height: 15, accentColor: 'var(--mk-accent)' }} />
+      </td>
+
       {/* Marca */}
       <Td>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

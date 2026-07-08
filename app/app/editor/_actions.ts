@@ -395,3 +395,22 @@ export async function sincronizarNotionDirecto(): Promise<
 
   return { ok: true, totals, duration_ms: Date.now() - startedAt }
 }
+
+/* Elimina VARIAS publicaciones a la vez desde el Editor (selección múltiple).
+   Lorena 08-jul-2026: poder seleccionar varios videos y borrarlos (p. ej.
+   duplicados). Mismo delete que deletePublicacion pero en lote y sin redirect. */
+export async function eliminarPublicaciones(
+  ids: string[],
+): Promise<{ ok: true; eliminadas: number } | { ok: false; error: string }> {
+  await requireUser()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const limpios = Array.from(new Set((ids ?? []).filter((x) => typeof x === 'string' && x.length > 0)))
+  if (limpios.length === 0) return { ok: false, error: 'No hay videos seleccionados' }
+  const { error } = await service.from('publicaciones').delete().in('id', limpios)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/editor')
+  revalidatePath('/publicaciones')
+  revalidatePath('/inicio')
+  return { ok: true, eliminadas: limpios.length }
+}
