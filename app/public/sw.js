@@ -85,3 +85,36 @@ self.addEventListener('fetch', (event) => {
       )
   )
 })
+
+/* ===== Notificaciones push =====
+ * El servidor envía un push cuando se confirma una publicación (aviso a
+ * Pedro/Lorena). Mostramos la notificación con vibración; al tocarla, abrimos
+ * (o enfocamos) la app en la pantalla correspondiente. */
+self.addEventListener('push', (event) => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch (e) { data = { body: event.data ? event.data.text() : '' } }
+  const title = data.title || 'Distinto Agencia'
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/icons/icon-192.png',
+    badge: '/favicon-32.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+    data: { url: data.url || '/publicaciones/publicar-hoy' },
+  }
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = (event.notification.data && event.notification.data.url) || '/inicio'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if ('focus' in w) { if (w.navigate) { try { w.navigate(url) } catch (e) {} } return w.focus() }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url)
+    })
+  )
+})

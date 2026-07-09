@@ -13,6 +13,7 @@ import {
   ChevronLeft, Scissors, Type, History, CheckCircle2, X, AlertTriangle, RotateCcw, CalendarDays,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
+import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { marcarPublicado, desmarcarPublicado } from '../_actions'
 
 export type PublicarHoyItem = {
@@ -120,14 +121,17 @@ export function PublicarHoyView({ items, fecha, fechaLabel, hoy, resumen, histor
             {esHoy ? 'Lo que toca publicar' : 'Revisando'} · <span className="capitalize">{fechaLabel}</span>
           </p>
         </div>
-        <button
-          onClick={() => setHistOpen(true)}
-          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] font-semibold hover:bg-muted transition-colors"
-          title="Historial de lo publicado esta semana"
-        >
-          <History className="w-4 h-4" /> <span className="hidden sm:inline">Historial</span>
-          {historial.length > 0 && <span className="ml-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: AGENCY }}>{historial.length}</span>}
-        </button>
+        <div className="shrink-0 flex items-center gap-2">
+          <ActivarNotificaciones />
+          <button
+            onClick={() => setHistOpen(true)}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] font-semibold hover:bg-muted transition-colors"
+            title="Historial de lo publicado esta semana"
+          >
+            <History className="w-4 h-4" /> <span className="hidden sm:inline">Historial</span>
+            {historial.length > 0 && <span className="ml-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: AGENCY }}>{historial.length}</span>}
+          </button>
+        </div>
       </header>
 
       {/* ===== Barra de fechas ===== */}

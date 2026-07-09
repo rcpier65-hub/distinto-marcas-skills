@@ -33,6 +33,7 @@ import { AvisoGrabaciones } from './aviso-grabaciones'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
+import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 
 export type InicioData = {
   nombre: string
@@ -470,6 +471,13 @@ export function InicioView({ data }: { data: InicioData }) {
             </Link>
           )}
         </header>
+
+        {/* Activar notificaciones push en este dispositivo (aviso al confirmar
+            publicaciones). Se muestra solo si hay algo que hacer (activar /
+            instruir); si ya está activo, muestra un chip discreto. */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -12, marginBottom: 4 }}>
+          <ActivarNotificaciones />
+        </div>
 
         {/* Banner de recordatorios — solo Lorena (Operaciones).
             Pedro 07-jul-2026: quitar el banner para Erick (no debe salirle al

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendWhatsAppMessage } from '@/lib/integrations/rubi'
+import { enviarPushAMiembros } from '@/lib/push/send'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -46,9 +47,17 @@ export async function marcarPublicado(id: string): Promise<Result> {
   const m = pub ? (Array.isArray(pub.marca) ? pub.marca[0] : pub.marca) : null
   const hora = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(new Date())
   const redes = Array.isArray(pub?.plataformas) && pub.plataformas.length ? ` · ${pub.plataformas.join(', ')}` : ''
+  const marcaNombre = m?.nombre ?? 'Marca'
   await notificarWhatsApp(
-    `✅ *Publicado* — ${m?.emoji_marca ? m.emoji_marca + ' ' : ''}${m?.nombre ?? 'Marca'}\n📄 ${pub?.nombre ?? ''}${redes}\n🕐 ${hora}`,
+    `✅ *Publicado* — ${m?.emoji_marca ? m.emoji_marca + ' ' : ''}${marcaNombre}\n📄 ${pub?.nombre ?? ''}${redes}\n🕐 ${hora}`,
   )
+  // Notificación push real al celular/PC de Pedro y Lorena.
+  await enviarPushAMiembros(['pedro', 'lorena'], {
+    title: `✅ Publicado — ${marcaNombre}`,
+    body: `${pub?.nombre ?? ''}${redes} · ${hora}`,
+    url: '/publicaciones/publicar-hoy',
+    tag: `pub-${id}`,
+  })
 
   revalidatePath('/publicaciones/publicar-hoy')
   revalidatePath('/publicaciones')
