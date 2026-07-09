@@ -56,18 +56,32 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
 
   async function activar() {
     setBusy(true)
+    const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
     try {
       const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      if (!vapid) { toast.error('Falta configurar las notificaciones (VAPID)'); return }
+      if (!vapid) { toast.error('Falta configurar las notificaciones (VAPID). Avísale a Pedro.'); return }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        toast.error(esIOS
+          ? 'En iPhone: agrega la app a la pantalla de inicio y ábrela desde ese ícono.'
+          : 'Tu navegador no soporta notificaciones push. Usa Chrome, Edge o Safari actualizado.')
+        return
+      }
       const reg = await navigator.serviceWorker.register('/sw.js')
       await navigator.serviceWorker.ready
       const perm = await Notification.requestPermission()
       if (perm !== 'granted') {
         setEstado(perm === 'denied' ? 'denegado' : 'inactivo')
-        toast.error('No diste permiso de notificaciones')
+        toast.error(perm === 'denied'
+          ? 'Bloqueaste las notificaciones. Actívalas en los ajustes del navegador para este sitio.'
+          : 'No diste permiso de notificaciones.')
         return
       }
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource })
+      // Reusar la suscripción existente si ya hay una (evita InvalidStateError
+      // en PC cuando ya se había suscrito antes).
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource })
+      }
       const j = sub.toJSON()
       const r = await guardarSubscripcionPush(
         { endpoint: sub.endpoint, p256dh: j.keys?.p256dh ?? '', auth: j.keys?.auth ?? '' },
@@ -80,7 +94,14 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
       try { await reg.showNotification('🔔 Notificaciones activadas', { body: 'Así te avisaremos cuando se publique algo.', icon: '/icons/icon-192.png', badge: '/favicon-32.png' }) } catch { /* noop */ }
     } catch (e) {
       console.error('[push] activar falló:', e)
-      toast.error('No se pudo activar. En iPhone, primero agrega la app a la pantalla de inicio.')
+      const nombre = (e as Error)?.name || ''
+      if (esIOS) {
+        toast.error('En iPhone: agrega la app a la pantalla de inicio y ábrela desde ese ícono, luego activa.')
+      } else if (nombre === 'NotAllowedError') {
+        toast.error('Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador para este sitio.')
+      } else {
+        toast.error(`No se pudo activar${nombre ? ` (${nombre})` : ''}. Prueba con Chrome, Edge o Safari actualizado.`)
+      }
     } finally {
       setBusy(false)
     }

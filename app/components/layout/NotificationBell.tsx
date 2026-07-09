@@ -22,13 +22,28 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
-  /* Panel anclado a la esquina superior derecha del viewport (estilo
-     Facebook) en desktop, y full-width tipo sheet en mobile. NO lo
-     anclamos al botón para evitar que tape el contenido del sidebar. */
+  /* En desktop anclamos el panel JUSTO debajo de la campana (con las coords del
+     botón) para que se vea que abre; en mobile es un sheet full-width arriba.
+     Antes se abría en la esquina superior derecha (lejos de la campana del
+     sidebar) → parecía que "no abría". Fix Pedro 08-jul. */
   const [isMobile, setIsMobile] = useState(false)
+  const [coords, setCoords] = useState<{ bottom: number; left: number } | null>(null)
 
   const total = notificaciones.length
   const altas = notificaciones.filter((n) => n.urgencia === 'alta').length
+
+  function toggle() {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setCoords({ bottom: r.bottom, left: r.left })
+    }
+    setOpen((o) => !o)
+  }
+
+  const PANEL_W = 360
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const panelLeft = coords ? Math.max(8, Math.min(coords.left, vw - PANEL_W - 8)) : (vw - PANEL_W - 16)
+  const panelTop = coords ? coords.bottom + 8 : 56
 
   useEffect(() => {
     if (!open) return
@@ -48,7 +63,7 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
       <button
         ref={btnRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         title="Notificaciones"
         aria-label={`Notificaciones${total ? ` (${total})` : ''}`}
         style={{
@@ -93,12 +108,11 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
           <div
             style={{
               position: 'fixed',
-              /* Desktop: esquina superior derecha (estilo Facebook).
-                 Mobile: sheet full-width pegado arriba. */
-              top: isMobile ? 56 : 16,
-              right: isMobile ? 8 : 16,
-              left: isMobile ? 8 : 'auto',
-              width: isMobile ? 'auto' : 380,
+              /* Desktop: anclado debajo de la campana. Mobile: sheet arriba. */
+              top: isMobile ? 56 : panelTop,
+              right: isMobile ? 8 : 'auto',
+              left: isMobile ? 8 : panelLeft,
+              width: isMobile ? 'auto' : PANEL_W,
               maxHeight: isMobile ? '78vh' : '82vh',
               zIndex: 9999,
               background: '#fff',
