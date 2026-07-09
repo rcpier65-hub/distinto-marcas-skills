@@ -2,10 +2,27 @@
 
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { enviarPushAMiembroId } from '@/lib/push/send'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 type Result = { ok: true } | { ok: false; error: string }
+
+/* Prueba real: manda un push al propio dispositivo del usuario actual para
+   confirmar que las notificaciones del sistema funcionan. */
+export async function probarPush(): Promise<Result> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const { data: me } = await service.from('team_members').select('id').eq('auth_user_id', user.id).maybeSingle()
+  const n = await enviarPushAMiembroId(me?.id ?? null, {
+    title: '🔔 Notificación de prueba',
+    body: 'Así te avisaremos cuando se publique algo.',
+    url: '/publicaciones/publicar-hoy',
+    tag: 'prueba',
+  })
+  if (n === 0) return { ok: false, error: 'No hay una suscripción activa en este dispositivo. Activa las notificaciones primero.' }
+  return { ok: true }
+}
 
 /* Guarda (o actualiza) la suscripción push de este navegador para el usuario
    actual. Upsert por endpoint (una suscripción por navegador). */

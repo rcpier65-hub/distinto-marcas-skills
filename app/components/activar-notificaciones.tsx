@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Bell, BellRing, BellOff } from 'lucide-react'
-import { guardarSubscripcionPush } from '@/lib/push/actions'
+import { guardarSubscripcionPush, probarPush } from '@/lib/push/actions'
 
 type Estado = 'checking' | 'unsupported' | 'ios-instalar' | 'inactivo' | 'activo' | 'denegado'
 
@@ -24,6 +24,16 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export function ActivarNotificaciones({ className }: { className?: string }) {
   const [estado, setEstado] = useState<Estado>('checking')
   const [busy, setBusy] = useState(false)
+  const [probando, setProbando] = useState(false)
+
+  async function probar() {
+    setProbando(true)
+    try {
+      const r = await probarPush()
+      if (!r.ok) toast.error(r.error)
+      else toast.success('Enviado — deberías ver la notificación del sistema')
+    } finally { setProbando(false) }
+  }
 
   useEffect(() => {
     (async () => {
@@ -66,6 +76,8 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
       if (!r.ok) { toast.error(r.error ?? 'No se pudo guardar'); return }
       setEstado('activo')
       toast.success('🔔 Notificaciones activadas en este dispositivo')
+      // Notificación real del sistema al instante (prueba viva de que funciona).
+      try { await reg.showNotification('🔔 Notificaciones activadas', { body: 'Así te avisaremos cuando se publique algo.', icon: '/icons/icon-192.png', badge: '/favicon-32.png' }) } catch { /* noop */ }
     } catch (e) {
       console.error('[push] activar falló:', e)
       toast.error('No se pudo activar. En iPhone, primero agrega la app a la pantalla de inicio.')
@@ -78,8 +90,13 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
 
   if (estado === 'activo') {
     return (
-      <span className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-semibold ${className ?? ''}`} style={{ background: 'rgba(20,184,166,0.14)', color: '#0f766e' }}>
-        <BellRing className="w-4 h-4" /> Notificaciones activadas
+      <span className={`inline-flex items-center gap-2 ${className ?? ''}`}>
+        <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-semibold" style={{ background: 'rgba(20,184,166,0.14)', color: '#0f766e' }}>
+          <BellRing className="w-4 h-4" /> Notificaciones activadas
+        </span>
+        <button onClick={probar} disabled={probando} className="text-[12px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-60" title="Enviar una notificación de prueba a este dispositivo">
+          {probando ? 'Probando…' : 'Probar'}
+        </button>
       </span>
     )
   }

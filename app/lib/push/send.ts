@@ -59,3 +59,28 @@ export async function enviarPushAMiembros(nombresObjetivo: string[], payload: Pu
     console.error('[push] enviarPushAMiembros falló:', e)
   }
 }
+
+/* Envía push a TODAS las suscripciones de un miembro (por su team_member_id).
+   Devuelve cuántas se enviaron OK. Usado por la prueba "Probar notificación". */
+export async function enviarPushAMiembroId(teamMemberId: string | null, payload: PushPayload): Promise<number> {
+  if (!teamMemberId || !ensureVapid()) return 0
+  const service = createServiceClient() as Service
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .eq('team_member_id', teamMemberId)
+  if (!subs || subs.length === 0) return 0
+  const data = JSON.stringify(payload)
+  let ok = 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await Promise.all((subs as any[]).map(async (s) => {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, data)
+      ok++
+    } catch (e: unknown) {
+      const code = (e as { statusCode?: number })?.statusCode
+      if (code === 404 || code === 410) await service.from('push_subscriptions').delete().eq('id', s.id)
+    }
+  }))
+  return ok
+}

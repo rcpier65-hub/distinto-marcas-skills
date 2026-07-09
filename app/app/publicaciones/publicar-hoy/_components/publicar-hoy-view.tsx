@@ -10,11 +10,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Download, Music, Copy, Check, ImageIcon, Film, ExternalLink, StickyNote, ChevronRight,
-  ChevronLeft, Scissors, Type, History, CheckCircle2, X, AlertTriangle, RotateCcw, CalendarDays,
+  ChevronLeft, Scissors, Type, History, CheckCircle2, X, AlertTriangle, RotateCcw, CalendarDays, Trash2,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
-import { marcarPublicado, desmarcarPublicado } from '../_actions'
+import { marcarPublicado, desmarcarPublicado, eliminarPublicacion } from '../_actions'
 
 export type PublicarHoyItem = {
   id: string
@@ -96,7 +96,7 @@ export function PublicarHoyView({ items, fecha, fechaLabel, hoy, resumen, histor
 
   function onConfirm(id: string) {
     setConfirmados((s) => new Set(s).add(id))
-    toast.success('✅ Publicación confirmada · avisando por WhatsApp')
+    toast.success('✅ Publicación confirmada · avisando a Pedro y Lorena')
     startTransition(async () => {
       const r = await marcarPublicado(id)
       if (!r.ok) { setConfirmados((s) => { const n = new Set(s); n.delete(id); return n }); toast.error(r.error) }
@@ -300,9 +300,21 @@ function PiezaCard({ item, publicada, onConfirm, onUndo }: {
 }
 
 function HistorialModal({ historial, onClose }: { historial: HistorialItem[]; onClose: () => void }) {
-  // Agrupar por fecha (desc).
+  const [items, setItems] = useState(historial)
+  const [, startT] = useTransition()
+
+  function eliminar(id: string) {
+    if (!confirm('¿Eliminar esta publicación? Esta acción no se puede deshacer.')) return
+    setItems((cur) => cur.filter((h) => h.id !== id))
+    startT(async () => {
+      const r = await eliminarPublicacion(id)
+      if (!r.ok) toast.error(r.error)
+      else toast.success('Publicación eliminada 🗑️')
+    })
+  }
+
   const porFecha = new Map<string, HistorialItem[]>()
-  for (const h of historial) { const a = porFecha.get(h.fecha) ?? []; a.push(h); porFecha.set(h.fecha, a) }
+  for (const h of items) { const a = porFecha.get(h.fecha) ?? []; a.push(h); porFecha.set(h.fecha, a) }
   const fechas = Array.from(porFecha.keys()).sort((a, b) => b.localeCompare(a))
 
   return (
@@ -312,26 +324,28 @@ function HistorialModal({ historial, onClose }: { historial: HistorialItem[]; on
           <div className="flex items-center gap-2">
             <History className="w-5 h-5" style={{ color: AGENCY }} />
             <h2 className="text-[16px] font-bold">Publicado esta semana</h2>
-            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: AGENCY }}>{historial.length}</span>
+            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: AGENCY }}>{items.length}</span>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X className="w-5 h-5" /></button>
         </div>
         <div className="overflow-y-auto p-4 space-y-4">
-          {historial.length === 0 ? (
+          {items.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-8">Todavía no se ha publicado nada esta semana.</p>
           ) : fechas.map((f) => (
             <div key={f}>
               <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5 capitalize">{diaCorto(f)}</div>
               <div className="space-y-1.5">
                 {porFecha.get(f)!.map((h) => (
-                  <a key={h.id} href={`/publicaciones/${h.id}?volver=${encodeURIComponent('/publicaciones/publicar-hoy')}`}
-                    className="flex items-center gap-2.5 rounded-lg border p-2.5 hover:bg-muted/40 transition-colors" style={{ borderLeft: `3px solid ${h.marcaColor}` }}>
+                  <div key={h.id} className="flex items-center gap-2.5 rounded-lg border p-2.5" style={{ borderLeft: `3px solid ${h.marcaColor}` }}>
                     <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: '#14b8a6' }} />
-                    <div className="flex-1 min-w-0">
+                    <a href={`/publicaciones/${h.id}?volver=${encodeURIComponent('/publicaciones/publicar-hoy')}`} className="flex-1 min-w-0 hover:underline">
                       <div className="text-[13px] font-semibold truncate">{h.titulo}</div>
                       <div className="text-[11.5px] text-muted-foreground truncate">{h.marcaEmoji ? h.marcaEmoji + ' ' : ''}{h.marcaNombre}{h.publicadoAt ? ` · ${horaDe(h.publicadoAt)}` : ''}</div>
-                    </div>
-                  </a>
+                    </a>
+                    <button onClick={() => eliminar(h.id)} title="Eliminar publicación" aria-label="Eliminar publicación" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
