@@ -452,31 +452,29 @@ export function InicioView({ data }: { data: InicioData }) {
               </div>
             )}
           </div>
-          {/* Botón "Checklist de video" — SOLO Erick (arriba a la derecha de su
-              inicio). Abre su interfaz propia para organizar/verificar videos.
-              Pedro 07-jul-2026: "solo del usuario erick". */}
+        </header>
+
+        {/* Acciones del encabezado — RESPONSIVE. Pedro 08-jul: en móvil el botón
+            "Checklist de video" aplastaba el saludo/avatar → ahora va ABAJO,
+            a todo el ancho en celular y en fila en PC. Incluye "Activar
+            notificaciones" (solo aparece si hay algo que hacer). */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 mb-2">
           {data.nombre === 'Erick' && (
             <Link
               href="/checklist-video"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-white"
               style={{
-                flexShrink: 0, marginLeft: 'auto', alignSelf: 'flex-start',
-                display: 'inline-flex', alignItems: 'center', gap: 8,
                 background: 'linear-gradient(135deg, #7170ff, #ba41f7)',
-                color: '#fff', fontWeight: 600, fontSize: 13,
-                padding: '10px 15px', borderRadius: 12, textDecoration: 'none',
-                boxShadow: '0 6px 18px -6px rgba(113,112,255,0.7)', whiteSpace: 'nowrap',
+                fontSize: 14, padding: '12px 16px', textDecoration: 'none',
+                boxShadow: '0 6px 18px -6px rgba(113,112,255,0.7)',
               }}
             >
-              🎬 <span style={{ display: 'inline' }}>Checklist de video</span>
+              🎬 Checklist de video
             </Link>
           )}
-        </header>
-
-        {/* Activar notificaciones push en este dispositivo (aviso al confirmar
-            publicaciones). Se muestra solo si hay algo que hacer (activar /
-            instruir); si ya está activo, muestra un chip discreto. */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -12, marginBottom: 4 }}>
-          <ActivarNotificaciones />
+          <div className="flex justify-end sm:ml-auto">
+            <ActivarNotificaciones />
+          </div>
         </div>
 
         {/* Banner de recordatorios — solo Lorena (Operaciones).
