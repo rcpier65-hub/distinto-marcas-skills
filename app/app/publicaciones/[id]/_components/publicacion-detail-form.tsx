@@ -292,6 +292,26 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     })
   }
 
+  /* SUB-ESTADO auto-guardado (como la checklist y "Mandar a diseño"). Ailyn
+     ponía "Listo" pero NO persistía: el sub-estado solo se guardaba al tocar
+     "Guardar cambios" → al reabrir volvía a "Sin empezar". Ahora se guarda al
+     toque, con rollback si falla. */
+  function setSubEstado(e: EstadoTarea) {
+    const prev = form.estado_tarea
+    if (prev === e) return
+    setForm((s) => ({ ...s, estado_tarea: e }))
+    startTransition(async () => {
+      const result = await updatePublicacion(initial.id, { estado_tarea: e })
+      if (result.ok) {
+        toast.success(`Sub-estado → ${ESTADO_TAREA_LABEL[e]}`)
+        router.refresh()
+      } else {
+        toast.error(`Error: ${result.error}`)
+        setForm((s) => ({ ...s, estado_tarea: prev }))
+      }
+    })
+  }
+
   function toggleArrayItem(key: 'plataformas' | 'tipo_contenido' | 'objetivos', value: string) {
     setForm((s) => {
       const arr = s[key]
@@ -904,7 +924,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                         <button
                           key={e}
                           type="button"
-                          onClick={() => setForm((s) => ({ ...s, estado_tarea: e }))}
+                          onClick={() => setSubEstado(e)}
                           className={`flex-1 h-7 px-1 rounded-md text-[10px] font-medium transition-all leading-none ${
                             active
                               ? 'bg-background text-foreground shadow-sm ring-1 ring-black/[0.04]'
