@@ -11,7 +11,7 @@
    Objetivo (Pedro): cada chico del equipo manda su reporte diario al
    grupo cuando cierra el día. */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { ClipboardCheck } from 'lucide-react'
 import type { ReporteDelDiaData } from '@/lib/inicio/load-reporte-del-dia'
 
@@ -127,11 +127,16 @@ export function ReporteDelDiaCard({ data }: Props) {
       // Esperar a que fonts estén cargadas (Inter Tight) — si no, sale con
       // fallback feo.
       if (document.fonts?.ready) await document.fonts.ready
-      const blob = await toBlob(cardRef.current, {
+      const node = cardRef.current
+      const blob = await toBlob(node, {
         pixelRatio: 2,        // retina-quality
         backgroundColor: '#ffffff',
         cacheBust: true,
         skipFonts: false,
+        /* Tamaño natural EXPLÍCITO (ancho fijo 540 × alto dinámico) para que la
+           captura tome TODA la altura, no un cuadrado recortado. */
+        width: node.offsetWidth,
+        height: node.offsetHeight,
       })
       if (!blob) throw new Error('No se pudo generar el blob')
 
@@ -524,10 +529,27 @@ function ReporteImage({
   cardRef: React.RefObject<HTMLDivElement | null>
   total: number
 }) {
-  /* La imagen real es 540×540 (escalada a 1080×1080 en pixelRatio=2 al
-     capturar). En el modal la mostramos al 80% del ancho disponible
-     para que entre cómoda. */
+  /* La imagen es de ANCHO fijo (540) y ALTURA DINÁMICA: crece con todas las
+     tareas para que NUNCA se recorte (Pedro/Ailyn 09-jul: "la imagen sale
+     recortada, no salen todas las tareas"). En el modal la escalamos para que
+     entre completa; el capture es a tamaño natural (retina con pixelRatio 2). */
   const SIZE = 540
+  const previewWrapRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+  const [cardH, setCardH] = useState(SIZE)
+  useLayoutEffect(() => {
+    function medir() {
+      const w = previewWrapRef.current?.clientWidth ?? SIZE
+      setScale(Math.min(1, w / SIZE))
+      if (cardRef.current) setCardH(cardRef.current.offsetHeight)
+    }
+    medir()
+    // Re-medir tras un tick (por si las fuentes/imagen del avatar cambian la altura).
+    const t = setTimeout(medir, 250)
+    window.addEventListener('resize', medir)
+    return () => { clearTimeout(t); window.removeEventListener('resize', medir) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
 
   /* Iniciales para fallback de avatar */
   const iniciales = data.usuarioNombreCompleto
@@ -547,35 +569,24 @@ function ReporteImage({
   if (vis.coments) stats.push({ emoji: '💬', valor: data.comentariosRespondidosCount, label: 'Coments', color: '#06b6d4' })
 
   return (
+    /* Wrapper de PREVIEW: ancho 100% del modal, alto = altura real de la card
+       escalada. Escala la card (ancho fijo 540) para que entre completa. */
     <div
+      ref={previewWrapRef}
       style={{
         width: '100%',
-        aspectRatio: '1 / 1',
-        position: 'relative',
+        height: cardH * scale,
         overflow: 'hidden',
         borderRadius: 16,
-        background: '#fff',
         boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
       }}
     >
+      <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: SIZE }}>
       <div
         ref={cardRef}
         style={{
           width: SIZE,
-          height: SIZE,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          transform: `scale(${1})`,
-          transformOrigin: 'top left',
-          /* En CSS no podemos saber el ancho exacto del contenedor antes
-             del montaje. Usamos un trick: el contenedor padre tiene
-             aspect-ratio 1/1 y width: 100%, y este div interno tiene
-             dimensiones FIJAS — lo escalamos vía CSS scaling responsive
-             usando una variable. Solución pragmática: dimensionar todo
-             en valores relativos al SIZE constante. Para el preview el
-             usuario ve "fit" si tenemos el width: 100% del padre. Mejor
-             usar contenedor real escalado. */
+          minHeight: SIZE,      /* cuadrada como mínimo; crece si hay muchas tareas */
           background: 'linear-gradient(155deg, #f5f3ff 0%, #fdf2f8 50%, #fff7ed 100%)',
           padding: 36,
           display: 'flex',
@@ -659,14 +670,11 @@ function ReporteImage({
               ✓ Lo que terminé
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {data.tareasCompletadas.slice(0, 6).map((t) => (
+              {/* Todas las tareas — la imagen crece en alto para que salgan
+                  COMPLETAS (Pedro 09-jul). Ya no se corta a 6. */}
+              {data.tareasCompletadas.map((t) => (
                 <TareaRow key={t.id} t={t} />
               ))}
-              {data.tareasCompletadas.length > 6 && (
-                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: 2 }}>
-                  …y {data.tareasCompletadas.length - 6} más
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -678,14 +686,9 @@ function ReporteImage({
               📥 Asignadas a mí
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {data.tareasAsignadas.slice(0, 5).map((t) => (
+              {data.tareasAsignadas.map((t) => (
                 <TareaRow key={t.id} t={t} />
               ))}
-              {data.tareasAsignadas.length > 5 && (
-                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: 2 }}>
-                  …y {data.tareasAsignadas.length - 5} más
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -773,6 +776,7 @@ function ReporteImage({
             {data.fechaIso}
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
