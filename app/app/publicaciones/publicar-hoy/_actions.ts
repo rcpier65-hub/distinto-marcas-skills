@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { enviarPushAMiembros } from '@/lib/push/send'
+import { enviarPushAMiembros, enviarPushAClientesDeMarca } from '@/lib/push/send'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -19,7 +19,7 @@ export async function marcarPublicado(id: string): Promise<Result> {
 
   const { data: pub } = await service
     .from('publicaciones')
-    .select('nombre, plataformas, marca:marcas(nombre, emoji_marca)')
+    .select('nombre, plataformas, marca:marcas(id, nombre, emoji_marca)')
     .eq('id', id)
     .maybeSingle()
 
@@ -40,6 +40,15 @@ export async function marcarPublicado(id: string): Promise<Result> {
     url: '/publicaciones/publicar-hoy',
     tag: `pub-${id}`,
   })
+  // Y al CLIENTE de esa marca (portal): "¡tu video ya está publicado!".
+  if (m?.id) {
+    await enviarPushAClientesDeMarca(m.id, {
+      title: `✅ ¡Tu video se publicó! ${m.emoji_marca ?? ''}`.trim(),
+      body: `${pub?.nombre ?? marcaNombre}${redes} · ${hora}`,
+      url: '/cliente',
+      tag: `cliente-pub-${id}`,
+    })
+  }
 
   revalidatePath('/publicaciones/publicar-hoy')
   revalidatePath('/publicaciones')

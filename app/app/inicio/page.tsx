@@ -62,6 +62,12 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   const showWelcome = sp.welcome === '1'
 
   const user = await requireUser()
+
+  /* Si es un CLIENTE (portal de marca), no ve el inicio del equipo → a /cliente. */
+  const { getClienteActual } = await import('@/lib/cliente/get-cliente')
+  const { redirect } = await import('next/navigation')
+  if (await getClienteActual()) redirect('/cliente')
+
   const p = await getCurrentMemberPermisos()
 
   /* Pedro pidió: admin (sin team_member) también debe tener su /inicio

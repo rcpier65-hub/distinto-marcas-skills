@@ -69,11 +69,27 @@ export async function enviarPushAMiembroId(teamMemberId: string | null, payload:
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth')
     .eq('team_member_id', teamMemberId)
+  return await enviarASubs(service, subs, payload)
+}
+
+/* Notifica a los CLIENTES de una marca (portal de cliente). Se usa al confirmar
+   una publicación → al cliente le llega "tu video ya está publicado". */
+export async function enviarPushAClientesDeMarca(marcaId: string | null, payload: PushPayload): Promise<number> {
+  if (!marcaId || !ensureVapid()) return 0
+  const service = createServiceClient() as Service
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .eq('marca_id', marcaId)
+  return await enviarASubs(service, subs, payload)
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function enviarASubs(service: Service, subs: any[] | null, payload: PushPayload): Promise<number> {
   if (!subs || subs.length === 0) return 0
   const data = JSON.stringify(payload)
   let ok = 0
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await Promise.all((subs as any[]).map(async (s) => {
+  await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, data)
       ok++

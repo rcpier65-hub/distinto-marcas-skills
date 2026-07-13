@@ -3,6 +3,7 @@
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { enviarPushAMiembroId } from '@/lib/push/send'
+import { getClienteActual } from '@/lib/cliente/get-cliente'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -32,12 +33,28 @@ export async function guardarSubscripcionPush(
 ): Promise<Result> {
   const user = await requireUser()
   const service = createServiceClient() as Service
-  const { data: me } = await service.from('team_members').select('id, nombre').eq('auth_user_id', user.id).maybeSingle()
   if (!sub?.endpoint || !sub?.p256dh || !sub?.auth) return { ok: false, error: 'Suscripción inválida' }
+
+  /* Si es CLIENTE → guardamos con marca_id (para notificarle al publicar de su
+     marca). Si es MIEMBRO del equipo → team_member_id. */
+  const cliente = await getClienteActual()
+  let team_member_id: string | null = null
+  let marca_id: string | null = null
+  let nombre: string | null = null
+  if (cliente) {
+    marca_id = cliente.marcaId
+    nombre = cliente.nombre
+  } else {
+    const { data: me } = await service.from('team_members').select('id, nombre').eq('auth_user_id', user.id).maybeSingle()
+    team_member_id = me?.id ?? null
+    nombre = me?.nombre ?? null
+  }
+
   const { error } = await service.from('push_subscriptions').upsert(
     {
-      team_member_id: me?.id ?? null,
-      nombre: me?.nombre ?? null,
+      team_member_id,
+      marca_id,
+      nombre,
       endpoint: sub.endpoint,
       p256dh: sub.p256dh,
       auth: sub.auth,

@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { SwRegister } from '@/components/pwa/sw-register'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { getClienteActual } from '@/lib/cliente/get-cliente'
 import { getNotificaciones, type Notificacion } from '@/lib/notificaciones/get-notificaciones'
 import './globals.css'
 
@@ -72,9 +73,10 @@ export default async function RootLayout({
   // sidebar y el command palette muestren SIEMPRE las marcas reales — incluidas
   // las que se crean desde el Dashboard. Defensivo: el helper ya cae a la lista
   // fija si la base falla.
-  const [marcas, permisos] = await Promise.all([
+  const [marcas, permisos, cliente] = await Promise.all([
     getMarcasNav(),
     getCurrentMemberPermisos(),
+    getClienteActual(),
   ])
 
   /* Notificaciones urgentes para la campanita del shell (best-effort). */
@@ -123,7 +125,13 @@ export default async function RootLayout({
       className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo} notificaciones={notificaciones}>{children}</AppShell>
+        {/* Los CLIENTES (portal de marca) NO ven el sistema interno del equipo:
+            se renderizan en un shell limpio, sin sidebar. El equipo sí ve AppShell. */}
+        {cliente ? (
+          <div className="min-h-full">{children}</div>
+        ) : (
+          <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo} notificaciones={notificaciones}>{children}</AppShell>
+        )}
         <Toaster />
         {/* SwRegister: instala /sw.js para hacer la app instalable
             como PWA en macOS/iOS/Android con icono full color. */}
