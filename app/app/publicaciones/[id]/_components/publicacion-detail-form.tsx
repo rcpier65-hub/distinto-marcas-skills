@@ -22,7 +22,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { MarcaLogo } from '@/components/marca-logo'
-import { updatePublicacion, deletePublicacion, togglePublicacionField, marcarParaDiseno, generarCopysConIA, guardarPromptMarca } from '../_actions'
+import { updatePublicacion, deletePublicacion, togglePublicacionField, marcarParaDiseno, generarCopysConIA, guardarPromptMarca, avisarClientePublicado } from '../_actions'
 import { duplicarPublicacion } from '../../_actions'
 import { esRedireccion } from '@/lib/utils/is-redirect-error'
 import { marcarParaEditarHoy } from '@/app/editor/_actions'
@@ -289,6 +289,20 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         toast.error(`Error: ${result.error}`)
         setParaDiseno(!next)
       }
+    })
+  }
+
+  /* Links del post publicado (TikTok/IG) + "video ya subido → avisar al
+     cliente". Estado propio (no van al form principal). Pedro 09-jul. */
+  const [linkTiktok, setLinkTiktok] = useState<string>((initial as unknown as { link_tiktok?: string | null }).link_tiktok ?? '')
+  const [linkInstagram, setLinkInstagram] = useState<string>((initial as unknown as { link_instagram?: string | null }).link_instagram ?? '')
+  const [yaPublicado, setYaPublicado] = useState<boolean>((initial.estado as string) === 'publicado')
+  const [avisando, startAvisar] = useTransition()
+  function avisarCliente() {
+    startAvisar(async () => {
+      const r = await avisarClientePublicado(initial.id, { linkTiktok, linkInstagram })
+      if (r.ok) { setYaPublicado(true); toast.success('📲 Cliente avisado — se le notificó que su video ya está publicado'); router.refresh() }
+      else toast.error(`Error: ${r.error}`)
     })
   }
 
@@ -934,6 +948,29 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                       )
                     })}
                   </div>
+                </div>
+
+                {/* ===== Video ya subido → avisar al cliente (con los links) =====
+                    Pedro 09-jul: cuando el video ya está publicado, el trabajador
+                    pega el link de TikTok/IG y toca el botón → se marca publicado,
+                    le llega una notificación al cliente y verá estos links en su
+                    portal. */}
+                <div className="space-y-2 pt-3 border-t">
+                  <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                    📲 Video publicado (para el cliente)
+                  </label>
+                  <input value={linkTiktok} onChange={(e) => setLinkTiktok(e.target.value)} placeholder="🎵 Link de TikTok"
+                    className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30" />
+                  <input value={linkInstagram} onChange={(e) => setLinkInstagram(e.target.value)} placeholder="📸 Link de Instagram"
+                    className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30" />
+                  <button type="button" onClick={avisarCliente} disabled={avisando}
+                    className="w-full h-10 rounded-lg text-white font-semibold text-[12px] inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    style={{ background: yaPublicado ? '#14b8a6' : 'linear-gradient(135deg, #16a34a, #22c55e)', boxShadow: '0 4px 12px -4px rgba(22,163,74,0.6)' }}
+                    title="Marca la publicación como publicada y avisa al cliente por notificación push">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    {avisando ? 'Avisando…' : yaPublicado ? '✓ Cliente avisado · reenviar' : 'Video ya subido — avisar al cliente'}
+                  </button>
+                  <p className="text-[10.5px] text-muted-foreground leading-tight">Le llega una notificación al celular del cliente y verá estos links en su portal.</p>
                 </div>
               </div>
             </aside>

@@ -19,6 +19,8 @@ export type PubCliente = {
   portada: string | null
   video: string | null
   driveResultado: string | null
+  linkTiktok: string | null
+  linkInstagram: string | null
   copy: string | null
   estado: string | null
 }
@@ -193,6 +195,25 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
           )}
 
           {esVideo && embed && <p className="text-[11px] text-muted-foreground text-center">▶️ Toca play para ver el video</p>}
+
+          {/* Links del post publicado — el cliente va a ver el video en vivo. */}
+          {(urlOk(p.linkTiktok) || urlOk(p.linkInstagram)) && (
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Ver publicado en</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {urlOk(p.linkTiktok) && (
+                  <a href={urlOk(p.linkTiktok)!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-bold text-white" style={{ background: '#111' }}>
+                    🎵 TikTok <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                {urlOk(p.linkInstagram) && (
+                  <a href={urlOk(p.linkInstagram)!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #f58529, #dd2a7b, #8134af)' }}>
+                    📸 Instagram <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {p.copy && (
             <div>

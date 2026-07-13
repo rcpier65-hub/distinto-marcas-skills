@@ -35,7 +35,7 @@ export default async function ClientePortalPage() {
   const service = createServiceClient() as any
   const hoy = ymdLima(new Date())
 
-  const COLS = `id, nombre, copy, fecha_publicacion, estado, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url`
+  const COLS = `id, nombre, copy, fecha_publicacion, estado, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url, link_tiktok, link_instagram`
 
   const [pubRes, proxRes] = await Promise.all([
     // Publicadas (recientes)
@@ -57,6 +57,8 @@ export default async function ClientePortalPage() {
     portada: r.portada_editada_url ?? r.portada_cruda_url ?? null,
     video: r.video_con_musica_url ?? null,
     driveResultado: r.drive_resultado_url ?? null,
+    linkTiktok: r.link_tiktok ?? null,
+    linkInstagram: r.link_instagram ?? null,
     copy: r.copy ?? null,
     estado: r.estado ?? null,
   })
