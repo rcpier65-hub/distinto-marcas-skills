@@ -472,6 +472,20 @@ export function InicioView({ data }: { data: InicioData }) {
               🎬 Checklist de video
             </Link>
           )}
+          {/* Accesos de clientes — Erick (Pedro pidió que él lo gestione) y el
+              director (Pedro). Crea el usuario/contraseña de cada marca. */}
+          {(data.nombre === 'Erick' || data.rolBase === 'director') && (
+            <Link
+              href="/admin/clientes"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl font-semibold"
+              style={{
+                fontSize: 14, padding: '12px 16px', textDecoration: 'none',
+                border: '1.5px solid #7170ff', color: '#7170ff', background: '#fff',
+              }}
+            >
+              👥 Accesos de clientes
+            </Link>
+          )}
           <div className="flex justify-end sm:ml-auto">
             <ActivarNotificaciones />
           </div>

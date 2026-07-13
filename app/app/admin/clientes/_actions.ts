@@ -10,9 +10,12 @@ import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 type Service = any
 type Result = { ok: true } | { ok: false; error: string }
 
-async function soloDirector(): Promise<boolean> {
+/* Pueden gestionar accesos de cliente: el director (Pedro) y Erick (Pedro pidió
+   que Erick se encargue). NO cualquier admin (jimena queda fuera a propósito). */
+async function puedeGestionarClientes(): Promise<boolean> {
   const permisos = await getCurrentMemberPermisos()
-  return !!permisos && permisos.member.rol_base === 'director'
+  if (!permisos) return false
+  return permisos.member.rol_base === 'director' || permisos.member.nombre === 'Erick'
 }
 
 /* Crea el ACCESO de un cliente para una marca. Lo opera Pedro (director) desde
@@ -25,7 +28,7 @@ export async function crearAccesoCliente(input: {
   nombre: string
 }): Promise<Result> {
   await requireUser()
-  if (!(await soloDirector())) return { ok: false, error: 'Solo el admin puede crear accesos de cliente' }
+  if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso para crear accesos de cliente' }
 
   const email = (input.email ?? '').trim().toLowerCase()
   const password = input.password ?? ''
@@ -68,7 +71,7 @@ export async function crearAccesoCliente(input: {
 
 export async function eliminarAccesoCliente(id: string): Promise<Result> {
   await requireUser()
-  if (!(await soloDirector())) return { ok: false, error: 'Solo el admin' }
+  if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso' }
   const service = createServiceClient() as Service
   const { data: row } = await service.from('marca_clientes').select('auth_user_id').eq('id', id).maybeSingle()
   await service.from('marca_clientes').delete().eq('id', id)

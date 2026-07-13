@@ -11,8 +11,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function AdminClientesPage() {
   await requireUser()
+  // Pedro (director) y Erick (Pedro pidió que Erick lo gestione). jimena (admin) no.
   const permisos = await getCurrentMemberPermisos()
-  if (!permisos || permisos.member.rol_base !== 'director') redirect('/inicio')
+  const puede = !!permisos && (permisos.member.rol_base === 'director' || permisos.member.nombre === 'Erick')
+  if (!puede) redirect('/inicio')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
