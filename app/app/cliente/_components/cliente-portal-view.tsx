@@ -18,6 +18,7 @@ export type PubCliente = {
   redes: string[]
   portada: string | null
   video: string | null
+  driveResultado: string | null
   copy: string | null
   estado: string | null
 }
@@ -34,6 +35,19 @@ function urlOk(u: string | null): string | null {
   const t = u.trim()
   if (!t) return null
   return t.startsWith('http') ? t : `https://${t}`
+}
+/* Extrae el ID de un enlace de Google Drive (open?id=, uc?id=, /file/d/ID/). */
+function driveId(url: string | null): string | null {
+  if (!url) return null
+  const u = url.trim()
+  if (!/drive\.google\.com|docs\.google\.com/.test(u)) return null
+  return (u.match(/[?&]id=([-\w]+)/)?.[1]) ?? (u.match(/\/d\/([-\w]+)/)?.[1]) ?? null
+}
+/* Convierte el link de Drive en un embed reproducible (video se ve/reproduce
+   dentro del portal; imagen se muestra). */
+function driveEmbed(url: string | null): string | null {
+  const id = driveId(url)
+  return id ? `https://drive.google.com/file/d/${id}/preview` : null
 }
 
 export function ClientePortalView({ marcaNombre, marcaSlug, marcaEmoji, marcaColor, contacto, publicadas, porPublicar }: {
@@ -138,7 +152,10 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
   abierto: boolean; onToggle: () => void
   aprobado: boolean; aprobandoAhora: boolean; onAprobar: () => void; puedeAprobar?: boolean
 }) {
-  const video = urlOk(p.video)
+  const contenidoUrl = urlOk(p.video) ?? urlOk(p.driveResultado) ?? urlOk(p.portada)
+  const embed = driveEmbed(p.video) ?? driveEmbed(p.driveResultado) ?? driveEmbed(p.portada)
+  const hayContenido = !!contenidoUrl
+  const esVideo = !!urlOk(p.video)
   return (
     <div className="rounded-2xl bg-card overflow-hidden shadow-sm ring-1 ring-black/[0.04] transition-shadow hover:shadow-md" style={{ borderLeft: `5px solid ${color}` }}>
       {/* Cabecera clickeable */}
@@ -157,35 +174,52 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
         <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Detalle expandible */}
+      {/* Detalle expandible — el cliente VE el contenido antes de aprobar */}
       {abierto && (
         <div className="px-3 pb-3 pt-1 border-t space-y-3">
-          {/* Imagen grande / placeholder */}
-          <div className="rounded-xl overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
-            <Thumb portada={p.portada} color={color} emoji={emoji} big />
-          </div>
-          {p.copy && <p className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-relaxed line-clamp-6">{p.copy}</p>}
+          {embed ? (
+            /* Video/imagen del Drive reproducible DENTRO del portal. */
+            <div className="rounded-xl overflow-hidden bg-black/5" style={{ aspectRatio: '4 / 5', maxHeight: 520 }}>
+              <iframe src={embed} title={p.titulo} allow="autoplay" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
+            </div>
+          ) : hayContenido ? (
+            <a href={contenidoUrl!} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
+              <Thumb portada={p.portada} color={color} emoji={emoji} big />
+            </a>
+          ) : (
+            <div className="rounded-xl p-6 text-center text-[13px] text-muted-foreground" style={{ background: `${color}10` }}>
+              ⏳ El equipo está preparando el contenido. Te avisamos cuando esté listo para revisar.
+            </div>
+          )}
+
+          {esVideo && embed && <p className="text-[11px] text-muted-foreground text-center">▶️ Toca play para ver el video</p>}
+
+          {p.copy && (
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Texto de la publicación</div>
+              <p className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-relaxed">{p.copy}</p>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 flex-wrap">
-            {video && (
-              <a href={video} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-white" style={{ background: color }}>
-                Ver video <ExternalLink className="w-3.5 h-3.5" />
+            {contenidoUrl && (
+              <a href={contenidoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-[13px] font-semibold border" style={{ borderColor: `${color}55`, color }}>
+                <ExternalLink className="w-3.5 h-3.5" /> Abrir {esVideo ? 'video' : 'contenido'}
               </a>
             )}
-            {/* Aprobar (solo por-publicar y no aprobado aún) */}
-            {puedeAprobar && !aprobado && (
-              <button onClick={onAprobar} disabled={aprobandoAhora} className="flex-1 min-w-[160px] inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-bold text-[14px] disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #16a34a, #22c55e)', boxShadow: '0 6px 16px -6px rgba(22,163,74,0.7)' }}>
-                <ThumbsUp className="w-5 h-5" /> {aprobandoAhora ? 'Aprobando…' : 'Aprobar video'}
+            {puedeAprobar && !aprobado && hayContenido && (
+              <button onClick={onAprobar} disabled={aprobandoAhora} className="flex-1 min-w-[150px] inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-bold text-[14px] disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #16a34a, #22c55e)', boxShadow: '0 6px 16px -6px rgba(22,163,74,0.7)' }}>
+                <ThumbsUp className="w-5 h-5" /> {aprobandoAhora ? 'Aprobando…' : 'Aprobar'}
               </button>
             )}
             {aprobado && (
               <span className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl text-[13px] font-bold" style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}>
-                <PartyPopper className="w-4 h-4" /> ¡Aprobado por ti! Ya le avisamos al equipo.
+                <PartyPopper className="w-4 h-4" /> ¡Aprobado por ti!
               </span>
             )}
           </div>
-          {puedeAprobar && !aprobado && (
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Sparkles className="w-3 h-3" style={{ color }} /> Al aprobar, el equipo recibe el aviso y lo programa para publicar.</p>
+          {puedeAprobar && !aprobado && hayContenido && (
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Sparkles className="w-3 h-3" style={{ color }} /> Míralo y, si te gusta, toca “Aprobar”. El equipo recibe el aviso al instante.</p>
           )}
         </div>
       )}
