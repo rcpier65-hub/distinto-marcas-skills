@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Bell, BellRing, BellOff } from 'lucide-react'
+import { Bell, BellRing } from 'lucide-react'
 import { guardarSubscripcionPush, probarPush } from '@/lib/push/actions'
 
 type Estado = 'checking' | 'unsupported' | 'ios-instalar' | 'inactivo' | 'activo' | 'denegado'
@@ -107,8 +107,6 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
     }
   }
 
-  if (estado === 'checking' || estado === 'unsupported') return null
-
   if (estado === 'activo') {
     return (
       <span className={`inline-flex items-center gap-2 ${className ?? ''}`}>
@@ -122,28 +120,16 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
     )
   }
 
-  if (estado === 'ios-instalar') {
-    return (
-      <span className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12px] font-medium border ${className ?? ''}`} title="En iPhone: Compartir → Agregar a inicio, luego abre la app desde el ícono y activa las notificaciones.">
-        <Bell className="w-4 h-4 text-muted-foreground" /> iPhone: agrega la app a inicio
-      </span>
-    )
-  }
-
-  if (estado === 'denegado') {
-    return (
-      <span className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12px] font-medium border ${className ?? ''}`} title="Están bloqueadas. Actívalas desde los ajustes del navegador para este sitio.">
-        <BellOff className="w-4 h-4 text-muted-foreground" /> Notificaciones bloqueadas
-      </span>
-    )
-  }
-
+  /* En CUALQUIER otro estado (checking / inactivo / no-soportado / iPhone /
+     denegado) mostramos SIEMPRE el botón — nunca null. Al tocarlo, activar()
+     resuelve el caso (activa, o da el mensaje: iPhone instalar, o bloqueadas). */
+  const etiqueta = busy ? 'Activando…' : estado === 'denegado' ? 'Reintentar notificaciones' : 'Activar notificaciones'
   return (
     <button onClick={activar} disabled={busy}
-      className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-semibold text-white disabled:opacity-60 ${className ?? ''}`}
-      style={{ background: 'linear-gradient(135deg, #7170ff, #ba41f7)' }}
-      title="Recibe un aviso en este dispositivo cuando se confirme una publicación">
-      <Bell className="w-4 h-4" /> {busy ? 'Activando…' : 'Activar notificaciones'}
+      className={`inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-white disabled:opacity-60 ${className ?? ''}`}
+      style={{ background: 'linear-gradient(135deg, #7170ff, #ba41f7)', boxShadow: '0 6px 18px -6px rgba(113,112,255,0.7)' }}
+      title="Recibe un aviso en este dispositivo cuando se publique">
+      <Bell className="w-4 h-4" /> {etiqueta}
     </button>
   )
 }

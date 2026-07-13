@@ -67,13 +67,13 @@ export function ClientePortalView({ marcaNombre, marcaSlug, marcaEmoji, marcaCol
         </div>
       </header>
 
-      {/* Activar notificaciones */}
-      <div className="rounded-xl border bg-card p-4 flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-sm min-w-0">
+      {/* Activar notificaciones — botón prominente, a todo el ancho en celular. */}
+      <div className="rounded-xl border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="text-sm min-w-0 flex-1">
           <div className="font-semibold">🔔 Avísame cuando publiquen</div>
-          <div className="text-xs text-muted-foreground">Activa las notificaciones para recibir un aviso en tu celular apenas se publique tu contenido.</div>
+          <div className="text-xs text-muted-foreground">Con un toque activas las notificaciones y recibes un aviso en tu celular apenas se publique tu contenido.</div>
         </div>
-        <ActivarNotificaciones />
+        <ActivarNotificaciones className="w-full sm:w-auto" />
       </div>
 
       {/* Por publicar */}
