@@ -45,3 +45,7 @@ app/.vercel
 # Supabase
 app/supabase/.branches/
 app/supabase/.temp/
+
+# Contexto/memoria del proyecto — datos sensibles, NO subir al repo público
+docs/contexto/
+/CLAUDE.md

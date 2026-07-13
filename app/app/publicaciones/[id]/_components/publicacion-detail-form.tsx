@@ -306,6 +306,14 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     })
   }
 
+  /* Caption de WhatsApp para avisar al equipo que el video ya salió. Los links
+     de IG/TikTok se rellenan solos desde los inputs de arriba. Pedro 13-jul. */
+  const captionWhatsApp =
+    `☺️✨ ¡Hola, equipo!\n\n` +
+    `El nuevo video ya se encuentra publicado en nuestras redes sociales. Les comparto los enlaces:\n\n` +
+    `📸 Instagram:\n${linkInstagram.trim() || '(pega el link de Instagram arriba)'}\n\n` +
+    `🎵 TikTok:\n${linkTiktok.trim() || '(pega el link de TikTok arriba)'}`
+
   /* SUB-ESTADO auto-guardado (como la checklist y "Mandar a diseño"). Ailyn
      ponía "Listo" pero NO persistía: el sub-estado solo se guardaba al tocar
      "Guardar cambios" → al reabrir volvía a "Sin empezar". Ahora se guarda al
@@ -971,6 +979,36 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                     {avisando ? 'Avisando…' : yaPublicado ? '✓ Cliente avisado · reenviar' : 'Video ya subido — avisar al cliente'}
                   </button>
                   <p className="text-[10.5px] text-muted-foreground leading-tight">Le llega una notificación al celular del cliente y verá estos links en su portal.</p>
+
+                  {/* Caption de WhatsApp para el grupo del equipo — los links se
+                      colocan solos desde los inputs de arriba. Aparece apenas hay
+                      un link o cuando el video ya se marcó publicado. */}
+                  {(linkTiktok.trim() || linkInstagram.trim() || yaPublicado) && (
+                    <div className="mt-2 rounded-lg border border-border/50 bg-muted/40 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-background/40">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                          💬 Caption WhatsApp
+                        </span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(captionWhatsApp)
+                              toast.success('Caption copiado al portapapeles 📋')
+                            } catch {
+                              toast.error('No se pudo copiar — copiá manualmente')
+                            }
+                          }}
+                          title="Copiar el caption para pegarlo en el grupo de WhatsApp"
+                          className="flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted transition-colors"
+                        >
+                          <CopyIcon className="w-3 h-3" />
+                          Copiar
+                        </button>
+                      </div>
+                      <pre className="px-3 py-2 text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono text-foreground/90 m-0">{captionWhatsApp}</pre>
+                    </div>
+                  )}
                 </div>
               </div>
             </aside>
