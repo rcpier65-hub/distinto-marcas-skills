@@ -1,11 +1,11 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
-  ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText,
+  ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
@@ -85,6 +85,7 @@ export function ClientePortalView({
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
   const [vista, setVista] = useState<'cal' | 'lista' | 'stats'>('cal')
+  const [videoModal, setVideoModal] = useState<{ embed: string; title: string } | null>(null)
 
   function esAprobado(p: PubCliente) { return !!p.aprobadoAt || !!aprobados[p.id] }
   function colorEstado(p: PubCliente) {
@@ -176,6 +177,7 @@ export function ClientePortalView({
         aprobandoAhora={aprobando === p.id}
         onAprobar={() => aprobar(p.id)}
         puedeAprobar={!esPublicada(p)}
+        onPlay={(embed) => setVideoModal({ embed, title: p.titulo })}
       />
     )
   }
@@ -341,6 +343,10 @@ export function ClientePortalView({
       )}
 
       <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>
+
+      {videoModal && (
+        <VideoModal embed={videoModal.embed} title={videoModal.title} onClose={() => setVideoModal(null)} />
+      )}
     </main>
   )
 }
@@ -365,10 +371,11 @@ function Leyenda({ color, label }: { color: string; label: string }) {
   )
 }
 
-function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, aprobandoAhora, onAprobar, puedeAprobar }: {
+function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, aprobandoAhora, onAprobar, puedeAprobar, onPlay }: {
   p: PubCliente; color: string; emoji: string | null; publicada?: boolean
   abierto: boolean; onToggle: () => void
   aprobado: boolean; aprobandoAhora: boolean; onAprobar: () => void; puedeAprobar?: boolean
+  onPlay: (embed: string) => void
 }) {
   const contenidoUrl = urlOk(p.video) ?? urlOk(p.driveResultado) ?? urlOk(p.portada)
   const embed = driveEmbed(p.video) ?? driveEmbed(p.driveResultado) ?? driveEmbed(p.portada)
@@ -396,15 +403,21 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
       {abierto && (
         <div className="px-3 pb-3 pt-1 border-t space-y-3">
           {embed ? (
-            /* Reproductor del Drive DENTRO del portal. Formato vertical (reel/
-               TikTok) centrado y acotado a la pantalla: el video se ve completo
-               y el reproductor NO ocupa toda la pantalla. */
-            <div
-              className="mx-auto rounded-xl overflow-hidden bg-black"
-              style={{ width: '100%', maxWidth: 300, aspectRatio: '9 / 16', maxHeight: '68vh' }}
+            /* Miniatura compacta con ▶. Al tocar, el video se abre a PANTALLA
+               COMPLETA (VideoModal con botón Cerrar). Así la tarjeta no queda
+               ocupada por un reproductor gigante y el cliente ve el video cómodo. */
+            <button
+              onClick={() => onPlay(embed)}
+              className="relative w-full block rounded-xl overflow-hidden"
+              style={{ aspectRatio: '16 / 10' }}
             >
-              <iframe src={embed} title={p.titulo} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
-            </div>
+              <Thumb portada={p.portada} color={color} emoji={emoji} big />
+              <span className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.28)' }}>
+                <span className="flex items-center justify-center rounded-full shadow-lg" style={{ width: 60, height: 60, background: 'rgba(255,255,255,0.95)' }}>
+                  <Play className="w-7 h-7" fill="#111" style={{ color: '#111', marginLeft: 3 }} />
+                </span>
+              </span>
+            </button>
           ) : hayContenido ? (
             <a href={contenidoUrl!} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
               <Thumb portada={p.portada} color={color} emoji={emoji} big />
@@ -415,7 +428,7 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
             </div>
           )}
 
-          {esVideo && embed && <p className="text-[11px] text-muted-foreground text-center">▶️ Toca play para ver el video</p>}
+          {embed && <p className="text-[11px] text-muted-foreground text-center">▶️ Toca para ver el video en pantalla completa</p>}
 
           {/* Links del post publicado — el cliente va a ver el video en vivo. */}
           {(urlOk(p.linkTiktok) || urlOk(p.linkInstagram)) && (
@@ -606,6 +619,39 @@ function Kpi({ label, value, color, icon }: { label: string; value: number; colo
     <div className="rounded-2xl bg-card p-3.5 shadow-sm ring-1 ring-black/[0.04]">
       <div className="text-3xl font-extrabold leading-none" style={{ color }}>{value}</div>
       <div className="text-[12px] text-muted-foreground font-semibold mt-1.5">{icon} {label}</div>
+    </div>
+  )
+}
+
+/* Video a PANTALLA COMPLETA. Se abre al tocar la miniatura de una tarjeta.
+   Fondo negro, el video vertical bien grande y un botón "Cerrar" claro (además
+   de tocar fuera o Esc). Bloquea el scroll del fondo mientras está abierto. */
+function VideoModal({ embed, title, onClose }: { embed: string; title: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.94)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 12 }}>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="inline-flex items-center gap-1.5 text-white text-[14px] font-bold"
+          style={{ height: 44, padding: '0 16px', borderRadius: 999, background: 'rgba(255,255,255,0.18)', border: 0 }}
+        >
+          <X className="w-5 h-5" /> Cerrar
+        </button>
+      </div>
+      <div onClick={(e) => e.stopPropagation()} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px 20px' }}>
+        <div style={{ width: '100%', maxWidth: 440, aspectRatio: '9 / 16', maxHeight: '82vh', background: '#000', borderRadius: 14, overflow: 'hidden' }}>
+          <iframe src={embed} title={title} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
+        </div>
+      </div>
     </div>
   )
 }
