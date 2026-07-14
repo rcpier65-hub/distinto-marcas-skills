@@ -97,8 +97,9 @@ export function ClientePortalView({
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
   const [vista, setVista] = useState<'cal' | 'lista' | 'stats'>('cal')
-  /* Modo del calendario: Día · Semana (como la grilla del equipo) · Mes. */
-  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes'>('semana')
+  /* Modo del calendario. Arranca en MES (dashboard principal); el cliente puede
+     luego elegir Semana o Día. Pedro 14-jul-2026. */
+  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes'>('mes')
 
   function esAprobado(p: PubCliente) { return !!p.aprobadoAt || !!aprobados[p.id] }
   function colorEstado(p: PubCliente) {
@@ -272,9 +273,9 @@ export function ClientePortalView({
                 <button onClick={navHoy} className="ml-1 h-9 px-3.5 rounded-xl text-[13px] font-bold transition-colors" style={{ background: `${marcaColor}18`, color: marcaColor }}>Hoy</button>
               </div>
               <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/60">
-                <ModoBtn active={calMode === 'dia'} onClick={() => setCalMode('dia')} color={marcaColor} label="Día" />
-                <ModoBtn active={calMode === 'semana'} onClick={() => setCalMode('semana')} color={marcaColor} label="Semana" />
                 <ModoBtn active={calMode === 'mes'} onClick={() => setCalMode('mes')} color={marcaColor} label="Mes" />
+                <ModoBtn active={calMode === 'semana'} onClick={() => setCalMode('semana')} color={marcaColor} label="Semana" />
+                <ModoBtn active={calMode === 'dia'} onClick={() => setCalMode('dia')} color={marcaColor} label="Día" />
               </div>
               <div className="text-[12px] font-semibold text-muted-foreground w-full text-center sm:w-auto sm:text-right">
                 {navCount} publicaci{navCount === 1 ? 'ón' : 'ones'}
