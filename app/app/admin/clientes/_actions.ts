@@ -69,6 +69,23 @@ export async function crearAccesoCliente(input: {
   return { ok: true }
 }
 
+/* Cambiar el NOMBRE del contacto del cliente (lo que aparece como
+   "Hola, {nombre} 👋" en su portal). Lo puede hacer Erick o el director.
+   Pedro 14-jul-2026. */
+export async function actualizarNombreCliente(id: string, nombre: string): Promise<Result> {
+  await requireUser()
+  if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso' }
+  const nuevo = (nombre ?? '').trim()
+  if (!nuevo) return { ok: false, error: 'El nombre no puede estar vacío' }
+  if (nuevo.length > 80) return { ok: false, error: 'El nombre es demasiado largo' }
+  const service = createServiceClient() as Service
+  const { error } = await service.from('marca_clientes').update({ nombre: nuevo }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/clientes')
+  revalidatePath('/cliente')
+  return { ok: true }
+}
+
 export async function eliminarAccesoCliente(id: string): Promise<Result> {
   await requireUser()
   if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso' }

@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { UserPlus, Trash2, KeyRound, Building2 } from 'lucide-react'
-import { crearAccesoCliente, eliminarAccesoCliente } from '../_actions'
+import { UserPlus, Trash2, KeyRound, Building2, Pencil, Check, X } from 'lucide-react'
+import { crearAccesoCliente, eliminarAccesoCliente, actualizarNombreCliente } from '../_actions'
 
 export type MarcaMini = { slug: string; nombre: string; emoji: string | null }
 export type AccesoCliente = { id: string; nombre: string; email: string; marcaNombre: string; marcaEmoji: string | null }
@@ -19,6 +19,9 @@ export function ClientesAdminView({ marcas, accesos }: { marcas: MarcaMini[]; ac
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [creando, setCreando] = useState(false)
+  const [editando, setEditando] = useState<string | null>(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [guardando, setGuardando] = useState(false)
 
   async function crear() {
     if (!marca || !email.trim() || password.length < 8) { toast.error('Completa marca, correo y contraseña (mín. 8)'); return }
@@ -38,6 +41,20 @@ export function ClientesAdminView({ marcas, accesos }: { marcas: MarcaMini[]; ac
     startTransition(async () => { const r = await eliminarAccesoCliente(id); if (!r.ok) toast.error(r.error) })
   }
 
+  function empezarEdicion(a: AccesoCliente) { setEditando(a.id); setEditNombre(a.nombre) }
+
+  async function guardarNombre(id: string) {
+    const nuevo = editNombre.trim()
+    if (!nuevo) { toast.error('El nombre no puede estar vacío'); return }
+    setGuardando(true)
+    const r = await actualizarNombreCliente(id, nuevo)
+    setGuardando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    setLista((cur) => cur.map((a) => (a.id === id ? { ...a, nombre: nuevo } : a)))
+    setEditando(null)
+    toast.success('✅ Nombre actualizado. El cliente lo verá en su portal.')
+  }
+
   return (
     <main className="mx-auto max-w-2xl p-4 sm:p-6 pb-24 space-y-5">
       <div className="rounded-2xl p-5 text-white" style={{ background: `linear-gradient(135deg, ${AGENCY}, ${AGENCY2} 60%, #ec4899)` }}>
@@ -54,7 +71,7 @@ export function ClientesAdminView({ marcas, accesos }: { marcas: MarcaMini[]; ac
               {marcas.map((m) => <option key={m.slug} value={m.slug}>{m.emoji ? m.emoji + ' ' : ''}{m.nombre}</option>)}
             </select>
           </label>
-          <label className="text-xs text-muted-foreground flex flex-col gap-1">Nombre del contacto (opcional)
+          <label className="text-xs text-muted-foreground flex flex-col gap-1">Nombre del contacto (sale en el saludo del portal)
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Ana (Mil Ideas)" className="h-10 px-3 rounded-lg border bg-background text-sm" />
           </label>
           <label className="text-xs text-muted-foreground flex flex-col gap-1">Usuario (correo)
@@ -80,11 +97,32 @@ export function ClientesAdminView({ marcas, accesos }: { marcas: MarcaMini[]; ac
         ) : lista.map((a) => (
           <div key={a.id} className="flex items-center gap-3 rounded-xl border bg-card p-3">
             <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#eef0f7', color: '#534ab7' }}>{a.marcaEmoji ?? '🏷️'}</span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold truncate">{a.marcaNombre}{a.nombre ? ` · ${a.nombre}` : ''}</div>
-              <div className="text-xs text-muted-foreground truncate">{a.email}</div>
-            </div>
-            <button onClick={() => eliminar(a.id)} title="Quitar acceso" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 shrink-0"><Trash2 className="w-4 h-4" /></button>
+            {editando === a.id ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <input
+                    value={editNombre}
+                    onChange={(e) => setEditNombre(e.target.value)}
+                    autoFocus
+                    placeholder="Nombre del contacto (sale en el saludo)"
+                    className="w-full h-9 px-3 rounded-lg border bg-background text-sm"
+                    onKeyDown={(e) => { if (e.key === 'Enter') guardarNombre(a.id); if (e.key === 'Escape') setEditando(null) }}
+                  />
+                  <div className="text-[11px] text-muted-foreground truncate mt-1">{a.marcaNombre} · {a.email}</div>
+                </div>
+                <button onClick={() => guardarNombre(a.id)} disabled={guardando} title="Guardar" className="w-8 h-8 rounded-lg flex items-center justify-center text-green-600 hover:bg-green-50 shrink-0 disabled:opacity-50"><Check className="w-4 h-4" /></button>
+                <button onClick={() => setEditando(null)} title="Cancelar" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted shrink-0"><X className="w-4 h-4" /></button>
+              </>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold truncate">{a.marcaNombre}{a.nombre ? ` · ${a.nombre}` : ''}</div>
+                  <div className="text-xs text-muted-foreground truncate">{a.email}</div>
+                </div>
+                <button onClick={() => empezarEdicion(a)} title="Cambiar nombre" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => eliminar(a.id)} title="Quitar acceso" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 shrink-0"><Trash2 className="w-4 h-4" /></button>
+              </>
+            )}
           </div>
         ))}
       </div>
