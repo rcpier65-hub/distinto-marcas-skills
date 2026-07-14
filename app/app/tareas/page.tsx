@@ -47,12 +47,14 @@ export default async function TareasPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
 
-  /* Equipo (para sugerir @menciones). Excluye al director. */
+  /* Equipo (para @menciones y el filtro por persona del CEO). Incluye a TODOS
+     los miembros activos. Antes excluía a los directores, pero Erick (mano
+     derecha) es director y SÍ tiene tareas asignadas y quiere poder filtrarse.
+     Pedro 14-jul-2026. */
   const { data: members } = await service
     .from('team_members')
     .select('id, nombre')
     .eq('activo', true)
-    .neq('rol_base', 'director')
     .order('nombre')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
