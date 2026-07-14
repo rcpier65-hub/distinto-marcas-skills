@@ -52,6 +52,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/render-grilla') ||
     request.nextUrl.pathname.startsWith('/api/render-grilla-html') ||
     request.nextUrl.pathname.startsWith('/api/debug') ||
+    request.nextUrl.pathname === '/api/version' ||   // solo el id del deploy (auto-update); sin datos sensibles
     request.nextUrl.pathname === '/' ||
     /* PWA assets — deben servirse sin auth */
     request.nextUrl.pathname === '/manifest.webmanifest' ||
