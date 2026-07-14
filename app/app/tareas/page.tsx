@@ -23,6 +23,20 @@ export default async function TareasPage() {
     .maybeSingle()
   const meId: string | null = tm?.id ?? null
   const esCEO = tm?.rol_base === 'director'
+  const esPedro = (tm?.nombre ?? '').trim().toLowerCase() === 'pedro'
+
+  /* Un director que NO es Pedro (p.ej. Erick, la mano derecha) ve el tablero de
+     TODO el equipo, PERO no las tareas personales de Pedro. Buscamos el id de
+     Pedro para excluir sus tareas de la vista de Erick. Pedro 14-jul-2026. */
+  let pedroId: string | null = null
+  if (esCEO && !esPedro) {
+    const { data: pedroRow } = await service
+      .from('team_members')
+      .select('id')
+      .ilike('nombre', 'pedro')
+      .maybeSingle()
+    pedroId = pedroRow?.id ?? null
+  }
 
   let q = service
     .from('tareas')
@@ -32,7 +46,9 @@ export default async function TareasPage() {
   if (!esCEO && meId) q = q.eq('team_member_id', meId)
   const { data } = await q
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tareas: Tarea[] = ((data ?? []) as any[]).map(rowToTarea)
+  let tareas: Tarea[] = ((data ?? []) as any[]).map(rowToTarea)
+  /* Erick (director ≠ Pedro): fuera las tareas personales de Pedro. */
+  if (pedroId) tareas = tareas.filter((t) => t.teamMemberId !== pedroId)
 
   /* Historial: tareas YA terminadas (las últimas 200). Alimentan el panel de
      "Archivo" del tablero. Mismo gate por persona que las activas. */
@@ -45,7 +61,8 @@ export default async function TareasPage() {
   if (!esCEO && meId) qc = qc.eq('team_member_id', meId)
   const { data: dataC } = await qc
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
+  let completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
+  if (pedroId) completadas = completadas.filter((t) => t.teamMemberId !== pedroId)
 
   /* Equipo (para @menciones y el filtro por persona del CEO). Incluye a TODOS
      los miembros activos. Antes excluía a los directores, pero Erick (mano
@@ -57,7 +74,9 @@ export default async function TareasPage() {
     .eq('activo', true)
     .order('nombre')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+  let equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+  /* Erick no ve las tareas de Pedro → tampoco lo listamos como opción de filtro. */
+  if (pedroId) equipo = equipo.filter((m) => m.id !== pedroId)
 
   return <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esCEO} meId={meId} equipo={equipo} />
 }
