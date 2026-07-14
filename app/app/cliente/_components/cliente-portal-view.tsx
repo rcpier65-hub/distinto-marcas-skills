@@ -35,7 +35,6 @@ export type PubCliente = {
 
 const RED_EMOJI: Record<string, string> = { instagram: '📸', facebook: '👍', tiktok: '🎵', linkedin: '💼', youtube: '▶️' }
 const RED_NOMBRE: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', linkedin: 'LinkedIn', youtube: 'YouTube' }
-const DIAS_SEM = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 const DIAS_SEM_LARGO = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -145,17 +144,22 @@ export function ClientePortalView({
   const [sel, setSel] = useState<string>(hoy)
   const [weekStart, setWeekStart] = useState<string>(() => mondayOf(hoy))
 
-  const { celdas, tituloMes } = useMemo(() => {
-    const { y, m } = ym
-    const primero = new Date(y, m, 1)
-    const offset = (primero.getDay() + 6) % 7
-    const dias = new Date(y, m + 1, 0).getDate()
-    const cells: (number | null)[] = []
-    for (let i = 0; i < offset; i++) cells.push(null)
-    for (let d = 1; d <= dias; d++) cells.push(d)
-    while (cells.length % 7 !== 0) cells.push(null)
-    const titulo = capitalizar(new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)))
-    return { celdas: cells, tituloMes: titulo }
+  const tituloMes = useMemo(
+    () => capitalizar(new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(ym.y, ym.m, 1))),
+    [ym],
+  )
+  /* Semanas (lunes→domingo) que cubren el mes visible — para mostrar el Mes como
+     semanas apiladas, cada una igual a la vista Semana. */
+  const monthWeeks = useMemo(() => {
+    const lastDay = new Date(ym.y, ym.m + 1, 0).getDate()
+    const lastOfMonth = ymd(ym.y, ym.m, lastDay)
+    let ws = mondayOf(ymd(ym.y, ym.m, 1))
+    const weeks: string[][] = []
+    while (ws <= lastOfMonth) {
+      weeks.push(Array.from({ length: 7 }, (_, i) => addDays(ws, i)))
+      ws = addDays(ws, 7)
+    }
+    return weeks
   }, [ym])
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
@@ -306,43 +310,15 @@ export function ClientePortalView({
               />
             )}
 
-            {/* MES — calendario con las TARJETAS dentro de cada día (como la
-                semana, pero mes completo). Pedro 14-jul-2026. */}
+            {/* MES — las semanas del mes apiladas, cada una igual a la vista
+                Semana (encabezados LUN/MAR… + tarjetas de color). Pedro 14-jul. */}
             {calMode === 'mes' && (
-              <div className="overflow-x-auto -mx-1 px-1">
-                <div className="min-w-[560px] lg:min-w-0">
-                  <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
-                    {DIAS_SEM_LARGO.map((d, i) => <div key={i} className="text-center text-[10px] lg:text-[12px] font-bold text-muted-foreground py-1">{d}</div>)}
-                  </div>
-                  <div className="grid grid-cols-7 gap-px rounded-xl overflow-hidden" style={{ background: 'var(--border, #e5e7eb)', border: '1px solid var(--border, #e5e7eb)' }}>
-                    {celdas.map((d, i) => {
-                      if (d === null) return <div key={i} className="bg-muted/20 min-h-[68px] lg:min-h-[104px]" />
-                      const k = ymd(ym.y, ym.m, d)
-                      const items = porDia.get(k) ?? []
-                      const isHoy = k === hoy
-                      return (
-                        <div key={i} className="p-1 lg:p-1.5 min-h-[68px] lg:min-h-[104px] flex flex-col gap-1"
-                          style={{ background: isHoy ? `${marcaColor}12` : 'var(--card, #fff)', boxShadow: isHoy ? `inset 0 0 0 2px ${marcaColor}` : undefined }}>
-                          <div className="text-[11px] lg:text-[13px] font-extrabold leading-none" style={{ color: isHoy ? marcaColor : undefined }}>{d}</div>
-                          <div className="flex flex-col gap-1 overflow-hidden">
-                            {items.slice(0, 3).map((p) => {
-                              const c = colorEstado(p)
-                              const activo = p.id === expandido
-                              return (
-                                <button key={p.id} onClick={() => onChip(p)}
-                                  className="text-left rounded px-1.5 py-1 leading-tight transition-all"
-                                  style={{ borderLeft: `3px solid ${c}`, background: activo ? `${c}30` : `${c}18`, boxShadow: activo ? `0 0 0 1.5px ${c}` : undefined }}>
-                                  <span className="block text-[9px] lg:text-[11px] font-bold truncate" style={{ color: c }}>{p.titulo}</span>
-                                </button>
-                              )
-                            })}
-                            {items.length > 3 && <span className="text-[9px] lg:text-[10px] font-bold text-muted-foreground">+{items.length - 3} más</span>}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+              <div className="space-y-3 lg:space-y-4">
+                {monthWeeks.map((wk, i) => (
+                  <WeekView key={i} weekDays={wk} porDia={porDia} hoy={hoy} marcaColor={marcaColor}
+                    colorEstado={colorEstado} estadoLabel={estadoLabel} redesStr={redesStr}
+                    onChip={onChip} expandidoId={expandido} mesFiltro={ym.m} />
+                ))}
               </div>
             )}
 
@@ -448,7 +424,7 @@ function DetalleModal({ p, color, emoji, publicada, aprobado, aprobandoAhora, on
 }
 
 /* ===== Grilla SEMANAL — columnas por día (estilo grilla del equipo) ===== */
-function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel, redesStr, onChip, expandidoId }: {
+function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel, redesStr, onChip, expandidoId, mesFiltro }: {
   weekDays: string[]
   porDia: Map<string, PubCliente[]>
   hoy: string
@@ -458,6 +434,7 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
   redesStr: (p: PubCliente) => string
   onChip: (p: PubCliente) => void
   expandidoId: string | null
+  mesFiltro?: number
 }) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 lg:grid lg:grid-cols-7 lg:gap-2.5 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0">
@@ -466,8 +443,9 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
         const dow = (dt.getDay() + 6) % 7
         const items = porDia.get(k) ?? []
         const isHoy = k === hoy
+        const fuera = mesFiltro != null && dt.getMonth() !== mesFiltro
         return (
-          <div key={k} className="min-w-[150px] flex-shrink-0 lg:min-w-0 lg:flex-shrink">
+          <div key={k} className="min-w-[150px] flex-shrink-0 lg:min-w-0 lg:flex-shrink" style={{ opacity: fuera ? 0.38 : 1 }}>
             <div className="rounded-xl px-2 py-1.5 mb-2 text-center" style={{ background: isHoy ? marcaColor : 'var(--muted, #f1f5f9)' }}>
               <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: isHoy ? '#fff' : 'var(--muted-foreground, #94a3b8)' }}>{DIAS_SEM_LARGO[dow]}</div>
               <div className="text-lg font-extrabold leading-tight" style={{ color: isHoy ? '#fff' : undefined }}>{dt.getDate()}</div>
