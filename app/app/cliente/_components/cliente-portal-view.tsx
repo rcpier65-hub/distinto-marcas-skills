@@ -247,25 +247,37 @@ export function ClientePortalView({
                 const isHoy = k === hoy
                 const isSel = k === sel
                 const tiene = items.length > 0
+                // Resaltado de días con publicaciones: fondo tintado + borde de
+                // marca + número en color de marca. Seleccionado = relleno sólido;
+                // hoy = anillo grueso.
+                const bg = isSel ? marcaColor : tiene ? `${marcaColor}24` : 'transparent'
+                const ring = isSel
+                  ? undefined
+                  : isHoy
+                    ? `inset 0 0 0 2px ${marcaColor}`
+                    : tiene
+                      ? `inset 0 0 0 1.5px ${marcaColor}66`
+                      : undefined
+                const numColor = isSel ? '#fff' : tiene ? marcaColor : undefined
                 return (
                   <button
                     key={i}
                     onClick={() => setSel(k)}
-                    className="relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all"
+                    className="relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all active:scale-95"
                     style={{
-                      background: isSel ? marcaColor : tiene ? `${marcaColor}12` : 'transparent',
-                      color: isSel ? '#fff' : undefined,
-                      boxShadow: isHoy && !isSel ? `inset 0 0 0 2px ${marcaColor}` : undefined,
-                      fontWeight: tiene || isHoy ? 700 : 500,
+                      background: bg,
+                      color: numColor,
+                      boxShadow: ring,
+                      fontWeight: tiene || isHoy ? 800 : 500,
                     }}
                   >
                     <span className="text-[13px] leading-none">{d}</span>
                     {tiene && (
-                      <span className="absolute bottom-1.5 flex items-center gap-[3px]">
+                      <span className="absolute bottom-1 flex items-center gap-[3px]">
                         {items.slice(0, 3).map((p, j) => (
-                          <span key={j} className="w-[5px] h-[5px] rounded-full" style={{ background: isSel ? '#fff' : colorEstado(p) }} />
+                          <span key={j} className="w-[6px] h-[6px] rounded-full" style={{ background: isSel ? '#fff' : colorEstado(p) }} />
                         ))}
-                        {items.length > 3 && <span className="text-[8px] font-bold" style={{ color: isSel ? '#fff' : marcaColor }}>+</span>}
+                        {items.length > 3 && <span className="text-[9px] font-extrabold leading-none" style={{ color: isSel ? '#fff' : marcaColor }}>+</span>}
                       </span>
                     )}
                   </button>
