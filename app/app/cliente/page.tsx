@@ -37,20 +37,24 @@ export default async function ClientePortalPage() {
 
   const COLS = `id, nombre, copy, fecha_publicacion, estado, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url, link_tiktok, link_instagram`
 
-  const [pubRes, proxRes] = await Promise.all([
-    // Publicadas (recientes)
-    service.from('publicaciones').select(COLS).eq('marca_id', cliente.marcaId).eq('estado', 'publicado').order('fecha_publicacion', { ascending: false }).limit(30)
-      .then((r: unknown) => r, () => ({ data: [] })),
-    // Por publicar (de hoy en adelante, aún no publicadas)
-    service.from('publicaciones').select(COLS).eq('marca_id', cliente.marcaId).neq('estado', 'publicado').gte('fecha_publicacion', hoy).order('fecha_publicacion', { ascending: true }).limit(30)
-      .then((r: unknown) => r, () => ({ data: [] })),
-  ])
+  // Traemos TODAS las publicaciones de la marca (con y sin publicar). El
+  // calendario del portal las agrupa por día; la vista lista las separa en
+  // "por publicar" y "publicadas".
+  const { data } = await service
+    .from('publicaciones')
+    .select(COLS)
+    .eq('marca_id', cliente.marcaId)
+    .order('fecha_publicacion', { ascending: false })
+    .limit(400)
+    .then((r: unknown) => r, () => ({ data: [] }))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRow = (r: any): PubCliente => ({
     id: r.id,
     titulo: r.nombre ?? '(sin título)',
-    fecha: r.fecha_publicacion ?? null,
+    // Fecha del calendario: la programada; si ya se publicó sin fecha, usamos
+    // la fecha real de publicación (en horario Lima).
+    fecha: r.fecha_publicacion ?? (r.publicado_at ? ymdLima(new Date(r.publicado_at)) : null),
     publicadoAt: r.publicado_at ?? null,
     aprobadoAt: r.aprobado_cliente_at ?? null,
     redes: normalizeRedes(r.plataformas),
@@ -64,19 +68,18 @@ export default async function ClientePortalPage() {
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const publicadas = (((pubRes as any)?.data ?? []) as any[]).map(mapRow)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const porPublicar = (((proxRes as any)?.data ?? []) as any[]).map(mapRow)
+  const pubs = (((data as any) ?? []) as any[]).map(mapRow)
 
   return (
     <ClientePortalView
+      marcaId={cliente.marcaId}
       marcaNombre={cliente.marcaNombre}
       marcaSlug={cliente.marcaSlug}
       marcaEmoji={cliente.marcaEmoji}
       marcaColor={cliente.marcaColor}
       contacto={cliente.nombre}
-      publicadas={publicadas}
-      porPublicar={porPublicar}
+      hoy={hoy}
+      pubs={pubs}
     />
   )
 }

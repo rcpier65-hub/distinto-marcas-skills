@@ -8,7 +8,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { generarCopysIA } from '@/lib/copys/generar'
 import { promptSeedPorSlug } from '@/lib/copys/seeds'
 import { registrarActividad } from '@/lib/actividad/registrar'
-import { enviarPushAClientesDeMarca, enviarPushAMiembros } from '@/lib/push/send'
+import { enviarPushAClientesDeMarca } from '@/lib/push/send'
 import type { EstadoPublicacion, EstadoTarea } from '@/lib/types/database'
 
 export type UpdatePublicacionInput = {
@@ -425,8 +425,9 @@ export async function deletePublicacion(
 
 /* "Video ya subido → avisar al cliente". Lo usa el trabajador desde el detalle:
    guarda los links del post (TikTok/Instagram), marca la publicación como
-   publicada y manda un push AL CLIENTE de la marca ("¡Tu video se publicó!") y
-   al equipo (Pedro/Lorena). Pedro 09-jul-2026. */
+   publicada y manda un push SOLO AL CLIENTE de la marca ("¡Tu video se
+   publicó!"). Pedro 14-jul-2026: el aviso de publicado NO va al equipo, solo
+   al cliente. */
 export async function avisarClientePublicado(
   id: string,
   input: { linkTiktok?: string | null; linkInstagram?: string | null },
@@ -453,7 +454,7 @@ export async function avisarClientePublicado(
   const marcaNombre = m?.nombre ?? 'Marca'
   const hora = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(new Date())
 
-  // Al CLIENTE de la marca.
+  // SOLO al CLIENTE de la marca (el equipo ya no recibe el aviso de publicado).
   if (m?.id) {
     await enviarPushAClientesDeMarca(m.id, {
       title: `✅ ¡Tu video se publicó! ${m.emoji_marca ?? ''}`.trim(),
@@ -462,13 +463,6 @@ export async function avisarClientePublicado(
       tag: `cliente-pub-${id}`,
     })
   }
-  // Al equipo (Pedro/Lorena).
-  await enviarPushAMiembros(['pedro', 'lorena'], {
-    title: `✅ Publicado — ${m?.emoji_marca ? m.emoji_marca + ' ' : ''}${marcaNombre}`,
-    body: `${pub?.nombre ?? ''} · ${hora}`,
-    url: '/publicaciones/publicar-hoy',
-    tag: `pub-${id}`,
-  })
 
   revalidatePath('/publicaciones')
   revalidatePath('/publicaciones/publicar-hoy')

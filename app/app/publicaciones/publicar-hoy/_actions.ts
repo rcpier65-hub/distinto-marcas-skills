@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { enviarPushAMiembros, enviarPushAClientesDeMarca } from '@/lib/push/send'
+import { enviarPushAClientesDeMarca } from '@/lib/push/send'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -33,14 +33,9 @@ export async function marcarPublicado(id: string): Promise<Result> {
   const hora = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(new Date())
   const redes = Array.isArray(pub?.plataformas) && pub.plataformas.length ? ` · ${pub.plataformas.join(', ')}` : ''
   const marcaNombre = m?.nombre ?? 'Marca'
-  // Notificación PUSH real al celular/PC de Pedro y Lorena (sin WhatsApp).
-  await enviarPushAMiembros(['pedro', 'lorena'], {
-    title: `✅ Publicado — ${m?.emoji_marca ? m.emoji_marca + ' ' : ''}${marcaNombre}`,
-    body: `${pub?.nombre ?? ''}${redes} · ${hora}`,
-    url: '/publicaciones/publicar-hoy',
-    tag: `pub-${id}`,
-  })
-  // Y al CLIENTE de esa marca (portal): "¡tu video ya está publicado!".
+  // La notificación de "publicado" va SOLO al CLIENTE de la marca (portal),
+  // NO al equipo. Pedro 14-jul-2026: "cuando hacen una publicación me llega a
+  // mí; no quiero, que solo le llegue al cliente".
   if (m?.id) {
     await enviarPushAClientesDeMarca(m.id, {
       title: `✅ ¡Tu video se publicó! ${m.emoji_marca ?? ''}`.trim(),

@@ -8,8 +8,8 @@
 
 import { useState } from 'react'
 
-// Excepciones de extensión (la mayoría son SVG vector; Little Joe y Vid Natur solo tienen PNG).
-const EXT_OVERRIDE: Record<string, string> = { 'little-joe': 'png', 'vid-natur': 'png' }
+// Excepciones de extensión (la mayoría son SVG vector; estas solo tienen PNG).
+const EXT_OVERRIDE: Record<string, string> = { 'little-joe': 'png', 'vid-natur': 'png', 'mil-ideas': 'png' }
 
 // Slugs internos / sin logo → directo al emoji (evita 404).
 const SIN_LOGO = new Set(['interno', 'unknown', 'warrior-supps', 'oral-bueaty'])
@@ -27,11 +27,16 @@ export function MarcaLogo({
   size?: number
   className?: string
 }) {
-  const [failed, setFailed] = useState(false)
+  // Cadena de extensiones a intentar en orden. Si la marca tiene override,
+  // usamos SOLO esa (evita un 404 innecesario). Si no, probamos svg y luego
+  // png — así una marca nueva (p.ej. un cliente) muestra su logo aunque solo
+  // suban el PNG, sin tener que tocar este archivo.
+  const chain = EXT_OVERRIDE[slug] ? [EXT_OVERRIDE[slug]] : ['svg', 'png']
+  const [step, setStep] = useState(0)
   const px = `${size}px`
 
-  // Fallback al emoji
-  if (failed || !slug || SIN_LOGO.has(slug)) {
+  // Fallback al emoji: sin slug, marca sin logo, o ya agotamos la cadena.
+  if (!slug || SIN_LOGO.has(slug) || step >= chain.length) {
     return (
       <span
         className={`inline-flex items-center justify-center rounded-md bg-muted shrink-0 ${className}`}
@@ -43,7 +48,7 @@ export function MarcaLogo({
     )
   }
 
-  const ext = EXT_OVERRIDE[slug] ?? 'svg'
+  const ext = chain[step]
   return (
     <span
       className={`inline-flex items-center justify-center rounded-md bg-white border border-border/70 shrink-0 overflow-hidden ${className}`}
@@ -51,9 +56,10 @@ export function MarcaLogo({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        key={ext}
         src={`/marcas/${slug}/logo.${ext}`}
         alt={nombre ?? slug}
-        onError={() => setFailed(true)}
+        onError={() => setStep((s) => s + 1)}
         className="w-full h-full object-contain p-[2px]"
       />
     </span>
