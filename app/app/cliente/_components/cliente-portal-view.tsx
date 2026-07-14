@@ -386,8 +386,14 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
       {abierto && (
         <div className="px-3 pb-3 pt-1 border-t space-y-3">
           {embed ? (
-            <div className="rounded-xl overflow-hidden bg-black/5" style={{ aspectRatio: '4 / 5', maxHeight: 520 }}>
-              <iframe src={embed} title={p.titulo} allow="autoplay" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
+            /* Reproductor del Drive DENTRO del portal. Formato vertical (reel/
+               TikTok) centrado y acotado a la pantalla: el video se ve completo
+               y el reproductor NO ocupa toda la pantalla. */
+            <div
+              className="mx-auto rounded-xl overflow-hidden bg-black"
+              style={{ aspectRatio: '9 / 16', height: 'min(62vh, 520px)', maxWidth: '100%' }}
+            >
+              <iframe src={embed} title={p.titulo} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
             </div>
           ) : hayContenido ? (
             <a href={contenidoUrl!} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
