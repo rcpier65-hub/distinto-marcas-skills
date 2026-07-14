@@ -1,7 +1,9 @@
 // app/app/tareas/page.tsx
 //
 // Tablero de tareas estilo "Notas". Columnas dinámicas (categoría = entidad).
-// El CEO (director) ve TODAS las tareas; cada miembro solo las suyas.
+// Las tareas son PERSONALES: cada miembro ve SOLO las suyas. Únicamente el
+// DUEÑO (Pedro) ve el tablero completo del equipo. Pedro 14-jul-2026:
+// "las tareas son personales; Erick no debe ver las de Aylin ni Lorena, etc."
 
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -22,33 +24,21 @@ export default async function TareasPage() {
     .eq('auth_user_id', user.id)
     .maybeSingle()
   const meId: string | null = tm?.id ?? null
-  const esCEO = tm?.rol_base === 'director'
-  const esPedro = (tm?.nombre ?? '').trim().toLowerCase() === 'pedro'
-
-  /* Un director que NO es Pedro (p.ej. Erick, la mano derecha) ve el tablero de
-     TODO el equipo, PERO no las tareas personales de Pedro. Buscamos el id de
-     Pedro para excluir sus tareas de la vista de Erick. Pedro 14-jul-2026. */
-  let pedroId: string | null = null
-  if (esCEO && !esPedro) {
-    const { data: pedroRow } = await service
-      .from('team_members')
-      .select('id')
-      .ilike('nombre', 'pedro')
-      .maybeSingle()
-    pedroId = pedroRow?.id ?? null
-  }
+  /* SOLO el DUEÑO (Pedro: sin team_member, o el team_member llamado "Pedro")
+     ve el tablero completo del equipo. TODOS los demás —incluido Erick, que es
+     director-administrador— ven SOLO sus propias tareas. Las tareas son
+     personales; si se asigna a alguien, esa persona la ve en su tablero. */
+  const esOwner = !tm || (tm?.nombre ?? '').trim().toLowerCase() === 'pedro'
 
   let q = service
     .from('tareas')
     .select(TAREA_SELECT)
     .eq('completada', false)
     .order('created_at', { ascending: false })
-  if (!esCEO && meId) q = q.eq('team_member_id', meId)
+  if (!esOwner && meId) q = q.eq('team_member_id', meId)
   const { data } = await q
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let tareas: Tarea[] = ((data ?? []) as any[]).map(rowToTarea)
-  /* Erick (director ≠ Pedro): fuera las tareas personales de Pedro. */
-  if (pedroId) tareas = tareas.filter((t) => t.teamMemberId !== pedroId)
+  const tareas: Tarea[] = ((data ?? []) as any[]).map(rowToTarea)
 
   /* Historial: tareas YA terminadas (las últimas 200). Alimentan el panel de
      "Archivo" del tablero. Mismo gate por persona que las activas. */
@@ -58,25 +48,21 @@ export default async function TareasPage() {
     .eq('completada', true)
     .order('completada_at', { ascending: false, nullsFirst: false })
     .limit(200)
-  if (!esCEO && meId) qc = qc.eq('team_member_id', meId)
+  if (!esOwner && meId) qc = qc.eq('team_member_id', meId)
   const { data: dataC } = await qc
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
-  if (pedroId) completadas = completadas.filter((t) => t.teamMemberId !== pedroId)
+  const completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
 
-  /* Equipo (para @menciones y el filtro por persona del CEO). Incluye a TODOS
-     los miembros activos. Antes excluía a los directores, pero Erick (mano
-     derecha) es director y SÍ tiene tareas asignadas y quiere poder filtrarse.
-     Pedro 14-jul-2026. */
+  /* Equipo (para sugerir @menciones al asignar una tarea a otra persona).
+     Incluye a todos los miembros activos. El filtro por persona del tablero solo
+     lo ve el dueño (esOwner) — los demás ven solo lo suyo, no necesitan filtro. */
   const { data: members } = await service
     .from('team_members')
     .select('id, nombre')
     .eq('activo', true)
     .order('nombre')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
-  /* Erick no ve las tareas de Pedro → tampoco lo listamos como opción de filtro. */
-  if (pedroId) equipo = equipo.filter((m) => m.id !== pedroId)
+  const equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
 
-  return <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esCEO} meId={meId} equipo={equipo} />
+  return <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esOwner} meId={meId} equipo={equipo} />
 }

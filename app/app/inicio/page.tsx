@@ -79,6 +79,11 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
      para que vea TODAS las publicaciones, no solo las asignadas. */
   const esAdmin = !p
   const esCEO = esAdmin || (p?.member.rol_base === 'director')
+  /* El DUEÑO (Pedro): sin team_member, o el team_member llamado "Pedro". SOLO el
+     dueño ve el trabajo/tareas de TODO el equipo en su reporte y su inicio. Los
+     demás (incluido Erick, que es director-administrador) ven SOLO lo suyo.
+     Pedro 14-jul-2026: "las tareas son personales; Erick no debe ver las de Aylin". */
+  const esOwner = esAdmin || (p?.member.nombre ?? '').trim().toLowerCase() === 'pedro'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -169,11 +174,10 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   /* Datos contextuales según el rol */
   let tareasMias: InicioData['tareasMias'] = []
 
-  if (esCEO) {
-    /* Admin/CEO: mostrar las publicaciones más recientes pendientes de
-       cualquier estado activo (no archivado), para tener pulso del día.
-       Aplica para Pedro como owner sin team_member Y también para
-       pedro@agenciadistinto.com con rol director. */
+  if (esOwner) {
+    /* SOLO el dueño (Pedro): pulso del día con las publicaciones más recientes
+       pendientes de cualquier estado activo. Erick (director) NO cae acá — ve
+       solo su propio trabajo por rol (abajo). Pedro 14-jul-2026. */
     const { data } = await service
       .from('publicaciones')
       .select(`id, nombre, fecha_publicacion, estado, marca:marcas(slug, nombre, color_primario_hex)`)
@@ -423,7 +427,10 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       usuarioNombreCompleto: nombreCapitalizado,
       usuarioAvatarUrl: memberData.avatar_url,
       usuarioRol: memberData.rolNombre,
-      esCEO,
+      /* Reporte "personal": solo el dueño ve el trabajo de todo el equipo. Erick
+         (director) ve SOLO lo suyo — sin esto, su reporte mostraba la cola de
+         diseño de Aylin. Pedro 14-jul-2026. */
+      esCEO: esOwner,
       rolBase: memberData.rol_base,
     }).catch((e) => {
       console.error('[inicio] loadReporteDelDia falló — sigo con null:', e)
