@@ -397,7 +397,11 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
      con permiso explícito). Si NO tiene, el bloque cockpit no aparece y
      la home queda en versión simple. */
   const verCockpit = esCEO || (p && tieneAcceso(p.permisos, 'metricas' as ModuloPermiso))
-  const puedeVerFinanzas = esCEO || (p && tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso)) || false
+  /* Finanzas: estrictamente por PERMISO para cualquier miembro del equipo,
+     incluso director/CEO. Así Erick (director, mano derecha) tiene acceso a todo
+     MENOS finanzas si su permiso de finanzas está en false. El dueño (sin
+     team_member, p=null) sí ve todo. Pedro 14-jul-2026. */
+  const puedeVerFinanzas = p ? tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso) : true
 
   /* Cargamos cockpitData, lista de marcas y el reporte del día en
      paralelo. marcasNav viene de la tabla `marcas` (Supabase) → cualquier
@@ -448,6 +452,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     saludo: saludoSegunHora(),
     rol: memberData.rolNombre,
     rolBase: memberData.rol_base,
+    puedeVerFinanzas,
     avatarUrl: memberData.avatar_url,
     cargo: memberData.cargo_personalizado,
     cumpleHoy,

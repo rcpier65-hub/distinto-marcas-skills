@@ -45,6 +45,8 @@ export type InicioData = {
   rol: string
   /* rol_base de BD para elegir el ícono animado del rol */
   rolBase: string
+  /* Si el usuario puede ver Finanzas (para ocultar la tarjeta rápida a quien no). */
+  puedeVerFinanzas: boolean
   avatarUrl: string | null
   cargo: string | null
   cumpleHoy: boolean
@@ -627,7 +629,7 @@ export function InicioView({ data }: { data: InicioData }) {
                 para que el carrusel scrollee contenido, no toda la pantalla). */}
             {/* Accesos rápidos: Pedro (CEO) no los necesita. Solo equipo. */}
             {data.rolBase !== 'director' && (
-              <AccesosRapidos rolBase={data.rolBase} acento={acento} />
+              <AccesosRapidos rolBase={data.rolBase} acento={acento} puedeVerFinanzas={data.puedeVerFinanzas} />
             )}
             <TrabajoYReuniones
               tareas={data.tareasMias}
@@ -1413,8 +1415,8 @@ function PendienteItem({
    genéricos: "Mis diseños para hoy" en vez de "Diseño". Hover lift +
    color del rol como acento. 2-3 cards máximo para no saturar.
    ==================================================================== */
-function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }) {
-  const accesos = useMemo<Array<{ titulo: string; subtitulo: string; href: string; Icon: LucideIcon; color?: string }>>(() => {
+function AccesosRapidos({ rolBase, acento, puedeVerFinanzas }: { rolBase: string; acento: string; puedeVerFinanzas: boolean }) {
+  const accesosBase = useMemo<Array<{ titulo: string; subtitulo: string; href: string; Icon: LucideIcon; color?: string }>>(() => {
     const COMUNES = {
       perfil: { titulo: 'Mi perfil', subtitulo: 'Foto, datos, contraseña', href: '/perfil', Icon: User },
       habitos: { titulo: 'Mis hábitos', subtitulo: 'Heatmap completo y rutinas', href: '/habitos', Icon: Flame },
@@ -1453,6 +1455,10 @@ function AccesosRapidos({ rolBase, acento }: { rolBase: string; acento: string }
       COMUNES.habitos,
     ]
   }, [rolBase])
+
+  /* Ocultamos la tarjeta de Finanzas a quien no tiene ese permiso (p.ej. Erick,
+     que es director con acceso a todo MENOS finanzas). */
+  const accesos = puedeVerFinanzas ? accesosBase : accesosBase.filter((a) => a.href !== '/finanzas')
 
   return (
     <section>
