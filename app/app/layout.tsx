@@ -3,6 +3,7 @@ import { Inter_Tight, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
 import { SwRegister } from '@/components/pwa/sw-register'
+import { AutoUpdate } from '@/components/pwa/auto-update'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { getClienteActual } from '@/lib/cliente/get-cliente'
@@ -136,6 +137,9 @@ export default async function RootLayout({
         {/* SwRegister: instala /sw.js para hacer la app instalable
             como PWA en macOS/iOS/Android con icono full color. */}
         <SwRegister />
+        {/* AutoUpdate: recarga la app sola cuando hay una versión nueva
+            publicada, sin tener que cerrar/abrir. Aplica a equipo y clientes. */}
+        <AutoUpdate />
       </body>
     </html>
   )
