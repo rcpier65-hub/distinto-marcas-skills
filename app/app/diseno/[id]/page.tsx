@@ -88,6 +88,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
           fechaDiseno: pub.fecha_diseno,
           fechaEntrega: pub.fecha_entrega,
           subEstado: pub.estado_tarea ?? 'sin_empezar',
+          fechaMarcadaParaDisenar: pub.fecha_marcada_para_disenar ?? null,
           driveMaterialUrl: pub.drive_material_url,
           driveResultadoUrl: pub.drive_resultado_url,
           horaReunion: pub.reunion_hora,

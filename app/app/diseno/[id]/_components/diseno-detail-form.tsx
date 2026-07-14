@@ -12,10 +12,10 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Calendar, Clock, Folder, Image as ImageIcon, Users,
+  Calendar, CalendarCheck, Clock, Folder, Image as ImageIcon, Users,
   Save, Trash2, Archive, Hourglass, Copy as CopyIcon, ExternalLink, Video, Loader2,
 } from 'lucide-react'
-import { updateDisenoEntry, archivarTarea } from '../../_actions'
+import { updateDisenoEntry, archivarTarea, marcarParaDisenarHoy, desmarcarParaDisenarHoy } from '../../_actions'
 import { deletePublicacion } from '@/app/publicaciones/[id]/_actions'
 import { esRedireccion } from '@/lib/utils/is-redirect-error'
 import { sincronizarReunion } from '../_reunion-actions'
@@ -39,6 +39,7 @@ type Publicacion = {
   descripcion: string | null
   fechaDiseno: string | null
   fechaEntrega: string | null
+  fechaMarcadaParaDisenar: string | null
   subEstado: string
   driveMaterialUrl: string | null
   driveResultadoUrl: string | null
@@ -75,6 +76,24 @@ export function DisenoDetailForm({
   const [isSaving, setIsSaving] = useState(false)
   const [meetLink, setMeetLink] = useState<string | null>(publicacion.reunionMeetLink)
   const [syncing, setSyncing] = useState(false)
+  /* "Trabajar HOY": marca fecha_marcada_para_disenar = hoy. Ancla la tarea a la
+     lista de hoy de Aylin (filtro "solo hoy") — así, aunque cambie el estado y
+     la tarjeta se mueva de columna en el Kanban, no la pierde. Aylin 10-jul. */
+  const HOY = new Date().toISOString().slice(0, 10)
+  const [marcadaHoy, setMarcadaHoy] = useState<boolean>(publicacion.fechaMarcadaParaDisenar === HOY)
+  const [togglingHoy, setTogglingHoy] = useState(false)
+
+  function toggleHoy() {
+    const nuevo = !marcadaHoy
+    setMarcadaHoy(nuevo)
+    setTogglingHoy(true)
+    startTransition(async () => {
+      const r = nuevo ? await marcarParaDisenarHoy(form.id) : await desmarcarParaDisenarHoy(form.id)
+      setTogglingHoy(false)
+      if (!r.ok) { setMarcadaHoy(!nuevo); toast.error(r.error); return }
+      toast.success(nuevo ? '📌 Añadida a tu lista de HOY' : 'Quitada de hoy', { duration: 1500 })
+    })
+  }
 
   // Crea/actualiza la reunión en Google Calendar (con hora + Meet + invitados).
   function handleSincronizarReunion() {
@@ -224,7 +243,21 @@ export function DisenoDetailForm({
             className="w-full text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-muted focus:border-primary focus:outline-none transition-colors py-1 mb-3"
           />
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
+          {/* Botón HOY — lo pidió Aylin: mandar la tarea a su lista de hoy sin
+              perderla. Morado lleno = ya está en hoy. */}
+          <button
+            onClick={toggleHoy}
+            disabled={togglingHoy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-colors disabled:opacity-50"
+            style={marcadaHoy
+              ? { background: '#7c3aed', color: '#fff', border: '1px solid #7c3aed' }
+              : { background: 'rgba(124,58,237,0.10)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.35)' }}
+            title={marcadaHoy ? 'Quitar de tu lista de hoy' : 'Añadir a tu lista de HOY'}
+          >
+            <CalendarCheck className="w-3.5 h-3.5" />
+            {marcadaHoy ? 'En HOY ✓' : 'Trabajar HOY'}
+          </button>
           <button
             onClick={handleArchive}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors"
