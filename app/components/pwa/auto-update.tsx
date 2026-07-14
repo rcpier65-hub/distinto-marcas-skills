@@ -19,7 +19,7 @@
 import { useEffect, useRef } from 'react'
 
 const CURRENT = process.env.NEXT_PUBLIC_BUILD_ID || 'dev'
-const CHECK_MS = 60_000
+const CHECK_MS = 30_000
 
 function estaEscribiendo(): boolean {
   if (typeof document === 'undefined') return false
@@ -74,6 +74,7 @@ export function AutoUpdate() {
 
     document.addEventListener('visibilitychange', alVolver)
     window.addEventListener('focus', alVolver)
+    window.addEventListener('online', chequear)
     document.addEventListener('focusout', alSalirDeCampo)
 
     // Chequeo inicial: por si abrió una versión vieja que quedó en caché.
@@ -84,6 +85,7 @@ export function AutoUpdate() {
       clearInterval(intervalo)
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener('focus', alVolver)
+      window.removeEventListener('online', chequear)
       document.removeEventListener('focusout', alSalirDeCampo)
     }
   }, [])
