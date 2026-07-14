@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
-  ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play,
+  ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
@@ -28,6 +28,9 @@ export type PubCliente = {
   copy: string | null
   guion: string | null
   estado: string | null
+  fechaEntrega: string | null
+  esDiseno: boolean
+  estadoTarea: string | null
 }
 
 const RED_EMOJI: Record<string, string> = { instagram: '📸', facebook: '👍', tiktok: '🎵', linkedin: '💼', youtube: '▶️' }
@@ -42,6 +45,11 @@ const C_PUBLICADO = '#14b8a6'  // teal  — ya se publicó
 const C_PORPUB = '#f59e0b'     // ámbar — por publicar
 
 function esPublicada(p: PubCliente) { return (p.estado ?? '') === 'publicado' }
+/* "En diseño" = tarea de diseño (Aylin) que aún se está trabajando. Se muestran
+   en su propia sección para que el cliente vea qué se está diseñando para él. */
+function enDiseno(p: PubCliente) {
+  return p.esDiseno && !esPublicada(p) && (p.estadoTarea === 'sin_empezar' || p.estadoTarea === 'en_progreso' || p.estadoTarea === 'pausada' || p.estadoTarea == null)
+}
 
 function fechaBonita(iso: string | null): string {
   if (!iso) return ''
@@ -100,6 +108,9 @@ export function ClientePortalView({
   /* Modo del calendario. Arranca en MES (dashboard principal); el cliente puede
      luego elegir Semana o Día. Pedro 14-jul-2026. */
   const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes'>('mes')
+  /* Publicación abierta en la ventana de detalle (al tocar una tarjeta del
+     calendario). El cliente ve el video ahí y puede aprobarlo. */
+  const [modalPub, setModalPub] = useState<PubCliente | null>(null)
 
   function esAprobado(p: PubCliente) { return !!p.aprobadoAt || !!aprobados[p.id] }
   function colorEstado(p: PubCliente) {
@@ -110,17 +121,24 @@ export function ClientePortalView({
   function estadoLabel(p: PubCliente) { return esAprobado(p) ? 'Aprobado' : esPublicada(p) ? 'Publicado' : 'Por publicar' }
   function redesStr(p: PubCliente) { return p.redes.map((r) => RED_EMOJI[r] ?? r).join('') }
 
-  /* Agrupamos las piezas por día (YYYY-MM-DD). */
+  /* Piezas "normales" (publicaciones) vs diseños en proceso de Aylin. */
+  const pubsNormales = useMemo(() => pubs.filter((p) => !enDiseno(p)), [pubs])
+  const disenosEnProceso = useMemo(
+    () => pubs.filter(enDiseno).sort((a, b) => (a.fechaEntrega ?? a.fecha ?? '9999').localeCompare(b.fechaEntrega ?? b.fecha ?? '9999')),
+    [pubs],
+  )
+
+  /* Agrupamos las publicaciones por día (YYYY-MM-DD) para el calendario. */
   const porDia = useMemo(() => {
     const m = new Map<string, PubCliente[]>()
-    for (const p of pubs) {
+    for (const p of pubsNormales) {
       if (!p.fecha) continue
       const k = p.fecha.slice(0, 10)
       const arr = m.get(k)
       if (arr) arr.push(p); else m.set(k, [p])
     }
     return m
-  }, [pubs])
+  }, [pubsNormales])
 
   const [hY, hM] = hoy.split('-').map(Number)
   const [ym, setYm] = useState<{ y: number; m: number }>({ y: hY, m: hM - 1 })
@@ -144,10 +162,9 @@ export function ClientePortalView({
   const weekLabel = rangoSemana(weekDays[0], weekDays[6])
   const weekCount = weekDays.reduce((n, k) => n + (porDia.get(k)?.length ?? 0), 0)
   const mesPrefix = `${ym.y}-${String(ym.m + 1).padStart(2, '0')}`
-  const mesCount = useMemo(() => pubs.filter((p) => (p.fecha ?? '').startsWith(mesPrefix)).length, [pubs, mesPrefix])
+  const mesCount = useMemo(() => pubsNormales.filter((p) => (p.fecha ?? '').startsWith(mesPrefix)).length, [pubsNormales, mesPrefix])
 
   const itemsDelDia = porDia.get(sel) ?? []
-  const detallePub = expandido ? pubs.find((p) => p.id === expandido) ?? null : null
 
   function irMes(delta: number) {
     setYm((cur) => {
@@ -177,14 +194,14 @@ export function ClientePortalView({
   const navLabel = calMode === 'dia' ? capitalizar(fechaBonita(sel)) : calMode === 'semana' ? weekLabel : tituloMes
   const navCount = calMode === 'dia' ? itemsDelDia.length : calMode === 'semana' ? weekCount : mesCount
 
-  /* Vista lista: separación por publicar / publicadas. */
+  /* Vista lista: separación por publicar / publicadas (sin los diseños en proceso). */
   const porPublicar = useMemo(
-    () => pubs.filter((p) => !esPublicada(p)).sort((a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? '')),
-    [pubs],
+    () => pubsNormales.filter((p) => !esPublicada(p)).sort((a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? '')),
+    [pubsNormales],
   )
   const publicadas = useMemo(
-    () => pubs.filter((p) => esPublicada(p)).sort((a, b) => (b.publicadoAt ?? b.fecha ?? '').localeCompare(a.publicadoAt ?? a.fecha ?? '')),
-    [pubs],
+    () => pubsNormales.filter((p) => esPublicada(p)).sort((a, b) => (b.publicadoAt ?? b.fecha ?? '').localeCompare(a.publicadoAt ?? a.fecha ?? '')),
+    [pubsNormales],
   )
 
   async function salir() {
@@ -216,11 +233,9 @@ export function ClientePortalView({
     )
   }
 
-  /* Al tocar una tarjeta de la grilla semanal: la abrimos como detalle abajo. */
-  function onChip(p: PubCliente) {
-    setExpandido(p.id)
-    if (p.fecha) setSel(p.fecha.slice(0, 10))
-  }
+  /* Al tocar una tarjeta del calendario (Semana/Mes): abre la ventana de
+     detalle para ver el video y aprobarlo. */
+  function onChip(p: PubCliente) { setModalPub(p) }
 
   return (
     <main className="mx-auto max-w-2xl lg:max-w-6xl p-4 sm:p-6 lg:p-8 pb-28 space-y-5 lg:space-y-6">
@@ -299,15 +314,15 @@ export function ClientePortalView({
                   <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
                     {DIAS_SEM_LARGO.map((d, i) => <div key={i} className="text-center text-[10px] lg:text-[12px] font-bold text-muted-foreground py-1">{d}</div>)}
                   </div>
-                  <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
+                  <div className="grid grid-cols-7 gap-px rounded-xl overflow-hidden" style={{ background: 'var(--border, #e5e7eb)', border: '1px solid var(--border, #e5e7eb)' }}>
                     {celdas.map((d, i) => {
-                      if (d === null) return <div key={i} className="rounded-lg bg-muted/20 min-h-[68px] lg:min-h-[104px]" />
+                      if (d === null) return <div key={i} className="bg-muted/20 min-h-[68px] lg:min-h-[104px]" />
                       const k = ymd(ym.y, ym.m, d)
                       const items = porDia.get(k) ?? []
                       const isHoy = k === hoy
                       return (
-                        <div key={i} className="rounded-lg p-1 lg:p-1.5 min-h-[68px] lg:min-h-[104px] flex flex-col gap-1"
-                          style={{ background: isHoy ? `${marcaColor}12` : 'var(--muted, #f6f7f9)', boxShadow: isHoy ? `inset 0 0 0 1.5px ${marcaColor}` : undefined }}>
+                        <div key={i} className="p-1 lg:p-1.5 min-h-[68px] lg:min-h-[104px] flex flex-col gap-1"
+                          style={{ background: isHoy ? `${marcaColor}12` : 'var(--card, #fff)', boxShadow: isHoy ? `inset 0 0 0 2px ${marcaColor}` : undefined }}>
                           <div className="text-[11px] lg:text-[13px] font-extrabold leading-none" style={{ color: isHoy ? marcaColor : undefined }}>{d}</div>
                           <div className="flex flex-col gap-1 overflow-hidden">
                             {items.slice(0, 3).map((p) => {
@@ -339,21 +354,8 @@ export function ClientePortalView({
             </div>
           </section>
 
-          {/* DETALLE — abajo, sin modal */}
-          {calMode !== 'dia' ? (
-            <section className="max-w-2xl mx-auto w-full">
-              {detallePub ? (
-                <>
-                  <div className="text-[13px] font-bold mb-2 flex items-center gap-1.5" style={{ color: marcaColor }}>
-                    <CalendarDays className="w-4 h-4" /> {capitalizar(fechaBonita(detallePub.fecha))}
-                  </div>
-                  {renderCard(detallePub)}
-                </>
-              ) : (
-                <Vacio texto={`Toca una publicación ${calMode === 'semana' ? 'de la semana' : 'del mes'} para verla y aprobarla.`} />
-              )}
-            </section>
-          ) : (
+          {/* DÍA — lista de tarjetas del día (Semana/Mes abren ventana al tocar) */}
+          {calMode === 'dia' && (
             <section>
               <div className="flex items-center gap-2 mb-2.5">
                 <span className="inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-bold px-3 py-1.5 rounded-full" style={{ background: `${marcaColor}18`, color: marcaColor }}>
@@ -362,7 +364,7 @@ export function ClientePortalView({
                 {itemsDelDia.length > 0 && <span className="text-[12px] font-bold text-muted-foreground">{itemsDelDia.length}</span>}
               </div>
               {itemsDelDia.length === 0 ? (
-                <Vacio texto={calMode === 'dia' ? 'No hay publicaciones este día. Usa ‹ › para ver otro día.' : 'No hay publicaciones este día. Toca otro día del calendario.'} />
+                <Vacio texto="No hay publicaciones este día. Usa ‹ › para ver otro día." />
               ) : (
                 <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:items-start">{itemsDelDia.map(renderCard)}</div>
               )}
@@ -373,6 +375,13 @@ export function ClientePortalView({
 
       {vista === 'lista' && (
         <>
+          {disenosEnProceso.length > 0 && (
+            <section>
+              <SecHeader icon={<Palette className="w-4 h-4" />} label="En diseño" count={disenosEnProceso.length} color="#8b5cf6" />
+              <p className="text-[12px] text-muted-foreground -mt-1 mb-2.5">El equipo está diseñando estas piezas para tu marca. 🎨</p>
+              <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">{disenosEnProceso.map(renderCard)}</div>
+            </section>
+          )}
           <section>
             <SecHeader icon={<Clock className="w-4 h-4" />} label="Por publicar" count={porPublicar.length} color={C_PORPUB} />
             {porPublicar.length === 0 ? (
@@ -393,11 +402,48 @@ export function ClientePortalView({
       )}
 
       {vista === 'stats' && (
-        <StatsView pubs={pubs} publicadas={publicadas} porPublicar={porPublicar} color={marcaColor} hoy={hoy} esAprobado={esAprobado} />
+        <StatsView pubs={pubsNormales} publicadas={publicadas} porPublicar={porPublicar} enDisenoCount={disenosEnProceso.length} color={marcaColor} hoy={hoy} esAprobado={esAprobado} />
       )}
 
       <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>
+
+      {modalPub && (
+        <DetalleModal
+          p={modalPub} color={marcaColor} emoji={marcaEmoji}
+          publicada={esPublicada(modalPub)}
+          aprobado={esAprobado(modalPub)}
+          aprobandoAhora={aprobando === modalPub.id}
+          onAprobar={() => aprobar(modalPub.id)}
+          puedeAprobar={!esPublicada(modalPub)}
+          onClose={() => setModalPub(null)}
+        />
+      )}
     </main>
+  )
+}
+
+/* Ventana de detalle de una publicación (al tocarla en el calendario). Muestra
+   el video (chico) y el botón Aprobar. Es un panel centrado/hoja inferior — NO
+   el reproductor a pantalla completa. */
+function DetalleModal({ p, color, emoji, publicada, aprobado, aprobandoAhora, onAprobar, puedeAprobar, onClose }: {
+  p: PubCliente; color: string; emoji: string | null; publicada: boolean
+  aprobado: boolean; aprobandoAhora: boolean; onAprobar: () => void; puedeAprobar: boolean; onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: 'rgba(15,23,42,0.5)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-card w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-3 border-b bg-card">
+          <div className="text-[13px] font-bold flex items-center gap-1.5 min-w-0" style={{ color }}>
+            <CalendarDays className="w-4 h-4 shrink-0" /> <span className="truncate">{capitalizar(fechaBonita(p.fecha)) || 'Publicación'}</span>
+          </div>
+          <button onClick={onClose} className="shrink-0 inline-flex items-center gap-1 text-[13px] font-bold px-3 h-9 rounded-xl hover:bg-muted transition-colors"><X className="w-4 h-4" /> Cerrar</button>
+        </div>
+        <div className="p-3">
+          <PubCard p={p} color={color} emoji={emoji} publicada={publicada} abierto onToggle={onClose}
+            aprobado={aprobado} aprobandoAhora={aprobandoAhora} onAprobar={onAprobar} puedeAprobar={puedeAprobar} />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -635,10 +681,11 @@ function Vacio({ texto }: { texto: string }) {
 }
 
 /* Estadísticas del cliente — métricas de ACTIVIDAD reales. */
-function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
+function StatsView({ pubs, publicadas, porPublicar, enDisenoCount, color, hoy, esAprobado }: {
   pubs: PubCliente[]
   publicadas: PubCliente[]
   porPublicar: PubCliente[]
+  enDisenoCount: number
   color: string
   hoy: string
   esAprobado: (p: PubCliente) => boolean
@@ -666,10 +713,11 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 lg:gap-4">
         <Kpi label="Publicadas" value={publicadas.length} color={color} icon="✅" />
         <Kpi label="Este mes" value={publicadasEsteMes} color={color} icon="📅" />
         <Kpi label="Por publicar" value={porPublicar.length} color={color} icon="⏳" />
+        <Kpi label="En diseño" value={enDisenoCount} color={color} icon="🎨" />
         <Kpi label="Aprobados por ti" value={aprobados} color={color} icon="👍" />
       </div>
 
