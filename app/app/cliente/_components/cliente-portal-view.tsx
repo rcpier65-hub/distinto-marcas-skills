@@ -401,7 +401,7 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
                y el reproductor NO ocupa toda la pantalla. */
             <div
               className="mx-auto rounded-xl overflow-hidden bg-black"
-              style={{ aspectRatio: '9 / 16', height: 'min(62vh, 520px)', maxWidth: '100%' }}
+              style={{ width: '100%', maxWidth: 300, aspectRatio: '9 / 16', maxHeight: '68vh' }}
             >
               <iframe src={embed} title={p.titulo} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
             </div>
