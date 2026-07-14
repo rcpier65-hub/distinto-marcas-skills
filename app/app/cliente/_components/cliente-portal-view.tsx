@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
-  ThumbsUp, Sparkles, PartyPopper, CalendarDays, List,
+  ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
@@ -26,11 +26,14 @@ export type PubCliente = {
   linkTiktok: string | null
   linkInstagram: string | null
   copy: string | null
+  guion: string | null
   estado: string | null
 }
 
 const RED_EMOJI: Record<string, string> = { instagram: '📸', facebook: '👍', tiktok: '🎵', linkedin: '💼', youtube: '▶️' }
+const RED_NOMBRE: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', linkedin: 'LinkedIn', youtube: 'YouTube' }
 const DIAS_SEM = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 /* Colores por estado de una pieza (para los puntos del calendario y las píldoras). */
 const C_APROBADO = '#16a34a'   // verde — el cliente ya lo aprobó
@@ -81,7 +84,7 @@ export function ClientePortalView({
   const [aprobados, setAprobados] = useState<Record<string, string>>({})
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
-  const [vista, setVista] = useState<'cal' | 'lista'>('cal')
+  const [vista, setVista] = useState<'cal' | 'lista' | 'stats'>('cal')
 
   function esAprobado(p: PubCliente) { return !!p.aprobadoAt || !!aprobados[p.id] }
   function colorEstado(p: PubCliente) {
@@ -210,13 +213,14 @@ export function ClientePortalView({
         <ActivarNotificaciones className="w-full sm:w-auto" />
       </div>
 
-      {/* Toggle Calendario / Lista */}
-      <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-muted/60 w-full max-w-[280px] mx-auto">
+      {/* Toggle Calendario / Lista / Estadísticas */}
+      <div className="flex items-center gap-1 p-1 rounded-2xl bg-muted/60 w-full max-w-[380px] mx-auto">
         <ToggleBtn active={vista === 'cal'} onClick={() => setVista('cal')} color={marcaColor} icon={<CalendarDays className="w-4 h-4" />} label="Calendario" />
         <ToggleBtn active={vista === 'lista'} onClick={() => setVista('lista')} color={marcaColor} icon={<List className="w-4 h-4" />} label="Lista" />
+        <ToggleBtn active={vista === 'stats'} onClick={() => setVista('stats')} color={marcaColor} icon={<BarChart3 className="w-4 h-4" />} label="Stats" />
       </div>
 
-      {vista === 'cal' ? (
+      {vista === 'cal' && (
         <>
           {/* CALENDARIO */}
           <section className="rounded-3xl bg-card p-4 sm:p-5 shadow-sm ring-1 ring-black/[0.04]">
@@ -308,7 +312,9 @@ export function ClientePortalView({
             )}
           </section>
         </>
-      ) : (
+      )}
+
+      {vista === 'lista' && (
         <>
           {/* VISTA LISTA */}
           <section>
@@ -328,6 +334,10 @@ export function ClientePortalView({
             )}
           </section>
         </>
+      )}
+
+      {vista === 'stats' && (
+        <StatsView pubs={pubs} publicadas={publicadas} porPublicar={porPublicar} color={marcaColor} hoy={hoy} esAprobado={esAprobado} />
       )}
 
       <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>
@@ -426,6 +436,13 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
             </div>
           )}
 
+          {p.guion && (
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1"><FileText className="w-3 h-3" /> Guión</div>
+              <div className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-relaxed rounded-xl p-3 max-h-56 overflow-y-auto" style={{ background: `${color}0d` }}>{p.guion}</div>
+            </div>
+          )}
+
           {p.copy && (
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Texto de la publicación</div>
@@ -494,4 +511,101 @@ function SecHeader({ icon, label, count, color }: { icon: ReactNode; label: stri
 
 function Vacio({ texto }: { texto: string }) {
   return <div className="rounded-2xl border-2 border-dashed bg-muted/20 text-center text-sm text-muted-foreground py-7">{texto}</div>
+}
+
+/* Estadísticas del cliente — métricas de ACTIVIDAD reales (no engagement, que
+   no tenemos en la base): total publicadas, este mes, por publicar, aprobados,
+   cadencia por mes y mix por red. */
+function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
+  pubs: PubCliente[]
+  publicadas: PubCliente[]
+  porPublicar: PubCliente[]
+  color: string
+  hoy: string
+  esAprobado: (p: PubCliente) => boolean
+}) {
+  const [hy, hm] = hoy.split('-').map(Number)
+  const mesActualKey = `${hy}-${String(hm).padStart(2, '0')}`
+  const mesDe = (p: PubCliente) => (p.publicadoAt ?? p.fecha ?? '').slice(0, 7)
+
+  const publicadasEsteMes = publicadas.filter((p) => mesDe(p) === mesActualKey).length
+  const aprobados = pubs.filter(esAprobado).length
+
+  // Cadencia: últimos 6 meses.
+  const meses: { key: string; label: string }[] = []
+  for (let i = 5; i >= 0; i--) {
+    let y = hy, m = hm - i
+    while (m <= 0) { m += 12; y -= 1 }
+    meses.push({ key: `${y}-${String(m).padStart(2, '0')}`, label: MESES_CORTOS[m - 1] })
+  }
+  const porMes = meses.map((mm) => ({ ...mm, n: publicadas.filter((p) => mesDe(p) === mm.key).length }))
+  const maxMes = Math.max(1, ...porMes.map((m) => m.n))
+
+  // Mix por red (solo publicadas).
+  const redCount: Record<string, number> = {}
+  for (const p of publicadas) for (const r of p.redes) redCount[r] = (redCount[r] ?? 0) + 1
+  const redes = Object.entries(redCount).sort((a, b) => b[1] - a[1])
+  const maxRed = Math.max(1, ...redes.map(([, n]) => n))
+
+  return (
+    <div className="space-y-4">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Kpi label="Publicadas" value={publicadas.length} color={color} icon="✅" />
+        <Kpi label="Este mes" value={publicadasEsteMes} color={color} icon="📅" />
+        <Kpi label="Por publicar" value={porPublicar.length} color={color} icon="⏳" />
+        <Kpi label="Aprobados por ti" value={aprobados} color={color} icon="👍" />
+      </div>
+
+      {/* Publicaciones por mes */}
+      <section className="rounded-3xl bg-card p-4 shadow-sm ring-1 ring-black/[0.04]">
+        <div className="text-[13px] font-bold mb-3 flex items-center gap-1.5"><BarChart3 className="w-4 h-4" style={{ color }} /> Publicaciones por mes</div>
+        <div className="flex items-end justify-between gap-2">
+          {porMes.map((m) => {
+            const h = m.n ? Math.max(8, Math.round((m.n / maxMes) * 90)) : 3
+            return (
+              <div key={m.key} className="flex-1 flex flex-col items-center gap-1">
+                <div className="text-[11px] font-bold h-4 leading-4" style={{ color }}>{m.n || ''}</div>
+                <div className="w-full rounded-t-md transition-all" style={{ height: h, background: m.n ? color : `${color}22` }} />
+                <div className="text-[10px] font-semibold text-muted-foreground">{m.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Por red social */}
+      <section className="rounded-3xl bg-card p-4 shadow-sm ring-1 ring-black/[0.04]">
+        <div className="text-[13px] font-bold mb-3">Por red social</div>
+        {redes.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground">Aún no hay publicaciones con red asignada.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {redes.map(([r, n]) => (
+              <div key={r} className="flex items-center gap-2">
+                <span className="text-[13px] w-24 shrink-0">{RED_EMOJI[r] ?? '•'} {RED_NOMBRE[r] ?? r}</span>
+                <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${(n / maxRed) * 100}%`, background: color }} />
+                </div>
+                <span className="text-[13px] font-bold w-6 text-right">{n}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <p className="text-[11px] text-muted-foreground text-center px-4">
+        Resumen de la actividad de tu contenido con Distinto Agencia.
+      </p>
+    </div>
+  )
+}
+
+function Kpi({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
+  return (
+    <div className="rounded-2xl bg-card p-3.5 shadow-sm ring-1 ring-black/[0.04]">
+      <div className="text-3xl font-extrabold leading-none" style={{ color }}>{value}</div>
+      <div className="text-[12px] text-muted-foreground font-semibold mt-1.5">{icon} {label}</div>
+    </div>
+  )
 }
