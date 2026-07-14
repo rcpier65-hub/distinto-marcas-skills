@@ -181,22 +181,22 @@ export function ClientePortalView({
   }
 
   return (
-    <main className="mx-auto max-w-2xl p-4 sm:p-6 pb-28 space-y-5">
+    <main className="mx-auto max-w-2xl lg:max-w-6xl p-4 sm:p-6 lg:p-8 pb-28 space-y-5 lg:space-y-6">
       {/* Realtime: el portal se actualiza solo cuando el equipo publica/cambia algo. */}
       <ClienteRealtime marcaId={marcaId} />
 
       {/* HEADER de marca — con el logo real de la marca. */}
-      <header className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white" style={{ background: `linear-gradient(135deg, ${marcaColor}, ${marcaColor}b0 55%, #ec4899)` }}>
-        <div aria-hidden className="absolute -top-10 -right-8 w-40 h-40 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-        <div aria-hidden className="absolute -bottom-12 -left-6 w-36 h-36 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
-        <div className="relative flex items-center gap-3">
-          <div className="bg-white rounded-2xl p-2 shrink-0 shadow-lg">
+      <header className="relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:p-8 text-white" style={{ background: `linear-gradient(135deg, ${marcaColor}, ${marcaColor}b0 55%, #ec4899)` }}>
+        <div aria-hidden className="absolute -top-10 -right-8 w-40 h-40 lg:w-56 lg:h-56 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+        <div aria-hidden className="absolute -bottom-12 -left-6 w-36 h-36 lg:w-52 lg:h-52 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
+        <div className="relative flex items-center gap-3 lg:gap-5">
+          <div className="bg-white rounded-2xl p-2 lg:p-3 shrink-0 shadow-lg">
             <MarcaLogo slug={marcaSlug} nombre={marcaNombre} emoji={marcaEmoji} size={48} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] uppercase tracking-widest text-white/85 font-bold">Portal del cliente</div>
-            <h1 className="text-2xl font-extrabold leading-tight truncate">{marcaNombre}</h1>
-            {contacto && <div className="text-[13px] text-white/90">Hola, {contacto} 👋</div>}
+            <div className="text-[11px] lg:text-xs uppercase tracking-widest text-white/85 font-bold">Portal del cliente</div>
+            <h1 className="text-2xl lg:text-4xl font-extrabold leading-tight truncate">{marcaNombre}</h1>
+            {contacto && <div className="text-[13px] lg:text-[15px] text-white/90">Hola, {contacto} 👋</div>}
           </div>
           <button onClick={salir} title="Cerrar sesión" className="relative shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold bg-white/20 hover:bg-white/30 rounded-xl px-3 py-2 transition-colors">
             <LogOut className="w-3.5 h-3.5" /> Salir
@@ -221,29 +221,29 @@ export function ClientePortalView({
       </div>
 
       {vista === 'cal' && (
-        <>
+        <div className="space-y-5 lg:space-y-0 lg:grid lg:grid-cols-[1.5fr_1fr] lg:gap-6 lg:items-start">
           {/* CALENDARIO */}
-          <section className="rounded-3xl bg-card p-4 sm:p-5 shadow-sm ring-1 ring-black/[0.04]">
+          <section className="rounded-3xl bg-card p-4 sm:p-5 lg:p-6 shadow-sm ring-1 ring-black/[0.04]">
             {/* Navegación de mes */}
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={() => irMes(-1)} aria-label="Mes anterior" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors">
+            <div className="flex items-center justify-between mb-3 lg:mb-4">
+              <button onClick={() => irMes(-1)} aria-label="Mes anterior" className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <div className="text-[15px] font-extrabold">{tituloMes}</div>
-              <button onClick={() => irMes(1)} aria-label="Mes siguiente" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors">
+              <div className="text-[15px] lg:text-xl font-extrabold">{tituloMes}</div>
+              <button onClick={() => irMes(1)} aria-label="Mes siguiente" className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors">
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 
             {/* Encabezado de días */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
+            <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
               {DIAS_SEM.map((d, i) => (
-                <div key={i} className="text-center text-[11px] font-bold text-muted-foreground py-1">{d}</div>
+                <div key={i} className="text-center text-[11px] lg:text-[13px] font-bold text-muted-foreground py-1">{d}</div>
               ))}
             </div>
 
             {/* Celdas */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
               {celdas.map((d, i) => {
                 if (d === null) return <div key={i} />
                 const k = ymd(ym.y, ym.m, d)
@@ -275,7 +275,7 @@ export function ClientePortalView({
                       fontWeight: tiene || isHoy ? 800 : 500,
                     }}
                   >
-                    <span className="text-[13px] leading-none">{d}</span>
+                    <span className="text-[13px] lg:text-[15px] leading-none">{d}</span>
                     {tiene && (
                       <span className="absolute bottom-1 flex items-center gap-[3px]">
                         {items.slice(0, 3).map((p, j) => (
@@ -298,9 +298,9 @@ export function ClientePortalView({
           </section>
 
           {/* DÍA SELECCIONADO */}
-          <section>
+          <section className="lg:sticky lg:top-6">
             <div className="flex items-center gap-2 mb-2.5">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-bold px-3 py-1.5 rounded-full" style={{ background: `${marcaColor}18`, color: marcaColor }}>
+              <span className="inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-bold px-3 py-1.5 rounded-full" style={{ background: `${marcaColor}18`, color: marcaColor }}>
                 <CalendarDays className="w-4 h-4" /> {capitalizar(fechaBonita(sel))}
               </span>
               {itemsDelDia.length > 0 && <span className="text-[12px] font-bold text-muted-foreground">{itemsDelDia.length}</span>}
@@ -308,10 +308,10 @@ export function ClientePortalView({
             {itemsDelDia.length === 0 ? (
               <Vacio texto="No hay publicaciones este día. Toca otro día del calendario." />
             ) : (
-              <div className="space-y-2.5">{itemsDelDia.map(renderCard)}</div>
+              <div className="space-y-2.5 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">{itemsDelDia.map(renderCard)}</div>
             )}
           </section>
-        </>
+        </div>
       )}
 
       {vista === 'lista' && (
@@ -322,7 +322,7 @@ export function ClientePortalView({
             {porPublicar.length === 0 ? (
               <Vacio texto="No hay publicaciones programadas por ahora." />
             ) : (
-              <div className="space-y-2.5">{porPublicar.map(renderCard)}</div>
+              <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">{porPublicar.map(renderCard)}</div>
             )}
           </section>
           <section className="mt-5">
@@ -330,7 +330,7 @@ export function ClientePortalView({
             {publicadas.length === 0 ? (
               <Vacio texto="Todavía no hay publicaciones publicadas." />
             ) : (
-              <div className="space-y-2.5">{publicadas.map(renderCard)}</div>
+              <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">{publicadas.map(renderCard)}</div>
             )}
           </section>
         </>
@@ -568,15 +568,16 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
   return (
     <div className="space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-4">
         <Kpi label="Publicadas" value={publicadas.length} color={color} icon="✅" />
         <Kpi label="Este mes" value={publicadasEsteMes} color={color} icon="📅" />
         <Kpi label="Por publicar" value={porPublicar.length} color={color} icon="⏳" />
         <Kpi label="Aprobados por ti" value={aprobados} color={color} icon="👍" />
       </div>
 
+      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
       {/* Publicaciones por mes */}
-      <section className="rounded-3xl bg-card p-4 shadow-sm ring-1 ring-black/[0.04]">
+      <section className="rounded-3xl bg-card p-4 lg:p-5 shadow-sm ring-1 ring-black/[0.04]">
         <div className="text-[13px] font-bold mb-3 flex items-center gap-1.5"><BarChart3 className="w-4 h-4" style={{ color }} /> Publicaciones por mes</div>
         <div className="flex items-end justify-between gap-2">
           {porMes.map((m) => {
@@ -593,7 +594,7 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
       </section>
 
       {/* Por red social */}
-      <section className="rounded-3xl bg-card p-4 shadow-sm ring-1 ring-black/[0.04]">
+      <section className="rounded-3xl bg-card p-4 lg:p-5 shadow-sm ring-1 ring-black/[0.04]">
         <div className="text-[13px] font-bold mb-3">Por red social</div>
         {redes.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">Aún no hay publicaciones con red asignada.</p>
@@ -611,6 +612,7 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
           </div>
         )}
       </section>
+      </div>
 
       <p className="text-[11px] text-muted-foreground text-center px-4">
         Resumen de la actividad de tu contenido con Distinto Agencia.
