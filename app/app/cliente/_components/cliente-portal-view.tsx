@@ -291,39 +291,44 @@ export function ClientePortalView({
               />
             )}
 
-            {/* MES — grilla mensual */}
+            {/* MES — calendario con las TARJETAS dentro de cada día (como la
+                semana, pero mes completo). Pedro 14-jul-2026. */}
             {calMode === 'mes' && (
-              <>
-                <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
-                  {DIAS_SEM.map((d, i) => <div key={i} className="text-center text-[11px] lg:text-[13px] font-bold text-muted-foreground py-1">{d}</div>)}
+              <div className="overflow-x-auto -mx-1 px-1">
+                <div className="min-w-[560px] lg:min-w-0">
+                  <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
+                    {DIAS_SEM_LARGO.map((d, i) => <div key={i} className="text-center text-[10px] lg:text-[12px] font-bold text-muted-foreground py-1">{d}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
+                    {celdas.map((d, i) => {
+                      if (d === null) return <div key={i} className="rounded-lg bg-muted/20 min-h-[68px] lg:min-h-[104px]" />
+                      const k = ymd(ym.y, ym.m, d)
+                      const items = porDia.get(k) ?? []
+                      const isHoy = k === hoy
+                      return (
+                        <div key={i} className="rounded-lg p-1 lg:p-1.5 min-h-[68px] lg:min-h-[104px] flex flex-col gap-1"
+                          style={{ background: isHoy ? `${marcaColor}12` : 'var(--muted, #f6f7f9)', boxShadow: isHoy ? `inset 0 0 0 1.5px ${marcaColor}` : undefined }}>
+                          <div className="text-[11px] lg:text-[13px] font-extrabold leading-none" style={{ color: isHoy ? marcaColor : undefined }}>{d}</div>
+                          <div className="flex flex-col gap-1 overflow-hidden">
+                            {items.slice(0, 3).map((p) => {
+                              const c = colorEstado(p)
+                              const activo = p.id === expandido
+                              return (
+                                <button key={p.id} onClick={() => onChip(p)}
+                                  className="text-left rounded px-1.5 py-1 leading-tight transition-all"
+                                  style={{ borderLeft: `3px solid ${c}`, background: activo ? `${c}30` : `${c}18`, boxShadow: activo ? `0 0 0 1.5px ${c}` : undefined }}>
+                                  <span className="block text-[9px] lg:text-[11px] font-bold truncate" style={{ color: c }}>{p.titulo}</span>
+                                </button>
+                              )
+                            })}
+                            {items.length > 3 && <span className="text-[9px] lg:text-[10px] font-bold text-muted-foreground">+{items.length - 3} más</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-                <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
-                  {celdas.map((d, i) => {
-                    if (d === null) return <div key={i} />
-                    const k = ymd(ym.y, ym.m, d)
-                    const items = porDia.get(k) ?? []
-                    const isHoy = k === hoy
-                    const isSel = k === sel
-                    const tiene = items.length > 0
-                    const bg = isSel ? marcaColor : tiene ? `${marcaColor}24` : 'transparent'
-                    const ring = isSel ? undefined : isHoy ? `inset 0 0 0 2px ${marcaColor}` : tiene ? `inset 0 0 0 1.5px ${marcaColor}66` : undefined
-                    const numColor = isSel ? '#fff' : tiene ? marcaColor : undefined
-                    return (
-                      <button key={i} onClick={() => setSel(k)}
-                        className="relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all active:scale-95"
-                        style={{ background: bg, color: numColor, boxShadow: ring, fontWeight: tiene || isHoy ? 800 : 500 }}>
-                        <span className="text-[13px] lg:text-[15px] leading-none">{d}</span>
-                        {tiene && (
-                          <span className="absolute bottom-1 flex items-center gap-[3px]">
-                            {items.slice(0, 3).map((p, j) => <span key={j} className="w-[6px] h-[6px] rounded-full" style={{ background: isSel ? '#fff' : colorEstado(p) }} />)}
-                            {items.length > 3 && <span className="text-[9px] font-extrabold leading-none" style={{ color: isSel ? '#fff' : marcaColor }}>+</span>}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
+              </div>
             )}
 
             {/* Leyenda */}
@@ -335,7 +340,7 @@ export function ClientePortalView({
           </section>
 
           {/* DETALLE — abajo, sin modal */}
-          {calMode === 'semana' ? (
+          {calMode !== 'dia' ? (
             <section className="max-w-2xl mx-auto w-full">
               {detallePub ? (
                 <>
@@ -345,7 +350,7 @@ export function ClientePortalView({
                   {renderCard(detallePub)}
                 </>
               ) : (
-                <Vacio texto="Toca una publicación de la semana para verla y aprobarla." />
+                <Vacio texto={`Toca una publicación ${calMode === 'semana' ? 'de la semana' : 'del mes'} para verla y aprobarla.`} />
               )}
             </section>
           ) : (
