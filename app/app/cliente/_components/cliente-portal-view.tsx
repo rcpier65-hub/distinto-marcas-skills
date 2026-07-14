@@ -33,9 +33,10 @@ export type PubCliente = {
 const RED_EMOJI: Record<string, string> = { instagram: '📸', facebook: '👍', tiktok: '🎵', linkedin: '💼', youtube: '▶️' }
 const RED_NOMBRE: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', linkedin: 'LinkedIn', youtube: 'YouTube' }
 const DIAS_SEM = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const DIAS_SEM_LARGO = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
-/* Colores por estado de una pieza (para los puntos del calendario y las píldoras). */
+/* Colores por estado de una pieza (puntos del calendario, chips, píldoras). */
 const C_APROBADO = '#16a34a'   // verde — el cliente ya lo aprobó
 const C_PUBLICADO = '#14b8a6'  // teal  — ya se publicó
 const C_PORPUB = '#f59e0b'     // ámbar — por publicar
@@ -49,6 +50,17 @@ function fechaBonita(iso: string | null): string {
 }
 function capitalizar(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s }
 function ymd(y: number, m: number, d: number) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` }
+/* Helpers de fecha basados en strings YYYY-MM-DD (TZ-safe: no usan UTC). */
+function parseYmd(s: string): Date { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+function toYmd(dt: Date): string { return ymd(dt.getFullYear(), dt.getMonth(), dt.getDate()) }
+function addDays(s: string, n: number): string { const dt = parseYmd(s); dt.setDate(dt.getDate() + n); return toYmd(dt) }
+function mondayOf(s: string): string { const dt = parseYmd(s); const off = (dt.getDay() + 6) % 7; dt.setDate(dt.getDate() - off); return toYmd(dt) }
+function rangoSemana(a: string, b: string): string {
+  const da = parseYmd(a), db = parseYmd(b)
+  if (da.getMonth() === db.getMonth()) return `${da.getDate()} – ${db.getDate()} ${MESES_CORTOS[db.getMonth()]} ${db.getFullYear()}`
+  return `${da.getDate()} ${MESES_CORTOS[da.getMonth()]} – ${db.getDate()} ${MESES_CORTOS[db.getMonth()]} ${db.getFullYear()}`
+}
+
 function urlOk(u: string | null): string | null {
   if (!u) return null
   const t = u.trim()
@@ -85,6 +97,8 @@ export function ClientePortalView({
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
   const [vista, setVista] = useState<'cal' | 'lista' | 'stats'>('cal')
+  /* Modo del calendario: Día · Semana (como la grilla del equipo) · Mes. */
+  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes'>('semana')
 
   function esAprobado(p: PubCliente) { return !!p.aprobadoAt || !!aprobados[p.id] }
   function colorEstado(p: PubCliente) {
@@ -92,6 +106,8 @@ export function ClientePortalView({
     if (esPublicada(p)) return C_PUBLICADO
     return C_PORPUB
   }
+  function estadoLabel(p: PubCliente) { return esAprobado(p) ? 'Aprobado' : esPublicada(p) ? 'Publicado' : 'Por publicar' }
+  function redesStr(p: PubCliente) { return p.redes.map((r) => RED_EMOJI[r] ?? r).join('') }
 
   /* Agrupamos las piezas por día (YYYY-MM-DD). */
   const porDia = useMemo(() => {
@@ -105,15 +121,15 @@ export function ClientePortalView({
     return m
   }, [pubs])
 
-  /* Mes visible (0-based). Arranca en el mes de hoy (Lima). */
   const [hY, hM] = hoy.split('-').map(Number)
   const [ym, setYm] = useState<{ y: number; m: number }>({ y: hY, m: hM - 1 })
   const [sel, setSel] = useState<string>(hoy)
+  const [weekStart, setWeekStart] = useState<string>(() => mondayOf(hoy))
 
   const { celdas, tituloMes } = useMemo(() => {
     const { y, m } = ym
     const primero = new Date(y, m, 1)
-    const offset = (primero.getDay() + 6) % 7 // lunes = 0
+    const offset = (primero.getDay() + 6) % 7
     const dias = new Date(y, m + 1, 0).getDate()
     const cells: (number | null)[] = []
     for (let i = 0; i < offset; i++) cells.push(null)
@@ -123,11 +139,19 @@ export function ClientePortalView({
     return { celdas: cells, tituloMes: titulo }
   }, [ym])
 
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
+  const weekLabel = rangoSemana(weekDays[0], weekDays[6])
+  const weekCount = weekDays.reduce((n, k) => n + (porDia.get(k)?.length ?? 0), 0)
+  const mesPrefix = `${ym.y}-${String(ym.m + 1).padStart(2, '0')}`
+  const mesCount = useMemo(() => pubs.filter((p) => (p.fecha ?? '').startsWith(mesPrefix)).length, [pubs, mesPrefix])
+
+  const itemsDelDia = porDia.get(sel) ?? []
+  const detallePub = expandido ? pubs.find((p) => p.id === expandido) ?? null : null
+
   function irMes(delta: number) {
     setYm((cur) => {
       const nd = new Date(cur.y, cur.m + delta, 1)
       const ny = nd.getFullYear(), nm = nd.getMonth()
-      // Seleccionar el primer día con contenido del nuevo mes (o el día 1).
       let primerConContenido: string | null = null
       const dias = new Date(ny, nm + 1, 0).getDate()
       for (let d = 1; d <= dias; d++) {
@@ -138,10 +162,21 @@ export function ClientePortalView({
       return { y: ny, m: nm }
     })
   }
+  function navPrev() {
+    if (calMode === 'dia') setSel((s) => addDays(s, -1))
+    else if (calMode === 'semana') setWeekStart((w) => addDays(w, -7))
+    else irMes(-1)
+  }
+  function navNext() {
+    if (calMode === 'dia') setSel((s) => addDays(s, 1))
+    else if (calMode === 'semana') setWeekStart((w) => addDays(w, 7))
+    else irMes(1)
+  }
+  function navHoy() { setSel(hoy); setWeekStart(mondayOf(hoy)); setYm({ y: hY, m: hM - 1 }) }
+  const navLabel = calMode === 'dia' ? capitalizar(fechaBonita(sel)) : calMode === 'semana' ? weekLabel : tituloMes
+  const navCount = calMode === 'dia' ? itemsDelDia.length : calMode === 'semana' ? weekCount : mesCount
 
-  const itemsDelDia = porDia.get(sel) ?? []
-
-  /* Vista lista: separación clásica por publicar / publicadas. */
+  /* Vista lista: separación por publicar / publicadas. */
   const porPublicar = useMemo(
     () => pubs.filter((p) => !esPublicada(p)).sort((a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? '')),
     [pubs],
@@ -180,12 +215,17 @@ export function ClientePortalView({
     )
   }
 
+  /* Al tocar una tarjeta de la grilla semanal: la abrimos como detalle abajo. */
+  function onChip(p: PubCliente) {
+    setExpandido(p.id)
+    if (p.fecha) setSel(p.fecha.slice(0, 10))
+  }
+
   return (
     <main className="mx-auto max-w-2xl lg:max-w-6xl p-4 sm:p-6 lg:p-8 pb-28 space-y-5 lg:space-y-6">
-      {/* Realtime: el portal se actualiza solo cuando el equipo publica/cambia algo. */}
       <ClienteRealtime marcaId={marcaId} />
 
-      {/* HEADER de marca — con el logo real de la marca. */}
+      {/* HEADER de marca */}
       <header className="relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:p-8 text-white" style={{ background: `linear-gradient(135deg, ${marcaColor}, ${marcaColor}b0 55%, #ec4899)` }}>
         <div aria-hidden className="absolute -top-10 -right-8 w-40 h-40 lg:w-56 lg:h-56 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
         <div aria-hidden className="absolute -bottom-12 -left-6 w-36 h-36 lg:w-52 lg:h-52 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
@@ -221,73 +261,69 @@ export function ClientePortalView({
       </div>
 
       {vista === 'cal' && (
-        <div className="space-y-5 lg:space-y-0 lg:grid lg:grid-cols-[1.5fr_1fr] lg:gap-6 lg:items-start">
-          {/* CALENDARIO */}
+        <div className="space-y-4">
           <section className="rounded-3xl bg-card p-4 sm:p-5 lg:p-6 shadow-sm ring-1 ring-black/[0.04]">
-            {/* Navegación de mes */}
-            <div className="flex items-center justify-between mb-3 lg:mb-4">
-              <button onClick={() => irMes(-1)} aria-label="Mes anterior" className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div className="text-[15px] lg:text-xl font-extrabold">{tituloMes}</div>
-              <button onClick={() => irMes(1)} aria-label="Mes siguiente" className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors">
-                <ChevronRight className="w-5 h-5" />
-              </button>
+            {/* Barra: navegación + modo Día/Semana/Mes + conteo */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-1.5">
+                <button onClick={navPrev} aria-label="Anterior" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                <div className="font-extrabold text-[15px] lg:text-lg text-center min-w-[130px] lg:min-w-[190px] capitalize">{navLabel}</div>
+                <button onClick={navNext} aria-label="Siguiente" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                <button onClick={navHoy} className="ml-1 h-9 px-3.5 rounded-xl text-[13px] font-bold transition-colors" style={{ background: `${marcaColor}18`, color: marcaColor }}>Hoy</button>
+              </div>
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/60">
+                <ModoBtn active={calMode === 'dia'} onClick={() => setCalMode('dia')} color={marcaColor} label="Día" />
+                <ModoBtn active={calMode === 'semana'} onClick={() => setCalMode('semana')} color={marcaColor} label="Semana" />
+                <ModoBtn active={calMode === 'mes'} onClick={() => setCalMode('mes')} color={marcaColor} label="Mes" />
+              </div>
+              <div className="text-[12px] font-semibold text-muted-foreground w-full text-center sm:w-auto sm:text-right">
+                {navCount} publicaci{navCount === 1 ? 'ón' : 'ones'}
+              </div>
             </div>
 
-            {/* Encabezado de días */}
-            <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
-              {DIAS_SEM.map((d, i) => (
-                <div key={i} className="text-center text-[11px] lg:text-[13px] font-bold text-muted-foreground py-1">{d}</div>
-              ))}
-            </div>
+            {/* SEMANA — columnas por día, como la grilla del equipo */}
+            {calMode === 'semana' && (
+              <WeekView
+                weekDays={weekDays} porDia={porDia} hoy={hoy} marcaColor={marcaColor}
+                colorEstado={colorEstado} estadoLabel={estadoLabel} redesStr={redesStr}
+                onChip={onChip} expandidoId={expandido}
+              />
+            )}
 
-            {/* Celdas */}
-            <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
-              {celdas.map((d, i) => {
-                if (d === null) return <div key={i} />
-                const k = ymd(ym.y, ym.m, d)
-                const items = porDia.get(k) ?? []
-                const isHoy = k === hoy
-                const isSel = k === sel
-                const tiene = items.length > 0
-                // Resaltado de días con publicaciones: fondo tintado + borde de
-                // marca + número en color de marca. Seleccionado = relleno sólido;
-                // hoy = anillo grueso.
-                const bg = isSel ? marcaColor : tiene ? `${marcaColor}24` : 'transparent'
-                const ring = isSel
-                  ? undefined
-                  : isHoy
-                    ? `inset 0 0 0 2px ${marcaColor}`
-                    : tiene
-                      ? `inset 0 0 0 1.5px ${marcaColor}66`
-                      : undefined
-                const numColor = isSel ? '#fff' : tiene ? marcaColor : undefined
-                return (
-                  <button
-                    key={i}
-                    onClick={() => setSel(k)}
-                    className="relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all active:scale-95"
-                    style={{
-                      background: bg,
-                      color: numColor,
-                      boxShadow: ring,
-                      fontWeight: tiene || isHoy ? 800 : 500,
-                    }}
-                  >
-                    <span className="text-[13px] lg:text-[15px] leading-none">{d}</span>
-                    {tiene && (
-                      <span className="absolute bottom-1 flex items-center gap-[3px]">
-                        {items.slice(0, 3).map((p, j) => (
-                          <span key={j} className="w-[6px] h-[6px] rounded-full" style={{ background: isSel ? '#fff' : colorEstado(p) }} />
-                        ))}
-                        {items.length > 3 && <span className="text-[9px] font-extrabold leading-none" style={{ color: isSel ? '#fff' : marcaColor }}>+</span>}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+            {/* MES — grilla mensual */}
+            {calMode === 'mes' && (
+              <>
+                <div className="grid grid-cols-7 gap-1 lg:gap-1.5 mb-1">
+                  {DIAS_SEM.map((d, i) => <div key={i} className="text-center text-[11px] lg:text-[13px] font-bold text-muted-foreground py-1">{d}</div>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
+                  {celdas.map((d, i) => {
+                    if (d === null) return <div key={i} />
+                    const k = ymd(ym.y, ym.m, d)
+                    const items = porDia.get(k) ?? []
+                    const isHoy = k === hoy
+                    const isSel = k === sel
+                    const tiene = items.length > 0
+                    const bg = isSel ? marcaColor : tiene ? `${marcaColor}24` : 'transparent'
+                    const ring = isSel ? undefined : isHoy ? `inset 0 0 0 2px ${marcaColor}` : tiene ? `inset 0 0 0 1.5px ${marcaColor}66` : undefined
+                    const numColor = isSel ? '#fff' : tiene ? marcaColor : undefined
+                    return (
+                      <button key={i} onClick={() => setSel(k)}
+                        className="relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all active:scale-95"
+                        style={{ background: bg, color: numColor, boxShadow: ring, fontWeight: tiene || isHoy ? 800 : 500 }}>
+                        <span className="text-[13px] lg:text-[15px] leading-none">{d}</span>
+                        {tiene && (
+                          <span className="absolute bottom-1 flex items-center gap-[3px]">
+                            {items.slice(0, 3).map((p, j) => <span key={j} className="w-[6px] h-[6px] rounded-full" style={{ background: isSel ? '#fff' : colorEstado(p) }} />)}
+                            {items.length > 3 && <span className="text-[9px] font-extrabold leading-none" style={{ color: isSel ? '#fff' : marcaColor }}>+</span>}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Leyenda */}
             <div className="flex items-center justify-center gap-3 flex-wrap mt-3 pt-3 border-t text-[11px] text-muted-foreground">
@@ -297,26 +333,40 @@ export function ClientePortalView({
             </div>
           </section>
 
-          {/* DÍA SELECCIONADO */}
-          <section className="lg:sticky lg:top-6">
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-bold px-3 py-1.5 rounded-full" style={{ background: `${marcaColor}18`, color: marcaColor }}>
-                <CalendarDays className="w-4 h-4" /> {capitalizar(fechaBonita(sel))}
-              </span>
-              {itemsDelDia.length > 0 && <span className="text-[12px] font-bold text-muted-foreground">{itemsDelDia.length}</span>}
-            </div>
-            {itemsDelDia.length === 0 ? (
-              <Vacio texto="No hay publicaciones este día. Toca otro día del calendario." />
-            ) : (
-              <div className="space-y-2.5 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">{itemsDelDia.map(renderCard)}</div>
-            )}
-          </section>
+          {/* DETALLE — abajo, sin modal */}
+          {calMode === 'semana' ? (
+            <section className="max-w-2xl mx-auto w-full">
+              {detallePub ? (
+                <>
+                  <div className="text-[13px] font-bold mb-2 flex items-center gap-1.5" style={{ color: marcaColor }}>
+                    <CalendarDays className="w-4 h-4" /> {capitalizar(fechaBonita(detallePub.fecha))}
+                  </div>
+                  {renderCard(detallePub)}
+                </>
+              ) : (
+                <Vacio texto="Toca una publicación de la semana para verla y aprobarla." />
+              )}
+            </section>
+          ) : (
+            <section>
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-bold px-3 py-1.5 rounded-full" style={{ background: `${marcaColor}18`, color: marcaColor }}>
+                  <CalendarDays className="w-4 h-4" /> {capitalizar(fechaBonita(sel))}
+                </span>
+                {itemsDelDia.length > 0 && <span className="text-[12px] font-bold text-muted-foreground">{itemsDelDia.length}</span>}
+              </div>
+              {itemsDelDia.length === 0 ? (
+                <Vacio texto={calMode === 'dia' ? 'No hay publicaciones este día. Usa ‹ › para ver otro día.' : 'No hay publicaciones este día. Toca otro día del calendario.'} />
+              ) : (
+                <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:items-start">{itemsDelDia.map(renderCard)}</div>
+              )}
+            </section>
+          )}
         </div>
       )}
 
       {vista === 'lista' && (
         <>
-          {/* VISTA LISTA */}
           <section>
             <SecHeader icon={<Clock className="w-4 h-4" />} label="Por publicar" count={porPublicar.length} color={C_PORPUB} />
             {porPublicar.length === 0 ? (
@@ -345,14 +395,74 @@ export function ClientePortalView({
   )
 }
 
+/* ===== Grilla SEMANAL — columnas por día (estilo grilla del equipo) ===== */
+function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel, redesStr, onChip, expandidoId }: {
+  weekDays: string[]
+  porDia: Map<string, PubCliente[]>
+  hoy: string
+  marcaColor: string
+  colorEstado: (p: PubCliente) => string
+  estadoLabel: (p: PubCliente) => string
+  redesStr: (p: PubCliente) => string
+  onChip: (p: PubCliente) => void
+  expandidoId: string | null
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 lg:grid lg:grid-cols-7 lg:gap-2.5 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0">
+      {weekDays.map((k) => {
+        const dt = parseYmd(k)
+        const dow = (dt.getDay() + 6) % 7
+        const items = porDia.get(k) ?? []
+        const isHoy = k === hoy
+        return (
+          <div key={k} className="min-w-[150px] flex-shrink-0 lg:min-w-0 lg:flex-shrink">
+            <div className="rounded-xl px-2 py-1.5 mb-2 text-center" style={{ background: isHoy ? marcaColor : 'var(--muted, #f1f5f9)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: isHoy ? '#fff' : 'var(--muted-foreground, #94a3b8)' }}>{DIAS_SEM_LARGO[dow]}</div>
+              <div className="text-lg font-extrabold leading-tight" style={{ color: isHoy ? '#fff' : undefined }}>{dt.getDate()}</div>
+              {items.length > 0 && <div className="text-[10px] font-bold" style={{ color: isHoy ? '#fff' : 'var(--muted-foreground, #94a3b8)' }}>{items.length} pub</div>}
+            </div>
+            <div className="space-y-1.5 min-h-[40px]">
+              {items.length === 0 ? (
+                <div className="text-center text-[11px] text-muted-foreground/40 py-2">—</div>
+              ) : items.map((p) => {
+                const c = colorEstado(p)
+                const activo = p.id === expandidoId
+                const redes = redesStr(p)
+                return (
+                  <button key={p.id} onClick={() => onChip(p)}
+                    className="w-full text-left rounded-lg p-2 transition-all hover:shadow-sm"
+                    style={{ borderLeft: `3px solid ${c}`, background: activo ? `${c}2e` : `${c}12`, boxShadow: activo ? `0 0 0 1.5px ${c}` : undefined }}>
+                    <div className="text-[12px] font-bold leading-tight line-clamp-2">{p.titulo}</div>
+                    <div className="text-[10px] font-semibold mt-1 flex items-center gap-1" style={{ color: c }}>
+                      <span className="w-1.5 h-1.5 rounded-full inline-block shrink-0" style={{ background: c }} /> {estadoLabel(p)}{redes ? ` · ${redes}` : ''}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function ToggleBtn({ active, onClick, color, icon, label }: { active: boolean; onClick: () => void; color: string; icon: ReactNode; label: string }) {
   return (
-    <button
-      onClick={onClick}
+    <button onClick={onClick}
       className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-bold transition-all"
-      style={{ background: active ? '#fff' : 'transparent', color: active ? color : 'var(--muted-foreground, #64748b)', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.10)' : undefined }}
-    >
+      style={{ background: active ? '#fff' : 'transparent', color: active ? color : 'var(--muted-foreground, #64748b)', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.10)' : undefined }}>
       {icon} {label}
+    </button>
+  )
+}
+
+function ModoBtn({ active, onClick, color, label }: { active: boolean; onClick: () => void; color: string; label: string }) {
+  return (
+    <button onClick={onClick}
+      className="h-8 px-3 rounded-lg text-[12.5px] font-bold transition-all"
+      style={{ background: active ? '#fff' : 'transparent', color: active ? color : 'var(--muted-foreground, #64748b)', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.10)' : undefined }}>
+      {label}
     </button>
   )
 }
@@ -377,7 +487,6 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
   const esVideo = !!urlOk(p.video)
   return (
     <div className="rounded-2xl bg-card overflow-hidden shadow-sm ring-1 ring-black/[0.04] transition-shadow hover:shadow-md" style={{ borderLeft: `5px solid ${color}` }}>
-      {/* Cabecera clickeable */}
       <button onClick={onToggle} className="w-full flex items-center gap-3 p-3 text-left">
         <Thumb portada={p.portada} color={color} emoji={emoji} size={54} />
         <div className="flex-1 min-w-0">
@@ -393,24 +502,15 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
         <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Detalle expandible — el cliente VE el contenido antes de aprobar */}
       {abierto && (
         <div className="px-3 pb-3 pt-1 border-t space-y-3">
           {embed ? (
             playing ? (
-              /* Reproductor CHICO dentro de la tarjeta — NO cubre la pantalla.
-                 Pedro 14-jul: que se vea acá mismo, pequeño. Si lo quieren en
-                 grande, está el botón "Ver en Drive" abajo. */
               <div className="mx-auto rounded-xl overflow-hidden bg-black" style={{ width: '100%', maxWidth: 200, aspectRatio: '9 / 16', maxHeight: 340 }}>
                 <iframe src={embed} title={p.titulo} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
               </div>
             ) : (
-              /* Portada compacta con ▶. Al tocar, el video aparece chico acá mismo. */
-              <button
-                onClick={() => setPlaying(true)}
-                className="relative w-full block rounded-xl overflow-hidden"
-                style={{ aspectRatio: '16 / 10' }}
-              >
+              <button onClick={() => setPlaying(true)} className="relative w-full block rounded-xl overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
                 <Thumb portada={p.portada} color={color} emoji={emoji} big />
                 <span className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.28)' }}>
                   <span className="flex items-center justify-center rounded-full shadow-lg" style={{ width: 56, height: 56, background: 'rgba(255,255,255,0.95)' }}>
@@ -435,7 +535,6 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
             </p>
           )}
 
-          {/* Links del post publicado — el cliente va a ver el video en vivo. */}
           {(urlOk(p.linkTiktok) || urlOk(p.linkInstagram)) && (
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Ver publicado en</div>
@@ -494,8 +593,6 @@ function PubCard({ p, color, emoji, publicada, abierto, onToggle, aprobado, apro
   )
 }
 
-/* Miniatura: imagen real si carga; si no, un fondo con el color de la marca y
-   su emoji — nunca el ícono gris genérico. */
 function Thumb({ portada, color, emoji, size, big }: { portada: string | null; color: string; emoji: string | null; size?: number; big?: boolean }) {
   const [failed, setFailed] = useState(false)
   const url = urlOk(portada)
@@ -531,9 +628,7 @@ function Vacio({ texto }: { texto: string }) {
   return <div className="rounded-2xl border-2 border-dashed bg-muted/20 text-center text-sm text-muted-foreground py-7">{texto}</div>
 }
 
-/* Estadísticas del cliente — métricas de ACTIVIDAD reales (no engagement, que
-   no tenemos en la base): total publicadas, este mes, por publicar, aprobados,
-   cadencia por mes y mix por red. */
+/* Estadísticas del cliente — métricas de ACTIVIDAD reales. */
 function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
   pubs: PubCliente[]
   publicadas: PubCliente[]
@@ -549,7 +644,6 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
   const publicadasEsteMes = publicadas.filter((p) => mesDe(p) === mesActualKey).length
   const aprobados = pubs.filter(esAprobado).length
 
-  // Cadencia: últimos 6 meses.
   const meses: { key: string; label: string }[] = []
   for (let i = 5; i >= 0; i--) {
     let y = hy, m = hm - i
@@ -559,7 +653,6 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
   const porMes = meses.map((mm) => ({ ...mm, n: publicadas.filter((p) => mesDe(p) === mm.key).length }))
   const maxMes = Math.max(1, ...porMes.map((m) => m.n))
 
-  // Mix por red (solo publicadas).
   const redCount: Record<string, number> = {}
   for (const p of publicadas) for (const r of p.redes) redCount[r] = (redCount[r] ?? 0) + 1
   const redes = Object.entries(redCount).sort((a, b) => b[1] - a[1])
@@ -567,7 +660,6 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-4">
         <Kpi label="Publicadas" value={publicadas.length} color={color} icon="✅" />
         <Kpi label="Este mes" value={publicadasEsteMes} color={color} icon="📅" />
@@ -576,42 +668,40 @@ function StatsView({ pubs, publicadas, porPublicar, color, hoy, esAprobado }: {
       </div>
 
       <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
-      {/* Publicaciones por mes */}
-      <section className="rounded-3xl bg-card p-4 lg:p-5 shadow-sm ring-1 ring-black/[0.04]">
-        <div className="text-[13px] font-bold mb-3 flex items-center gap-1.5"><BarChart3 className="w-4 h-4" style={{ color }} /> Publicaciones por mes</div>
-        <div className="flex items-end justify-between gap-2">
-          {porMes.map((m) => {
-            const h = m.n ? Math.max(8, Math.round((m.n / maxMes) * 90)) : 3
-            return (
-              <div key={m.key} className="flex-1 flex flex-col items-center gap-1">
-                <div className="text-[11px] font-bold h-4 leading-4" style={{ color }}>{m.n || ''}</div>
-                <div className="w-full rounded-t-md transition-all" style={{ height: h, background: m.n ? color : `${color}22` }} />
-                <div className="text-[10px] font-semibold text-muted-foreground">{m.label}</div>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Por red social */}
-      <section className="rounded-3xl bg-card p-4 lg:p-5 shadow-sm ring-1 ring-black/[0.04]">
-        <div className="text-[13px] font-bold mb-3">Por red social</div>
-        {redes.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">Aún no hay publicaciones con red asignada.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {redes.map(([r, n]) => (
-              <div key={r} className="flex items-center gap-2">
-                <span className="text-[13px] w-24 shrink-0">{RED_EMOJI[r] ?? '•'} {RED_NOMBRE[r] ?? r}</span>
-                <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${(n / maxRed) * 100}%`, background: color }} />
+        <section className="rounded-3xl bg-card p-4 lg:p-5 shadow-sm ring-1 ring-black/[0.04]">
+          <div className="text-[13px] font-bold mb-3 flex items-center gap-1.5"><BarChart3 className="w-4 h-4" style={{ color }} /> Publicaciones por mes</div>
+          <div className="flex items-end justify-between gap-2">
+            {porMes.map((m) => {
+              const h = m.n ? Math.max(8, Math.round((m.n / maxMes) * 90)) : 3
+              return (
+                <div key={m.key} className="flex-1 flex flex-col items-center gap-1">
+                  <div className="text-[11px] font-bold h-4 leading-4" style={{ color }}>{m.n || ''}</div>
+                  <div className="w-full rounded-t-md transition-all" style={{ height: h, background: m.n ? color : `${color}22` }} />
+                  <div className="text-[10px] font-semibold text-muted-foreground">{m.label}</div>
                 </div>
-                <span className="text-[13px] font-bold w-6 text-right">{n}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        )}
-      </section>
+        </section>
+
+        <section className="rounded-3xl bg-card p-4 lg:p-5 shadow-sm ring-1 ring-black/[0.04]">
+          <div className="text-[13px] font-bold mb-3">Por red social</div>
+          {redes.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground">Aún no hay publicaciones con red asignada.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {redes.map(([r, n]) => (
+                <div key={r} className="flex items-center gap-2">
+                  <span className="text-[13px] w-24 shrink-0">{RED_EMOJI[r] ?? '•'} {RED_NOMBRE[r] ?? r}</span>
+                  <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(n / maxRed) * 100}%`, background: color }} />
+                  </div>
+                  <span className="text-[13px] font-bold w-6 text-right">{n}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       <p className="text-[11px] text-muted-foreground text-center px-4">
@@ -629,4 +719,3 @@ function Kpi({ label, value, color, icon }: { label: string; value: number; colo
     </div>
   )
 }
-
