@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -43,7 +43,10 @@ const C_APROBADO = '#16a34a'   // verde — el cliente ya lo aprobó
 const C_PUBLICADO = '#14b8a6'  // teal  — ya se publicó
 const C_PORPUB = '#f59e0b'     // ámbar — por publicar
 
-function esPublicada(p: PubCliente) { return (p.estado ?? '') === 'publicado' }
+/* "Publicada" = tiene publicado_at (señal robusta que pone "Video ya subido" y
+   que el form NO revierte) O estado 'publicado'. Antes solo miraba estado, que
+   el autosave del detalle a veces revertía → quedaba en "Por publicar". Pedro 14-jul. */
+function esPublicada(p: PubCliente) { return !!p.publicadoAt || (p.estado ?? '') === 'publicado' }
 /* "En diseño" = tarea de diseño (Aylin) que aún se está trabajando. Se muestran
    en su propia sección para que el cliente vea qué se está diseñando para él. */
 function enDiseno(p: PubCliente) {
@@ -240,6 +243,17 @@ export function ClientePortalView({
   /* Al tocar una tarjeta del calendario (Semana/Mes): abre la ventana de
      detalle para ver el video y aprobarlo. */
   function onChip(p: PubCliente) { setModalPub(p) }
+
+  /* Deep-link: si el cliente entra desde la notificación push (/cliente?pub=ID),
+     abrimos directo esa publicación para que vea el video recién subido y sus
+     links de TikTok/Instagram. Pedro 14-jul-2026. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const pubId = new URLSearchParams(window.location.search).get('pub')
+    if (!pubId) return
+    const p = pubs.find((x) => x.id === pubId)
+    if (p) setModalPub(p)
+  }, [pubs])
 
   return (
     <main className="mx-auto max-w-2xl lg:max-w-6xl p-4 sm:p-6 lg:p-8 pb-28 space-y-5 lg:space-y-6">

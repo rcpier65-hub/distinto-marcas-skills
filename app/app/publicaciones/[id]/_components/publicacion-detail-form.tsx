@@ -296,7 +296,15 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
      cliente". Estado propio (no van al form principal). Pedro 09-jul. */
   const [linkTiktok, setLinkTiktok] = useState<string>((initial as unknown as { link_tiktok?: string | null }).link_tiktok ?? '')
   const [linkInstagram, setLinkInstagram] = useState<string>((initial as unknown as { link_instagram?: string | null }).link_instagram ?? '')
-  const [yaPublicado, setYaPublicado] = useState<boolean>((initial.estado as string) === 'publicado')
+  /* "Ya publicado" se detecta por publicado_at (lo pone "Video ya subido" y NO
+     se revierte), no por estado (que el autosave a veces revierte a 'tareas').
+     Antes: al salir y volver, el botón reaparecía como si no se hubiera subido. */
+  const [yaPublicado, setYaPublicado] = useState<boolean>(
+    (initial as unknown as { publicado_at?: string | null }).publicado_at != null,
+  )
+  /* El cliente aprobó este video (aprobado_cliente_at). Alimenta el banner
+     flotante que le recuerda al encargado subir el video. Pedro 14-jul. */
+  const aprobadoCliente = (initial as unknown as { aprobado_cliente_at?: string | null }).aprobado_cliente_at != null
   const [avisando, startAvisar] = useTransition()
   function avisarCliente() {
     startAvisar(async () => {
@@ -626,6 +634,19 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
        bar quedan FUERA del grid (hermanos), por eso necesitamos un
        wrapper pb-20 que envuelva todo. */
     <div className="pb-20">
+      {/* Banner flotante arriba a la derecha: aprobado por el cliente (pulsa,
+          recuerda subir el video) → al publicar cambia a "Video publicado". */}
+      {yaPublicado ? (
+        <div className="fixed z-50 inline-flex items-center gap-1.5 px-4 h-11 rounded-full text-white font-bold text-[13px]"
+          style={{ top: 72, right: 20, background: 'linear-gradient(135deg,#0d9488,#14b8a6)', boxShadow: '0 8px 24px -8px rgba(20,184,166,0.75)' }}>
+          ✅ Video publicado
+        </div>
+      ) : aprobadoCliente ? (
+        <div className="fixed z-50 inline-flex items-center gap-1.5 px-4 h-11 rounded-full text-white font-bold text-[13px] animate-pulse"
+          style={{ top: 72, right: 20, background: 'linear-gradient(135deg,#16a34a,#22c55e)', boxShadow: '0 8px 28px -6px rgba(22,163,74,0.9)' }}>
+          🎉 ¡El cliente aprobó! Sube el video
+        </div>
+      ) : null}
       <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
       {/* COLUMNA IZQUIERDA — HEADER + Card del copy + resto */}
       <div className="space-y-4 min-w-0">

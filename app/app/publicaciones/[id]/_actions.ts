@@ -459,7 +459,7 @@ export async function avisarClientePublicado(
     await enviarPushAClientesDeMarca(m.id, {
       title: `✅ ¡Tu video se publicó! ${m.emoji_marca ?? ''}`.trim(),
       body: `${pub?.nombre ?? marcaNombre} · ${hora}`,
-      url: '/cliente',
+      url: `/cliente?pub=${id}`,   // abre directo esa publicación en el portal
       tag: `cliente-pub-${id}`,
     })
   }
