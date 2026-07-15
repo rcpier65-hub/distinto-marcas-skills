@@ -79,13 +79,25 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
           : 'No diste permiso de notificaciones.')
         return
       }
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
+      await navigator.serviceWorker.register('/sw.js')
+      // Usamos la registración ACTIVA (más confiable para push que la que
+      // devuelve register(), que puede estar todavía instalándose).
+      const reg = await navigator.serviceWorker.ready
       // Reusar la suscripción existente si ya hay una (evita InvalidStateError
       // en PC cuando ya se había suscrito antes).
       let sub = await reg.pushManager.getSubscription()
       if (!sub) {
-        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource })
+        const opts: PushSubscriptionOptionsInit = { userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource }
+        try {
+          sub = await reg.pushManager.subscribe(opts)
+        } catch (err) {
+          // AbortError en Safari/macOS suele ser transitorio (servicio de push
+          // de Apple rechaza el primer intento) → esperamos y reintentamos 1 vez.
+          if ((err as Error)?.name === 'AbortError') {
+            await new Promise((r) => setTimeout(r, 1200))
+            sub = await reg.pushManager.subscribe(opts)
+          } else throw err
+        }
       }
       const j = sub.toJSON()
       const r = await guardarSubscripcionPush(
@@ -104,6 +116,8 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
         toast.error('En iPhone: agrega la app a la pantalla de inicio y ábrela desde ese ícono, luego activa.')
       } else if (nombre === 'NotAllowedError') {
         toast.error('Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador para este sitio.')
+      } else if (nombre === 'AbortError') {
+        toast.error('El sistema no pudo registrar el push (AbortError). En Mac: verifica que macOS y Safari estén actualizados, y que "Distinto" tenga permiso en Ajustes del Sistema → Notificaciones. Vuelve a intentar; si sigue, instálala con Chrome.', { duration: 9000 })
       } else {
         toast.error(`No se pudo activar${nombre ? ` (${nombre})` : ''}. Prueba con Chrome, Edge o Safari actualizado.`)
       }
