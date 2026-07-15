@@ -47,10 +47,16 @@ const C_PORPUB = '#f59e0b'     // ámbar — por publicar
    que el form NO revierte) O estado 'publicado'. Antes solo miraba estado, que
    el autosave del detalle a veces revertía → quedaba en "Por publicar". Pedro 14-jul. */
 function esPublicada(p: PubCliente) { return !!p.publicadoAt || (p.estado ?? '') === 'publicado' }
-/* "En diseño" = tarea de diseño (Aylin) que aún se está trabajando. Se muestran
-   en su propia sección para que el cliente vea qué se está diseñando para él. */
-function enDiseno(p: PubCliente) {
-  return p.esDiseno && !esPublicada(p) && (p.estadoTarea === 'sin_empezar' || p.estadoTarea === 'en_progreso' || p.estadoTarea === 'pausada' || p.estadoTarea == null)
+/* Pieza de DISEÑO de Aylin (banner, post, catálogo, imágenes…): es trabajo de
+   diseño, NO un video del flujo de aprobar/publicar. Va a su propia sección para
+   no mezclarlo con las publicaciones de video. Pedro 14-jul-2026. */
+function esDisenoPieza(p: PubCliente) { return p.esDiseno }
+/* Etiqueta de estado de un diseño para el cliente. */
+function disenoLabel(p: PubCliente): string {
+  if (p.estadoTarea === 'listo') return 'Listo'
+  if (p.estadoTarea === 'en_progreso') return 'En proceso'
+  if (p.estadoTarea === 'pausada') return 'En pausa'
+  return 'Programado'
 }
 
 function fechaBonita(iso: string | null): string {
@@ -123,10 +129,10 @@ export function ClientePortalView({
   function estadoLabel(p: PubCliente) { return esAprobado(p) ? 'Aprobado' : esPublicada(p) ? 'Publicado' : 'Por publicar' }
   function redesStr(p: PubCliente) { return p.redes.map((r) => RED_EMOJI[r] ?? r).join('') }
 
-  /* Piezas "normales" (publicaciones) vs diseños en proceso de Aylin. */
-  const pubsNormales = useMemo(() => pubs.filter((p) => !enDiseno(p)), [pubs])
-  const disenosEnProceso = useMemo(
-    () => pubs.filter(enDiseno).sort((a, b) => (a.fechaEntrega ?? a.fecha ?? '9999').localeCompare(b.fechaEntrega ?? b.fecha ?? '9999')),
+  /* Videos (flujo de publicación) vs diseños de Aylin (banners, posts…). */
+  const pubsNormales = useMemo(() => pubs.filter((p) => !esDisenoPieza(p)), [pubs])
+  const disenos = useMemo(
+    () => pubs.filter(esDisenoPieza).sort((a, b) => (a.fechaEntrega ?? a.fecha ?? '9999').localeCompare(b.fechaEntrega ?? b.fecha ?? '9999')),
     [pubs],
   )
 
@@ -365,11 +371,23 @@ export function ClientePortalView({
 
       {vista === 'lista' && (
         <>
-          {disenosEnProceso.length > 0 && (
+          {disenos.length > 0 && (
             <section>
-              <SecHeader icon={<Palette className="w-4 h-4" />} label="En diseño" count={disenosEnProceso.length} color="#8b5cf6" />
-              <p className="text-[12px] text-muted-foreground -mt-1 mb-2.5">El equipo está diseñando estas piezas para tu marca. 🎨</p>
-              <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">{disenosEnProceso.map(renderCard)}</div>
+              <SecHeader icon={<Palette className="w-4 h-4" />} label="Diseños de Aylin" count={disenos.length} color="#8b5cf6" />
+              <p className="text-[12px] text-muted-foreground -mt-1 mb-2.5">Banners, posts y piezas gráficas que el equipo diseña para tu marca. 🎨</p>
+              <div className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
+                {disenos.map((p) => (
+                  <button key={p.id} onClick={() => setModalPub(p)}
+                    className="w-full text-left rounded-2xl bg-card p-3 shadow-sm ring-1 ring-black/[0.04] flex items-center gap-3 transition-shadow hover:shadow-md" style={{ borderLeft: '5px solid #8b5cf6' }}>
+                    <Thumb portada={p.portada} color="#8b5cf6" emoji="🎨" size={54} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] font-bold truncate">{p.titulo}</div>
+                      <div className="text-[12px] text-muted-foreground mt-0.5 truncate">{p.fecha ? `📅 ${fechaBonita(p.fecha)}` : 'Sin fecha'}</div>
+                    </div>
+                    <span className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#8b5cf618', color: '#8b5cf6' }}>{disenoLabel(p)}</span>
+                  </button>
+                ))}
+              </div>
             </section>
           )}
           <section>
@@ -392,7 +410,7 @@ export function ClientePortalView({
       )}
 
       {vista === 'stats' && (
-        <StatsView pubs={pubsNormales} publicadas={publicadas} porPublicar={porPublicar} enDisenoCount={disenosEnProceso.length} color={marcaColor} hoy={hoy} esAprobado={esAprobado} />
+        <StatsView pubs={pubsNormales} publicadas={publicadas} porPublicar={porPublicar} enDisenoCount={disenos.length} color={marcaColor} hoy={hoy} esAprobado={esAprobado} />
       )}
 
       <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>
@@ -709,7 +727,7 @@ function StatsView({ pubs, publicadas, porPublicar, enDisenoCount, color, hoy, e
         <Kpi label="Publicadas" value={publicadas.length} color={color} icon="✅" />
         <Kpi label="Este mes" value={publicadasEsteMes} color={color} icon="📅" />
         <Kpi label="Por publicar" value={porPublicar.length} color={color} icon="⏳" />
-        <Kpi label="En diseño" value={enDisenoCount} color={color} icon="🎨" />
+        <Kpi label="Diseños" value={enDisenoCount} color={color} icon="🎨" />
         <Kpi label="Aprobados por ti" value={aprobados} color={color} icon="👍" />
       </div>
 
