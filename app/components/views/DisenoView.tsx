@@ -1197,7 +1197,18 @@ function NuevaTareaModal({
   const [agregarReunion, setAgregarReunion] = useState(false)
   const [horaReunion, setHoraReunion] = useState('')
   const [invitadosInput, setInvitadosInput] = useState('')
+  /* "Para hoy": marca la tarea recién creada para trabajarla hoy (Aylin la pidió
+     acá también, no solo en el detalle). Pedro 14-jul-2026. */
+  const [paraHoy, setParaHoy] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  /* Cierre seguro: si hay algo escrito, confirma antes de descartar (evita
+     perder la tarea por error). Sin contenido, cierra directo. */
+  function pedirCerrar() {
+    const hayContenido = nombre.trim() || descripcion.trim() || marcasExtras.size > 0
+    if (hayContenido && !window.confirm('¿Descartar esta tarea? Se perderá lo que escribiste.')) return
+    onClose()
+  }
 
   /* Auto-fetch correos de cliente cuando elige marca: mejora UX para
      que el usuario no tenga que escribir manualmente los emails. */
@@ -1252,6 +1263,9 @@ function NuevaTareaModal({
     })
     setSubmitting(false)
     if (!r.ok) { toast.error(r.error); return }
+
+    /* Si marcó "para hoy", la anclamos a la lista de hoy de Aylin. */
+    if (paraHoy && r.data?.id) { try { await marcarParaDisenarHoy(r.data.id) } catch { /* noop */ } }
 
     /* Una sola tarea etiquetada con varias marcas (no copias). */
     if (r.data!.extrasCreadas > 0) {
@@ -1308,7 +1322,8 @@ function NuevaTareaModal({
 
   return (
     <div
-      onClick={onClose}
+      /* NO cerramos al hacer clic en el fondo: Aylin perdía TODA la tarea al
+         tocar afuera por error. Se cierra solo con la ✕ o "Cancelar". Pedro 14-jul. */
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
         background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(4px)',
@@ -1346,7 +1361,7 @@ function NuevaTareaModal({
           <h2 style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0 }}>
             Nueva tarea de diseño
           </h2>
-          <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4 }}>
+          <button type="button" onClick={pedirCerrar} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4 }}>
             ✕
           </button>
         </div>
@@ -1488,6 +1503,35 @@ function NuevaTareaModal({
               style={{ ...inputStyle, cursor: 'pointer' }}
             />
           </Field>
+        </div>
+
+        {/* Toggle "Trabajar HOY" — Aylin lo pidió acá: al crear la tarea la
+            ancla a su lista de hoy (fecha_marcada_para_disenar). */}
+        <div
+          onClick={() => setParaHoy((v) => !v)}
+          style={{
+            padding: 12, borderRadius: 'var(--mk-radius-md)',
+            border: `1px solid ${paraHoy ? '#7c3aed' : 'var(--mk-border-subtle)'}`,
+            background: paraHoy ? 'rgba(124, 58, 237, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+            transition: 'all 120ms ease',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={paraHoy}
+            onChange={(e) => setParaHoy(e.target.checked)}
+            style={{ accentColor: '#7c3aed', width: 14, height: 14 }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>
+              📅 Trabajar HOY
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
+              La agrega a tu lista de hoy para tenerla a mano.
+            </span>
+          </div>
         </div>
 
         {/* Toggle ¿Es para publicar? — solo aparece si NO es interno
@@ -1639,7 +1683,7 @@ function NuevaTareaModal({
           flexShrink: 0,
         }}>
           <button
-            type="button" onClick={onClose}
+            type="button" onClick={pedirCerrar}
             style={{
               padding: '8px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
               background: 'transparent', color: 'var(--mk-text-secondary)',
