@@ -66,16 +66,21 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
           : 'Tu navegador no soporta notificaciones push. Usa Chrome, Edge o Safari actualizado.')
         return
       }
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
+      // PEDIR EL PERMISO PRIMERO. Safari (macOS/iOS) exige que
+      // Notification.requestPermission() se llame dentro del gesto del clic,
+      // ANTES de cualquier await (register/ready). Antes lo llamábamos después
+      // de registrar el SW → en el dock de Mac (Safari) NO activaba y quedaba
+      // sin suscripción. Pedro 14-jul-2026.
       const perm = await Notification.requestPermission()
       if (perm !== 'granted') {
         setEstado(perm === 'denied' ? 'denegado' : 'inactivo')
         toast.error(perm === 'denied'
-          ? 'Bloqueaste las notificaciones. Actívalas en los ajustes del navegador para este sitio.'
+          ? 'Bloqueaste las notificaciones. Actívalas en los ajustes del navegador (o del sistema) para este sitio.'
           : 'No diste permiso de notificaciones.')
         return
       }
+      const reg = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
       // Reusar la suscripción existente si ya hay una (evita InvalidStateError
       // en PC cuando ya se había suscrito antes).
       let sub = await reg.pushManager.getSubscription()
