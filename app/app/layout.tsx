@@ -80,17 +80,9 @@ export default async function RootLayout({
     getClienteActual(),
   ])
 
-  /* Notificaciones PERSONALES para la campanita: cada usuario ve solo lo suyo
-     (por rol); solo el dueño (Pedro) ve todo. Pedro 14-jul-2026. */
-  const esOwnerNotif = !permisos || (permisos.member.nombre ?? '').trim().toLowerCase() === 'pedro'
+  /* Notificaciones urgentes para la campanita del shell (best-effort). */
   let notificaciones: Notificacion[] = []
-  try {
-    notificaciones = await getNotificaciones({
-      esOwner: esOwnerNotif,
-      rolBase: permisos?.member.rol_base ?? null,
-      nombre: permisos?.member.nombre ?? null,
-    })
-  } catch { /* no rompemos el layout */ }
+  try { notificaciones = await getNotificaciones() } catch { /* no rompemos el layout */ }
 
   /* Email del usuario logueado para mostrar en el sidebar — sirve como
      "indicador de sesión activa" para que Pedro pueda confirmar

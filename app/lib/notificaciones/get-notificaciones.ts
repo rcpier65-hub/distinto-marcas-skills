@@ -52,23 +52,7 @@ function marcaDe(r: any): { nombre: string; color: string | null; emoji: string 
   }
 }
 
-/* Notificaciones PERSONALES por rol. Antes eran globales (todos veían todo).
-   Pedro 14-jul-2026: cada quien ve solo lo suyo.
-   - Dueño (Pedro): ve todo (pulso del día).
-   - Editor: solo sus videos por editar (editor_nombre = él).
-   - Community/Social manager: comentarios sin responder + grabaciones sin guion.
-   - Otros roles (diseñador, admin como Erick): sin alertas operativas → panel vacío. */
-export async function getNotificaciones(opts?: {
-  esOwner?: boolean
-  rolBase?: string | null
-  nombre?: string | null
-}): Promise<Notificacion[]> {
-  const esOwner = opts?.esOwner ?? true // sin opts (compat) = ver todo
-  const rol = opts?.rolBase ?? null
-  const nombre = (opts?.nombre ?? '').trim().toLowerCase()
-  const esEditor = rol === 'editor'
-  const esCM = rol === 'community_manager' || rol === 'social_media_manager'
-
+export async function getNotificaciones(): Promise<Notificacion[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const hoy = ymdLima(new Date())
@@ -77,8 +61,8 @@ export async function getNotificaciones(opts?: {
 
   const out: Notificacion[] = []
 
-  /* 1) Grabaciones a <=2 días sin guion listo. Solo dueño o community/social. */
-  if (esOwner || esCM) try {
+  /* 1) Grabaciones a <=2 días sin guion listo. */
+  try {
     const sel = 'id, fecha_planeada, guion_listo, marcas:marca_id (nombre, color_primario_hex, emoji_marca)'
     let res = await service
       .from('grabaciones')
@@ -116,12 +100,11 @@ export async function getNotificaciones(opts?: {
     }
   } catch { /* tabla no existe */ }
 
-  /* 2) Videos por editar próximos (<=2 días). Dueño ve todos; un editor solo
-        los suyos (editor_nombre = él). */
-  if (esOwner || esEditor) try {
+  /* 2) Videos por editar con publicación próxima (<=2 días). */
+  try {
     const res = await service
       .from('publicaciones')
-      .select('id, nombre, fecha_publicacion, editor_nombre, marcas:marca_id (nombre, color_primario_hex, emoji_marca)')
+      .select('id, nombre, fecha_publicacion, marcas:marca_id (nombre, color_primario_hex, emoji_marca)')
       .eq('estado', 'editar')
       .gte('fecha_publicacion', hoy)
       .lte('fecha_publicacion', en2)
@@ -129,8 +112,6 @@ export async function getNotificaciones(opts?: {
       .limit(15)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of (res.data ?? []) as any[]) {
-      // Un editor (no dueño) solo ve los videos asignados a su nombre.
-      if (!esOwner && esEditor && (r.editor_nombre ?? '').trim().toLowerCase() !== nombre) continue
       const m = marcaDe(r)
       const dd = diasEntre(r.fecha_publicacion, hoy)
       const cuando = dd === 0 ? 'hoy' : dd === 1 ? 'mañana' : `en ${dd} días`
@@ -147,8 +128,8 @@ export async function getNotificaciones(opts?: {
     }
   } catch { /* ignore */ }
 
-  /* 3) Comentarios pendientes muy atrasados (>3 días). Solo dueño o community/social. */
-  if (esOwner || esCM) try {
+  /* 3) Comentarios pendientes muy atrasados (>3 días sin responder). */
+  try {
     const res = await service
       .from('comentarios_inbox')
       .select('id, author_username, author_display_name, comment_created_at, marcas:marca_id (nombre, color_primario_hex, emoji_marca)')

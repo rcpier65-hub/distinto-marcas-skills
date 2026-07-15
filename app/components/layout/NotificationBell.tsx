@@ -8,6 +8,7 @@
    rect del botón (robusto contra overflow del sidebar). */
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Bell, CalendarClock, Scissors, MessageCircle, X } from 'lucide-react'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
@@ -94,7 +95,7 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
         )}
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <>
           {/* Backdrop opaco-suave para cerrar al clickear fuera */}
           <div
@@ -192,7 +193,8 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </>
   )
