@@ -25,6 +25,62 @@ function primerNombre(n: string): string {
   return (n ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? ''
 }
 
+/* Crea una tarea rápida YA asociada a una marca — botón "+ Tarea" de las cards
+   del módulo Marcas (Pedro 13-jul). NO pasa por la IA: la marca la sabemos, así
+   que la categoría es el nombre de la marca (cae en su columna del tablero) y
+   guardamos marca_slug. Queda sincronizada con /tareas automáticamente porque
+   es una fila normal de `tareas`. */
+export async function crearTareaEnMarca(marcaSlug: string, textoOriginal: string): Promise<
+  { ok: true; tarea: Tarea } | { ok: false; error: string }
+> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const texto = (textoOriginal ?? '').trim()
+  if (!texto) return { ok: false, error: 'No escribiste nada' }
+  if (texto.length > 600) return { ok: false, error: 'Demasiado largo' }
+
+  const me = await currentMember(service, user.id)
+
+  const { data: marca } = await service
+    .from('marcas')
+    .select('nombre, slug')
+    .eq('slug', marcaSlug)
+    .maybeSingle()
+  if (!marca) return { ok: false, error: 'Marca no encontrada' }
+
+  /* Reusar el color de la columna de esa marca si ya existe. */
+  const { data: existentes } = await service.from('tareas').select('categoria, color')
+  const colorByCat = new Map<string, string>()
+  const usados: string[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (existentes ?? []) as any[]) {
+    if (!colorByCat.has(r.categoria)) { colorByCat.set(r.categoria, r.color); usados.push(r.color) }
+  }
+  const categoria = marca.nombre as string
+  const color = colorByCat.get(categoria) ?? colorParaCategoria(usados)
+
+  const { data, error } = await service
+    .from('tareas')
+    .insert({
+      team_member_id: me.id,
+      created_by: me.id,
+      texto: limpiarTexto(texto),
+      categoria,
+      color,
+      completada: false,
+      focus_lane: null,
+      marca_slug: marca.slug,
+    })
+    .select(SELECT)
+    .single()
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/tareas')
+  revalidatePath('/dashboard')
+  revalidatePath('/inicio')
+  return { ok: true, tarea: rowToTarea(data) }
+}
+
 export async function crearTarea(textoOriginal: string): Promise<
   { ok: true; tarea: Tarea } | { ok: false; error: string }
 > {

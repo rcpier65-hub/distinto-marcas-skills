@@ -1,8 +1,10 @@
 // app/app/dashboard/page.tsx
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { requireUser } from '@/lib/auth/get-user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { MarcaCard, type MarcaCardData } from './_components/marca-card'
+import { type MarcaCardData, type TareaMarca } from './_components/marca-card'
+import { MarcasGrid } from './_components/marcas-grid'
 import { NuevaMarcaForm } from './_components/nueva-marca-form'
 
 export const dynamic = 'force-dynamic'
@@ -47,6 +49,47 @@ export default async function DashboardPage({
   }))
   const activasCount = cards.filter((c) => c.activa).length
 
+  /* Tareas RÁPIDAS pendientes por marca (NO publicaciones) — alimentan el toggle
+     "Tareas por marca". Una tarea es de la marca si tiene marca_slug (las que se
+     crean con el botón "+ Tarea" de la card) o si su categoría es el nombre de la
+     marca (las que la IA categorizó sola). El CEO ve las de todos; cada miembro
+     solo las suyas. Pedro 13-jul. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: tmRow } = await service
+    .from('team_members').select('id, rol_base').eq('auth_user_id', user.id).maybeSingle()
+  const esCEO = tmRow?.rol_base === 'director'
+
+  let qTareas = service
+    .from('tareas')
+    .select('id, texto, categoria, marca_slug, team_member_id, created_by, miembro:team_members!tareas_team_member_id_fkey(nombre)')
+    .eq('completada', false)
+    .order('created_at', { ascending: false })
+  if (!esCEO && tmRow?.id) qTareas = qTareas.eq('team_member_id', tmRow.id)
+  const { data: tareasRows } = await qTareas
+
+  /* Nombres del equipo para resolver quién creó cada tarea. */
+  const { data: miembros } = await service.from('team_members').select('id, nombre')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nombrePorId = new Map<string, string>(((miembros ?? []) as any[]).map((m) => [m.id, m.nombre]))
+
+  const tareasPorMarca: Record<string, TareaMarca[]> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const t of ((tareasRows ?? []) as any[])) {
+    const cat = (t.categoria ?? '').toLowerCase().trim()
+    const match = cards.find(
+      (c) => (t.marca_slug && t.marca_slug === c.slug) || cat === c.nombre.toLowerCase().trim(),
+    )
+    if (!match) continue
+    const m = Array.isArray(t.miembro) ? t.miembro[0] : t.miembro
+    ;(tareasPorMarca[match.slug] ??= []).push({
+      id: t.id,
+      texto: t.texto,
+      persona: m?.nombre ?? null,
+      creador: t.created_by ? (nombrePorId.get(t.created_by) ?? null) : null,
+    })
+  }
+
   return (
     <main className="container mx-auto p-8 max-w-6xl">
       <header className="mb-8">
@@ -69,11 +112,7 @@ export default async function DashboardPage({
         <NuevaMarcaForm defaultOpen={abrirForm} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cards.map((m) => (
-          <MarcaCard key={m.slug} marca={m} />
-        ))}
-      </div>
+      <MarcasGrid cards={cards} tareasPorMarca={tareasPorMarca} />
     </main>
   )
 }
