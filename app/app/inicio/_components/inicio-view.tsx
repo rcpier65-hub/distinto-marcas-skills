@@ -34,9 +34,16 @@ import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
+import { RecordatorioMes } from '@/components/fechas/recordatorio-mes'
 
 export type InicioData = {
   nombre: string
+  /* Aviso de fechas importantes del mes (Lorena/directores). null si no aplica.
+     Incluye la lista de lo que viene este mes para coordinarlo con las marcas. */
+  avisoFechas?: {
+    mes: string; total: number; marcas: string[]; esInicioMes: boolean
+    items: Array<{ id: string; dia: number; titulo: string; marcaNombre: string; categoriaLabel: string; categoriaColor: string }>
+  } | null
   /* Saludo calculado en server (timezone Lima): 'Buenos días',
      'Buenas tardes' o 'Buenas noches'. Antes el cliente lo calculaba
      con new Date().getHours() pero durante SSR el server de Vercel
@@ -461,6 +468,19 @@ export function InicioView({ data }: { data: InicioData }) {
             a todo el ancho en celular y en fila en PC. Incluye "Activar
             notificaciones" (solo aparece si hay algo que hacer). */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 mb-2">
+          {/* Iniciar una reunión — videollamada del equipo (función de Erick).
+              Va para TODOS: es para que el equipo se comunique entre sí. */}
+          <Link
+            href="/reunion"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-white"
+            style={{
+              background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+              fontSize: 14, padding: '12px 16px', textDecoration: 'none',
+              boxShadow: '0 6px 18px -6px rgba(20,184,166,0.7)',
+            }}
+          >
+            🎥 Iniciar una reunión
+          </Link>
           {data.nombre === 'Erick' && (
             <Link
               href="/checklist-video"
@@ -488,10 +508,39 @@ export function InicioView({ data }: { data: InicioData }) {
               👥 Accesos de clientes
             </Link>
           )}
+          {/* La Ruleta — sorteo mensual de quién organiza la salida del equipo
+              (función de Erick). En el usuario de Erick y el director. */}
+          {(data.nombre === 'Erick' || data.rolBase === 'director') && (
+            <Link
+              href="/ruleta"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-white"
+              style={{
+                background: 'linear-gradient(135deg, #f59e0b, #ec4899)',
+                fontSize: 14, padding: '12px 16px', textDecoration: 'none',
+                boxShadow: '0 6px 18px -6px rgba(236,72,153,0.7)',
+              }}
+            >
+              🎲 La Ruleta
+            </Link>
+          )}
           <div className="flex justify-end sm:ml-auto">
             <ActivarNotificaciones />
           </div>
         </div>
+
+        {/* Recordatorio de FECHAS IMPORTANTES del mes (función de Lorena/Erick).
+            Lista lo que viene este mes para coordinarlo con las marcas. Solo se
+            calcula para Lorena/directores, así que aquí solo aparece para ellos. */}
+        {data.avisoFechas && data.avisoFechas.total > 0 && (
+          <RecordatorioMes
+            mes={data.avisoFechas.mes}
+            total={data.avisoFechas.total}
+            marcas={data.avisoFechas.marcas}
+            esInicioMes={data.avisoFechas.esInicioMes}
+            items={data.avisoFechas.items}
+            verTodoHref="/fechas-importantes"
+          />
+        )}
 
         {/* Banner de recordatorios — solo Lorena (Operaciones).
             Pedro 07-jul-2026: quitar el banner para Erick (no debe salirle al

@@ -451,8 +451,52 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     ? { ...cockpitDataRaw, marcasNav, ocultarGrabacionesProximas: esCEO }
     : null
 
+  /* Recordatorio de FECHAS IMPORTANTES del mes (Lorena/directores): lo que
+     queda por coordinar este mes (grabaciones, eventos…). Solo lo que viene
+     (fecha >= hoy) dentro del mes actual. Función de Erick/Lorena. */
+  let avisoFechas: InicioData['avisoFechas'] = null
+  if (esCEO || memberData.nombre === 'LORENA') {
+    const { categoriaInfo } = await import('@/lib/fechas/categorias')
+    const mesPref = hoy.slice(0, 7)
+    const { data: fechasMes } = await service
+      .from('fechas_importantes')
+      .select('id, titulo, fecha, categoria, marca:marcas(nombre)')
+      .gte('fecha', hoy)
+      .lte('fecha', `${mesPref}-31`)
+      .order('fecha', { ascending: true })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filas = (fechasMes ?? []) as any[]
+    if (filas.length > 0) {
+      const MESES_N = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+      const nombres = new Set<string>()
+      const items = filas.map((f) => {
+        const m = Array.isArray(f.marca) ? f.marca[0] : f.marca
+        if (m?.nombre) nombres.add(m.nombre as string)
+        const ymd = typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : ''
+        const cat = categoriaInfo(f.categoria)
+        return {
+          id: f.id as string,
+          dia: Number(ymd.slice(8, 10)),
+          titulo: (f.titulo ?? '—') as string,
+          marcaNombre: (m?.nombre ?? 'Marca') as string,
+          categoriaLabel: cat.label,
+          categoriaColor: cat.color,
+        }
+      })
+      const esInicioMes = Number(hoy.slice(8, 10)) <= 5
+      avisoFechas = {
+        mes: MESES_N[Number(hoy.slice(5, 7)) - 1],
+        total: filas.length,
+        marcas: [...nombres],
+        esInicioMes,
+        items: items.slice(0, 6),
+      }
+    }
+  }
+
   const data: InicioData = {
     nombre: nombreCapitalizado,
+    avisoFechas,
     /* Saludo calculado en server con timezone Lima — antes el cliente
        calculaba con new Date().getHours() pero durante SSR el server
        de Vercel está en UTC y daba 'Buenos días' a las 9pm Lima. */

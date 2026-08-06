@@ -70,10 +70,6 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
         return id && permisos.marcasAcceso!.includes(id)
       })
     : marcas
-  /* Badge del "Inbox global" = suma de pendientes REALES de las marcas
-     visibles. Antes era un 73 hardcodeado que no coincidía con el inbox
-     (Pedro: "dice 73 y no hay nada"). 0 → sin badge. */
-  const inboxPendientes = marcasVisibles.reduce((acc, m) => acc + (m.pendientes ?? 0), 0)
   const pathname = usePathname()
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     workspace: true,
@@ -179,9 +175,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio') || isActive('/cockpit')} shortcut="1" />
           {/* Tareas: tablero personal de cada uno (estilo Notas). Todos lo ven. */}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
-          {puede('inbox') && (
-            <NavItem href="/comentarios"   icon={<InboxIcon />}    label="Inbox global"   active={isActive('/comentarios')}   shortcut="2" badge={inboxPendientes > 0 ? inboxPendientes : undefined} />
-          )}
+          {/* "Inbox global" eliminado del menú — ya no se usa. Pedro 06-ago-2026. */}
           {puede('publicaciones') && (
             <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
           )}
@@ -202,6 +196,11 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {/* Creación de Ideas: estudio de contenido para creadores (guiones
               virales, banco de ideas, teleprompter…). Visible para todo el equipo. */}
           <NavItem href="/creacion-de-ideas" icon={<SparklesIcon />} label="Creación de Ideas" active={isActive('/creacion-de-ideas')} />
+          {/* Fechas importantes — función de Lorena/Erick. Fechas clave del año
+              por marca. Solo Lorena y directores (Erick/Pedro). */}
+          {(esCEO || permisos?.nombre === 'LORENA') && (
+            <NavItem href="/fechas-importantes" icon={<CalendarIcon />} label="Fechas importantes" active={isActive('/fechas-importantes')} />
+          )}
         </Section>
 
         {/* Sección marcas: controlada por el permiso 'marcas' (nuevo).
@@ -505,7 +504,6 @@ const avatarStyle: React.CSSProperties = {
 }
 
 function HomeIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 6L7 2.5L11.5 6V11.5H8.5V8H5.5V11.5H2.5V6Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
-function InboxIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L4 3H10L12 7M2 7V11H12V7M2 7H5L6 9H8L9 7H12" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
 function CalendarIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="3" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M2 6H12M5 2V4M9 2V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function VideoIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="4" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M9 6L12 4.5V9.5L9 8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
 function EditIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 1.5L10.5 4L4.5 10H2V7.5L8 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M7 2.5L9.5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }

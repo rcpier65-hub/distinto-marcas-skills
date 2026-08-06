@@ -813,9 +813,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                 Pedro pidió tener WORKFLOW y PROPIEDADES en el mismo
                 bloque vertical al costado del copy, para no scrollear
                 buscando estado/editor/fechas mientras edita el texto.
-                En mobile va full-width arriba; en mobile el workflow y las
-                propiedades se reparten en 2 columnas para no ocupar tanto alto. */}
-            <aside className="w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-muted/30 p-3 grid grid-cols-2 gap-x-4 gap-y-4 lg:block lg:space-y-4">
+                En mobile va full-width arriba. En CELULAR angosto (<640px) se
+                apila en 1 columna para que se lea bien; desde tablet (≥640px) el
+                workflow y las propiedades se reparten en 2 columnas para no
+                ocupar tanto alto. Fix responsive Pedro 06-ago-2026. */}
+            <aside className="w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-muted/30 p-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 lg:block lg:space-y-4">
               {/* Workflow checklist */}
               <div className="space-y-2">
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
