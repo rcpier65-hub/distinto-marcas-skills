@@ -421,20 +421,10 @@ function sidebar(){
       <div class="xpbar"><i style="width:${L.pct}%"></i></div>
       <div style="color:var(--faint);font-size:11px;margin-top:6px">${L.into}/${L.need} XP para N${L.lv+1}</div>
     </div>
-    <div class="side-card">
-      <div class="side-title">Plan actual</div>
-      <div class="plan-name">Gratis 👑</div>
-      <button class="btn accent block" style="margin-top:12px" onclick="location.hash='#/cuenta'">Subir a Pro</button>
-    </div>
     <div class="side-card streak-card">
       <div class="mascot">${S.streak>=7?'🔥':BRAND.mascot}</div>
       <div class="streak-num">🔥 ${S.streak} <small>día${S.streak===1?'':'s'}</small></div>
       <div style="color:var(--muted);font-size:12px">Racha · récord ${S.streakRecord}</div>
-    </div>
-    <div class="side-card">
-      <div class="side-title">Invita a un amigo</div>
-      <div style="color:var(--muted);font-size:13px;margin:6px 0 12px">Gana beneficios por cada suscripción.</div>
-      <button class="btn block" onclick="toast('Link de invitación copiado 🔗')">Invitar</button>
     </div>
   </aside>`;
 }
@@ -690,16 +680,6 @@ const screens = {
         </div>
       </div>
       <div class="card" style="margin-bottom:16px">
-        <div class="side-title" style="margin-bottom:12px">Plan</div>
-        <div class="plan-grid">
-          <div class="plan-col"><div style="font-weight:700;font-family:var(--font-display);font-size:18px">Gratis</div><div style="color:var(--muted);font-size:13px">$0 · para siempre</div>
-            <ul><li>✓ Organiza tus guiones</li><li>✓ Randomizador + banco</li><li>✓ Teleprompter</li><li>✓ Racha y XP</li></ul></div>
-          <div class="plan-col pro"><div style="font-weight:700;font-family:var(--font-display);font-size:18px">Pro <span class="badge publicado">recomendado</span></div><div style="color:var(--muted);font-size:13px">IA completa</div>
-            <ul><li>✓ IA real (Claude) en los guiones</li><li>✓ Multiplicador ×12 sin tope</li><li>✓ Mi Voz avanzada</li><li>✓ Sugerir semana + multi-cuenta</li></ul>
-            <button class="btn accent block" style="margin-top:12px" onclick="toast('Pagos (Culqi/Mercado Pago) llegan en fase 2')">Activar Pro</button></div>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:16px">
         <div class="side-title">Tema</div>
         <div class="row" style="margin-top:10px">
           <button class="chip ${S.theme==='distinto'?'on':''}" onclick="setTheme('distinto')">✨ Sistema (tu app · claro + violeta)</button>
@@ -786,15 +766,35 @@ function chatBubble(m){
 function renderChat(){ const el=$('#chatThread'); if(!el) return; el.innerHTML=chatThread.map(chatBubble).join(''); el.scrollTop=el.scrollHeight; }
 function chatUserIdea(text){ ensureChat(); chatThread.push({who:'user',kind:'user',text}); chatThread.push({who:'bot',kind:'actions',idea:text}); renderChat(); }
 function chatSend(){ readPrefs(); const inp=$('#chatInput'); const v=((inp&&inp.value)||'').trim(); if(!v){ toast('Escribe una idea'); return; } if(inp) inp.value=''; if(/^https?:\/\//i.test(v)){ ensureChat(); chatThread.push({who:'user',kind:'user',text:v}); chatThread.push({who:'bot',kind:'bot-text',text:'Los links → guion llegan en la fase 2 (con tu pipeline de transcripción). Por ahora escríbeme el tema. 🙌'}); renderChat(); return; } chatUserIdea(v); }
-function chatConvertir(idea){
+async function chatConvertir(idea){
   readPrefs();
   const b=DATA.ideas.find(x=>x.idea===idea); const gancho=(b&&b.hook)||('¿'+cap(shorten(idea))+'? Esto te va a servir.');
   chatThread.push({who:'bot',kind:'teaser',gancho});
-  chatThread.push({who:'bot',kind:'bot-text',text:'¡Vamos a ello! Te armo el guion completo con el framework VIRAL ✍️'});
-  const sc=gen.script(idea); window._last=sc;
+  chatThread.push({who:'bot',kind:'bot-text',text:'Generando tu guion con IA (Claude)… ✍️'});
+  renderChat();
+  let sc = await generarConIA(idea, gancho);
+  if(!sc){ sc = gen.script(idea, gancho); }  // fallback local si la IA falla
+  window._last=sc;
+  // reemplaza el "Generando…" por el guion
+  chatThread.pop();
+  chatThread.push({who:'bot',kind:'bot-text',text: sc.ia? '¡Listo! Guion generado con Claude ✨' : 'Te armé el guion con el framework VIRAL (modo local) ✍️'});
   chatThread.push({who:'bot',kind:'script',sc});
   set(s=>{ s.onboarding.guion=true; s.rings.guion=Math.min(100,s.rings.guion+34); s.xp+=15; });
   renderChat();
+}
+/* Llama al endpoint server de la app (Claude real). Devuelve un `sc` con la
+   misma forma que gen.script, o null si falla (para caer al fallback local). */
+async function generarConIA(idea, hook){
+  try{
+    const r = await fetch('/api/creacion-ideas/generar', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ idea, hook, niche:S.prefs.niche, platform:S.prefs.platform, goal:S.prefs.goal })
+    });
+    const j = await r.json();
+    if(!j.ok || !Array.isArray(j.steps)){ if(j&&j.error) toast('IA: '+j.error); return null; }
+    const steps = j.steps.map(s=>({ key:s.key, name:s.name, purpose:s.purpose, ti:0, text:s.text }));
+    return { id:uid(), title:idea, steps, topic:shorten(idea), hook, niche:S.prefs.niche, platform:S.prefs.platform, goal:S.prefs.goal, state:'borrador', createdAt:Date.now(), ia:true };
+  }catch(e){ return null; }
 }
 function chatGuardarIdea(idea){ saveIdea(idea); chatThread.push({who:'bot',kind:'bot-text',text:'Guardada en tus ideas 💡 La ves en la pestaña Ideas.'}); renderChat(); }
 function chatMultiplicar(idea){ const list=gen.multiply(idea); const html='<b>12 ángulos de: '+esc(shorten(idea))+'</b><div class="grid g2" style="margin-top:10px">'+list.map(a=>`<div class="idea-card"><span class="tag">${esc(a.angle)}</span><div style="font-weight:600">${esc(a.title)}</div><button class="btn sm" style="margin-top:auto" onclick="chatUserIdea('${jsq(a.title)}')">✦ Guion</button></div>`).join('')+'</div>'; chatThread.push({who:'bot',kind:'bot-text',html}); addXP(10); renderChat(); toast('12 ángulos ⚡ +10 XP'); }
@@ -813,7 +813,7 @@ function render(){
   const cls = r==='inicio' ? 'shell' : (NORAIL.includes(r)?'shell no-rail':'shell full');
   const showSide = r==='inicio' || NORAIL.includes(r);
   $('#root').innerHTML = topbar(r) + `<div class="${cls}">${showSide?sidebar():''}${fn()}${withRail?rail():''}</div>` +
-    `<div class="foot">${BRAND.name} · prototipo local · tus datos viven solo en este navegador. La IA real (Claude), el login y los pagos se enchufan en la fase 2.</div>`;
+    `<div class="foot">${BRAND.name} · guiones con IA (Claude) conectada a tu sistema · tus datos viven en este navegador.</div>`;
   if(r==='crear') renderChat();
 }
 window.addEventListener('hashchange', render);
