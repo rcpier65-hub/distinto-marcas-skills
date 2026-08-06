@@ -28,6 +28,14 @@
   --accent:#ba41f7; --accent-ink:#ffffff; --accent-soft:rgba(186,65,247,.16);
   --accent2:#f2cc2c; --danger:#ff6b6b; --gold:#f2cc2c;
 }
+/* SISTEMA DISTINTO — claro, tokens de la app (fondo blanco/#fafafa + acento #7170ff) */
+:root[data-theme="distinto"]{
+  --bg:#fafafa; --bg2:#ffffff; --surface:#ffffff; --surface2:#f6f6f8; --surface3:#eeeef1;
+  --line:rgba(10,10,10,.10); --text:#0a0a0a; --muted:rgba(10,10,10,.60); --faint:rgba(10,10,10,.42);
+  --accent:#7170ff; --accent-ink:#ffffff; --accent-soft:rgba(113,112,255,.12);
+  --accent2:#a78bff; --danger:#ef4444; --gold:#f59e0b;
+  --shadow:0 8px 24px rgba(10,10,10,.07);
+}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg); color:var(--text); font-family:var(--font-body); -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.5}
@@ -284,7 +292,7 @@ const DATA = {
 /* ---------- STORE ---------- */
 const KEY='creacion-ideas.v1';
 const defaults = () => ({
-  name:'Creador', theme:'neon', xp:0,
+  name:'Creador', theme:'distinto', xp:0,
   streak:1, streakRecord:1,
   rings:{idea:0, guion:0, publicado:0},
   onboarding:{semilla:false, pilar:false, guion:false, teleprompter:false, agenda:false},
@@ -366,7 +374,7 @@ function sugerirSemana(){ set(s=>{ DAYS.forEach((d,i)=>{ if(!(s.calendar[i]||[])
 function addVoice(){ const n=prompt('Nombre de la voz (ej: "Yo casual")'); if(!n) return; const tone=prompt('Describe tu tono en una frase (ej: cercano, directo, con humor)')||''; set(s=>{ s.voices.unshift({id:uid(), name:n, tone}); if(!s.activeVoice) s.activeVoice=s.voices[0].id; }); toast('Voz creada 🗣️'); }
 function setVoice(id){ set(s=>s.activeVoice=id); }
 function delVoice(id){ set(s=>{ s.voices=s.voices.filter(v=>v.id!==id); if(s.activeVoice===id) s.activeVoice=s.voices[0]?s.voices[0].id:null; }); }
-function toggleTheme(){ setTheme(S.theme==='neon'?'cozy':'neon'); }
+function toggleTheme(){ const order=['distinto','neon','cozy']; setTheme(order[(order.indexOf(S.theme)+1)%order.length]); }
 function setTheme(t){ set(s=>s.theme=t); }
 function exportData(){ const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='distinto-studio-datos.json'; a.click(); }
 function resetData(){ if(confirm('¿Borrar todos tus datos locales?')){ localStorage.removeItem(KEY); S=load(); render(); } }
@@ -396,7 +404,7 @@ function topbar(route){
     <div class="brand"><span class="spark">${BRAND.mascot}</span>${BRAND.name}</div>
     <nav class="nav">${links.map(([r,l])=>`<a href="#/${r}" class="${route===r?'active':''}">${l}<span class="u"></span></a>`).join('')}</nav>
     <div class="top-actions">
-      <button class="chip" onclick="toggleTheme()">${S.theme==='neon'?'🟢 Studio':'🟣 Agencia'}</button>
+      <button class="chip" onclick="toggleTheme()">${S.theme==='distinto'?'✨ Sistema':S.theme==='neon'?'🟢 Studio':'🟣 Agencia'}</button>
       <button class="btn accent sm" onclick="location.hash='#/crear'">✦ Crear</button>
       <div class="avatar">${BRAND.mascot}</div>
     </div>
@@ -694,6 +702,7 @@ const screens = {
       <div class="card" style="margin-bottom:16px">
         <div class="side-title">Tema</div>
         <div class="row" style="margin-top:10px">
+          <button class="chip ${S.theme==='distinto'?'on':''}" onclick="setTheme('distinto')">✨ Sistema (tu app · claro + violeta)</button>
           <button class="chip ${S.theme==='neon'?'on':''}" onclick="setTheme('neon')">🟢 Studio (navy + verde)</button>
           <button class="chip ${S.theme==='cozy'?'on':''}" onclick="setTheme('cozy')">🟣 Agencia (morado + amarillo)</button>
         </div>
