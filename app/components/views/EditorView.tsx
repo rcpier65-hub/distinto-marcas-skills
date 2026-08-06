@@ -202,7 +202,10 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
   /* Helpers para resolver marca/editor desde slug/id */
   const marcaBySlug = useMemo(() => new Map(marcas.map((m) => [m.slug, m])), [marcas])
   const editorById = useMemo(() => new Map(editores.map((e) => [e.id, e])), [editores])
-  const hoy = new Date().toISOString().slice(0, 10)
+  // HOY en zona horaria de Lima (NO UTC). Con UTC, después de las 7pm de Lima
+  // (medianoche UTC) "hoy" saltaba a mañana y el filtro "Mi trabajo para hoy"
+  // ocultaba TODAS las tareas del editor. Reporte de Brandy 22-jul-2026.
+  const hoy = fechaLima(new Date())
 
   /* Desglose por estado REAL (para el diagnóstico cuando la vista queda vacía:
      muestra en qué estado están los videos que existen). */
@@ -980,6 +983,12 @@ function Row({
      mostramos el tiempo final en lugar del botón. */
   const enEdicion = !!entry.iniciadoEdicionAt && !entry.editadoAt
   const yaEditado = !!entry.editadoAt
+  /* El botón "▶ Editar" (iniciar edición) debe estar disponible mientras el
+     video siga siendo editable (estado 'editar' o 'aprobar'), aunque tenga un
+     `editado_at` de una ronda anterior. Antes se ocultaba con `!yaEditado`, y
+     como `editado_at` nunca se limpia, un video que volvía a "editar" (revisión)
+     se quedaba sin el botón. Reporte de Brandy 23-jul-2026. */
+  const puedeEditarBoton = estaMarcadaHoy && (entry.estado === 'editar' || entry.estado === 'aprobar')
   const bgDefault = enEdicion ? 'rgba(34, 211, 238, 0.08)'  /* cyan tenue para "editando" */
     : estaMarcadaHoy ? 'rgba(113, 112, 255, 0.04)' : 'transparent'
 
@@ -1041,14 +1050,14 @@ function Row({
               </span>
             )}
           </span>
-          {estaMarcadaHoy && !yaEditado && (
+          {puedeEditarBoton && (
             <BotonEditando
               enEdicion={enEdicion}
               iniciadoAt={entry.iniciadoEdicionAt}
               onToggle={onToggleEnEdicion}
             />
           )}
-          {yaEditado && entry.iniciadoEdicionAt && (
+          {yaEditado && entry.iniciadoEdicionAt && !puedeEditarBoton && (
             <span
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,

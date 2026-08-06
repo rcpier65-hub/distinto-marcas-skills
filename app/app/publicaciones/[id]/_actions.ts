@@ -8,7 +8,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { generarCopysIA } from '@/lib/copys/generar'
 import { promptSeedPorSlug } from '@/lib/copys/seeds'
 import { registrarActividad } from '@/lib/actividad/registrar'
-import { enviarPushAClientesDeMarca } from '@/lib/push/send'
+import { enviarPushAClientesDeMarca, enviarPushAMiembros, marcaAvisaAlEquipo } from '@/lib/push/send'
 import type { EstadoPublicacion, EstadoTarea } from '@/lib/types/database'
 
 export type UpdatePublicacionInput = {
@@ -126,6 +126,47 @@ export async function updatePublicacion(
     else update.editado = true
   }
 
+  /* Al AVANZAR el estado (aprobar/programar/publicar/enviado) hacemos dos cosas
+     leyendo la pub una sola vez:
+     (A) CRÉDITO DE EDICIÓN EN EL REPORTE — "Mandar a aprobar" desde el detalle
+         pasa por acá; el reporte del editor cuenta por `editado_at` (+ editor_
+         nombre). El módulo Editor sí lo setea, pero este botón no lo hacía →
+         Pieer mandaba a aprobar y NO salía en su reporte (Erick 31-jul-2026).
+         Solo para tareas de EDICIÓN (no diseño) y sin pisar un editado_at previo
+         (Pedro: "el tiempo se cuenta desde la PRIMERA vez").
+     (B) AVISO AL CLIENTE — "tienes un video listo para aprobar" en la TRANSICIÓN
+         a 'aprobar' (estado previo != 'aprobar'), para no re-notificar en cada
+         guardado. Pedro 27-jul-2026. */
+  const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
+  let avisarListoCliente: { marcaId: string; nombre: string; titulo: string; emoji: string } | null = null
+  if (typeof input.estado === 'string' && ESTADOS_AVANZADOS.includes(input.estado)) {
+    const { data: ctxRev } = await service
+      .from('publicaciones')
+      .select('estado, nombre, es_tarea_diseno, editado_at, marca:marcas(id, nombre, emoji_marca)')
+      .eq('id', id)
+      .maybeSingle()
+    if (ctxRev) {
+      // (A) Crédito de edición para el reporte del editor.
+      const esDiseno = ctxRev.es_tarea_diseno === true || ctxRev.estado === 'disenar'
+      if (!esDiseno) {
+        if (input.editado === undefined) update.editado = true
+        if (!ctxRev.editado_at && update.editado_at === undefined) update.editado_at = new Date().toISOString()
+      }
+      // (B) Aviso al cliente en la transición a 'aprobar'.
+      if (input.estado === 'aprobar' && ctxRev.estado !== 'aprobar') {
+        const mm = Array.isArray(ctxRev.marca) ? ctxRev.marca[0] : ctxRev.marca
+        if (mm?.id) {
+          avisarListoCliente = {
+            marcaId: mm.id as string,
+            nombre: (mm.nombre ?? '') as string,
+            titulo: ((input.nombre ?? ctxRev.nombre) ?? '') as string,
+            emoji: (mm.emoji_marca ?? '') as string,
+          }
+        }
+      }
+    }
+  }
+
   let { error } = await service.from('publicaciones').update(update).eq('id', id)
 
   // DEFENSIVO contra columnas faltantes (migración pendiente). Una columna que
@@ -138,7 +179,7 @@ export async function updatePublicacion(
   // guardaban (se "guardaba" pero al recargar no salían). Iteramos por si
   // faltara más de una columna. Mismo patrón que ya nos mordió: un fallback
   // NUNCA debe tirar datos válidos, solo la columna realmente ausente.
-  const OPTIONAL_COLS = ['video_sin_musica_url', 'video_con_musica_url', 'drive_resultado_url', 'es_tarea_diseno', 'frase']
+  const OPTIONAL_COLS = ['video_sin_musica_url', 'video_con_musica_url', 'drive_resultado_url', 'es_tarea_diseno', 'frase', 'editado_at']
   let intentos = 0
   while (
     error && intentos < OPTIONAL_COLS.length && (
@@ -162,6 +203,21 @@ export async function updatePublicacion(
   if (error) {
     console.error('[updatePublicacion] error:', error)
     return { ok: false, error: error.message }
+  }
+
+  // Avisar al CLIENTE que su video ya está listo para aprobar (solo en la
+  // transición a 'aprobar'; ver arriba). Best-effort: no rompe el guardado.
+  if (avisarListoCliente) {
+    try {
+      await enviarPushAClientesDeMarca(avisarListoCliente.marcaId, {
+        title: `🎬 Tienes un video listo para aprobar${avisarListoCliente.emoji ? ` ${avisarListoCliente.emoji}` : ''}`,
+        body: `${avisarListoCliente.titulo || 'Tu video'} — entra a tu portal para verlo y aprobarlo. 👀`,
+        url: `/cliente?pub=${id}`,
+        tag: `listo-aprobar-${id}`,
+      })
+    } catch (e) {
+      console.error('[updatePublicacion] aviso "listo para aprobar" falló:', e)
+    }
   }
 
   // Historial de actividad (best-effort).
@@ -425,9 +481,10 @@ export async function deletePublicacion(
 
 /* "Video ya subido → avisar al cliente". Lo usa el trabajador desde el detalle:
    guarda los links del post (TikTok/Instagram), marca la publicación como
-   publicada y manda un push SOLO AL CLIENTE de la marca ("¡Tu video se
-   publicó!"). Pedro 14-jul-2026: el aviso de publicado NO va al equipo, solo
-   al cliente. */
+   publicada y manda un push AL CLIENTE de la marca ("¡Tu video se publicó!").
+   Pedro 14-jul-2026: por defecto el aviso de publicado va SOLO al cliente.
+   Pedro 27-jul-2026: para las marcas en MARCAS_AVISO_EQUIPO (Retoz por ahora)
+   además avisa al equipo (Pedro + Erick). */
 export async function avisarClientePublicado(
   id: string,
   input: { linkTiktok?: string | null; linkInstagram?: string | null },
@@ -438,9 +495,15 @@ export async function avisarClientePublicado(
 
   const { data: pub } = await service
     .from('publicaciones')
-    .select('nombre, plataformas, marca:marcas(id, nombre, emoji_marca)')
+    .select('nombre, plataformas, video_con_musica_url, marca:marcas(id, nombre, slug, emoji_marca)')
     .eq('id', id)
     .maybeSingle()
+
+  /* Antes acá había un freno que no dejaba avisar al cliente si el video estaba
+     en H.265. Ya no hace falta: el portal sirve los videos por /api/video, que
+     usa la versión H.264 que Google ya tiene convertida — así CUALQUIER video se
+     ve, sin importar cómo lo exporten. Sin fricción para el equipo.
+     Pedro 16-jul-2026. */
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update: any = { estado: 'publicado', publicado_at: new Date().toISOString(), updated_by: user.id }
@@ -454,14 +517,25 @@ export async function avisarClientePublicado(
   const marcaNombre = m?.nombre ?? 'Marca'
   const hora = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(new Date())
 
-  // SOLO al CLIENTE de la marca (el equipo ya no recibe el aviso de publicado).
+  // Al CLIENTE de la marca.
   if (m?.id) {
     await enviarPushAClientesDeMarca(m.id, {
       title: `✅ ¡Tu video se publicó! ${m.emoji_marca ?? ''}`.trim(),
-      body: `${pub?.nombre ?? marcaNombre} · ${hora}`,
+      body: `${pub?.nombre ?? marcaNombre} — ya puedes verlo en tus redes sociales 🎉`,
       url: `/cliente?pub=${id}`,   // abre directo esa publicación en el portal
       tag: `cliente-pub-${id}`,
     })
+    /* Para las marcas donde el equipo quiere estar al tanto (Retoz, por ahora),
+       avisar también a Pedro (director) + Erick que el video ya se publicó.
+       Pedro 27-jul-2026 (revierte el "solo cliente" del 14-jul, pero acotado). */
+    if (marcaAvisaAlEquipo(m.slug, m.nombre)) {
+      await enviarPushAMiembros(['erick'], {
+        title: `✅ Video publicado · ${marcaNombre}`,
+        body: `${pub?.nombre ?? marcaNombre} · ${hora}`,
+        url: `/publicaciones/${id}`,
+        tag: `pub-publicado-eq-${id}`,
+      })
+    }
   }
 
   revalidatePath('/publicaciones')

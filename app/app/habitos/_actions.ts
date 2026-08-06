@@ -12,8 +12,17 @@ function isoDayOfWeek(d: Date): number {
   return js === 0 ? 7 : js
 }
 
+/* Fecha de HOY en PERÚ (UTC-5).
+   BUG que arregla (Pedro 16-jul-2026): antes usaba `new Date().toISOString()`,
+   que es UTC. Como Perú va 5 horas atrás, a partir de las 7 p.m. hora peruana
+   el UTC ya está en el día siguiente → el hábito se guardaba con la fecha de
+   MAÑANA. El reporte del día busca por fecha de Lima (fechaLimaIso en
+   lib/inicio/load-reporte-del-dia.ts), así que no lo encontraba y el hábito
+   salía como no cumplido. Ahora ambos hablan el mismo idioma: hora de Perú. */
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
 }
 
 export type HabitoConEstado = HabitoRow & {
@@ -40,9 +49,11 @@ export async function listHabitosConEstado(): Promise<
   const service = createServiceClient() as any
   const today = todayStr()
 
-  // Ventana de 49 días para heatmap (7 semanas)
-  const desde = new Date()
-  desde.setDate(desde.getDate() - 48)  // 49 días contando hoy
+  /* Ventana de 49 días para heatmap (7 semanas). Se ancla en el HOY de Perú
+     (no en el UTC del servidor) para que el calendario cuadre con las fechas
+     que guardamos. Mediodía UTC evita saltos de día al restar. */
+  const desde = new Date(today + 'T12:00:00Z')
+  desde.setUTCDate(desde.getUTCDate() - 48)  // 49 días contando hoy
   const desdeStr = desde.toISOString().slice(0, 10)
 
   /* Resolver team_member_id del usuario logueado para filtrar habitos.
@@ -198,7 +209,7 @@ export async function toggleHabitoHoy(habitoId: string): Promise<{ ok: true; com
       .delete()
       .eq('id', existing.data.id)
     if (error) return { ok: false, error: error.message }
-    revalidatePath('/habitos')
+    revalidatePath('/habitos'); revalidatePath('/inicio')
     return { ok: true, completado: false }
   }
 
@@ -209,12 +220,12 @@ export async function toggleHabitoHoy(habitoId: string): Promise<{ ok: true; com
   if (error) {
     // Si fue race condition (UNIQUE constraint), trato como ya estaba
     if ((error.message ?? '').includes('duplicate') || (error.message ?? '').includes('unique')) {
-      revalidatePath('/habitos')
+      revalidatePath('/habitos'); revalidatePath('/inicio')
       return { ok: true, completado: true }
     }
     return { ok: false, error: error.message }
   }
-  revalidatePath('/habitos')
+  revalidatePath('/habitos'); revalidatePath('/inicio')
   return { ok: true, completado: true }
 }
 
@@ -254,19 +265,19 @@ export async function toggleHabitoFecha(
   if (existing.data) {
     const { error } = await service.from('habitos_completados').delete().eq('id', existing.data.id)
     if (error) return { ok: false, error: error.message }
-    revalidatePath('/habitos')
+    revalidatePath('/habitos'); revalidatePath('/inicio')
     return { ok: true, completado: false }
   }
 
   const { error } = await service.from('habitos_completados').insert({ habito_id: habitoId, fecha })
   if (error) {
     if ((error.message ?? '').includes('duplicate') || (error.message ?? '').includes('unique')) {
-      revalidatePath('/habitos')
+      revalidatePath('/habitos'); revalidatePath('/inicio')
       return { ok: true, completado: true }
     }
     return { ok: false, error: error.message }
   }
-  revalidatePath('/habitos')
+  revalidatePath('/habitos'); revalidatePath('/inicio')
   return { ok: true, completado: true }
 }
 
@@ -324,7 +335,7 @@ export async function createHabito(args: {
     .single()
 
   if (error) return { ok: false, error: error.message }
-  revalidatePath('/habitos')
+  revalidatePath('/habitos'); revalidatePath('/inicio')
   return { ok: true, id: data.id }
 }
 
@@ -340,7 +351,7 @@ export async function archivarHabito(id: string): Promise<{ ok: true } | { ok: f
   if (!own.ok) return own
   const { error } = await service.from('habitos').update({ activo: false }).eq('id', id)
   if (error) return { ok: false, error: error.message }
-  revalidatePath('/habitos')
+  revalidatePath('/habitos'); revalidatePath('/inicio')
   return { ok: true }
 }
 
@@ -373,7 +384,7 @@ export async function eliminarHabito(id: string): Promise<{ ok: true } | { ok: f
   const { error } = await service.from('habitos').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
 
-  revalidatePath('/habitos')
+  revalidatePath('/habitos'); revalidatePath('/inicio')
   return { ok: true }
 }
 
@@ -399,6 +410,6 @@ export async function updateHabito(
 
   const { error } = await service.from('habitos').update(payload).eq('id', id)
   if (error) return { ok: false, error: error.message }
-  revalidatePath('/habitos')
+  revalidatePath('/habitos'); revalidatePath('/inicio')
   return { ok: true }
 }

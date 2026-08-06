@@ -12,7 +12,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 export type Notificacion = {
   id: string
-  tipo: 'grabacion' | 'editar' | 'comentario'
+  tipo: 'grabacion' | 'editar' | 'comentario' | 'observacion'
   titulo: string
   detalle: string
   href: string
@@ -150,6 +150,63 @@ export async function getNotificaciones(): Promise<Notificacion[]> {
         detalle: `@${autor} escribió hace ${dd} día${dd === 1 ? '' : 's'}`,
         href: '/comentarios',
         urgencia: dd >= 7 ? 'alta' : 'media',
+        marcaColor: m.color,
+        marcaEmoji: m.emoji,
+      })
+    }
+  } catch { /* ignore */ }
+
+  /* 4) Observaciones del CLIENTE sin atender. Garantiza que el pedido del
+     cliente le aparezca a Erick/Pedro en la campanita aunque el push no le
+     llegue (celular sin permiso, otra compu, etc.). Pedro 15-jul-2026. */
+  try {
+    const res = await service
+      .from('marca_observaciones')
+      .select('id, texto, autor_nombre, created_at, marcas:marca_id (nombre, color_primario_hex, emoji_marca)')
+      .eq('atendida', false)
+      .order('created_at', { ascending: false })
+      .limit(15)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (res.data ?? []) as any[]) {
+      const m = marcaDe(r)
+      const texto = (r.texto ?? '').replace(/\s+/g, ' ').trim()
+      const quien = r.autor_nombre ? `${r.autor_nombre}: ` : ''
+      out.push({
+        id: `obs-${r.id}`,
+        tipo: 'observacion',
+        titulo: `Observación de ${m.nombre}`,
+        detalle: `${quien}${texto.length > 70 ? texto.slice(0, 70) + '…' : texto}`,
+        href: '/admin/clientes',
+        urgencia: 'alta',
+        marcaColor: m.color,
+        marcaEmoji: m.emoji,
+      })
+    }
+  } catch { /* ignore */ }
+
+  /* 5) Grabaciones que AGENDÓ EL CLIENTE desde su portal (últimos 3 días).
+     Igual que las observaciones: garantiza que le aparezca al equipo en la
+     campanita aunque el push no llegue. Pedro 15-jul-2026. */
+  try {
+    const res = await service
+      .from('grabaciones')
+      .select('id, fecha_planeada, hora_planeada, notas, marcas:marca_id (nombre, color_primario_hex, emoji_marca)')
+      .eq('agendada_por_cliente', true)
+      .eq('estado', 'planeada')
+      .gte('created_at', `${hace3}T00:00:00`)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (res.data ?? []) as any[]) {
+      const m = marcaDe(r)
+      const hora = r.hora_planeada ? ` · ${String(r.hora_planeada).slice(0, 5)}` : ''
+      out.push({
+        id: `grabcli-${r.id}`,
+        tipo: 'grabacion',
+        titulo: `${m.nombre} agendó una grabación`,
+        detalle: `${fechaCorta(r.fecha_planeada)}${hora}${r.notas ? ` — ${String(r.notas).slice(0, 50)}` : ''}`,
+        href: '/grabaciones',
+        urgencia: 'alta',
         marcaColor: m.color,
         marcaEmoji: m.emoji,
       })

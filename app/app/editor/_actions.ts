@@ -17,6 +17,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { syncMarcaPublicaciones } from '@/lib/publicaciones/sync'
 import { registrarActividad } from '@/lib/actividad/registrar'
+import { avisarClienteVideoListo } from '@/lib/publicaciones/avisar-cliente-listo'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -31,11 +32,11 @@ export async function marcarParaEditarHoy(id: string): Promise<ActionResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  /* Usamos `new Date().toISOString().slice(0, 10)` (YYYY-MM-DD) en
-     lugar de CURRENT_DATE de Postgres para que la fecha sea la del
-     navegador del editor, no la del server (que podría estar en UTC
-     y dar la fecha del día siguiente). */
-  const hoy = new Date().toISOString().slice(0, 10)
+  /* HOY en zona horaria de Lima (NO UTC). Esta acción corre en el server
+     (Vercel = UTC): con toISOString(), marcar "Editar hoy" después de las 7pm
+     de Lima guardaba la fecha de MAÑANA y la tarea no aparecía en el filtro.
+     Reporte de Brandy 22-jul-2026. */
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
   const { error } = await service
     .from('publicaciones')
     .update({ fecha_marcada_para_editar: hoy, updated_by: user.id })
@@ -131,6 +132,7 @@ export async function updateEditorEntry(
 
      Sólo aplicamos si patch.estado viene definido y es estado avanzado. */
   const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
+  let avisarListo = false  // avisar al cliente "video listo para aprobar"
   if (patch.estado !== undefined && ESTADOS_AVANZADOS.includes(patch.estado)) {
     /* Terminó de editar (pasó a un estado avanzado) → encender el flag
        `editado` para que la tijereta del calendario se ponga verde sola. */
@@ -147,6 +149,8 @@ export async function updateEditorEntry(
     if (actual && !actual.editado_at) {
       update.editado_at = new Date().toISOString()
     }
+    // Transición a 'aprobar' desde el editor → avisar al cliente (todas las marcas).
+    if (patch.estado === 'aprobar' && actual && actual.estado !== 'aprobar') avisarListo = true
   }
 
   let { error } = await service.from('publicaciones').update(update).eq('id', id)
@@ -164,6 +168,8 @@ export async function updateEditorEntry(
     console.error('[updateEditorEntry] error:', error)
     return { ok: false, error: error.message }
   }
+
+  if (avisarListo) await avisarClienteVideoListo(id)
 
   // Historial: registramos el cambio de estado (lo más relevante del editor).
   if (patch.estado) {

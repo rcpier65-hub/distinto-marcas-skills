@@ -111,13 +111,24 @@ export async function crearTarea(textoOriginal: string): Promise<
 
   const categoria = await categorizarTarea(texto, [...colorByCat.keys()], marcas)
 
-  /* Asignación: si la categoría es un miembro del equipo, la tarea es suya. */
-  const catLower = categoria.toLowerCase().trim()
+  /* ASIGNACIÓN: SOLO por @mención EXPLÍCITA. Si el texto trae "@Nombre" y coincide
+     con un miembro activo, la tarea es de esa persona; si no, es del CREADOR.
+     ANTES se asignaba si la CATEGORÍA (que la IA saca del texto) coincidía con un
+     nombre → "reunión con lorena…" se la quedaba Lorena sin que la etiqueten, y se
+     filtraba a la lista de otro. Pedro 5-ago-2026: "las tareas no deben filtrarse
+     a otros usuarios, salvo que usen @ y etiqueten al usuario". */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const target = ((members ?? []) as any[]).find(
-    (m) => (m.nombre ?? '').toLowerCase().trim() === catLower || primerNombre(m.nombre) === catLower,
-  )
-  const ownerId = target?.id ?? me.id
+  const miembros = (members ?? []) as any[]
+  let ownerId = me.id
+  const mention = texto.match(/@([\p{L}][\p{L}.]*)/u)
+  if (mention) {
+    const mname = mention[1].toLowerCase().replace(/\.+$/, '')
+    const target = miembros.find((m) => {
+      const nombre = (m.nombre ?? '').toLowerCase().trim()
+      return primerNombre(m.nombre) === mname || nombre.replace(/\s+/g, '') === mname || nombre.split(/\s+/).includes(mname)
+    })
+    if (target) ownerId = target.id
+  }
 
   const color = colorByCat.get(categoria) ?? colorParaCategoria(usados)
 

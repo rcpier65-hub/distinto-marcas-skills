@@ -15,7 +15,7 @@ import {
   PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core'
-import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter } from 'lucide-react'
+import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2 } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane } from '../_actions'
@@ -472,6 +472,16 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }:
           <button onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Completar" style={iconBtn}>
             <Check size={12} strokeWidth={2.6} />
           </button>
+          {/* Eliminar directo (Pedro/Lorena 25-jul-2026: "a veces me confundo y ya
+              no las puedo sacar"). Botón visible con confirmación, además del que
+              vive en el menú de mover. */}
+          <button
+            onClick={() => { if (confirm(`¿Eliminar esta tarea?\n\n"${tarea.texto.slice(0, 60)}${tarea.texto.length > 60 ? '…' : ''}"`)) onDelete(tarea.id) }}
+            title="Eliminar tarea"
+            style={iconBtn}
+          >
+            <Trash2 size={12} strokeWidth={2.2} />
+          </button>
         </div>
       </div>
       {menu && (
@@ -484,7 +494,7 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }:
             <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Nueva…" style={{ flex: 1, fontSize: 12, padding: '5px 7px', border: '1px solid #e5e7eb', borderRadius: 7, outline: 'none' }} />
             <button type="submit" style={{ ...iconBtn, color: '#16a34a', background: '#f0fdf4' }}><Plus size={14} /></button>
           </form>
-          <button onClick={() => { onDelete(tarea.id); setMenu(false) }} style={{ ...menuItem, color: '#dc2626', marginTop: 2 }}>Eliminar</button>
+          <button onClick={() => { if (confirm(`¿Eliminar esta tarea?\n\n"${tarea.texto.slice(0, 60)}${tarea.texto.length > 60 ? '…' : ''}"`)) { onDelete(tarea.id); setMenu(false) } }} style={{ ...menuItem, color: '#dc2626', marginTop: 2 }}>🗑️ Eliminar</button>
         </div>
       )}
     </div>

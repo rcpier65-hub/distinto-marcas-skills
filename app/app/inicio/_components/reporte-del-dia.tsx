@@ -128,7 +128,7 @@ export function ReporteDelDiaCard({ data }: Props) {
       // fallback feo.
       if (document.fonts?.ready) await document.fonts.ready
       const node = cardRef.current
-      const blob = await toBlob(node, {
+      const baseOpts = {
         pixelRatio: 2,        // retina-quality
         backgroundColor: '#ffffff',
         cacheBust: true,
@@ -137,18 +137,39 @@ export function ReporteDelDiaCard({ data }: Props) {
            captura tome TODA la altura, no un cuadrado recortado. */
         width: node.offsetWidth,
         height: node.offsetHeight,
-      })
+      }
+      /* La generación puede fallar por fuentes o por IMÁGENES EXTERNAS (logos de
+         Drive / miniaturas) que "manchan" el canvas. Intento normal y, si falla,
+         reintento tolerante: sin fuentes/cache-bust y saltando imágenes que no
+         sean del mismo origen (mejor una imagen sin esa miniatura que ninguna). */
+      let blob: Blob | null = null
+      try { blob = await toBlob(node, baseOpts) } catch { blob = null }
+      if (!blob) {
+        try {
+          blob = await toBlob(node, {
+            ...baseOpts,
+            skipFonts: true,
+            cacheBust: false,
+            filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && !!n.src && !n.src.startsWith(location.origin) && !n.src.startsWith('data:')),
+          })
+        } catch { blob = null }
+      }
       if (!blob) throw new Error('No se pudo generar el blob')
 
-      /* clipboard.write con ClipboardItem image/png. Falla en navegadores
-         que no soportan (Safari iOS <13.4) o sin HTTPS — ahí caemos a
-         descarga del PNG como fallback. */
+      /* Intentar COPIAR al portapapeles; si el navegador no lo soporta o falla
+         (Firefox, foco perdido, permisos), DESCARGAR el PNG — así el usuario
+         SIEMPRE obtiene la imagen y nunca queda en "no se pudo". Pedro 5-ago. */
+      let copiado = false
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ClipboardItemCtor = (window as any).ClipboardItem
       if (navigator.clipboard?.write && ClipboardItemCtor) {
-        await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })])
-        setToast('Imagen copiada — pégala en WhatsApp')
-      } else {
+        try {
+          await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })])
+          copiado = true
+          setToast('Imagen copiada — pégala en WhatsApp')
+        } catch { copiado = false }
+      }
+      if (!copiado) {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -159,7 +180,7 @@ export function ReporteDelDiaCard({ data }: Props) {
       }
     } catch (e) {
       console.error('[reporte] copiarImagen:', e)
-      setToast('No se pudo copiar la imagen')
+      setToast('No se pudo generar la imagen')
     } finally {
       setCopiando(null)
     }

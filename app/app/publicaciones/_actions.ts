@@ -7,6 +7,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { enviarPushAClientesDeMarca, enviarPushAMiembros, marcaAvisaAlEquipo } from '@/lib/push/send'
+import { avisarClienteVideoListo } from '@/lib/publicaciones/avisar-cliente-listo'
 import type { EstadoPublicacion } from '@/lib/types/database'
 
 /**
@@ -21,15 +23,51 @@ export async function cambiarEstadoPublicacion(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  const { error } = await service
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: any = { estado: nuevoEstado, updated_by: user.id }
+
+  /* CRÉDITO DE EDICIÓN EN EL REPORTE: al AVANZAR el estado (aprobar/programar/
+     publicar/…) marcamos `editado` + `editado_at` para tareas de EDICIÓN, igual
+     que updatePublicacion y el módulo Editor. Sin esto, cambiar el estado desde
+     el kanban NO registraba el video en el reporte del editor (Pieer via Erick
+     31-jul-2026: "solo registra cuando mando a aprobar desde tareas"). Solo si
+     `editado_at` está null (Pedro: el tiempo se cuenta desde la PRIMERA vez). */
+  const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
+  let avisarListo = false  // avisar al cliente "video listo para aprobar"
+  if (ESTADOS_AVANZADOS.includes(nuevoEstado)) {
+    const { data: actual } = await service
+      .from('publicaciones')
+      .select('es_tarea_diseno, estado, editado_at')
+      .eq('id', id)
+      .maybeSingle()
+    const esDiseno = actual?.es_tarea_diseno === true || actual?.estado === 'disenar'
+    if (actual && !esDiseno) {
+      patch.editado = true
+      if (!actual.editado_at) patch.editado_at = new Date().toISOString()
+    }
+    // Transición a 'aprobar' desde el kanban → avisar al cliente (todas las marcas).
+    if (nuevoEstado === 'aprobar' && actual && actual.estado !== 'aprobar') avisarListo = true
+  }
+
+  let { error } = await service
     .from('publicaciones')
-    .update({ estado: nuevoEstado, updated_by: user.id })
+    .update(patch)
     .eq('id', id)
+
+  /* DEFENSIVO: si editado_at no existe (migración pendiente), reintentar sin esa
+     columna para no bloquear el cambio de estado. */
+  if (error && (error.code === '42703' || /editado_at/i.test(error.message ?? ''))) {
+    delete patch.editado_at
+    const retry = await service.from('publicaciones').update(patch).eq('id', id)
+    error = retry.error
+  }
 
   if (error) {
     console.error('[cambiarEstadoPublicacion] error:', error)
     return { ok: false, error: error.message }
   }
+
+  if (avisarListo) await avisarClienteVideoListo(id)
 
   revalidatePath('/publicaciones/kanban')
   revalidatePath('/publicaciones')
@@ -162,8 +200,43 @@ export async function createPublicacion(input: CreatePublicacionInput): Promise<
     throw new Error(`No se pudo crear: ${error.message}`)
   }
 
+  /* Aviso al CLIENTE: "te programaron una publicación nueva". Pedro 15-jul-2026.
+     Va SOLO acá (creación manual). La sincronización masiva de Notion NO
+     notifica a propósito: le mandaría decenas de avisos de golpe al cliente.
+     Ojo: al crearse la pub aún NO tiene video, por eso el texto dice
+     "programada" y no "lista para revisar" — cuando el equipo suba el video se
+     le manda el otro aviso ("ya está publicado"). */
+  try {
+    const { data: marca } = await service.from('marcas').select('nombre, slug').eq('id', input.marca_id).maybeSingle()
+    const fechaTxt = input.fecha_publicacion
+      ? new Intl.DateTimeFormat('es-PE', {
+          timeZone: 'America/Lima', weekday: 'long', day: 'numeric', month: 'long',
+        }).format(new Date(`${input.fecha_publicacion}T12:00:00`))
+      : null
+    await enviarPushAClientesDeMarca(input.marca_id, {
+      title: `📅 Nueva publicación programada${marca?.nombre ? ` · ${marca.nombre}` : ''}`,
+      body: `${nombreLimpio}${fechaTxt ? ` — ${fechaTxt}` : ''}. Te avisamos cuando esté listo el video.`,
+      url: `/cliente?pub=${data.id}`,
+      tag: `pub-nueva-${data.id}`,
+    })
+    /* Además, para las marcas donde el equipo quiere estar al tanto (Retoz, por
+       ahora): avisar a Pedro (director) + Erick que se subió un video a la grilla.
+       Pedro 27-jul-2026. */
+    if (marcaAvisaAlEquipo(marca?.slug, marca?.nombre)) {
+      await enviarPushAMiembros(['erick'], {
+        title: `🆕 Video en la grilla · ${marca?.nombre ?? 'Retoz'}`,
+        body: `${nombreLimpio}${fechaTxt ? ` — ${fechaTxt}` : ''}`,
+        url: `/publicaciones/${data.id}`,
+        tag: `pub-nueva-eq-${data.id}`,
+      })
+    }
+  } catch (e) {
+    console.error('[createPublicacion] aviso al cliente falló:', e)
+  }
+
   revalidatePath('/publicaciones')
   revalidatePath('/publicaciones/tabla')
+  revalidatePath('/cliente')
 
   // Redirect al detail para que llene el resto (plataformas, tipo, copy, etc.).
   // Propagamos ?volver= para que "Volver" regrese a la vista de origen. Fix #3.

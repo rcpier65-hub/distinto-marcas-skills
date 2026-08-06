@@ -44,6 +44,37 @@ export async function updateMarcaLogoUrl(
   return { ok: true }
 }
 
+/**
+ * Actualiza el color primario de una marca (color_primario_hex).
+ * Pedro elige aquí el color representativo; lo usan la grilla Y el portal
+ * del cliente (hero, menú, etiquetas). Fuente única de verdad del branding.
+ */
+export async function updateMarcaColor(
+  slug: string,
+  colorHex: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  const limpio = colorHex.trim()
+  // Aceptamos #RGB o #RRGGBB; vacío = volver al color por defecto (NULL).
+  const value = limpio ? limpio : null
+  if (value && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) {
+    return { ok: false, error: 'Color inválido (usa formato #RRGGBB)' }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { error } = await service
+    .from('marcas')
+    .update({ color_primario_hex: value })
+    .eq('slug', slug)
+
+  if (error) {
+    console.error('[updateMarcaColor] error:', error)
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/settings')
+  return { ok: true }
+}
+
 // ============================================================
 // WhatsApp config por marca (Migration 015)
 // ============================================================

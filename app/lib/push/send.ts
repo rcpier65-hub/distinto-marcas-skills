@@ -19,6 +19,17 @@ function ensureVapid(): boolean {
 
 export type PushPayload = { title: string; body: string; url?: string; tag?: string }
 
+/* Marcas cuyo EQUIPO (Pedro + Erick) también quiere recibir los avisos de
+   publicaciones nuevas y de "video publicado", además del cliente. Pedro
+   27-jul-2026: "por ahora solo Retoz". Para sumar otra marca, agrega su slug o
+   nombre (en minúsculas) a esta lista. */
+export const MARCAS_AVISO_EQUIPO = ['retoz']
+export function marcaAvisaAlEquipo(slug?: string | null, nombre?: string | null): boolean {
+  const s = (slug ?? '').toLowerCase()
+  const n = (nombre ?? '').toLowerCase()
+  return MARCAS_AVISO_EQUIPO.includes(s) || MARCAS_AVISO_EQUIPO.includes(n)
+}
+
 /* Envía una notificación push a los miembros cuyo nombre coincide con
    `nombresObjetivo` (case-insensitive) O que son director (Pedro). Reusa una
    sola query y limpia las suscripciones muertas (404/410). Nunca lanza: si algo
