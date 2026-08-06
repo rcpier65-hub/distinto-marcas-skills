@@ -297,7 +297,7 @@ const defaults = () => ({
   rings:{idea:0, guion:0, publicado:0},
   onboarding:{semilla:false, pilar:false, guion:false, teleprompter:false, agenda:false},
   ideas:[], scripts:[], captures:[], calendar:{}, voices:[], activeVoice:null,
-  libreta:{marca:'',oferta:'',avatar:'',notas:''}, series:[],
+  libreta:{marca:'',oferta:'',avatar:'',notas:'',cards:[],_tipo:'nota'}, series:[],
   prefs:{niche:'marketing', platform:'TikTok', goal:'Que me sigan'},
 });
 let S = load();
@@ -645,11 +645,35 @@ const screens = {
 
   libreta(){
     const l=S.libreta;
+    if(!Array.isArray(l.cards)) l.cards=[];
     const f=(k,label,ph)=>`<div style="margin-bottom:14px"><div class="eyebrow" style="margin-bottom:6px">${label}</div><textarea class="fld" style="width:100%;min-height:70px" oninput="saveLibreta('${k}',this.value)" placeholder="${ph}">${esc(l[k])}</textarea></div>`;
+    const TIPOS=[['nota','📝 Nota'],['idea','💡 Idea'],['ref','🔗 Referencia'],['gancho','🎣 Gancho']];
+    const tipo=l._tipo||'nota';
+    const cards=l.cards;
     return `<main><div class="head"><span class="eyebrow">Tu segundo cerebro</span><h2 style="width:100%">Mi Libreta</h2></div>
-      <div style="color:var(--muted);margin-bottom:16px">Todo lo que pongas aquí es el contexto que la IA usará (en fase 2) para que los guiones suenen a ti y a tu negocio, no a robot.</div>
-      <div class="card">${f('marca','¿Qué haces? Tu marca','Ej: Agencia de marketing para negocios locales…')}${f('oferta','Tu oferta / producto','Ej: Gestiono redes y pauta para restaurantes…')}${f('avatar','¿A quién le hablas? Tu avatar','Ej: Dueños de negocio 30-45, con poco tiempo…')}${f('notas','Frases y muletillas tuyas','Ej: "sin vueltas", "te lo resumo"… tu estilo')}</div>
-      <div style="color:var(--faint);font-size:12px;margin-top:12px">Se guarda solo mientras escribes.</div>
+      <div style="color:var(--muted);margin-bottom:16px">Guarda aquí tus ideas, notas, links y ganchos. Todo se guarda solo y lo puedes convertir en guion con un toque.</div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="eyebrow" style="margin-bottom:10px">📌 Captura rápida</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          ${TIPOS.map(([k,lbl])=>`<button class="chip ${tipo===k?'on':''}" onclick="setLibTipo('${k}')">${lbl}</button>`).join('')}
+        </div>
+        <div class="inputbar" style="align-items:stretch">
+          <textarea id="libInput" placeholder="Escribe una idea, nota, un link o un gancho… (Enter para guardar)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addLibCard()}"></textarea>
+          <button class="btn accent" onclick="addLibCard()" style="align-self:flex-end">＋ Guardar</button>
+        </div>
+      </div>
+
+      <div class="head" style="margin-bottom:12px"><span class="eyebrow">Tus notas · ${cards.length}</span></div>
+      ${cards.length
+        ? `<div class="grid g2">${cards.map(c=>libCardHTML(c)).join('')}</div>`
+        : `<div style="color:var(--muted);margin:6px 0 4px">Aún no tienes notas. Captura arriba tu primera idea 💡</div>`}
+
+      <div class="card" style="margin-top:22px">
+        <div class="eyebrow" style="margin-bottom:10px">🏢 Mi negocio · contexto para la IA</div>
+        <div style="color:var(--faint);font-size:12px;margin-bottom:12px">Esto ayuda a que los guiones suenen a ti y a tu negocio, no a robot.</div>
+        ${f('marca','¿Qué haces? Tu marca','Ej: Agencia de marketing para negocios locales…')}${f('oferta','Tu oferta / producto','Ej: Gestiono redes y pauta para restaurantes…')}${f('avatar','¿A quién le hablas? Tu avatar','Ej: Dueños de negocio 30-45, con poco tiempo…')}${f('notas','Frases y muletillas tuyas','Ej: "sin vueltas", "te lo resumo"… tu estilo')}
+      </div>
     </main>`;
   },
   series(){
@@ -800,6 +824,33 @@ function chatGuardarIdea(idea){ saveIdea(idea); chatThread.push({who:'bot',kind:
 function chatMultiplicar(idea){ const list=gen.multiply(idea); const html='<b>12 ángulos de: '+esc(shorten(idea))+'</b><div class="grid g2" style="margin-top:10px">'+list.map(a=>`<div class="idea-card"><span class="tag">${esc(a.angle)}</span><div style="font-weight:600">${esc(a.title)}</div><button class="btn sm" style="margin-top:auto" onclick="chatUserIdea('${jsq(a.title)}')">✦ Guion</button></div>`).join('')+'</div>'; chatThread.push({who:'bot',kind:'bot-text',html}); addXP(10); renderChat(); toast('12 ángulos ⚡ +10 XP'); }
 function dictar(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ toast('Tu navegador no soporta dictado por voz'); return; } const r=new SR(); r.lang='es-PE'; r.interimResults=false; toast('🎤 Escuchando…'); r.onresult=e=>{ const t=e.results[0][0].transcript; const inp=$('#chatInput'); if(inp) inp.value=t; toast('Listo, revisa y envía ✍️'); }; r.onerror=()=>toast('No pude escuchar 🎤'); r.start(); }
 function saveLibreta(k,v){ S.libreta[k]=v; save(); }
+/* ---- Mi Libreta: tarjetas ---- */
+const LIB_TIPO_LABEL={nota:'📝 Nota',idea:'💡 Idea',ref:'🔗 Referencia',gancho:'🎣 Gancho'};
+function libCardHTML(c){
+  const isLink=/^https?:\/\//i.test((c.text||'').trim());
+  return `<div class="idea-card">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span class="tag">${LIB_TIPO_LABEL[c.type]||'📝 Nota'}</span>
+      <button class="btn sm" style="margin-left:auto;padding:2px 8px" title="Eliminar" onclick="delLibCard('${c.id}')">🗑</button>
+    </div>
+    <textarea class="fld" style="width:100%;min-height:64px;border:none;background:transparent;padding:0;resize:vertical" oninput="editLibCard('${c.id}',this.value)">${esc(c.text)}</textarea>
+    <div class="row" style="margin-top:8px;gap:8px">
+      <button class="btn sm accent" onclick="libToCrear('${c.id}')">✦ Hacer guion</button>
+      ${isLink?`<a class="btn sm" href="${esc(c.text.trim())}" target="_blank" rel="noopener">🔗 Abrir</a>`:''}
+    </div>
+  </div>`;
+}
+function setLibTipo(t){ S.libreta._tipo=t; render(); }
+function addLibCard(){
+  const el=document.getElementById('libInput'); const v=((el&&el.value)||'').trim();
+  if(!v){ toast('Escribe algo primero'); return; }
+  if(!Array.isArray(S.libreta.cards)) S.libreta.cards=[];
+  S.libreta.cards.unshift({ id:uid(), type:S.libreta._tipo||'nota', text:v, at:Date.now() });
+  addXP(4); save(); render(); toast('Guardado en tu libreta 📒 +4 XP');
+}
+function editLibCard(id,v){ const c=(S.libreta.cards||[]).find(x=>x.id===id); if(c){ c.text=v; save(); } }
+function delLibCard(id){ S.libreta.cards=(S.libreta.cards||[]).filter(x=>x.id!==id); save(); render(); }
+function libToCrear(id){ const c=(S.libreta.cards||[]).find(x=>x.id===id); if(c) irCrear(c.text); }
 function addSerie(){ const n=prompt('Nombre de la serie (ej: "Errores de novato")'); if(!n) return; const f=prompt('Formato / cadencia (ej: "Cada lunes, 30s")')||'serie'; set(s=>s.series.unshift({id:uid(), name:n, format:f})); toast('Serie creada 📚'); }
 function delSerie(id){ set(s=>s.series=s.series.filter(x=>x.id!==id)); }
 
