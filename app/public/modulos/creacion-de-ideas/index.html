@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Distinto Studio · Estudio de Contenido</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --radius:16px; --radius-sm:11px;
+  --font-display:'Poppins',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,sans-serif;
+  --shadow:0 10px 30px rgba(0,0,0,.25);
+}
+/* DISTINTO STUDIO — navy #132D46 + verde #4ADE80 */
+:root[data-theme="neon"]{
+  --bg:#0b1b29; --bg2:#0e2233; --surface:#132d46; --surface2:#17364f; --surface3:#1e415d;
+  --line:#264a67; --text:#eff5fb; --muted:#90a9bd; --faint:#5f7d95;
+  --accent:#4ade80; --accent-ink:#0b1b29; --accent-soft:rgba(74,222,128,.15);
+  --accent2:#7bd0ff; --danger:#ff6b6b; --gold:#f2cc2c;
+}
+/* DISTINTO AGENCIA — morado #BA41F7 + amarillo #F2CC2C */
+:root[data-theme="cozy"]{
+  --bg:#150a22; --bg2:#1b0f2c; --surface:#231338; --surface2:#2b1945; --surface3:#341e54;
+  --line:#3d2560; --text:#f3edfb; --muted:#a892c4; --faint:#6e5690;
+  --accent:#ba41f7; --accent-ink:#ffffff; --accent-soft:rgba(186,65,247,.16);
+  --accent2:#f2cc2c; --danger:#ff6b6b; --gold:#f2cc2c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg); color:var(--text); font-family:var(--font-body); -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.5}
+h1,h2,h3,h4{font-family:var(--font-display); margin:0; line-height:1.12; letter-spacing:-.01em}
+button{font-family:inherit; cursor:pointer}
+a{color:inherit}
+::selection{background:var(--accent); color:var(--accent-ink)}
+input,select,textarea{font-family:inherit}
+
+.btn{border:1px solid var(--line); background:var(--surface2); color:var(--text); padding:10px 16px; border-radius:999px; font-weight:600; font-size:14px; display:inline-flex; align-items:center; gap:8px; transition:.15s; white-space:nowrap}
+.btn:hover{border-color:var(--faint); transform:translateY(-1px)}
+.btn.accent{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+.btn.accent:hover{filter:brightness(1.05)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:7px 12px; font-size:13px}
+.btn.block{width:100%; justify-content:center}
+.chip{border:1px solid var(--line); background:var(--surface2); padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; display:inline-flex; gap:7px; align-items:center; transition:.15s; color:var(--text)}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px}
+select,input.fld,textarea.fld{background:var(--surface2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px}
+select:focus,input.fld:focus,textarea.fld:focus{outline:none; border-color:var(--accent)}
+
+.topbar{position:sticky; top:0; z-index:50; background:color-mix(in srgb,var(--bg) 88%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid var(--line)}
+.topbar-inner{max-width:1440px; margin:0 auto; padding:0 22px; height:62px; display:flex; align-items:center; gap:16px}
+.brand{display:flex; align-items:center; gap:9px; font-family:var(--font-display); font-weight:800; font-size:19px; letter-spacing:-.02em; white-space:nowrap}
+.brand .spark{width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--accent-ink); display:grid;place-items:center;font-size:17px;box-shadow:0 0 0 4px var(--accent-soft)}
+.nav{display:flex; gap:2px; margin-left:6px; flex:1; overflow:auto; scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{padding:8px 12px; border-radius:10px; font-weight:600; font-size:14px; color:var(--muted); text-decoration:none; white-space:nowrap}
+.nav a:hover{color:var(--text); background:var(--surface2)}
+.nav a.active{color:var(--text); background:var(--surface2)}
+.nav a.active .u{display:block; height:2px; background:var(--accent); border-radius:2px; margin-top:5px}
+.nav a .u{display:none}
+.top-actions{display:flex; align-items:center; gap:9px}
+.avatar{width:36px;height:36px;border-radius:50%; background:var(--surface3); display:grid; place-items:center; font-size:18px; border:1px solid var(--line)}
+
+.shell{max-width:1440px; margin:0 auto; padding:22px; display:grid; gap:20px; grid-template-columns:264px minmax(0,1fr) 300px}
+.shell.no-rail{grid-template-columns:264px minmax(0,1fr)}
+.shell.full{grid-template-columns:minmax(0,1fr)}
+@media(max-width:1180px){ .shell,.shell.no-rail{grid-template-columns:1fr} .rail,.sidebar{display:none} }
+
+.sidebar,.rail{display:flex; flex-direction:column; gap:16px}
+.side-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px}
+.side-title{font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); font-weight:700}
+.plan-name{font-family:var(--font-display); font-weight:800; font-size:22px; margin-top:2px}
+.streak-card{text-align:center}
+.mascot{font-size:52px; line-height:1; filter:drop-shadow(0 6px 14px rgba(0,0,0,.25))}
+.streak-num{font-family:var(--font-display); font-weight:800; font-size:28px; margin-top:8px}
+.streak-num small{color:var(--accent)}
+
+/* xp bar */
+.xpbar{height:9px; background:var(--surface3); border-radius:999px; overflow:hidden; margin-top:8px}
+.xpbar>i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:999px}
+.lvl{display:inline-grid; place-items:center; width:34px;height:34px;border-radius:10px;background:var(--accent-soft); color:var(--text); font-weight:800; font-family:var(--font-display)}
+
+.rings{display:flex; gap:16px; align-items:center; justify-content:center; flex-wrap:wrap}
+.ring{--v:0; width:76px;height:76px;border-radius:50%; display:grid; place-items:center; position:relative; background:conic-gradient(var(--rc) calc(var(--v)*1%), var(--surface3) 0)}
+.ring::before{content:""; position:absolute; inset:9px; border-radius:50%; background:var(--surface)}
+.ring b{position:relative; font-size:22px}
+.ring span{position:absolute; bottom:-20px; font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap}
+
+.greet{display:flex; align-items:center; gap:16px; margin-bottom:6px}
+.greet .m{font-size:44px}
+.greet h1{font-size:32px}
+.pill{display:inline-flex; gap:7px; align-items:center; background:var(--accent-soft); color:var(--text); border:1px solid var(--line); padding:6px 13px; border-radius:999px; font-size:13px; font-weight:600; margin-top:6px}
+.composer{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px}
+.composer .q{color:var(--muted); font-size:15px; margin-bottom:12px}
+.composer .row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px}
+.inputbar{display:flex; gap:10px; align-items:center}
+.inputbar input,.inputbar textarea{flex:1; background:var(--surface2); border:1px solid var(--line); color:var(--text); border-radius:12px; padding:14px 16px; font-size:15px; font-family:inherit; resize:none}
+.inputbar input:focus,.inputbar textarea:focus{outline:none; border-color:var(--accent)}
+
+/* stat tiles */
+.stats{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:18px}
+@media(max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px 16px}
+.stat b{font-family:var(--font-display); font-size:28px; display:block}
+.stat span{color:var(--muted); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.05em}
+
+.check{display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--line)}
+.check:first-child{border-top:none}
+.check .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line); display:grid; place-items:center; flex:none}
+.check.done .box{background:var(--accent); border-color:transparent; color:var(--accent-ink)}
+.check.done .lbl{color:var(--muted); text-decoration:line-through}
+.xp{margin-left:auto; font-size:12px; color:var(--accent); font-weight:700}
+
+.grid{display:grid; gap:14px}
+.grid.g2{grid-template-columns:repeat(2,1fr)}
+.grid.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.grid.g3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.grid.g2,.grid.g3{grid-template-columns:1fr}}
+.idea-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:15px; display:flex; flex-direction:column; gap:9px; position:relative}
+.tag{align-self:flex-start; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 9px; border-radius:999px; background:var(--accent-soft); color:var(--text)}
+.star{position:absolute; top:12px; right:12px; font-size:18px; opacity:.5; cursor:pointer; background:none; border:none}
+.star.on{opacity:1}
+
+.step{border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:10px; background:var(--surface2)}
+.step .k{display:flex; align-items:center; gap:10px; margin-bottom:7px}
+.step .k b{width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800}
+.step .k .nm{font-weight:700; font-family:var(--font-display)}
+.step .k .pp{color:var(--muted); font-size:12px}
+.step .k .rg{margin-left:auto; background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);padding:3px 8px;font-size:12px;cursor:pointer}
+.step .k .rg:hover{color:var(--text);border-color:var(--accent)}
+.step .tx{outline:none}
+.step .tx:focus{background:var(--surface3); border-radius:6px}
+
+.head{display:flex; align-items:center; gap:14px; margin-bottom:16px; flex-wrap:wrap}
+.head h2{font-size:26px}
+.head .sp{flex:1}
+.eyebrow{font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:700}
+.empty{text-align:center; color:var(--muted); padding:40px 20px}
+.empty .m{font-size:44px; margin-bottom:6px}
+
+.tabs{display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px}
+.tab{border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:7px 13px; font-size:13px; font-weight:600; color:var(--muted)}
+.tab.on{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+.badge{font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:999px; border:1px solid var(--line)}
+.badge.borrador{color:var(--muted)}
+.badge.listo{color:var(--accent2); border-color:var(--accent2)}
+.badge.grabado{color:var(--gold); border-color:var(--gold)}
+.badge.publicado{color:var(--accent-ink); background:var(--accent); border-color:transparent}
+
+.week{display:grid; grid-template-columns:repeat(7,1fr); gap:10px}
+@media(max-width:760px){.week{grid-template-columns:repeat(2,1fr)}}
+.day{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px; min-height:150px; display:flex; flex-direction:column; gap:8px}
+.day.today{border-color:var(--accent)}
+.day .dn{font-size:12px; color:var(--muted); font-weight:700; text-transform:uppercase; display:flex; justify-content:space-between}
+.day .slot{background:var(--surface2); border:1px solid var(--line); border-radius:9px; padding:8px; font-size:12px; display:flex; gap:6px; align-items:flex-start}
+.day .add{margin-top:auto; border:1px dashed var(--line); background:none; color:var(--muted); border-radius:9px; padding:7px; font-size:12px; cursor:pointer}
+.day .add:hover{border-color:var(--accent); color:var(--text)}
+.goal{display:flex; align-items:center; gap:12px; margin-bottom:14px}
+.goal .bar{flex:1; height:10px; background:var(--surface3); border-radius:999px; overflow:hidden}
+.goal .bar>i{display:block;height:100%; background:var(--accent); border-radius:999px}
+
+.tp-overlay{position:fixed; inset:0; z-index:100; background:#000; color:#fff; display:none; flex-direction:column}
+.tp-overlay.on{display:flex}
+.tp-scroll{flex:1; overflow:hidden; position:relative}
+.tp-text{position:absolute; left:0; right:0; padding:0 8vw; font-family:var(--font-display); font-weight:700; text-align:center; will-change:transform}
+.tp-bar{display:flex; gap:12px; align-items:center; justify-content:center; padding:14px; background:#0c0c0c; border-top:1px solid #222; flex-wrap:wrap}
+.tp-bar input[type=range]{accent-color:var(--accent)}
+
+.mini-week{display:grid; grid-template-columns:repeat(7,1fr); gap:5px; text-align:center; margin-top:10px}
+.mini-week div{padding:7px 0; border-radius:9px; font-size:12px; font-weight:700; background:var(--surface2); color:var(--muted)}
+.mini-week div.on{background:var(--accent); color:var(--accent-ink)}
+
+.plan-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+@media(max-width:640px){.plan-grid{grid-template-columns:1fr}}
+.plan-col{border:1px solid var(--line); border-radius:var(--radius); padding:18px}
+.plan-col.pro{border-color:var(--accent)}
+.plan-col li{list-style:none; padding:6px 0; font-size:14px; display:flex; gap:8px}
+.plan-col ul{padding:0; margin:12px 0 0}
+
+.moodgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+@media(max-width:900px){.moodgrid{grid-template-columns:repeat(2,1fr)}}
+.moodgrid .cap{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden}
+.moodgrid .cap img{width:100%; display:block; aspect-ratio:1; object-fit:cover}
+.moodgrid .cap .n{padding:10px; font-size:13px}
+
+.toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0; background:var(--text); color:var(--bg); padding:12px 20px; border-radius:999px; font-weight:600; z-index:200; transition:.25s; pointer-events:none}
+.toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
+.foot{max-width:1440px;margin:10px auto 30px;padding:0 22px;color:var(--faint);font-size:12px}
+.row{display:flex; gap:10px; flex-wrap:wrap}
+/* chat */
+.chat{display:flex; flex-direction:column; gap:12px; max-height:56vh; overflow:auto; padding:4px 2px 12px}
+.bub{max-width:84%; padding:12px 15px; border-radius:16px; font-size:14px; line-height:1.5}
+.bub.bot{align-self:flex-start; background:var(--surface2); border:1px solid var(--line); border-bottom-left-radius:5px}
+.bub.user{align-self:flex-end; background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:5px; font-weight:600}
+.bub .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+.teaser{align-self:flex-start; max-width:84%; background:var(--accent-soft); border:1px solid var(--line); border-radius:14px; padding:12px 15px; font-size:14px; line-height:1.55}
+.chatcomposer{margin-top:14px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="tp-overlay" id="tp">
+  <div class="tp-scroll"><div class="tp-text" id="tpText"></div></div>
+  <div class="tp-bar">
+    <button class="btn sm" onclick="TP.toggle()"><span id="tpPlay">⏸ Pausa</span></button>
+    <label style="font-size:13px">Velocidad <input type="range" id="tpSpeed" min="10" max="140" value="55"></label>
+    <label style="font-size:13px">Tamaño <input type="range" id="tpSize" min="28" max="92" value="52"></label>
+    <button class="btn sm" onclick="TP.close()">✕ Cerrar</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const BRAND = { name:'Distinto Studio', mascot:'✦' };
+const NICHES=['marketing','fitness','comida','belleza','inmobiliaria','educacion','ecommerce','finanzas','viajes','tecnologia','emprendimiento','mascotas'];
+const PLATFORMS=['TikTok','Reels','Shorts'];
+const GOALS=['Que me sigan','Que guarden','Que compren','Que comenten'];
+const STATES=['borrador','listo','grabado','publicado'];
+const WEEK_GOAL=5;
+
+/* ---------- DATA (motor de contenido) ---------- */
+const DATA = {
+  ideas: [
+    {niche:'marketing', idea:'Auditar en vivo el perfil de un negocio local y mostrar 3 cambios que traen más mensajes.', hook:'Le arreglé el perfil a esta cafetería en 60 segundos y le llegaron 40 mensajes.'},
+    {niche:'marketing', idea:'Pantalla dividida: un caption aburrido vs el mismo con gancho. Explica por qué retiene.', hook:'Este caption te está costando clientes y ni te has dado cuenta.'},
+    {niche:'fitness', idea:'3 ejercicios que casi todos hacen mal y la corrección al lado.', hook:'Llevas 6 meses haciendo esto mal y por eso no crece.'},
+    {niche:'fitness', idea:'Arma un día de comida alta en proteína con presupuesto ajustado desde el mercado.', hook:'Comí como fisicoculturista con 30 soles: esto compré.'},
+    {niche:'comida', idea:'Lomo saltado en 6 minutos con lo que ya hay en el refri.', hook:'Lomo saltado en 6 minutos con lo que ya tienes en tu refri.'},
+    {niche:'comida', idea:'3 errores que arruinan tu arroz y la forma correcta al lado.', hook:'Deja de arruinar tu arroz: cometes estos 3 errores.'},
+    {niche:'belleza', idea:'Rutina de skincare de 3 productos para piel grasa en clima húmedo.', hook:'3 productos y adiós cara brillosa a mediodía.'},
+    {niche:'belleza', idea:'Aplicar corrector sin que se cuartee: el paso que casi todos se saltan.', hook:'Tu corrector se cuartea por este paso que te saltas.'},
+    {niche:'inmobiliaria', idea:'Tour de un depa señalando lo que nadie te dice antes de comprar.', hook:'Vi 20 depas y este error lo cometen casi todos.'},
+    {niche:'inmobiliaria', idea:'Con números reales, cuánto necesitas de cuota inicial (es menos de lo que crees).', hook:'Necesitas menos inicial de la que crees: te muestro los números.'},
+    {niche:'educacion', idea:'La técnica Feynman: enseñar un tema como si se lo contaras a un niño.', hook:'Estudia la mitad y aprende el doble con este método.'},
+    {niche:'educacion', idea:'3 apps gratis que reemplazan a un profesor particular, con demo de cada una.', hook:'Estas 3 apps gratis me subieron las notas sin gastar un sol.'},
+    {niche:'ecommerce', idea:'Empaque satisfactorio de un pedido: por qué un buen unboxing te da publicidad gratis.', hook:'Empaco así y mis clientes me hacen publicidad gratis.'},
+    {niche:'ecommerce', idea:'Fotos de producto profesionales con el celular, una caja y luz de ventana.', hook:'Fotos de producto que venden con tu celu y una caja de cartón.'},
+    {niche:'finanzas', idea:'Reto de ahorro de 52 semanas con un frasco: empieza con 1 sol y sube cada semana.', hook:'Empieza con 1 sol esta semana y ten 1,378 a fin de año.'},
+    {niche:'finanzas', idea:'3 gastos hormiga y cuánto suman al año en pantalla.', hook:'Ese gasto de 5 soles al día te cuesta 1,800 al año.'},
+    {niche:'viajes', idea:'Escapada de fin de semana con presupuesto exacto: transporte, comida y dónde dormir.', hook:'Escapada de fin de semana por 120 soles, todo incluido.'},
+    {niche:'viajes', idea:'Buscar vuelos en pantalla: fechas flexibles, incógnito y comparador, bajando el precio.', hook:'Bajé mi vuelo de 400 a 180 soles en 2 minutos, mira.'},
+    {niche:'tecnologia', idea:'3 funciones ocultas del celular que casi nadie usa, demostrando cada una.', hook:'Tu celular hace esto y no tenías ni idea.'},
+    {niche:'tecnologia', idea:'Resolver una tarea aburrida con IA en 30 segundos, mostrando el prompt exacto.', hook:'Le pedí esto a la IA y me ahorró 3 horas de trabajo.'},
+    {niche:'emprendimiento', idea:'El error que quiebra al 90% de negocios nuevos en 6 meses, con ejemplo.', hook:'El 90% quiebra por este error: no lo cometas tú.'},
+    {niche:'emprendimiento', idea:'Validar una idea de negocio en 1 día con una prueba simple antes de invertir.', hook:'No inviertas sin hacer antes esta prueba de 1 día.'},
+    {niche:'mascotas', idea:'3 alimentos de casa que son veneno para el perro, con imágenes claras.', hook:'Esto que le das a tu perro lo puede matar.'},
+    {niche:'mascotas', idea:'Señales de que tu gato te quiere, con clips de un gato haciéndolas.', hook:'Si tu gato hace esto, te ama de verdad.'},
+  ],
+  framework: { steps: [
+    {key:'V', name:'Verbal', purpose:'Gancho hablado (primeros 3s)', templates:[
+      'Si todavía haces {idea} de esta forma, para todo y escucha esto.',
+      'Nadie te lo dice en la cara, pero {idea} es lo que te está frenando.',
+      'Deja de hacer {idea} mal, te está costando {beneficio} sin que te des cuenta.']},
+    {key:'I', name:'Imán', purpose:'Retención / promesa', templates:[
+      'Quédate hasta el final, porque el último paso es el que de verdad te da {beneficio}.',
+      'En menos de un minuto te muestro cómo {idea} sin complicarte.',
+      'Te doy los 3 pasos exactos, y el número 2 casi nadie lo hace.']},
+    {key:'R', name:'Respaldo', purpose:'Prueba / credibilidad', templates:[
+      'No es teoría: lo probé yo primero y paso a paso llegué a {beneficio}.',
+      'Llevo años en esto y esto es lo único que de verdad funciona.',
+      'Ya son cientos los que lo aplicaron y hoy tienen {beneficio}.']},
+    {key:'A', name:'Anuncio', purpose:'Núcleo / valor', templates:[
+      'El secreto es simple: primero haces esto, luego esto otro, y recién ahí llega {beneficio}.',
+      'Anota esto: enfócate en una sola cosa a la vez y deja de dispersarte.',
+      'Aquí va el paso a paso que uso y que cualquiera puede copiar hoy.']},
+    {key:'L', name:'Lista / CTA', purpose:'Cierre + un solo CTA', templates:[
+      'Resumen: uno, dos y tres. Guarda este video para cuando lo hagas.',
+      'Si quieres {beneficio}, sígueme que aquí subo esto todos los días.',
+      'Comenta la palabra CLAVE y te mando la guía gratis.']},
+  ]},
+  angles: ['Error común','Antes/Después','Mito','Tutorial rápido','Historia personal','Lista','Contraintuitivo','Detrás de cámara','Comparación','Predicción','Reto','Pregunta'],
+  pillars: [
+    {name:'Enseña', color:'#4ADE80'}, {name:'Engancha', color:'#F472B6'},
+    {name:'Conecta', color:'#FB923C'}, {name:'Demuestra', color:'#3B82F6'},
+    {name:'Convierte', color:'#FBBF24'}, {name:'Conversa', color:'#A78BFA'},
+  ],
+  randomizer: ['3 errores que cometías cuando empezaste','Un mito de tu rubro que hay que enterrar','Antes vs después: tu mayor cambio','El proceso real detrás de tu mejor resultado','La pregunta que TODOS te hacen'],
+};
+
+/* ---------- STORE ---------- */
+const KEY='creacion-ideas.v1';
+const defaults = () => ({
+  name:'Creador', theme:'neon', xp:0,
+  streak:1, streakRecord:1,
+  rings:{idea:0, guion:0, publicado:0},
+  onboarding:{semilla:false, pilar:false, guion:false, teleprompter:false, agenda:false},
+  ideas:[], scripts:[], captures:[], calendar:{}, voices:[], activeVoice:null,
+  libreta:{marca:'',oferta:'',avatar:'',notas:''}, series:[],
+  prefs:{niche:'marketing', platform:'TikTok', goal:'Que me sigan'},
+});
+let S = load();
+function load(){ try{ return deepDefaults(defaults(), JSON.parse(localStorage.getItem(KEY))||{}); }catch(e){ return defaults(); } }
+function deepDefaults(d,s){ const o=Object.assign({},d,s); for(const k in d){ if(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k])) o[k]=Object.assign({},d[k],s[k]||{}); } return o; }
+function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+function set(fn){ fn(S); save(); render(); }
+
+/* ---------- helpers ---------- */
+const $=(s,el=document)=>el.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const jsq=s=>(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1900); }
+function addXP(n){ S.xp+=n; save(); }
+const DAYS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+function todayIdx(){ let d=new Date().getDay(); return (d+6)%7; }
+const LEVELS=[0,100,250,500,900,1400,2000];
+function levelInfo(xp){ let lv=1; for(let i=0;i<LEVELS.length;i++){ if(xp>=LEVELS[i]) lv=i+1; } const base=LEVELS[lv-1]||0; const next=LEVELS[lv]||(base+700); return {lv, into:xp-base, need:next-base, pct:Math.min(100,Math.round((xp-base)/(next-base)*100))}; }
+function words(sc){ return sc.steps.reduce((n,s)=>n+(s.text||'').split(/\s+/).length,0); }
+function durSec(sc){ return Math.max(8, Math.round(words(sc)/2.6)); }
+
+/* ---------- GENERADOR (placeholder; IA real en fase 2) ---------- */
+const shorten = s => { s=(s||'').split(/[.:]/)[0].trim(); return s.length>66? s.slice(0,66).trim()+'…' : s; };
+const lower = s => s? s.charAt(0).toLowerCase()+s.slice(1) : s;
+const cap = s => s? s.charAt(0).toUpperCase()+s.slice(1) : s;
+const AT = {
+  'Error común': t=>`El error que casi todos cometen con ${lower(t)}`,
+  'Antes/Después': t=>`Antes vs después: ${lower(t)}`,
+  'Mito': t=>`Mentira lo que crees sobre ${lower(t)}`,
+  'Tutorial rápido': t=>`${cap(t)}, en 3 pasos rápidos`,
+  'Historia personal': t=>`El día que entendí ${lower(t)}`,
+  'Lista': t=>`5 claves sobre ${lower(t)}`,
+  'Contraintuitivo': t=>`Deja de hacer ${lower(t)} (en serio)`,
+  'Detrás de cámara': t=>`Cómo hago ${lower(t)} de verdad, sin filtro`,
+  'Comparación': t=>`${cap(t)}: ¿cuál gana?`,
+  'Predicción': t=>`Si sigues así con ${lower(t)}, esto va a pasar`,
+  'Reto': t=>`Reto de 7 días: ${lower(t)}`,
+  'Pregunta': t=>`¿Sabes la verdad sobre ${lower(t)}?`,
+};
+const gen = {
+  step(s, idx, topic, hook){
+    if(s.key==='V' && hook) return hook;
+    const t = s.templates[idx % s.templates.length] || s.templates[0];
+    return t.replace(/\{idea\}/g, lower(topic)).replace(/\{nicho\}/g, S.prefs.niche).replace(/\{beneficio\}/g,'más alcance y ventas').replace(/\{avatar\}/g,'creador');
+  },
+  script(idea, hook){
+    const topic = shorten(idea).replace(/^(cómo|como|qué|que)\s+/i,'');
+    hook = hook || (DATA.ideas.find(x=>x.idea===idea)||{}).hook;
+    const steps = DATA.framework.steps.map((s,i)=>({ key:s.key, name:s.name, purpose:s.purpose, ti:0, text: gen.step(s,0,topic,hook) }));
+    return { id:uid(), title:idea, steps, topic, hook, niche:S.prefs.niche, platform:S.prefs.platform, goal:S.prefs.goal, state:'borrador', createdAt:Date.now() };
+  },
+  multiply(idea){ const topic=shorten(idea); return DATA.angles.map(a=>({ angle:a, title:(AT[a]||((t)=>a+': '+t))(topic) })); },
+  randomIdea(){ const b=DATA.ideas[Math.floor(Math.random()*DATA.ideas.length)]; return b? b.idea : DATA.randomizer[0]; },
+};
+
+/* ---------- actions ---------- */
+function saveScript(sc){ set(s=>{ if(!s.scripts.find(x=>x.id===sc.id)) s.scripts.unshift(sc); s.rings.guion=Math.min(100,s.rings.guion+34); s.onboarding.guion=true; s.xp+=15; }); toast('Guion guardado ✅ +15 XP'); }
+function saveIdea(text){ if(!text) return; set(s=>{ s.ideas.unshift({id:uid(), text, fav:false, at:Date.now()}); s.rings.idea=Math.min(100,s.rings.idea+34); s.onboarding.semilla=true; s.xp+=5; }); toast('Idea guardada 💡 +5 XP'); }
+function toggleFav(id){ set(s=>{ const i=s.ideas.find(x=>x.id===id); if(i) i.fav=!i.fav; }); }
+function scriptById(id){ return S.scripts.find(x=>x.id===id); }
+function copyScript(id){ const sc=scriptById(id); if(sc){ navigator.clipboard&&navigator.clipboard.writeText(scriptToText(sc)); toast('Copiado ⧉'); } }
+function delScript(id){ if(!confirm('¿Eliminar este guion?')) return; set(s=>s.scripts=s.scripts.filter(x=>x.id!==id)); toast('Guion eliminado'); }
+function dupScript(id){ const sc=scriptById(id); if(!sc) return; set(s=>s.scripts.unshift(Object.assign({},sc,{id:uid(), title:sc.title+' (copia)', state:'borrador', createdAt:Date.now()}))); toast('Guion duplicado'); }
+function cycleState(id){ set(s=>{ const sc=s.scripts.find(x=>x.id===id); if(!sc) return; let i=STATES.indexOf(sc.state||'borrador'); sc.state=STATES[(i+1)%STATES.length]; if(sc.state==='grabado'){ s.rings.idea=s.rings.idea; s.onboarding.teleprompter=true; s.xp+=20;} if(sc.state==='publicado'){ s.rings.publicado=Math.min(100,s.rings.publicado+34); s.xp+=30; } }); toast('Estado actualizado'); }
+function addCapture(t){ t=(t||'').trim(); if(!t)return; set(s=>s.captures.unshift({id:uid(),text:t})); toast('Capturado 🎒'); }
+function addCaptureImg(input){ const f=input.files&&input.files[0]; if(!f) return; const r=new FileReader(); r.onload=e=>{ set(s=>s.captures.unshift({id:uid(), img:e.target.result, text:f.name})); toast('Imagen añadida 🖼'); }; r.readAsDataURL(f); }
+function delCapture(id){ set(s=>s.captures=s.captures.filter(x=>x.id!==id)); }
+function scriptToText(sc){ return sc.steps.map(s=>s.text).join('\n\n'); }
+function assignDay(di){ if(!S.scripts.length){ toast('Primero crea un guion'); return; } const list=S.scripts.map((s,i)=>`${i+1}. ${s.title}`).join('\n'); const pick=prompt('¿Qué guion agendas?\n\n'+list+'\n\nEscribe el número:'); const n=parseInt(pick); if(!n||n<1||n>S.scripts.length) return; const sc=S.scripts[n-1]; set(s=>{ (s.calendar[di]=s.calendar[di]||[]).push(sc.id); s.onboarding.agenda=true; s.xp+=8; }); toast('Agendado 🗓 +8 XP'); }
+function unassign(di,id){ set(s=>{ s.calendar[di]=(s.calendar[di]||[]).filter(x=>x!==id); }); }
+function markPublished(di,id){ set(s=>{ const sc=s.scripts.find(x=>x.id===id); if(sc&&sc.state!=='publicado'){ sc.state='publicado'; s.rings.publicado=Math.min(100,s.rings.publicado+34); s.xp+=30; } }); toast('¡Publicado! 🚀 +30 XP'); }
+function sugerirSemana(){ set(s=>{ DAYS.forEach((d,i)=>{ if(!(s.calendar[i]||[]).length && !s.calendar['sug_'+i]){ const p=DATA.pillars[i%DATA.pillars.length]; s.calendar['sug_'+i]=p.name+': '+gen.randomIdea(); } }); s.xp+=25; }); toast('Semana sugerida ✨ +25 XP'); }
+function addVoice(){ const n=prompt('Nombre de la voz (ej: "Yo casual")'); if(!n) return; const tone=prompt('Describe tu tono en una frase (ej: cercano, directo, con humor)')||''; set(s=>{ s.voices.unshift({id:uid(), name:n, tone}); if(!s.activeVoice) s.activeVoice=s.voices[0].id; }); toast('Voz creada 🗣️'); }
+function setVoice(id){ set(s=>s.activeVoice=id); }
+function delVoice(id){ set(s=>{ s.voices=s.voices.filter(v=>v.id!==id); if(s.activeVoice===id) s.activeVoice=s.voices[0]?s.voices[0].id:null; }); }
+function toggleTheme(){ setTheme(S.theme==='neon'?'cozy':'neon'); }
+function setTheme(t){ set(s=>s.theme=t); }
+function exportData(){ const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='distinto-studio-datos.json'; a.click(); }
+function resetData(){ if(confirm('¿Borrar todos tus datos locales?')){ localStorage.removeItem(KEY); S=load(); render(); } }
+let deferredPWA=null; window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPWA=e; });
+function installPWA(){ if(deferredPWA){ deferredPWA.prompt(); } else { toast('Instálala desde el menú del navegador → "Añadir a inicio"'); } }
+
+/* filtros (no persistidos) */
+let fIdeaNiche='Todos', fGuion='Todos';
+function setIdeaNiche(n){ fIdeaNiche=n; render(); }
+function setGuionFilter(f){ fGuion=f; render(); }
+function filterCards(inputId, gridId){ const q=($('#'+inputId)?.value||'').toLowerCase(); document.querySelectorAll('#'+gridId+' [data-text]').forEach(el=>{ el.style.display = el.getAttribute('data-text').includes(q)?'':'none'; }); }
+
+/* ================= TELEPROMPTER ================= */
+const TP = {
+  raf:null, y:0, playing:false,
+  open(text){ if(!text){ toast('Nada que leer'); return; } $('#tpText').textContent=text; $('#tp').classList.add('on'); this.y=window.innerHeight*0.9; this.playing=true; $('#tpPlay').textContent='⏸ Pausa'; const size=$('#tpSize'); $('#tpText').style.fontSize=size.value+'px'; size.oninput=()=>$('#tpText').style.fontSize=size.value+'px'; cancelAnimationFrame(this.raf); this.loop(); set(s=>{ s.onboarding.teleprompter=true; }); },
+  loop(){ const el=$('#tpText'); const speed=+$('#tpSpeed').value/60; if(this.playing){ this.y-=speed; el.style.transform='translateY('+this.y+'px)'; if(this.y < -el.offsetHeight){ this.y=window.innerHeight*0.9; } } this.raf=requestAnimationFrame(()=>this.loop()); },
+  toggle(){ this.playing=!this.playing; $('#tpPlay').textContent=this.playing?'⏸ Pausa':'▶ Reanudar'; },
+  close(){ this.playing=false; cancelAnimationFrame(this.raf); $('#tp').classList.remove('on'); },
+};
+function tpOpen(id){ const sc=scriptById(id); if(sc) TP.open(scriptToText(sc)); }
+
+/* ================= CHROME ================= */
+function topbar(route){
+  const links=[['inicio','Inicio'],['crear','Crear'],['libreta','Mi Libreta'],['ideas','Ideas'],['guiones','Guiones'],['series','📚 Series'],['research','🔎 Research'],['calendario','Calendario'],['teleprompter','Teleprompter'],['capturas','Capturas'],['mivoz','Mi Voz'],['cuenta','Cuenta']];
+  return `<div class="topbar"><div class="topbar-inner">
+    <div class="brand"><span class="spark">${BRAND.mascot}</span>${BRAND.name}</div>
+    <nav class="nav">${links.map(([r,l])=>`<a href="#/${r}" class="${route===r?'active':''}">${l}<span class="u"></span></a>`).join('')}</nav>
+    <div class="top-actions">
+      <button class="chip" onclick="toggleTheme()">${S.theme==='neon'?'🟢 Studio':'🟣 Agencia'}</button>
+      <button class="btn accent sm" onclick="location.hash='#/crear'">✦ Crear</button>
+      <div class="avatar">${BRAND.mascot}</div>
+    </div>
+  </div></div>`;
+}
+function sidebar(){
+  const L=levelInfo(S.xp);
+  return `<aside class="sidebar">
+    <div class="side-card">
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="lvl">N${L.lv}</div>
+        <div><div class="plan-name" style="font-size:18px">${esc(S.name)}</div><div style="color:var(--muted);font-size:12px">${S.xp} XP · Nivel ${L.lv}</div></div>
+      </div>
+      <div class="xpbar"><i style="width:${L.pct}%"></i></div>
+      <div style="color:var(--faint);font-size:11px;margin-top:6px">${L.into}/${L.need} XP para N${L.lv+1}</div>
+    </div>
+    <div class="side-card">
+      <div class="side-title">Plan actual</div>
+      <div class="plan-name">Gratis 👑</div>
+      <button class="btn accent block" style="margin-top:12px" onclick="location.hash='#/cuenta'">Subir a Pro</button>
+    </div>
+    <div class="side-card streak-card">
+      <div class="mascot">${S.streak>=7?'🔥':BRAND.mascot}</div>
+      <div class="streak-num">🔥 ${S.streak} <small>día${S.streak===1?'':'s'}</small></div>
+      <div style="color:var(--muted);font-size:12px">Racha · récord ${S.streakRecord}</div>
+    </div>
+    <div class="side-card">
+      <div class="side-title">Invita a un amigo</div>
+      <div style="color:var(--muted);font-size:13px;margin:6px 0 12px">Gana beneficios por cada suscripción.</div>
+      <button class="btn block" onclick="toast('Link de invitación copiado 🔗')">Invitar</button>
+    </div>
+  </aside>`;
+}
+function rail(){
+  const ti=todayIdx();
+  const upcoming=[]; for(let i=0;i<7;i++){ (S.calendar[i]||[]).forEach(id=>{ const sc=scriptById(id); if(sc) upcoming.push({d:DAYS[i], sc}); }); }
+  return `<aside class="rail">
+    <div class="side-card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div class="side-title">📅 Esta semana</div><a href="#/calendario" style="font-size:12px;color:var(--accent);text-decoration:none">Ver →</a></div>
+      <div class="mini-week">${DAYS.map((d,i)=>`<div class="${i===ti?'on':''}">${d[0]}</div>`).join('')}</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:12px">${upcoming.length? upcoming.slice(0,3).map(u=>`<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="color:var(--text)">${u.d}</b> · ${esc(u.sc.title.slice(0,28))}</div>`).join('') : 'Nada programado aún.'}</div>
+    </div>
+    <div class="side-card">
+      <div class="side-title">💡 Ideas recientes</div>
+      ${S.ideas.length? S.ideas.slice(0,4).map(i=>`<div style="font-size:13px;padding:8px 0;border-top:1px solid var(--line)">${esc(i.text.slice(0,60))}</div>`).join('') : '<div style="color:var(--muted);font-size:13px;margin-top:6px">Aún no guardas ideas.</div>'}
+    </div>
+    <div class="side-card">
+      <div class="side-title">🎯 Pilares</div>
+      <div class="row" style="margin-top:10px">${DATA.pillars.map(p=>`<span class="tag" style="background:${p.color}22;border:1px solid ${p.color}55">${p.name}</span>`).join('')}</div>
+    </div>
+  </aside>`;
+}
+function ringsBlock(){
+  const r=S.rings;
+  const one=(v,color,label,emo)=>`<div class="ring" style="--v:${v};--rc:${color}"><b>${emo}</b><span>${label}</span></div>`;
+  return `<div class="rings">${one(r.idea,'var(--accent)','Idea','💡')}${one(r.guion,'var(--accent2)','Guion','📝')}${one(r.publicado,'var(--gold)','Publicado','🚀')}</div>`;
+}
+function selg(id,arr,cur){ return `<select id="${id}">${arr.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select>`; }
+
+/* ================= SCREENS ================= */
+const screens = {
+  inicio(){
+    const hour=new Date().getHours(); const g=hour<12?'Buenos días':hour<19?'Buenas tardes':'Buenas noches';
+    const ob=S.onboarding;
+    const items=[['semilla','Guarda tu primera idea semilla'],['guion','Genera tu primer guion con el framework'],['agenda','Agenda una publicación'],['teleprompter','Prueba el teleprompter']];
+    const done=items.filter(([k])=>ob[k]).length;
+    const pubs=S.scripts.filter(s=>s.state==='publicado').length;
+    const drafts=S.scripts.filter(s=>s.state==='borrador').slice(0,2);
+    const idea=DATA.ideas[(new Date().getDate())%DATA.ideas.length];
+    return `<main>
+      <div class="greet"><div class="m">${BRAND.mascot}</div><div>
+        <h1>${g}, ${esc(S.name)}</h1>
+        <div class="pill">🔥 ${S.streak} día${S.streak===1?'':'s'} seguidos creando</div>
+      </div></div>
+      <div class="composer">
+        <div class="q">¡Hola! ✨ ¿Qué quieres crear hoy? Escríbeme una idea, un tema o pégame un link.</div>
+        <div class="row" style="margin-bottom:12px">
+          <button class="chip" onclick="location.hash='#/crear'">💡 Tengo una idea</button>
+          <button class="chip" onclick="sugerir()">🎲 Sugiéreme un tema</button>
+          <button class="chip" onclick="toast('Link→guion llega en fase 2 (usa tu pipeline yt-dlp/Whisper)')">🔗 Tengo un link</button>
+        </div>
+        <div class="inputbar">
+          <input id="homeIdea" placeholder="Escribe una idea, un tema o pega un link…" onkeydown="if(event.key==='Enter')irCrear(this.value)"/>
+          <button class="btn accent" onclick="irCrear($('#homeIdea').value)">Enviar</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>${S.scripts.length}</b><span>Guiones</span></div>
+        <div class="stat"><b>${S.ideas.length}</b><span>Ideas</span></div>
+        <div class="stat"><b>${pubs}</b><span>Publicados</span></div>
+        <div class="stat"><b>${S.xp}</b><span>XP</span></div>
+      </div>
+      <div class="card" style="margin-top:18px;text-align:center">
+        <h3 style="margin-bottom:4px">Tus anillos ${done>=4?'¡completos! 🎉':'de hoy'}</h3>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:22px">Cada acción cierra un anillo. Hazlos todos hoy.</div>
+        <div style="margin-bottom:28px">${ringsBlock()}</div>
+      </div>
+      <div class="grid g2" style="margin-top:18px">
+        <div class="card">
+          <div class="eyebrow" style="margin-bottom:8px">💡 Idea de hoy</div>
+          <div style="font-weight:700;font-family:var(--font-display);font-size:18px;margin-bottom:6px">${esc(idea.idea)}</div>
+          <div style="color:var(--muted);font-size:13px;margin-bottom:14px">"${esc(idea.hook)}"</div>
+          <button class="btn accent" onclick="irCrear('${jsq(idea.idea)}')">✦ Crear guion</button>
+        </div>
+        <div class="card">
+          <div class="eyebrow" style="margin-bottom:8px">⏩ Continúa donde quedaste</div>
+          ${drafts.length? drafts.map(sc=>`<div style="display:flex;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"><span style="flex:1;font-size:14px">${esc(sc.title.slice(0,40))}</span><button class="btn sm" onclick="location.hash='#/guiones'">Abrir</button></div>`).join('') : '<div style="color:var(--muted);font-size:13px;margin-top:6px">No tienes borradores. Genera un guion y quedará aquí.</div>'}
+        </div>
+      </div>
+      ${done<4?`<div class="card" style="margin-top:18px">
+        <div class="head" style="margin-bottom:8px"><h3>Primeros pasos</h3><div class="sp"></div><span class="eyebrow">${done} de ${items.length} · +XP c/u</span></div>
+        ${items.map(([k,l])=>`<div class="check ${ob[k]?'done':''}"><div class="box">${ob[k]?'✓':''}</div><div class="lbl">${l}</div><div class="xp">${ob[k]?'✓':'+XP'}</div></div>`).join('')}
+      </div>`:''}
+    </main>`;
+  },
+
+  crear(){
+    ensureChat();
+    return `<main>
+      <div class="head"><span class="eyebrow">Crear</span><h2>Crea tu guion</h2><div class="sp"></div>
+        <div class="row">${selg('selNiche',NICHES,S.prefs.niche)}${selg('selPlat',PLATFORMS,S.prefs.platform)}<select id="selVoice">${S.voices.length? S.voices.map(v=>`<option value="${v.id}" ${S.activeVoice===v.id?'selected':''}>🗣️ ${esc(v.name)}</option>`).join('') : '<option>🗣️ Sin voz</option>'}</select></div>
+      </div>
+      <div class="card" style="padding:16px">
+        <div id="chatThread" class="chat"></div>
+        <div class="composer chatcomposer">
+          <div class="row" style="margin-bottom:10px">
+            <button class="chip" onclick="$('#chatInput').focus()">💡 Tengo una idea</button>
+            <button class="chip" onclick="var i=$('#chatInput');i.value=gen.randomIdea();i.focus()">🎲 Sugiéreme un tema</button>
+            <button class="chip" onclick="dictar()">🎤 Dictar</button>
+            <button class="chip" onclick="chatReset()">🧹 Nuevo</button>
+          </div>
+          <div class="inputbar">
+            <input id="chatInput" placeholder="Escribe una idea, un tema o pega un link…" onkeydown="if(event.key==='Enter')chatSend()"/>
+            <button class="btn accent" onclick="chatSend()">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </main>`;
+  },
+
+  ideas(){
+    const niches=['Todos',...NICHES];
+    const list=DATA.ideas.filter(b=>fIdeaNiche==='Todos'||b.niche===fIdeaNiche);
+    return `<main>
+      <div class="head"><h2>Ideas</h2><div class="sp"></div><span class="eyebrow">${DATA.ideas.length} en el banco</span></div>
+      <div class="card" style="margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:30px">🎲</div>
+        <div style="flex:1;min-width:180px"><div style="font-weight:700;font-family:var(--font-display)">¿Sin idea? Randomiza</div><div style="color:var(--muted);font-size:13px">Saca una idea del banco y conviértela en guion.</div></div>
+        <button class="btn accent" onclick="randomIntoCrear()">Sacar idea →</button>
+      </div>
+      <div class="composer" style="margin-bottom:16px"><div class="inputbar">
+        <input id="seedI" placeholder="Guarda una idea nueva…" onkeydown="if(event.key==='Enter'){saveIdea(this.value); this.value='';}"/>
+        <button class="btn accent" onclick="saveIdea($('#seedI').value); $('#seedI').value=''">Guardar</button>
+      </div></div>
+      <div class="tabs">${niches.map(n=>`<button class="tab ${fIdeaNiche===n?'on':''}" onclick="setIdeaNiche('${n}')">${n}</button>`).join('')}</div>
+      <input class="fld" id="ideaSearch" placeholder="🔎 Buscar en el banco…" style="width:100%;margin-bottom:14px" oninput="filterCards('ideaSearch','ideaGrid')"/>
+      <div class="grid g3" id="ideaGrid">${list.map(b=>`<div class="idea-card" data-text="${esc((b.idea+' '+b.hook+' '+b.niche).toLowerCase())}">
+        <span class="tag">${b.niche}</span>
+        <div style="font-weight:600">${esc(b.idea)}</div>
+        <div style="color:var(--muted);font-size:13px">"${esc(b.hook)}"</div>
+        <button class="btn sm" style="margin-top:auto" onclick="irCrear('${jsq(b.idea)}')">✦ Crear guion</button>
+      </div>`).join('')}</div>
+      ${S.ideas.length?`<div class="eyebrow" style="margin:24px 0 10px">Tus ideas (${S.ideas.length})</div>
+      <div class="grid g3">${S.ideas.map(i=>`<div class="idea-card">
+        <button class="star ${i.fav?'on':''}" onclick="toggleFav('${i.id}')">${i.fav?'⭐':'☆'}</button>
+        <div style="font-weight:600;padding-right:20px">${esc(i.text)}</div>
+        <button class="btn sm" style="margin-top:auto" onclick="irCrear('${jsq(i.text)}')">✦ Crear guion</button></div>`).join('')}</div>`:''}
+    </main>`;
+  },
+
+  guiones(){
+    if(!S.scripts.length) return `<main><div class="head"><h2>Guiones</h2></div>
+      <div class="card empty"><div class="m">📝</div><p>Aún no tienes guiones.<br>Crea el primero desde <a href="#/crear" style="color:var(--accent)">Crear</a>.</p></div></main>`;
+    const filters=['Todos',...STATES];
+    const list=S.scripts.filter(s=>fGuion==='Todos'||(s.state||'borrador')===fGuion);
+    return `<main><div class="head"><h2>Guiones</h2><div class="sp"></div><span class="eyebrow">${S.scripts.length} guardado(s)</span></div>
+      <div class="tabs">${filters.map(f=>`<button class="tab ${fGuion===f?'on':''}" onclick="setGuionFilter('${f}')">${cap(f)}${f!=='Todos'?' ('+S.scripts.filter(s=>(s.state||'borrador')===f).length+')':''}</button>`).join('')}</div>
+      <input class="fld" id="gSearch" placeholder="🔎 Buscar guion…" style="width:100%;margin-bottom:14px" oninput="filterCards('gSearch','gGrid')"/>
+      <div class="grid g2" id="gGrid">${list.map(sc=>`<div class="card" data-text="${esc(sc.title.toLowerCase())}">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <span class="badge ${sc.state||'borrador'}">${sc.state||'borrador'}</span>
+          <span class="tag">${sc.niche||'—'}</span>
+          <span style="margin-left:auto;color:var(--faint);font-size:12px">~${durSec(sc)}s · ${sc.platform||''}</span>
+        </div>
+        <div style="font-weight:700;font-family:var(--font-display);margin-bottom:6px">${esc(sc.title)}</div>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px">${esc((sc.steps[0]?.text||'').slice(0,90))}…</div>
+        <div class="row" style="margin:0">
+          <button class="btn sm accent" onclick="tpOpen('${sc.id}')">🎬</button>
+          <button class="btn sm" onclick="cycleState('${sc.id}')">→ estado</button>
+          <button class="btn sm" onclick="copyScript('${sc.id}')">⧉</button>
+          <button class="btn sm" onclick="dupScript('${sc.id}')">⎘</button>
+          <button class="btn sm" onclick="delScript('${sc.id}')">🗑</button>
+        </div>
+      </div>`).join('')||'<div class="empty" style="grid-column:1/-1">Nada en este estado.</div>'}</div></main>`;
+  },
+
+  teleprompter(){
+    return `<main><div class="head"><span class="eyebrow">Grabar</span><h2 style="width:100%">Teleprompter</h2></div>
+      ${S.scripts.length? `<div style="color:var(--muted);margin-bottom:14px">Elige un guion y ábrelo a pantalla completa. Ajusta velocidad y tamaño mientras grabas.</div>
+      <div class="grid g2">${S.scripts.map(sc=>`<div class="card">
+        <div style="font-weight:700;font-family:var(--font-display);margin-bottom:8px">${esc(sc.title)}</div>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px">~${durSec(sc)}s · ${words(sc)} palabras</div>
+        <button class="btn accent" onclick="tpOpen('${sc.id}')">🎬 Abrir teleprompter</button>
+      </div>`).join('')}</div>`
+      : `<div class="card empty"><div class="m">🎬</div><p>Crea un guion y aquí podrás leerlo con el teleprompter.</p></div>`}
+    </main>`;
+  },
+
+  calendario(){
+    const ti=todayIdx();
+    const planned=Object.keys(S.calendar).filter(k=>!k.startsWith('sug_')).reduce((n,k)=>n+(S.calendar[k]||[]).length,0);
+    return `<main><div class="head"><h2>Calendario semanal</h2><div class="sp"></div><button class="btn accent" onclick="sugerirSemana()">✨ Sugerir semana</button></div>
+      <div class="goal"><span class="eyebrow">Meta semanal</span><div class="bar"><i style="width:${Math.min(100,planned/WEEK_GOAL*100)}%"></i></div><b style="font-family:var(--font-display)">${planned}/${WEEK_GOAL}</b></div>
+      <div class="week">${DAYS.map((d,i)=>{
+        const list=(S.calendar[i]||[]).map(id=>{const sc=scriptById(id); return sc?`<div class="slot"><span style="flex:1">${esc(sc.title.slice(0,34))}</span><button onclick="markPublished(${i},'${id}')" title="Publicar" style="background:none;border:none;cursor:pointer">🚀</button><button onclick="unassign(${i},'${id}')" title="Quitar" style="background:none;border:none;color:var(--muted);cursor:pointer">✕</button></div>`:'';}).join('');
+        const sug=S.calendar['sug_'+i];
+        return `<div class="day ${i===ti?'today':''}"><div class="dn"><span>${d}</span>${i===ti?'<span style="color:var(--accent)">hoy</span>':''}</div>
+          ${list}${sug?`<div class="slot" style="border-style:dashed;color:var(--muted)"><span style="flex:1">${esc(sug)}</span><button onclick="set(s=>delete s.calendar['sug_${i}'])" style="background:none;border:none;color:var(--muted);cursor:pointer">✕</button></div>`:''}
+          <button class="add" onclick="assignDay(${i})">＋ Agendar guion</button>
+        </div>`;
+      }).join('')}</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:14px">Tip: agenda un guion, y cuando lo publiques toca 🚀 para cerrar tu anillo del día.</div>
+    </main>`;
+  },
+
+  mivoz(){
+    return `<main><div class="head"><span class="eyebrow">Tu tono</span><h2 style="width:100%">Mi Voz</h2><div class="sp"></div><button class="btn accent" onclick="addVoice()">＋ Nueva voz</button></div>
+      <div style="color:var(--muted);margin-bottom:16px">Define cómo hablas para que tus guiones suenen a ti, no a IA genérica. (En fase 2 esto ajusta la generación real.)</div>
+      ${S.voices.length? `<div class="grid g2">${S.voices.map(v=>`<div class="card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-weight:700;font-family:var(--font-display)">${esc(v.name)}</span>${S.activeVoice===v.id?'<span class="badge listo">activa</span>':''}</div>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px">${esc(v.tone||'Sin descripción')}</div>
+        <div class="row" style="margin:0">${S.activeVoice!==v.id?`<button class="btn sm accent" onclick="setVoice('${v.id}')">Usar</button>`:''}<button class="btn sm" onclick="delVoice('${v.id}')">🗑</button></div>
+      </div>`).join('')}</div>`
+      : `<div class="card empty"><div class="m">🗣️</div><p>Aún no tienes voces. Crea una con tu tono (cercano, directo, con humor…).</p></div>`}
+    </main>`;
+  },
+
+  capturas(){
+    return `<main><div class="head"><h2>Capturas</h2><div class="sp"></div><label class="btn">🖼 Subir imagen<input type="file" accept="image/*" style="display:none" onchange="addCaptureImg(this)"></label></div>
+      <div class="composer" style="margin-bottom:18px"><div class="inputbar">
+        <input id="capI" placeholder="Anota una idea, un clip, una referencia…" onkeydown="if(event.key==='Enter'){addCapture(this.value); this.value=''}"/>
+        <button class="btn accent" onclick="addCapture($('#capI').value); $('#capI').value=''">Capturar</button>
+      </div></div>
+      ${S.captures.length?`<div class="moodgrid">${S.captures.map(c=>`<div class="cap">${c.img?`<img src="${c.img}"/>`:''}<div class="n" style="display:flex;gap:6px"><span style="flex:1">${esc(c.text)}</span><button onclick="delCapture('${c.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer">✕</button></div></div>`).join('')}</div>`
+      :`<div class="card empty"><div class="m">🎒</div><p>Tu mochila de ideas del día vive aquí. Sube capturas de referencia o anota notas rápidas.</p></div>`}
+    </main>`;
+  },
+
+  libreta(){
+    const l=S.libreta;
+    const f=(k,label,ph)=>`<div style="margin-bottom:14px"><div class="eyebrow" style="margin-bottom:6px">${label}</div><textarea class="fld" style="width:100%;min-height:70px" oninput="saveLibreta('${k}',this.value)" placeholder="${ph}">${esc(l[k])}</textarea></div>`;
+    return `<main><div class="head"><span class="eyebrow">Tu segundo cerebro</span><h2 style="width:100%">Mi Libreta</h2></div>
+      <div style="color:var(--muted);margin-bottom:16px">Todo lo que pongas aquí es el contexto que la IA usará (en fase 2) para que los guiones suenen a ti y a tu negocio, no a robot.</div>
+      <div class="card">${f('marca','¿Qué haces? Tu marca','Ej: Agencia de marketing para negocios locales…')}${f('oferta','Tu oferta / producto','Ej: Gestiono redes y pauta para restaurantes…')}${f('avatar','¿A quién le hablas? Tu avatar','Ej: Dueños de negocio 30-45, con poco tiempo…')}${f('notas','Frases y muletillas tuyas','Ej: "sin vueltas", "te lo resumo"… tu estilo')}</div>
+      <div style="color:var(--faint);font-size:12px;margin-top:12px">Se guarda solo mientras escribes.</div>
+    </main>`;
+  },
+  series(){
+    return `<main><div class="head"><span class="eyebrow">Formatos que repites</span><h2 style="width:100%">Series</h2><div class="sp"></div><button class="btn accent" onclick="addSerie()">＋ Nueva serie</button></div>
+      <div style="color:var(--muted);margin-bottom:16px">Agrupa tus guiones en series recurrentes (ej. "Mito de los lunes", "Tip de 30s"). Publicar en serie fideliza a tu audiencia.</div>
+      ${S.series.length? `<div class="grid g3">${S.series.map(se=>`<div class="idea-card"><span class="tag">${esc(se.format||'serie')}</span><div style="font-weight:700;font-family:var(--font-display)">${esc(se.name)}</div><div style="color:var(--muted);font-size:13px">${S.scripts.filter(x=>x.serie===se.id).length} guiones</div><button class="btn sm" style="margin-top:auto" onclick="delSerie('${se.id}')">🗑 Eliminar</button></div>`).join('')}</div>`
+      : `<div class="card empty"><div class="m">📚</div><p>Aún no tienes series. Crea la primera (ej. "Errores de novato").</p></div>`}
+    </main>`;
+  },
+  research(){
+    const niche=S.prefs.niche;
+    const ex=DATA.ideas.filter(x=>x.niche===niche);
+    const src=(ex.length?ex:DATA.ideas).slice(0,4);
+    return `<main><div class="head"><span class="eyebrow">Radar · beta</span><h2 style="width:100%">Research</h2><div class="sp"></div><select onchange="set(s=>s.prefs.niche=this.value)">${NICHES.map(n=>`<option ${n===niche?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="card" style="margin-bottom:16px;background:var(--accent-soft)"><b>🔎 Qué hace el Radar</b><div style="color:var(--muted);font-size:14px;margin-top:6px">Detecta videos que se salieron de la curva (outliers) en tu nicho y te dice <b>por qué</b> funcionaron para que los adaptes. En fase 2 se conecta a datos reales; abajo ves el tipo de ganchos que explotan en <b>${niche}</b>.</div></div>
+      <div class="grid g2">${src.map(e=>`<div class="idea-card"><span class="tag">viral · ejemplo</span><div style="font-weight:600">"${esc(e.hook)}"</div><div style="color:var(--muted);font-size:13px">Por qué jala: dolor concreto + promesa rápida en los primeros 3s.</div><button class="btn sm" style="margin-top:auto" onclick="irCrear('${jsq(e.idea)}')">✦ Adaptar a guion</button></div>`).join('')}</div>
+    </main>`;
+  },
+  cuenta(){
+    const L=levelInfo(S.xp);
+    return `<main><div class="head"><h2>Mi cuenta</h2></div>
+      <div class="card" style="margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div class="avatar" style="width:64px;height:64px;font-size:30px">${BRAND.mascot}</div>
+        <div style="flex:1;min-width:180px">
+          <div class="inputbar"><input class="fld" id="nm" value="${esc(S.name)}" style="max-width:220px"/><button class="btn accent" onclick="set(s=>s.name=$('#nm').value.trim()||'Creador')">Guardar</button></div>
+          <div style="color:var(--muted);font-size:13px;margin-top:8px">Nivel ${L.lv} · ${S.xp} XP</div>
+          <div class="xpbar" style="max-width:320px"><i style="width:${L.pct}%"></i></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="side-title" style="margin-bottom:12px">Plan</div>
+        <div class="plan-grid">
+          <div class="plan-col"><div style="font-weight:700;font-family:var(--font-display);font-size:18px">Gratis</div><div style="color:var(--muted);font-size:13px">$0 · para siempre</div>
+            <ul><li>✓ Organiza tus guiones</li><li>✓ Randomizador + banco</li><li>✓ Teleprompter</li><li>✓ Racha y XP</li></ul></div>
+          <div class="plan-col pro"><div style="font-weight:700;font-family:var(--font-display);font-size:18px">Pro <span class="badge publicado">recomendado</span></div><div style="color:var(--muted);font-size:13px">IA completa</div>
+            <ul><li>✓ IA real (Claude) en los guiones</li><li>✓ Multiplicador ×12 sin tope</li><li>✓ Mi Voz avanzada</li><li>✓ Sugerir semana + multi-cuenta</li></ul>
+            <button class="btn accent block" style="margin-top:12px" onclick="toast('Pagos (Culqi/Mercado Pago) llegan en fase 2')">Activar Pro</button></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="side-title">Tema</div>
+        <div class="row" style="margin-top:10px">
+          <button class="chip ${S.theme==='neon'?'on':''}" onclick="setTheme('neon')">🟢 Studio (navy + verde)</button>
+          <button class="chip ${S.theme==='cozy'?'on':''}" onclick="setTheme('cozy')">🟣 Agencia (morado + amarillo)</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="side-title">App</div>
+        <div class="row" style="margin-top:10px"><button class="btn" onclick="installPWA()">📲 Instalar app</button><a class="btn" href="#/mivoz">🗣️ Mi Voz</a></div>
+      </div>
+      <div class="card">
+        <div class="side-title">Tus datos</div>
+        <div style="color:var(--muted);font-size:13px;margin:6px 0 12px">${S.scripts.length} guiones · ${S.ideas.length} ideas · ${S.captures.length} capturas · ${S.xp} XP</div>
+        <div class="row" style="margin:0"><button class="btn" onclick="exportData()">⇩ Exportar</button><button class="btn" onclick="resetData()">Reiniciar</button></div>
+      </div>
+    </main>`;
+  },
+};
+
+/* ---------- interactions ---------- */
+function readPrefs(){ const n=$('#selNiche'),p=$('#selPlat'),g=$('#selGoal'),v=$('#selVoice'); if(n||p||g){ S.prefs.niche=n?n.value:S.prefs.niche; S.prefs.platform=p?p.value:S.prefs.platform; S.prefs.goal=g?g.value:S.prefs.goal; if(v&&v.value) S.activeVoice=v.value; save(); } }
+function irCrear(v){ v=(v||'').trim(); if(!v){ toast('Escribe una idea primero'); return; } location.hash='#/crear'; setTimeout(()=>chatUserIdea(v),70); }
+function sugerir(){ const i=$('#homeIdea'); if(i){ i.value=gen.randomIdea(); i.focus(); } }
+function randomIntoCrear(){ irCrear(gen.randomIdea()); }
+function stepCard(s){ return `<div class="step"><div class="k"><b>${s.key}</b><span class="nm">${s.name}</span><span class="pp">${esc(s.purpose)}</span><button class="rg" onclick="regenStep('${s.key}')">↻ otra</button></div><div class="tx" contenteditable="true" oninput="editStep('${s.key}',this.textContent)">${esc(s.text)}</div></div>`; }
+function renderScript(sc){
+  const out=$('#genOut'); if(!out) return;
+  out.innerHTML=`<div class="card">
+    <div class="head" style="margin-bottom:10px"><span class="eyebrow">Framework VIRAL</span><h3 style="width:100%">${esc(sc.title)}</h3>
+      <div class="sp"></div><span class="eyebrow">~${durSec(sc)}s · ${words(sc)} palabras · ${sc.platform}</span></div>
+    ${sc.steps.map(stepCard).join('')}
+    <div class="row" style="margin:6px 0 0">
+      <button class="btn accent" onclick="saveScript(window._last)">💾 Guardar guion</button>
+      <button class="btn" onclick="TP.open(scriptToText(window._last))">🎬 Teleprompter</button>
+      <button class="btn" onclick="multiplicar()">⚡ Multiplicar ×12</button>
+      <button class="btn" onclick="copyLast()">⧉ Copiar</button>
+    </div></div>`;
+}
+function generar(){
+  readPrefs();
+  const idea=($('#crearIdea')?.value||'').trim(); if(!idea){ toast('Escribe tu idea'); return; }
+  const sc=gen.script(idea); window._last=sc;
+  set(s=>{ s.onboarding.guion=true; s.rings.guion=Math.min(100,s.rings.guion+34); });
+  const inp=$('#crearIdea'); if(inp) inp.value=idea;
+  renderScript(sc);
+}
+function regenStep(key){ const sc=window._last; if(!sc) return; const st=sc.steps.find(x=>x.key===key); const def=DATA.framework.steps.find(x=>x.key===key); st.ti=(st.ti+1)%def.templates.length; st.text=gen.step(def, st.ti, sc.topic, key==='V'?sc.hook:null); if($('#chatThread')) renderChat(); else if($('#genOut')) renderScript(sc); }
+function editStep(key,val){ const sc=window._last; if(!sc) return; const st=sc.steps.find(x=>x.key===key); if(st) st.text=val; }
+function copyLast(){ if(window._last){ navigator.clipboard&&navigator.clipboard.writeText(scriptToText(window._last)); toast('Copiado ⧉'); } }
+function multiplicar(){
+  readPrefs();
+  const idea=($('#crearIdea')?.value||$('#homeIdea')?.value||'tu idea').trim()||'tu idea';
+  const list=gen.multiply(idea);
+  const out=$('#genOut'); if(!out) return;
+  out.innerHTML=`<div class="card"><div class="head" style="margin-bottom:12px"><span class="eyebrow">Multiplicador ×12</span><h3 style="width:100%">12 ángulos de: ${esc(shorten(idea))}</h3></div>
+    <div class="grid g2">${list.map(a=>`<div class="idea-card"><span class="tag">${esc(a.angle)}</span><div style="font-weight:600">${esc(a.title)}</div>
+      <button class="btn sm" style="margin-top:auto" onclick="irCrear('${jsq(a.title)}')">✦ Guion</button></div>`).join('')}</div></div>`;
+  addXP(10); toast('12 ángulos ⚡ +10 XP');
+}
+
+/* ---------- chat (Crear conversacional) ---------- */
+let chatThread=null;
+function ensureChat(){ if(!chatThread) chatThread=[{who:'bot',kind:'greet'}]; }
+function chatReset(){ chatThread=[{who:'bot',kind:'greet'}]; renderChat(); }
+function scriptCardHTML(sc){
+  return `<div class="head" style="margin-bottom:10px"><span class="eyebrow">Framework VIRAL</span><h3 style="width:100%">${esc(sc.title)}</h3><div class="sp"></div><span class="eyebrow">~${durSec(sc)}s · ${words(sc)} palabras · ${sc.platform}</span></div>
+    ${sc.steps.map(stepCard).join('')}
+    <div class="row" style="margin:6px 0 0">
+      <button class="btn accent" onclick="saveScript(window._last)">💾 Guardar</button>
+      <button class="btn" onclick="TP.open(scriptToText(window._last))">🎬 Teleprompter</button>
+      <button class="btn" onclick="chatMultiplicar('${jsq(sc.title)}')">⚡ Multiplicar ×12</button>
+    </div>`;
+}
+function chatBubble(m){
+  if(m.kind==='greet') return `<div class="bub bot">¡Hola! ✨ ¿Qué quieres crear hoy? Escríbeme una idea, un tema o pégame un link.</div>`;
+  if(m.kind==='user') return `<div class="bub user">${esc(m.text)}</div>`;
+  if(m.kind==='bot-text') return `<div class="bub bot">${m.html||esc(m.text)}</div>`;
+  if(m.kind==='actions') return `<div class="bub bot">¡Me gusta! ¿Qué hacemos con esto?<div class="acts"><button class="btn sm accent" onclick="chatConvertir('${jsq(m.idea)}')">✍️ Convertir en guion</button><button class="btn sm" onclick="chatGuardarIdea('${jsq(m.idea)}')">📓 Guardar como idea</button><button class="btn sm" onclick="location.hash='#/research'">🔎 Investigar</button></div></div>`;
+  if(m.kind==='teaser') return `<div class="teaser"><b>Se me ocurre esto para arrancar 👇</b><br>Gancho: "${esc(m.gancho)}"<br><span style="color:var(--muted)">Estructura sugerida: Hook + 3 puntos numerados (5-7 seg c/u) + solución rápida + CTA.</span></div>`;
+  if(m.kind==='script') return `<div class="bub bot" style="max-width:100%">${scriptCardHTML(m.sc)}</div>`;
+  return '';
+}
+function renderChat(){ const el=$('#chatThread'); if(!el) return; el.innerHTML=chatThread.map(chatBubble).join(''); el.scrollTop=el.scrollHeight; }
+function chatUserIdea(text){ ensureChat(); chatThread.push({who:'user',kind:'user',text}); chatThread.push({who:'bot',kind:'actions',idea:text}); renderChat(); }
+function chatSend(){ readPrefs(); const inp=$('#chatInput'); const v=((inp&&inp.value)||'').trim(); if(!v){ toast('Escribe una idea'); return; } if(inp) inp.value=''; if(/^https?:\/\//i.test(v)){ ensureChat(); chatThread.push({who:'user',kind:'user',text:v}); chatThread.push({who:'bot',kind:'bot-text',text:'Los links → guion llegan en la fase 2 (con tu pipeline de transcripción). Por ahora escríbeme el tema. 🙌'}); renderChat(); return; } chatUserIdea(v); }
+function chatConvertir(idea){
+  readPrefs();
+  const b=DATA.ideas.find(x=>x.idea===idea); const gancho=(b&&b.hook)||('¿'+cap(shorten(idea))+'? Esto te va a servir.');
+  chatThread.push({who:'bot',kind:'teaser',gancho});
+  chatThread.push({who:'bot',kind:'bot-text',text:'¡Vamos a ello! Te armo el guion completo con el framework VIRAL ✍️'});
+  const sc=gen.script(idea); window._last=sc;
+  chatThread.push({who:'bot',kind:'script',sc});
+  set(s=>{ s.onboarding.guion=true; s.rings.guion=Math.min(100,s.rings.guion+34); s.xp+=15; });
+  renderChat();
+}
+function chatGuardarIdea(idea){ saveIdea(idea); chatThread.push({who:'bot',kind:'bot-text',text:'Guardada en tus ideas 💡 La ves en la pestaña Ideas.'}); renderChat(); }
+function chatMultiplicar(idea){ const list=gen.multiply(idea); const html='<b>12 ángulos de: '+esc(shorten(idea))+'</b><div class="grid g2" style="margin-top:10px">'+list.map(a=>`<div class="idea-card"><span class="tag">${esc(a.angle)}</span><div style="font-weight:600">${esc(a.title)}</div><button class="btn sm" style="margin-top:auto" onclick="chatUserIdea('${jsq(a.title)}')">✦ Guion</button></div>`).join('')+'</div>'; chatThread.push({who:'bot',kind:'bot-text',html}); addXP(10); renderChat(); toast('12 ángulos ⚡ +10 XP'); }
+function dictar(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ toast('Tu navegador no soporta dictado por voz'); return; } const r=new SR(); r.lang='es-PE'; r.interimResults=false; toast('🎤 Escuchando…'); r.onresult=e=>{ const t=e.results[0][0].transcript; const inp=$('#chatInput'); if(inp) inp.value=t; toast('Listo, revisa y envía ✍️'); }; r.onerror=()=>toast('No pude escuchar 🎤'); r.start(); }
+function saveLibreta(k,v){ S.libreta[k]=v; save(); }
+function addSerie(){ const n=prompt('Nombre de la serie (ej: "Errores de novato")'); if(!n) return; const f=prompt('Formato / cadencia (ej: "Cada lunes, 30s")')||'serie'; set(s=>s.series.unshift({id:uid(), name:n, format:f})); toast('Serie creada 📚'); }
+function delSerie(id){ set(s=>s.series=s.series.filter(x=>x.id!==id)); }
+
+/* ---------- router ---------- */
+const NORAIL=['crear','libreta','ideas','guiones','series','research','calendario','teleprompter','mivoz','capturas','cuenta'];
+function currentRoute(){ return (location.hash.replace('#/','')||'inicio'); }
+function render(){
+  document.documentElement.setAttribute('data-theme', S.theme);
+  const r=currentRoute(); const fn=screens[r]||screens.inicio;
+  const withRail = r==='inicio';
+  const cls = r==='inicio' ? 'shell' : (NORAIL.includes(r)?'shell no-rail':'shell full');
+  const showSide = r==='inicio' || NORAIL.includes(r);
+  $('#root').innerHTML = topbar(r) + `<div class="${cls}">${showSide?sidebar():''}${fn()}${withRail?rail():''}</div>` +
+    `<div class="foot">${BRAND.name} · prototipo local · tus datos viven solo en este navegador. La IA real (Claude), el login y los pagos se enchufan en la fase 2.</div>`;
+  if(r==='crear') renderChat();
+}
+window.addEventListener('hashchange', render);
+(function tickStreak(){ const last=localStorage.getItem('creacion-ideas.lastDay'); const today=new Date().toDateString(); if(last && last!==today){ S.streak+=1; S.streakRecord=Math.max(S.streakRecord,S.streak); save(); } localStorage.setItem('creacion-ideas.lastDay',today); })();
+render();
+</script>
+</body>
+</html>
