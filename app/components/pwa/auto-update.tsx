@@ -38,11 +38,33 @@ export function AutoUpdate() {
     if (!CURRENT || CURRENT === 'dev') return
     let cancelado = false
 
+    /* Aplica la actualización de VERDAD: borra las cachés del service worker
+       (si no, el SW sigue sirviendo el bundle viejo y por eso antes había que
+       cerrar y abrir la app), fuerza la activación del SW nuevo, y recién
+       recarga → la app arranca 100% fresca. Pedro 06-ago-2026. */
+    async function aplicarActualizacion() {
+      if (recargando.current) return
+      recargando.current = true
+      try {
+        if (typeof caches !== 'undefined') {
+          const keys = await caches.keys()
+          await Promise.all(keys.map((k) => caches.delete(k)))
+        }
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration()
+          if (reg) {
+            try { await reg.update() } catch { /* ignora */ }
+            reg.waiting?.postMessage({ type: 'SKIP_WAITING' })
+          }
+        }
+      } catch { /* si algo falla, igual recargamos */ }
+      window.location.reload()
+    }
+
     function recargarSiSeguro() {
       if (recargando.current) return
       if (estaEscribiendo()) { pendiente.current = true; return }
-      recargando.current = true
-      window.location.reload()
+      void aplicarActualizacion()
     }
 
     async function chequear() {
@@ -66,8 +88,7 @@ export function AutoUpdate() {
       setTimeout(() => {
         if (pendiente.current && !estaEscribiendo()) {
           pendiente.current = false
-          recargando.current = true
-          window.location.reload()
+          void aplicarActualizacion()
         }
       }, 200)
     }

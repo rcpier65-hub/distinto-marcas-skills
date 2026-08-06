@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   // Excepciones: marcas que solo tienen PNG oficial (sin SVG vector aún).
   const proto = url.protocol
   const host = url.host
-  const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas'])
+  const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas', 'retoz'])
   const ext = PNG_ONLY_LOGOS.has(slug) ? 'png' : 'svg'
   const logoUrl = logoOverride
     ? normalizeDriveUrl(logoOverride)

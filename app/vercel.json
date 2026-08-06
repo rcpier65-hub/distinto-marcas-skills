@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/recordatorio-fechas",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/recordatorio-publicar",
+      "schedule": "0 22 * * *"
     }
   ]
 }

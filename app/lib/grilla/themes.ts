@@ -387,6 +387,33 @@ export const THEMES: Record<string, GrillaTheme> = {
     logoBg: 'transparent',
     logoPad: '0',
   },
+  retoz: {
+    // Marca de renovación/reparación de calzado. Manual RETOZ: isotipo "R" en un
+    // círculo de flechas (ciclo = "desafío, reto y superación"). Paleta cálida
+    // artesanal: marrón #432719, naranja #D06402, beige #F1DAAE. Tipografías del
+    // manual: CATCHY MAGER (display serif elegante) + Poppins → en OSS usamos
+    // Playfair Display (serif elegante) + Poppins. Reusa el layout limpio de
+    // clinical-warm recoloreado a Retoz. Pedro 30-jul-2026.
+    style: 'clinical-warm',
+    primary: '#432719',        // marrón (texto, números, date pill)
+    accent: '#D06402',         // naranja (blobs, dividers, acentos)
+    highlight: '#F1DAAE',      // beige (highlight sutil)
+    canvas: '#FBF4E9',         // crema cálido claro (legibilidad de 7 días)
+    text: '#432719',           // marrón
+    cardBg: '#FFFFFF',
+    cardAltBg: '#F7E4C6',      // beige/durazno suave (card alterna)
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;0,900;1,500;1,600&family=Poppins:wght@300;400;500;600;700&display=swap',
+    fontSerif: "'Playfair Display', Georgia, serif",
+    fontSans: "'Poppins', system-ui, -apple-system, sans-serif",
+    fontDisplay: "'Playfair Display', Georgia, serif",
+    brandSmall: '',
+    brandBig: 'RETOZ',
+    tagline: '',
+    footerUrl: 'www.agenciadistinto.com',
+    heroTitle: '¿Qué se viene?',
+    // Isotipo "R" sobre fondo transparente → se ve bien en recuadro blanco.
+    logoBg: '#FFFFFF',
+  },
 }
 
 export function getTheme(slug: string): GrillaTheme {

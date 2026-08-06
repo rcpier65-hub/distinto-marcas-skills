@@ -40,7 +40,7 @@ const CARD_CLASSES = ['is-white', 'is-alt']
 // el PNG copiado/enviado muestre el MISMO logo que el preview.
 // Bug (15-jun-2026): este mapa decía manrique:'png' pero el archivo real es
 // logo.svg → el render pedía logo.png (404) y el logo NO salía en la imagen copiada.
-const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas'])
+const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas', 'retoz'])
 
 // SVG icon de "video" — para publicaciones tipo REEL/Video
 const VIDEO_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="34" rx="3"/><path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/><path d="M22 52h20"/><path d="M32 46v6"/></svg>`

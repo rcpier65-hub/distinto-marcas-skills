@@ -149,7 +149,7 @@ export async function exchangeCodeForTokens(code: string): Promise<
  * el refresh_token y persiste el nuevo. Si no hay tokens, devuelve null
  * (significa "Google Calendar no conectado todavía").
  */
-async function getValidAccessToken(): Promise<string | null> {
+export async function getValidAccessToken(): Promise<string | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const { data: row } = await service

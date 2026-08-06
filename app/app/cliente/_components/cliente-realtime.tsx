@@ -49,11 +49,26 @@ export function ClienteRealtime({ marcaId }: { marcaId: string }) {
     }
 
     const channel = supabase
-      .channel(`cliente:publicaciones:${marcaId}`)
+      .channel(`cliente:marca:${marcaId}`)
       .on(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         'postgres_changes' as any,
         { event: '*', schema: 'public', table: 'publicaciones', filter: `marca_id=eq.${marcaId}` },
+        () => scheduleRefresh(),
+      )
+      // Observaciones y reuniones: el portal (Observaciones / Reuniones) se
+      // actualiza solo cuando el equipo agenda una reunión o cambia algo.
+      // Pedro 15-jul-2026.
+      .on(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'marca_observaciones', filter: `marca_id=eq.${marcaId}` },
+        () => scheduleRefresh(),
+      )
+      .on(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'marca_reuniones', filter: `marca_id=eq.${marcaId}` },
         () => scheduleRefresh(),
       )
       .subscribe()

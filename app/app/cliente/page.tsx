@@ -40,10 +40,16 @@ export default async function ClientePortalPage() {
   // Traemos TODAS las publicaciones de la marca (con y sin publicar). El
   // calendario del portal las agrupa por día; la vista lista las separa en
   // "por publicar" y "publicadas".
+  /* CORTE del portal: el cliente solo ve contenido de AGOSTO 2026 en adelante.
+     Limpia el backlog viejo (videos antiguos sin publicar acumulados desde el
+     inicio) sin borrar nada — solo deja de mostrarlos. Corte FIJO (no rueda por
+     mes) para conservar el historial de aquí en adelante. Pedro 5-ago-2026. */
+  const PORTAL_DESDE = '2026-08-01'
   const { data } = await service
     .from('publicaciones')
     .select(COLS)
     .eq('marca_id', cliente.marcaId)
+    .or(`fecha_publicacion.gte.${PORTAL_DESDE},publicado_at.gte.${PORTAL_DESDE}`)
     .order('fecha_publicacion', { ascending: false })
     .limit(400)
     .then((r: unknown) => r, () => ({ data: [] }))
@@ -74,16 +80,44 @@ export default async function ClientePortalPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pubs = (((data as any) ?? []) as any[]).map(mapRow)
 
+  const { getObservacionesMarca, getReunionesMarca, getGrabacionesMarca } = await import('@/lib/portal/coordinacion')
+  const [observaciones, reuniones, grabaciones, fechasRes] = await Promise.all([
+    getObservacionesMarca(service, cliente.marcaId).catch(() => []),
+    getReunionesMarca(service, cliente.marcaId).catch(() => []),
+    getGrabacionesMarca(service, cliente.marcaId).catch(() => []),
+    // Fechas importantes de la marca (idea de Lorena) — el cliente las ve en su
+    // portal (solo lectura). Pedro 24-jul-2026.
+    service.from('fechas_importantes')
+      .select('id, titulo, fecha, nota, categoria')
+      .eq('marca_id', cliente.marcaId)
+      .order('fecha', { ascending: true })
+      .then((r: unknown) => r, () => ({ data: [] })),
+  ])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fechasImportantes = ((((fechasRes as any)?.data) ?? []) as any[]).map((f) => ({
+    id: f.id as string,
+    titulo: (f.titulo ?? '—') as string,
+    fecha: (typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : f.fecha) as string,
+    nota: (f.nota ?? null) as string | null,
+    categoria: (f.categoria ?? 'otro') as string,
+  }))
+
   return (
     <ClientePortalView
       marcaId={cliente.marcaId}
+      observaciones={observaciones}
+      reuniones={reuniones}
+      grabaciones={grabaciones}
       marcaNombre={cliente.marcaNombre}
       marcaSlug={cliente.marcaSlug}
       marcaEmoji={cliente.marcaEmoji}
       marcaColor={cliente.marcaColor}
+      marcaLogoUrl={cliente.marcaLogoUrl}
+      driveUrl={cliente.driveUrl}
       contacto={cliente.nombre}
       hoy={hoy}
       pubs={pubs}
+      fechasImportantes={fechasImportantes}
     />
   )
 }

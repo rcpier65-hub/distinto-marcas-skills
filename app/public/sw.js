@@ -42,6 +42,13 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+/* El cliente (auto-update.tsx) puede pedir al SW en espera que se active YA
+   cuando detecta una versión nueva publicada, para que la actualización sea
+   inmediata sin cerrar/abrir la app. Pedro 06-ago-2026. */
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
+})
+
 self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return

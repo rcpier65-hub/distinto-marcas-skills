@@ -9,7 +9,7 @@
 import { useState } from 'react'
 
 // Excepciones de extensión (la mayoría son SVG vector; estas solo tienen PNG).
-const EXT_OVERRIDE: Record<string, string> = { 'little-joe': 'png', 'vid-natur': 'png', 'mil-ideas': 'png' }
+const EXT_OVERRIDE: Record<string, string> = { 'little-joe': 'png', 'vid-natur': 'png', 'mil-ideas': 'png', retoz: 'png' }
 
 // Slugs internos / sin logo → directo al emoji (evita 404).
 const SIN_LOGO = new Set(['interno', 'unknown', 'warrior-supps', 'oral-bueaty'])
@@ -20,18 +20,26 @@ export function MarcaLogo({
   emoji,
   size = 28,
   className = '',
+  logoUrl = null,
 }: {
   slug: string
   nombre?: string
   emoji?: string | null
   size?: number
   className?: string
+  /* URL de logo configurada en la sección de marcas (marcas.logo_url). Si
+     viene, se intenta PRIMERO; si falla, cae a los archivos estáticos y luego
+     al emoji. Así el portal muestra el mismo logo que la grilla. */
+  logoUrl?: string | null
 }) {
-  // Cadena de extensiones a intentar en orden. Si la marca tiene override,
-  // usamos SOLO esa (evita un 404 innecesario). Si no, probamos svg y luego
-  // png — así una marca nueva (p.ej. un cliente) muestra su logo aunque solo
-  // suban el PNG, sin tener que tocar este archivo.
-  const chain = EXT_OVERRIDE[slug] ? [EXT_OVERRIDE[slug]] : ['svg', 'png']
+  // Cadena de fuentes a intentar en orden: primero la URL de la BD (si hay),
+  // luego archivos estáticos. Con override usamos SOLO esa extensión (evita un
+  // 404 innecesario); si no, probamos svg y luego png.
+  const estaticas = EXT_OVERRIDE[slug] ? [EXT_OVERRIDE[slug]] : ['svg', 'png']
+  const chain: string[] = [
+    ...(logoUrl ? [logoUrl] : []),
+    ...estaticas.map((ext) => `/marcas/${slug}/logo.${ext}`),
+  ]
   const [step, setStep] = useState(0)
   const px = `${size}px`
 
@@ -48,7 +56,7 @@ export function MarcaLogo({
     )
   }
 
-  const ext = chain[step]
+  const src = chain[step]
   return (
     <span
       className={`inline-flex items-center justify-center rounded-md bg-white border border-border/70 shrink-0 overflow-hidden ${className}`}
@@ -56,8 +64,8 @@ export function MarcaLogo({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        key={ext}
-        src={`/marcas/${slug}/logo.${ext}`}
+        key={src}
+        src={src}
         alt={nombre ?? slug}
         onError={() => setStep((s) => s + 1)}
         className="w-full h-full object-contain p-[2px]"
