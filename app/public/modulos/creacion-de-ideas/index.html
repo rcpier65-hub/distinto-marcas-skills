@@ -207,6 +207,24 @@ select:focus,input.fld:focus,textarea.fld:focus{outline:none; border-color:var(-
 .bub .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
 .teaser{align-self:flex-start; max-width:84%; background:var(--accent-soft); border:1px solid var(--line); border-radius:14px; padding:12px 15px; font-size:14px; line-height:1.55}
 .chatcomposer{margin-top:14px}
+/* ===== Mi Libreta · lienzo arrastrable (tipo Miro/Freeform) ===== */
+.lib-hint{color:var(--faint); font-size:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:2px 0 8px}
+.lib-canvas{position:relative; height:min(64vh,620px); margin:4px 0; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--bg2); background-image:radial-gradient(var(--line) 1.3px, transparent 1.3px); background-size:26px 26px; touch-action:none; cursor:grab; user-select:none}
+.lib-canvas.grabbing{cursor:grabbing}
+.lib-world{position:absolute; inset:0; will-change:transform}
+.lib-note{position:absolute; width:210px; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column}
+.lib-note-head{display:flex; align-items:center; gap:6px; padding:8px; cursor:grab; border-bottom:1px solid var(--line); background:var(--surface2)}
+.lib-note-head:active{cursor:grabbing}
+.lib-note .tag{font-size:11px}
+.lib-x{margin-left:auto; border:none; background:transparent; color:var(--faint); font-size:18px; line-height:1; cursor:pointer; padding:0 4px}
+.lib-x:hover{color:var(--danger)}
+.lib-note-text{border:none; background:transparent; color:var(--text); font-family:inherit; font-size:13.5px; line-height:1.45; padding:10px; min-height:66px; resize:none; outline:none; width:100%}
+.lib-note-foot{display:flex; gap:6px; padding:0 8px 8px}
+.lib-note.lib-nota{border-top:3px solid var(--muted)}
+.lib-note.lib-idea{border-top:3px solid var(--gold)}
+.lib-note.lib-ref{border-top:3px solid var(--accent2)}
+.lib-note.lib-gancho{border-top:3px solid var(--accent)}
+.lib-empty{position:absolute; inset:0; display:grid; place-items:center; color:var(--muted); font-size:14px; pointer-events:none; text-align:center; padding:20px}
 </style>
 </head>
 <body>
@@ -297,7 +315,7 @@ const defaults = () => ({
   rings:{idea:0, guion:0, publicado:0},
   onboarding:{semilla:false, pilar:false, guion:false, teleprompter:false, agenda:false},
   ideas:[], scripts:[], captures:[], calendar:{}, voices:[], activeVoice:null,
-  libreta:{marca:'',oferta:'',avatar:'',notas:'',cards:[],_tipo:'nota'}, series:[],
+  libreta:{marca:'',oferta:'',avatar:'',notas:'',cards:[],_tipo:'nota',pan:{x:0,y:0}}, series:[],
   prefs:{niche:'marketing', platform:'TikTok', goal:'Que me sigan'},
 });
 let S = load();
@@ -664,10 +682,18 @@ const screens = {
         </div>
       </div>
 
-      <div class="head" style="margin-bottom:12px"><span class="eyebrow">Tus notas · ${cards.length}</span></div>
-      ${cards.length
-        ? `<div class="grid g2">${cards.map(c=>libCardHTML(c)).join('')}</div>`
-        : `<div style="color:var(--muted);margin:6px 0 4px">Aún no tienes notas. Captura arriba tu primera idea 💡</div>`}
+      <div class="lib-hint">
+        <span><b>Tus notas · ${cards.length}</b></span>
+        <span>✋ Arrastra las tarjetas para moverlas · arrastra el fondo para desplazarte</span>
+        <div class="sp"></div>
+        <button class="chip" onclick="centrarLib()">🎯 Centrar</button>
+      </div>
+      <div class="lib-canvas" id="libCanvas">
+        <div class="lib-world" id="libWorld" style="transform:translate(${(l.pan&&l.pan.x)||0}px,${(l.pan&&l.pan.y)||0}px)">
+          ${cards.map(c=>libNoteHTML(c)).join('')}
+        </div>
+        ${cards.length? '' : `<div class="lib-empty">Aún no tienes notas.<br>Captura arriba tu primera idea 💡 y aparecerá aquí para moverla.</div>`}
+      </div>
 
       <div class="card" style="margin-top:22px">
         <div class="eyebrow" style="margin-bottom:10px">🏢 Mi negocio · contexto para la IA</div>
@@ -824,20 +850,15 @@ function chatGuardarIdea(idea){ saveIdea(idea); chatThread.push({who:'bot',kind:
 function chatMultiplicar(idea){ const list=gen.multiply(idea); const html='<b>12 ángulos de: '+esc(shorten(idea))+'</b><div class="grid g2" style="margin-top:10px">'+list.map(a=>`<div class="idea-card"><span class="tag">${esc(a.angle)}</span><div style="font-weight:600">${esc(a.title)}</div><button class="btn sm" style="margin-top:auto" onclick="chatUserIdea('${jsq(a.title)}')">✦ Guion</button></div>`).join('')+'</div>'; chatThread.push({who:'bot',kind:'bot-text',html}); addXP(10); renderChat(); toast('12 ángulos ⚡ +10 XP'); }
 function dictar(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ toast('Tu navegador no soporta dictado por voz'); return; } const r=new SR(); r.lang='es-PE'; r.interimResults=false; toast('🎤 Escuchando…'); r.onresult=e=>{ const t=e.results[0][0].transcript; const inp=$('#chatInput'); if(inp) inp.value=t; toast('Listo, revisa y envía ✍️'); }; r.onerror=()=>toast('No pude escuchar 🎤'); r.start(); }
 function saveLibreta(k,v){ S.libreta[k]=v; save(); }
-/* ---- Mi Libreta: tarjetas ---- */
+/* ---- Mi Libreta: lienzo arrastrable (tipo Miro/Freeform) ---- */
 const LIB_TIPO_LABEL={nota:'📝 Nota',idea:'💡 Idea',ref:'🔗 Referencia',gancho:'🎣 Gancho'};
-function libCardHTML(c){
+function libNoteHTML(c){
   const isLink=/^https?:\/\//i.test((c.text||'').trim());
-  return `<div class="idea-card">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span class="tag">${LIB_TIPO_LABEL[c.type]||'📝 Nota'}</span>
-      <button class="btn sm" style="margin-left:auto;padding:2px 8px" title="Eliminar" onclick="delLibCard('${c.id}')">🗑</button>
-    </div>
-    <textarea class="fld" style="width:100%;min-height:64px;border:none;background:transparent;padding:0;resize:vertical" oninput="editLibCard('${c.id}',this.value)">${esc(c.text)}</textarea>
-    <div class="row" style="margin-top:8px;gap:8px">
-      <button class="btn sm accent" onclick="libToCrear('${c.id}')">✦ Hacer guion</button>
-      ${isLink?`<a class="btn sm" href="${esc(c.text.trim())}" target="_blank" rel="noopener">🔗 Abrir</a>`:''}
-    </div>
+  const x=(typeof c.x==='number')?c.x:20, y=(typeof c.y==='number')?c.y:20;
+  return `<div class="lib-note lib-${c.type||'nota'}" data-id="${c.id}" style="left:${x}px;top:${y}px">
+    <div class="lib-note-head" data-drag><span class="tag">${LIB_TIPO_LABEL[c.type]||'📝 Nota'}</span><button class="lib-x" title="Eliminar" onclick="delLibCard('${c.id}')">×</button></div>
+    <textarea class="lib-note-text" oninput="editLibCard('${c.id}',this.value)" placeholder="Escribe…">${esc(c.text)}</textarea>
+    <div class="lib-note-foot"><button class="btn sm accent" onclick="libToCrear('${c.id}')">✦ Guion</button>${isLink?`<a class="btn sm" href="${esc(c.text.trim())}" target="_blank" rel="noopener">🔗</a>`:''}</div>
   </div>`;
 }
 function setLibTipo(t){ S.libreta._tipo=t; render(); }
@@ -845,12 +866,47 @@ function addLibCard(){
   const el=document.getElementById('libInput'); const v=((el&&el.value)||'').trim();
   if(!v){ toast('Escribe algo primero'); return; }
   if(!Array.isArray(S.libreta.cards)) S.libreta.cards=[];
-  S.libreta.cards.unshift({ id:uid(), type:S.libreta._tipo||'nota', text:v, at:Date.now() });
+  const p=S.libreta.pan||{x:0,y:0}; const n=S.libreta.cards.length;
+  const x=-p.x + 40 + (n%6)*28, y=-p.y + 40 + (n%6)*28;
+  S.libreta.cards.unshift({ id:uid(), type:S.libreta._tipo||'nota', text:v, at:Date.now(), x, y });
   addXP(4); save(); render(); toast('Guardado en tu libreta 📒 +4 XP');
 }
 function editLibCard(id,v){ const c=(S.libreta.cards||[]).find(x=>x.id===id); if(c){ c.text=v; save(); } }
 function delLibCard(id){ S.libreta.cards=(S.libreta.cards||[]).filter(x=>x.id!==id); save(); render(); }
 function libToCrear(id){ const c=(S.libreta.cards||[]).find(x=>x.id===id); if(c) irCrear(c.text); }
+function centrarLib(){ S.libreta.pan={x:0,y:0}; save(); render(); }
+/* Arrastre de tarjetas + paneo del lienzo (mouse y touch), por delegación en
+   document → funciona aunque el módulo re-renderice todo. No llamamos render()
+   durante el arrastre: movemos el DOM directo y guardamos al soltar. */
+let _libDrag=null;
+document.addEventListener('pointerdown', function(e){
+  const canvas = e.target.closest && e.target.closest('#libCanvas'); if(!canvas) return;
+  const handle = e.target.closest && e.target.closest('[data-drag]');
+  if(handle){
+    const note=handle.closest('.lib-note'); const id=note.getAttribute('data-id');
+    const c=(S.libreta.cards||[]).find(x=>x.id===id); if(!c) return;
+    _libDrag={kind:'card', id, el:note, sx:e.clientX, sy:e.clientY, ox:(typeof c.x==='number'?c.x:20), oy:(typeof c.y==='number'?c.y:20)};
+    e.preventDefault();
+  } else if(!(e.target.closest && e.target.closest('.lib-note'))){
+    const p=S.libreta.pan||{x:0,y:0};
+    _libDrag={kind:'pan', sx:e.clientX, sy:e.clientY, ox:p.x, oy:p.y};
+    canvas.classList.add('grabbing'); e.preventDefault();
+  }
+});
+document.addEventListener('pointermove', function(e){
+  if(!_libDrag) return;
+  const dx=e.clientX-_libDrag.sx, dy=e.clientY-_libDrag.sy;
+  if(_libDrag.kind==='card'){ _libDrag.el.style.left=(_libDrag.ox+dx)+'px'; _libDrag.el.style.top=(_libDrag.oy+dy)+'px'; }
+  else { const w=document.getElementById('libWorld'); if(w) w.style.transform='translate('+(_libDrag.ox+dx)+'px,'+(_libDrag.oy+dy)+'px)'; }
+});
+document.addEventListener('pointerup', function(){
+  if(!_libDrag) return;
+  const c=document.getElementById('libCanvas'); if(c) c.classList.remove('grabbing');
+  const w=document.getElementById('libWorld');
+  if(_libDrag.kind==='card'){ const cc=(S.libreta.cards||[]).find(x=>x.id===_libDrag.id); if(cc){ cc.x=parseInt(_libDrag.el.style.left)||0; cc.y=parseInt(_libDrag.el.style.top)||0; save(); } }
+  else if(w){ const m=/translate\((-?\d+\.?\d*)px,\s*(-?\d+\.?\d*)px\)/.exec(w.style.transform||''); if(m){ S.libreta.pan={x:parseFloat(m[1]), y:parseFloat(m[2])}; save(); } }
+  _libDrag=null;
+});
 function addSerie(){ const n=prompt('Nombre de la serie (ej: "Errores de novato")'); if(!n) return; const f=prompt('Formato / cadencia (ej: "Cada lunes, 30s")')||'serie'; set(s=>s.series.unshift({id:uid(), name:n, format:f})); toast('Serie creada 📚'); }
 function delSerie(id){ set(s=>s.series=s.series.filter(x=>x.id!==id)); }
 
