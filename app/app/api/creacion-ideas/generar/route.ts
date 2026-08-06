@@ -5,7 +5,7 @@
 // acá; requireUser valida la sesión por cookie.
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/auth/get-user'
-import { getAnthropicApiKey } from '@/lib/integrations/anthropic'
+import { getOpenAIApiKey } from '@/lib/integrations/openai'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,10 +20,10 @@ const STEPS = [
 
 export async function POST(req: Request) {
   await requireUser()
-  const key = await getAnthropicApiKey()
+  const key = await getOpenAIApiKey()
   if (!key) {
     return NextResponse.json(
-      { ok: false, error: 'No hay API key de Anthropic configurada (ponla en Settings).' },
+      { ok: false, error: 'No hay API key de OpenAI configurada (ponla en Settings).' },
       { status: 400 },
     )
   }
@@ -52,26 +52,30 @@ Devuelve exactamente:
 {"steps":[{"key":"V","text":"..."},{"key":"I","text":"..."},{"key":"R","text":"..."},{"key":"A","text":"..."},{"key":"L","text":"..."}]}`
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
-        max_tokens: 1400,
-        system,
-        messages: [{ role: 'user', content: userMsg }],
+        model: 'gpt-4o-mini',
+        temperature: 0.8,
+        max_tokens: 900,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userMsg },
+        ],
       }),
+      signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) {
       const t = await res.text()
-      return NextResponse.json({ ok: false, error: `Anthropic ${res.status}: ${t.slice(0, 180)}` }, { status: 502 })
+      return NextResponse.json({ ok: false, error: `OpenAI ${res.status}: ${t.slice(0, 180)}` }, { status: 502 })
     }
     const data = await res.json()
-    const rawText: string = (data?.content?.[0]?.text ?? '').trim()
+    const rawText: string = (data?.choices?.[0]?.message?.content ?? '').trim()
     const match = rawText.match(/\{[\s\S]*\}/)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let parsed: any = null

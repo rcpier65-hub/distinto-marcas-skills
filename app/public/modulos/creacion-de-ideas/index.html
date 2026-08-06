@@ -770,14 +770,14 @@ async function chatConvertir(idea){
   readPrefs();
   const b=DATA.ideas.find(x=>x.idea===idea); const gancho=(b&&b.hook)||('¿'+cap(shorten(idea))+'? Esto te va a servir.');
   chatThread.push({who:'bot',kind:'teaser',gancho});
-  chatThread.push({who:'bot',kind:'bot-text',text:'Generando tu guion con IA (Claude)… ✍️'});
+  chatThread.push({who:'bot',kind:'bot-text',text:'Generando tu guion con IA… ✍️'});
   renderChat();
   let sc = await generarConIA(idea, gancho);
   if(!sc){ sc = gen.script(idea, gancho); }  // fallback local si la IA falla
   window._last=sc;
   // reemplaza el "Generando…" por el guion
   chatThread.pop();
-  chatThread.push({who:'bot',kind:'bot-text',text: sc.ia? '¡Listo! Guion generado con Claude ✨' : 'Te armé el guion con el framework VIRAL (modo local) ✍️'});
+  chatThread.push({who:'bot',kind:'bot-text',text: sc.ia? '¡Listo! Guion generado con IA ✨' : 'Te armé el guion con el framework VIRAL (modo local) ✍️'});
   chatThread.push({who:'bot',kind:'script',sc});
   set(s=>{ s.onboarding.guion=true; s.rings.guion=Math.min(100,s.rings.guion+34); s.xp+=15; });
   renderChat();
@@ -813,7 +813,7 @@ function render(){
   const cls = r==='inicio' ? 'shell' : (NORAIL.includes(r)?'shell no-rail':'shell full');
   const showSide = r==='inicio' || NORAIL.includes(r);
   $('#root').innerHTML = topbar(r) + `<div class="${cls}">${showSide?sidebar():''}${fn()}${withRail?rail():''}</div>` +
-    `<div class="foot">${BRAND.name} · guiones con IA (Claude) conectada a tu sistema · tus datos viven en este navegador.</div>`;
+    `<div class="foot">${BRAND.name} · guiones con IA conectada a tu sistema · tus datos viven en este navegador.</div>`;
   if(r==='crear') renderChat();
 }
 window.addEventListener('hashchange', render);
