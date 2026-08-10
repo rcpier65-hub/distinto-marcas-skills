@@ -10,9 +10,14 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Scissors, FileText, Image as ImageIcon, Rocket } from 'lucide-react'
+import { Scissors, FileText, Image as ImageIcon, Rocket, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cambiarFechaPublicacion } from '@/app/publicaciones/_actions'
+import { AgregarFechaImportante } from '@/app/publicaciones/_components/agregar-fecha-importante'
+import { eliminarFechaImportante } from '@/app/fechas-importantes/_actions'
+import { categoriaInfo } from '@/lib/fechas/categorias'
+import { RecordatorioMes, type RecordatorioItem } from '@/components/fechas/recordatorio-mes'
+import { FechaDetalleModal } from '@/components/fechas/fecha-detalle-modal'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import {
   PUBLICACIONES_MOCK,
@@ -64,15 +69,21 @@ type Filters = {
    donde estaba (vista + marca + estado + red + editor). */
 const PUBLICACIONES_VIEW_STATE_KEY = 'publicaciones-view-state-v1'
 
+export type FechaCal = { id: string; titulo: string; fecha: string; nota: string | null; categoria: string; marcaNombre: string; marcaSlug: string; color: string }
+
 type Props = {
   publicaciones?: PublicacionMock[]
   /* Lista de marcas activa (viene de la DB vía getMarcasNav() en el server).
      Cae al mock solo si el page no la pasa — así marcas nuevas creadas en
      /dashboard aparecen automáticamente en el filtro. */
   marcas?: MarcaNav[]
+  /* Fechas importantes (idea de Lorena) integradas en el calendario. */
+  fechasImportantes?: FechaCal[]
+  marcasFechas?: { id: string; nombre: string }[]
+  canManageFechas?: boolean
 }
 
-export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas = MARCAS_NAV }: Props) {
+export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas = MARCAS_NAV, fechasImportantes = [], marcasFechas = [], canManageFechas = false }: Props) {
   /* router para que el botón "Nueva publicación" navegue a
      /publicaciones/nueva. Antes el botón era fantasma (sin onClick). */
   const router = useRouter()
@@ -136,6 +147,67 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
     }
     router.push(`/publicaciones/nueva?${params.toString()}`)
   }
+
+  /* Eliminar una fecha importante desde el calendario (solo Lorena/directores). */
+  const handleDeleteFecha = canManageFechas
+    ? (id: string) => {
+        eliminarFechaImportante(id).then((r) => {
+          if (r.ok) { toast.success('Fecha eliminada'); router.refresh() } else { toast.error(r.error) }
+        })
+      }
+    : undefined
+
+  /* Popup de detalle de una fecha importante (se abre al hacer click en un chip). */
+  const [detalleFecha, setDetalleFecha] = useState<FechaCal | null>(null)
+  const abrirFecha = (id: string) => { const f = fechasImportantes.find((x) => x.id === id); if (f) setDetalleFecha(f) }
+
+  /* Fechas importantes filtradas por la marca seleccionada. En la grilla de una
+     marca (ej. DF) SOLO deben verse SUS fechas — antes se colaban las de otras
+     marcas (ej. TypHouse) y parecían repetidas. Con el filtro en "todas" se ven
+     todas. Pedro 31-jul-2026. */
+  const fechasFiltradas = useMemo(() => {
+    const base = filters.marcaSlug === 'todas'
+      ? fechasImportantes
+      : fechasImportantes.filter((f) => f.marcaSlug === filters.marcaSlug)
+    /* Colapsar repeticiones del MISMO día con el mismo nombre: un feriado no
+       debe salir varias veces (ej. "Batalla de Junín" y "Batalla de Junín
+       (feriado)"). Normalizamos ignorando mayúsculas, acentos y aclaraciones
+       entre paréntesis. Pedro 31-jul-2026. */
+    const norm = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
+    const vistos = new Set<string>()
+    const out: FechaCal[] = []
+    for (const f of base) {
+      const key = `${f.fecha}|${norm(f.titulo)}`
+      if (vistos.has(key)) continue
+      vistos.add(key)
+      out.push(f)
+    }
+    return out
+  }, [fechasImportantes, filters.marcaSlug])
+
+  /* Recordatorio del mes para la parte superior del calendario: lo que viene
+     este mes (fecha >= hoy Lima, dentro del mes actual), igual que en el inicio. */
+  const recordatorioMes = useMemo(() => {
+    const hoy = dayKey(hoyLima())
+    const mesPref = hoy.slice(0, 7)
+    const delMes = fechasFiltradas
+      .filter((f) => f.fecha >= hoy && f.fecha.slice(0, 7) === mesPref)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    const marcasSet = new Set<string>()
+    const items: RecordatorioItem[] = delMes.map((f) => {
+      marcasSet.add(f.marcaNombre)
+      const cat = categoriaInfo(f.categoria)
+      return { id: f.id, dia: Number(f.fecha.slice(8, 10)), titulo: f.titulo, marcaNombre: f.marcaNombre, categoriaLabel: cat.label, categoriaColor: cat.color }
+    })
+    const MESES_N = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    return {
+      mes: MESES_N[Number(mesPref.slice(5, 7)) - 1],
+      total: delMes.length,
+      marcas: [...marcasSet],
+      esInicioMes: Number(hoy.slice(8, 10)) <= 5,
+      items: items.slice(0, 6),
+    }
+  }, [fechasFiltradas])
 
   /* Cambiar la marca del filtro Y reflejarlo en la URL, para que el estado
      sobreviva a navegaciones (crear pub → volver) y a un refresh. */
@@ -381,6 +453,11 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
 
         <div style={{ flex: 1 }} />
 
+        {/* Agregar fecha importante — solo Lorena + directores (idea de Lorena). */}
+        {canManageFechas && (view === 'mes' || view === 'semana') && (
+          <AgregarFechaImportante marcas={marcasFechas} />
+        )}
+
         {selected.size > 0 && (
           <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-accent)', fontWeight: 500 }}>
             {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
@@ -390,6 +467,13 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
           {filtered.length} publicacion{filtered.length !== 1 ? 'es' : ''}
         </span>
       </div>
+
+      {/* Recordatorio del mes (idea de Lorena) — arriba del calendario, colapsable. */}
+      {(view === 'mes' || view === 'semana') && (
+        <div style={{ padding: '0 var(--mk-space-4, 16px)' }}>
+          <RecordatorioMes {...recordatorioMes} onItemClick={abrirFecha} verTodoHref="/fechas-importantes" />
+        </div>
+      )}
 
       {/* ============== BODY ============== */}
       <div style={{ flex: 1, overflow: 'auto' }}>
@@ -406,9 +490,18 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
             }}
           />
         )}
-        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} onCreate={handleCreateEnFecha} />}
-        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} onCreate={handleCreateEnFecha} />}
+        {view === 'mes' && <MesView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} onCreate={handleCreateEnFecha} fechas={fechasFiltradas} onOpenFecha={setDetalleFecha} />}
+        {view === 'semana' && <SemanaView entries={filtered} isMobile={isMobile} onMoveDate={handleMoveDate} onCreate={handleCreateEnFecha} fechas={fechasFiltradas} onOpenFecha={setDetalleFecha} />}
       </div>
+
+      {/* Popup de detalle de una fecha importante */}
+      {detalleFecha && (
+        <FechaDetalleModal
+          fecha={{ id: detalleFecha.id, titulo: detalleFecha.titulo, fecha: detalleFecha.fecha, nota: detalleFecha.nota, categoria: detalleFecha.categoria, marcaNombre: detalleFecha.marcaNombre, marcaColor: detalleFecha.color }}
+          onClose={() => setDetalleFecha(null)}
+          onDelete={handleDeleteFecha}
+        />
+      )}
     </div>
    </MarcasNavContext.Provider>
   )
@@ -881,13 +974,96 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
    MES VIEW — grid mensual mejorado, todas las pubs clickeables
    ============================================================ */
 
-function MesView({ entries, isMobile = false, onMoveDate, onCreate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void; onCreate?: (fecha: string) => void }) {
+/* Chip de FECHA IMPORTANTE (idea de Lorena) — estilo tipo Mac Calendar: pastilla
+   con el color de la CATEGORÍA (tipo de actividad: grabación, cena, evento…) y
+   una ESTRELLITA del mismo color (Pedro la prefiere así). Un clic abre el popup
+   con toda la info de la fecha. */
+function FechaChip({ f, onOpen }: { f: FechaCal; onOpen: (f: FechaCal) => void }) {
+  const cat = categoriaInfo(f.categoria)
+  return (
+    <span
+      role="button"
+      onClick={(e) => { e.stopPropagation(); onOpen(f) }}
+      title={`${f.marcaNombre} · ${cat.label}: ${f.titulo}${f.nota ? ' — ' + f.nota : ''}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4, width: '100%',
+        padding: '2px 6px', borderRadius: 'var(--mk-radius-sm)', marginBottom: 2,
+        background: `${cat.color}22`, color: cat.color, fontSize: 11, fontWeight: 700,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        cursor: 'pointer',
+      }}>
+      <Star size={11} color={cat.color} fill={cat.color} style={{ flexShrink: 0 }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.titulo}</span>
+    </span>
+  )
+}
+
+/* Popup del DÍA — cuando una celda tiene muchas fechas importantes (+ videos)
+   se apelotonan; en la celda mostramos solo 2 y un "+N" que abre esto: la lista
+   completa de fechas importantes y videos de ese día, ordenada y clickeable.
+   Pedro 24-jul-2026. */
+function DiaDetalleModal({ fecha, fechas, pubs, onClose, onOpenFecha }: {
+  fecha: string; fechas: FechaCal[]; pubs: PublicacionMock[]; onClose: () => void; onOpenFecha: (f: FechaCal) => void
+}) {
+  const [y, mo, d] = fecha.split('-').map(Number)
+  const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+  const label = `${DIAS[new Date(y, mo - 1, d).getDay()]} ${d} de ${MONTH_NAMES[mo - 1].toLowerCase()}`
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: 'rgba(15,23,42,0.5)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-card w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-[16px] font-extrabold capitalize">{label}</div>
+          <button onClick={onClose} aria-label="Cerrar" className="w-8 h-8 rounded-lg inline-flex items-center justify-center hover:bg-muted"><X className="w-4 h-4" /></button>
+        </div>
+
+        {fechas.length > 0 && (
+          <div className="mb-4">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Fechas importantes · {fechas.length}</div>
+            <div className="space-y-1.5">
+              {fechas.map((f) => {
+                const cat = categoriaInfo(f.categoria)
+                return (
+                  <button key={f.id} onClick={() => { onClose(); onOpenFecha(f) }}
+                    className="w-full text-left flex items-center gap-2.5 rounded-lg border p-2.5 hover:shadow-sm transition-shadow" style={{ borderLeft: `4px solid ${cat.color}` }}>
+                    <Star size={14} color={cat.color} fill={cat.color} style={{ flexShrink: 0 }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold truncate">{f.titulo}</div>
+                      <div className="text-[11.5px] text-muted-foreground truncate">{cat.label} · {f.marcaNombre}</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {pubs.length > 0 && (
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Publicaciones · {pubs.length}</div>
+            <div className="flex flex-col gap-1.5">
+              {pubs.map((p) => <PubChip key={p.id} pub={p} variant="full" />)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MesView({ entries, isMobile = false, onMoveDate, onCreate, fechas = [], onOpenFecha }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void; onCreate?: (fecha: string) => void; fechas?: FechaCal[]; onOpenFecha: (f: FechaCal) => void }) {
   const today = hoyLima()
+  const fechasPorDia = useMemo(() => {
+    const m = new Map<string, FechaCal[]>()
+    for (const f of fechas) { const a = m.get(f.fecha) ?? []; a.push(f); m.set(f.fecha, a) }
+    return m
+  }, [fechas])
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   /* Día sobre el que se está arrastrando un video (para resaltar el destino). */
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   /* Día sobre el que está el mouse (para mostrar el botón "+" de crear). */
   const [hoverKey, setHoverKey] = useState<string | null>(null)
+  /* Día con su popup abierto (cuando hay muchas fechas importantes). */
+  const [diaAbierto, setDiaAbierto] = useState<string | null>(null)
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const firstOfMonth = new Date(year, month, 1)
@@ -1068,12 +1244,40 @@ function MesView({ entries, isMobile = false, onMoveDate, onCreate }: { entries:
                   scrollbarWidth: 'thin',
                 }}
               >
+                {(() => {
+                  const df = fechasPorDia.get(k) ?? []
+                  const MAX = 2
+                  return (
+                    <>
+                      {df.slice(0, MAX).map((f) => <FechaChip key={f.id} f={f} onOpen={onOpenFecha} />)}
+                      {df.length > MAX && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDiaAbierto(k) }}
+                          title="Ver todas las fechas importantes de este día"
+                          style={{ alignSelf: 'flex-start', border: 'none', background: 'rgba(0,0,0,0.05)', color: 'var(--mk-text-secondary)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--mk-radius-sm)', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          +{df.length - MAX} fecha{df.length - MAX === 1 ? '' : 's'} más
+                        </button>
+                      )}
+                    </>
+                  )
+                })()}
                 {pubs.map((p) => <PubChip key={p.id} pub={p} variant="compact" canDrag={!!onMoveDate && !isMobile} />)}
               </div>
             </div>
           )
         })}
       </div>
+
+      {diaAbierto && (
+        <DiaDetalleModal
+          fecha={diaAbierto}
+          fechas={fechasPorDia.get(diaAbierto) ?? []}
+          pubs={byDay.get(diaAbierto) ?? []}
+          onClose={() => setDiaAbierto(null)}
+          onOpenFecha={onOpenFecha}
+        />
+      )}
        </div>
       </div>
     </div>
@@ -1084,7 +1288,9 @@ function MesView({ entries, isMobile = false, onMoveDate, onCreate }: { entries:
    SEMANA VIEW — 7 columnas con detalle completo por publicación
    ============================================================ */
 
-function SemanaView({ entries, isMobile = false, onMoveDate, onCreate }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void; onCreate?: (fecha: string) => void }) {
+function SemanaView({ entries, isMobile = false, onMoveDate, onCreate, fechas = [], onOpenFecha }: { entries: PublicacionMock[]; isMobile?: boolean; onMoveDate?: (id: string, fecha: string) => void; onCreate?: (fecha: string) => void; fechas?: FechaCal[]; onOpenFecha: (f: FechaCal) => void }) {
+  const fechasPorDiaSem = new Map<string, FechaCal[]>()
+  for (const f of fechas) { const a = fechasPorDiaSem.get(f.fecha) ?? []; a.push(f); fechasPorDiaSem.set(f.fecha, a) }
   const today = hoyLima()
   /* Día sobre el que se arrastra un video (resaltar destino). */
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
@@ -1095,6 +1301,8 @@ function SemanaView({ entries, isMobile = false, onMoveDate, onCreate }: { entri
     return r
   }
   const [cursor, setCursor] = useState(() => startOfWeek(today))
+  /* Día con su popup abierto (muchas fechas importantes). */
+  const [diaAbierto, setDiaAbierto] = useState<string | null>(null)
 
   const days: Date[] = []
   for (let i = 0; i < 7; i++) {
@@ -1260,6 +1468,24 @@ function SemanaView({ entries, isMobile = false, onMoveDate, onCreate }: { entri
 
               {/* Pubs (column scroll) */}
               <div style={{ flex: 1, padding: '8px 6px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {(() => {
+                  const df = fechasPorDiaSem.get(k) ?? []
+                  const MAX = 3
+                  return (
+                    <>
+                      {df.slice(0, MAX).map((f) => <FechaChip key={f.id} f={f} onOpen={onOpenFecha} />)}
+                      {df.length > MAX && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDiaAbierto(k) }}
+                          title="Ver todas las fechas importantes de este día"
+                          style={{ alignSelf: 'flex-start', border: 'none', background: 'rgba(0,0,0,0.05)', color: 'var(--mk-text-secondary)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--mk-radius-sm)', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          +{df.length - MAX} fecha{df.length - MAX === 1 ? '' : 's'} más
+                        </button>
+                      )}
+                    </>
+                  )
+                })()}
                 {pubs.length === 0 ? (
                   onCreate ? (
                     <button
@@ -1291,6 +1517,16 @@ function SemanaView({ entries, isMobile = false, onMoveDate, onCreate }: { entri
           )
         })}
       </div>
+
+      {diaAbierto && (
+        <DiaDetalleModal
+          fecha={diaAbierto}
+          fechas={fechasPorDiaSem.get(diaAbierto) ?? []}
+          pubs={byDay.get(diaAbierto) ?? []}
+          onClose={() => setDiaAbierto(null)}
+          onOpenFecha={onOpenFecha}
+        />
+      )}
     </div>
   )
 }

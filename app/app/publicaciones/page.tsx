@@ -158,22 +158,47 @@ export default async function PublicacionesPage() {
   /* Route guard: si el user no tiene permiso publicaciones, redirige
      a su landing. Antes era accesible por URL directa aunque el
      sidebar lo escondiera. */
-  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
+  const { ensureAccesoModulo, getCurrentMemberPermisos } = await import('@/lib/team/permisos-helper')
   await ensureAccesoModulo('publicaciones')
 
-  /* Cargamos pubs y marcas en paralelo. `marcas` viene de la tabla `marcas`
-     de Supabase (vía getMarcasNav), así cualquier marca creada en
-     /dashboard aparece en el filtro de la cabecera sin tocar el mock. */
-  const [pubs, marcas] = await Promise.all([
+  /* Fechas importantes (idea de Lorena): se muestran integradas en el
+     calendario. Agregarlas: solo Lorena + directores. Ver [fechas-importantes]. */
+  const { createServiceClient } = await import('@/lib/supabase/service')
+  const { colorDeMarca } = await import('@/lib/marcas/branding')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const p = await getCurrentMemberPermisos()
+  const canManageFechas = !p || p.member.rol_base === 'director' || p.member.nombre === 'LORENA'
+
+  const [pubs, marcas, marcasFullRes, fechasRes] = await Promise.all([
     fetchFromSupabase().then((d) => d ?? PUBLICACIONES_MOCK),
     getMarcasNav(),
+    service.from('marcas').select('id, slug, nombre, color_primario_hex').eq('activa', true).order('nombre'),
+    service.from('fechas_importantes').select('id, marca_id, titulo, fecha, nota, categoria'),
   ])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcaInfo = new Map<string, { nombre: string; slug: string; color: string }>(((marcasFullRes?.data ?? []) as any[]).map((m) => [m.id, { nombre: m.nombre as string, slug: m.slug as string, color: colorDeMarca(m.slug, m.color_primario_hex) }]))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fechasImportantes = ((fechasRes?.data ?? []) as any[]).map((f) => {
+    const mi = marcaInfo.get(f.marca_id)
+    return { id: f.id as string, titulo: f.titulo as string, fecha: (typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : f.fecha) as string, nota: (f.nota ?? null) as string | null, categoria: (f.categoria ?? 'otro') as string, marcaNombre: mi?.nombre ?? 'Marca', marcaSlug: mi?.slug ?? 'unknown', color: mi?.color ?? '#7170ff' }
+  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcasFechas = ((marcasFullRes?.data ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+
   return (
     <>
       <div className="flex items-center justify-end gap-3 px-6 pt-4">
         <SyncNotionButton />
       </div>
-      <PublicacionesView publicaciones={pubs} marcas={marcas} />
+      <PublicacionesView
+        publicaciones={pubs}
+        marcas={marcas}
+        fechasImportantes={fechasImportantes}
+        marcasFechas={marcasFechas}
+        canManageFechas={canManageFechas}
+      />
     </>
   )
 }
