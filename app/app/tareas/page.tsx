@@ -10,6 +10,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { TAREA_SELECT, rowToTarea } from '@/lib/tareas/serialize'
 import type { Tarea } from '@/lib/tareas/types'
 import { TareasView } from './_components/tareas-view'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,5 +65,14 @@ export default async function TareasPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
 
-  return <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esOwner} meId={meId} equipo={equipo} />
+  return (
+    <>
+      {/* El tablero se actualiza solo cuando alguien crea/completa/mueve/borra
+          una tarea. Primario: Realtime (useRealtimeRefresh, tabla 'tareas').
+          Este AutoRefresh es RED DE SEGURIDAD por si el WebSocket se cae (celular
+          en segundo plano, red inestable). Pedro 06-ago-2026. */}
+      <AutoRefresh intervalMs={15000} />
+      <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esOwner} meId={meId} equipo={equipo} />
+    </>
+  )
 }

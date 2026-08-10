@@ -41,6 +41,12 @@ const TABLAS_REACTIVAS = [
   'habitos_completados',
   'team_members',
   'marcas',
+  // Tareas y pendientes: el tablero de Tareas y las notas rápidas se actualizan
+  // solos cuando alguien crea/completa/mueve/borra — sin recargar. Antes
+  // faltaban acá y por eso el tablero de tareas no se refrescaba solo (Lorena
+  // veía una tarea vieja que ya se había cerrado). Pedro 06-ago-2026.
+  'tareas',
+  'pendientes_rapidos',
 ]
 
 /* Tiempo de espera para agrupar eventos consecutivos.
