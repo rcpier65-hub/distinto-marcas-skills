@@ -411,7 +411,11 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
      paralelo. marcasNav viene de la tabla `marcas` (Supabase) → cualquier
      marca creada en /dashboard aparece automáticamente en cards y
      dropdowns del cockpit, sin tocar el mock estático. */
-  const [cockpitDataRaw, marcasNav, reporteDelDia] = await Promise.all([
+  /* TODO en paralelo: cockpit, marcas, reporte del día Y el trabajo del equipo.
+     Antes getTrabajoEquipo (~12 consultas) corría EN SERIE después de este
+     bloque → para el director sumaba una ronda extra de espera al abrir. Ahora
+     va dentro del mismo Promise.all. Pedro 06-ago-2026 ("tarda demasiado"). */
+  const [cockpitDataRaw, marcasNav, reporteDelDia, trabajoEquipo] = await Promise.all([
     verCockpit
       ? loadCockpitData(service, {
           nombreUsuario: nombreCapitalizado,
@@ -436,17 +440,14 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       console.error('[inicio] loadReporteDelDia falló — sigo con null:', e)
       return null
     }),
+    /* Trabajo del equipo — solo para el CEO. */
+    esCEO
+      ? getTrabajoEquipo(service).catch((e) => {
+          console.error('[inicio] getTrabajoEquipo falló — sigo con null:', e)
+          return null
+        })
+      : Promise.resolve(null),
   ])
-
-  /* Trabajo del equipo — solo para el CEO. Para él además ocultamos el
-     panel celeste "Grabaciones próximas" del cockpit (Pedro: en su inicio
-     prefiere ver el trabajo de Lorena/Ailyn/Pieer). */
-  const trabajoEquipo = esCEO
-    ? await getTrabajoEquipo(service).catch((e) => {
-        console.error('[inicio] getTrabajoEquipo falló — sigo con null:', e)
-        return null
-      })
-    : null
   const cockpitData = cockpitDataRaw
     ? { ...cockpitDataRaw, marcasNav, ocultarGrabacionesProximas: esCEO }
     : null

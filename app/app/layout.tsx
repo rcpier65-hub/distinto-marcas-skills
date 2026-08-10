@@ -74,28 +74,22 @@ export default async function RootLayout({
   // sidebar y el command palette muestren SIEMPRE las marcas reales — incluidas
   // las que se crean desde el Dashboard. Defensivo: el helper ya cae a la lista
   // fija si la base falla.
-  const [marcas, permisos, cliente] = await Promise.all([
+  /* Cargamos TODO lo del shell EN PARALELO. Antes las notificaciones y el email
+     del usuario iban EN SERIE después de este Promise.all → sumaban tiempo en
+     blanco al abrir la app. Ahora el layout tarda lo de la consulta más lenta,
+     no la suma. Pedro 06-ago-2026 ("tarda demasiado en aparecer"). */
+  const [marcas, permisos, cliente, notificaciones, user] = await Promise.all([
     getMarcasNav(),
     getCurrentMemberPermisos(),
     getClienteActual(),
+    getNotificaciones().catch(() => [] as Notificacion[]),
+    (async () => {
+      try { const { getUser } = await import('@/lib/auth/get-user'); return await getUser() }
+      catch { return null }
+    })(),
   ])
-
-  /* Notificaciones urgentes para la campanita del shell (best-effort). */
-  let notificaciones: Notificacion[] = []
-  try { notificaciones = await getNotificaciones() } catch { /* no rompemos el layout */ }
-
-  /* Email del usuario logueado para mostrar en el sidebar — sirve como
-     "indicador de sesión activa" para que Pedro pueda confirmar
-     fácilmente si está como admin o como Lorena/etc. */
-  let emailActivo: string | null = null
-  try {
-    const { getUser } = await import('@/lib/auth/get-user')
-    const user = await getUser()
-    emailActivo = user?.email ?? null
-  } catch {
-    /* ignore — usuario no logueado no debería renderizar layout pero
-       por si acaso, no rompemos */
-  }
+  /* Email del usuario logueado — indicador de sesión activa en el sidebar. */
+  const emailActivo: string | null = user?.email ?? null
 
   /* Reducimos los permisos a un objeto simple serializable para pasarlo
      al client component AppShell. Si no hay miembro asociado (admin/
