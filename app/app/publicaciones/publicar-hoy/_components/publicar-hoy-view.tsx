@@ -179,7 +179,7 @@ export function PublicarHoyView({ items, fecha, fechaLabel, hoy, resumen, histor
       ) : (
         <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', alignItems: 'start' }}>
           {grid.map((it) => (
-            <PiezaCard key={it.id} item={it} publicada={esPublicada(it)} onConfirm={() => onConfirm(it.id)} onUndo={() => onUndo(it.id)} />
+            <PiezaCard key={it.id} item={it} fecha={fecha} publicada={esPublicada(it)} onConfirm={() => onConfirm(it.id)} onUndo={() => onUndo(it.id)} />
           ))}
         </div>
       )}
@@ -189,8 +189,8 @@ export function PublicarHoyView({ items, fecha, fechaLabel, hoy, resumen, histor
   )
 }
 
-function PiezaCard({ item, publicada, onConfirm, onUndo }: {
-  item: PublicarHoyItem; publicada: boolean; onConfirm: () => void; onUndo: () => void
+function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
+  item: PublicarHoyItem; fecha: string; publicada: boolean; onConfirm: () => void; onUndo: () => void
 }) {
   const [copiado, setCopiado] = useState(false)
   const videoCM = urlOk(item.videoConMusica)
@@ -210,7 +210,7 @@ function PiezaCard({ item, publicada, onConfirm, onUndo }: {
   return (
     <section className="rounded-2xl bg-card ring-1 ring-black/[0.06] shadow-sm overflow-hidden flex flex-col" style={{ borderLeft: `4px solid ${item.marcaColor}`, opacity: publicada ? 0.92 : 1 }}>
       <a
-        href={`/publicaciones/${item.id}?volver=${encodeURIComponent('/publicaciones/publicar-hoy')}`}
+        href={`/publicaciones/${item.id}?volver=${encodeURIComponent('/publicaciones/publicar-hoy?fecha=' + fecha)}`}
         className="flex items-center gap-3 p-4 pb-3 border-b border-border/60 hover:bg-muted/40 transition-colors group"
         title="Abrir la publicación completa"
       >
