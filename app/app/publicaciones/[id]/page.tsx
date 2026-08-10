@@ -7,6 +7,8 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { MarcaLogo } from '@/components/marca-logo'
 import { PublicacionDetailForm } from './_components/publicacion-detail-form'
+import { FechasMarcaBanner, type FechaMarca } from './_components/fechas-marca-banner'
+import { colorDeMarca } from '@/lib/marcas/branding'
 import { promptSeedPorSlug } from '@/lib/copys/seeds'
 import type { PublicacionRow, EditorRow, EscenaRow } from '@/lib/types/database'
 
@@ -52,6 +54,27 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
 
   const marca = Array.isArray(pub.marca) ? pub.marca[0] : pub.marca
 
+  /* Fechas importantes de la marca (idea de Lorena): el editor las ve mientras
+     edita el video. Solo las próximas (>= hoy en Lima), ordenadas, máx 6. */
+  let fechasMarca: FechaMarca[] = []
+  if (marca?.id) {
+    const hoyLima = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+    const { data: fData } = await service
+      .from('fechas_importantes')
+      .select('id, titulo, fecha, nota, categoria')
+      .eq('marca_id', marca.id)
+      .gte('fecha', hoyLima)
+      .order('fecha', { ascending: true })
+      .limit(6)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fechasMarca = ((fData ?? []) as any[]).map((f) => ({
+      id: f.id, titulo: f.titulo,
+      fecha: typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : f.fecha,
+      nota: f.nota ?? null, categoria: f.categoria ?? 'otro',
+    }))
+  }
+  const marcaColor = colorDeMarca(marca?.slug ?? null, marca?.color_primario_hex ?? null)
+
   /* Prompt de copy de la marca: lo guardado en tono_voz.prompt_copy, o el seed
      por defecto del slug (Manrique) si aún no se guardó. Se lo pasamos al form
      para mostrarlo/editarlo junto a "Generar con IA". */
@@ -80,6 +103,10 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
         )}
         <span className="text-foreground font-medium truncate max-w-[260px]">{pub.nombre}</span>
       </nav>
+
+      {marca && (
+        <FechasMarcaBanner fechas={fechasMarca} marcaNombre={marca.nombre} marcaColor={marcaColor} />
+      )}
 
       <PublicacionDetailForm
         publicacion={pub as PublicacionRow}

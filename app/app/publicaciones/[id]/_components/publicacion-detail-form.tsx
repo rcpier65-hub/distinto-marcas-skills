@@ -12,11 +12,11 @@ import { toast } from 'sonner'
 import {
   Globe, MessageCircle, Pin,
   Target, ImageIcon, Music2, FolderOpen, Smile, Film,
-  CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2,
+  CalendarDays, Scissors, User as UserIcon, Palette, FileText, CheckCircle2, Clock, Send,
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
   Download, Video as VideoIcon, Check, Pencil, ChevronDown,
   Volume2, VolumeX, Maximize2, X, Table2, Type as TypeIcon,
-  Link as LinkIcon, Mic, SlidersHorizontal,
+  Link as LinkIcon, Mic, SlidersHorizontal, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -200,6 +200,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
   // 'sin' = video sin música (track limpio). Default: 'con' si hay con
   // música; si no, 'sin'.
   const [videoAudioMode, setVideoAudioMode] = useState<'con' | 'sin'>('con')
+  // Carrusel: imágenes de la carpeta de Drive para posts tipo CARRUSEL.
+  // Pedro 25-jul-2026: preview navegable con flechitas de las imágenes del carrusel.
+  const [carruselImgs, setCarruselImgs] = useState<{ id: string; name: string }[] | null>(null)
+  const [carruselIdx, setCarruselIdx] = useState(0)
+  const [carruselEstado, setCarruselEstado] = useState<'idle' | 'cargando' | 'listo' | 'sin_token' | 'vacio' | 'error'>('idle')
   // Modal del guion completo. Pedro pidió que "Ver guion completo"
   // abra un popup centrado en lugar de expandir el textarea inline
   // (que empujaba la página hacia abajo).
@@ -307,6 +312,14 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
   const aprobadoCliente = (initial as unknown as { aprobado_cliente_at?: string | null }).aprobado_cliente_at != null
   const [avisando, startAvisar] = useTransition()
   function avisarCliente() {
+    /* Además de la notificación push, abrimos WhatsApp con el caption listo para
+       que Pedro elija a quién enviarlo (persona o grupo). Se abre de una vez,
+       dentro del gesto del clic, para que el navegador no lo bloquee como pop-up;
+       el push se manda en paralelo. Solo si ya hay algún link (si no, el texto
+       saldría con los marcadores "(pega el link…)"). Pedro 27-jul-2026. */
+    if (linkTiktok.trim() || linkInstagram.trim()) {
+      window.open(`https://wa.me/?text=${encodeURIComponent(captionWhatsApp)}`, '_blank', 'noopener,noreferrer')
+    }
     startAvisar(async () => {
       const r = await avisarClientePublicado(initial.id, { linkTiktok, linkInstagram })
       if (r.ok) { setYaPublicado(true); toast.success('📲 Cliente avisado — se le notificó que su video ya está publicado'); router.refresh() }
@@ -624,6 +637,30 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     : driveFolderId ? 'drive'
     : 'empty'
 
+  /* CARRUSEL: si el tipo es "carrusel" y hay una carpeta de Drive (en Diseño o
+     Tomas), el preview muestra las imágenes con flechitas. Pedro 25-jul-2026. */
+  const esCarrusel = (form.tipo_contenido ?? []).some((t) => String(t).toLowerCase().includes('carrusel'))
+  const carruselFolderId = esCarrusel
+    ? (extractDriveFolderId(form.drive_resultado_url || '') || extractDriveFolderId(form.enlace_tomas || ''))
+    : null
+
+  useEffect(() => {
+    if (!carruselFolderId) { setCarruselImgs(null); setCarruselEstado('idle'); return }
+    let cancel = false
+    setCarruselEstado('cargando'); setCarruselIdx(0)
+    fetch(`/api/publicaciones/drive-images?folder=${encodeURIComponent(carruselFolderId)}`)
+      .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }))
+      .then(({ status, body }) => {
+        if (cancel) return
+        if (status === 409 || body?.codigo === 'sin_token') { setCarruselImgs(null); setCarruselEstado('sin_token'); return }
+        if (!body?.ok) { setCarruselImgs(null); setCarruselEstado('error'); return }
+        const imgs = (body.images ?? []) as { id: string; name: string }[]
+        setCarruselImgs(imgs); setCarruselEstado(imgs.length ? 'listo' : 'vacio')
+      })
+      .catch(() => { if (!cancel) { setCarruselImgs(null); setCarruselEstado('error') } })
+    return () => { cancel = true }
+  }, [carruselFolderId])
+
   return (
     /* Root wrapper. Antes el HEADER (chips marca/estado + título + tabs
        plataformas + Duplicar/Eliminar) estaba FUERA del grid en su
@@ -634,19 +671,27 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
        bar quedan FUERA del grid (hermanos), por eso necesitamos un
        wrapper pb-20 que envuelva todo. */
     <div className="pb-20">
-      {/* Banner flotante arriba a la derecha: aprobado por el cliente (pulsa,
-          recuerda subir el video) → al publicar cambia a "Video publicado". */}
-      {yaPublicado ? (
-        <div className="fixed z-50 inline-flex items-center gap-1.5 px-4 h-11 rounded-full text-white font-bold text-[13px]"
-          style={{ top: 72, right: 20, background: 'linear-gradient(135deg,#0d9488,#14b8a6)', boxShadow: '0 8px 24px -8px rgba(20,184,166,0.75)' }}>
-          ✅ Video publicado
+      {/* Aviso flotante fijo ARRIBA A LA DERECHA — bien visible y prominente.
+          Si el cliente aprobó pero falta subir el video → banner GRANDE que
+          vibra y hace zoom en loop (persistente) para que el editor lo anote.
+          Al publicar → banner de confirmación (el video ya está, no estorba).
+          Pedro 15-jul-2026. */}
+      {(yaPublicado || aprobadoCliente) && (
+        <div className="pointer-events-none fixed z-40 left-0 right-0 bottom-[76px] flex justify-center px-3 lg:left-auto lg:right-4 lg:bottom-auto lg:top-[70px] lg:px-0 lg:justify-end">
+          {yaPublicado ? (
+            <div className="pointer-events-auto inline-flex items-center gap-2 px-5 h-12 rounded-full text-white font-extrabold text-[15px]"
+              style={{ background: 'linear-gradient(135deg,#0d9488,#14b8a6)', boxShadow: '0 12px 32px -8px rgba(20,184,166,0.85)' }}>
+              <span className="text-[20px] leading-none">✅</span> Video publicado
+            </div>
+          ) : (
+            <div className="animar-avisar-subir pointer-events-auto max-w-full inline-flex items-center gap-2.5 px-5 py-3.5 rounded-2xl text-white font-extrabold text-[15px] sm:text-[16px] leading-tight"
+              style={{ background: 'linear-gradient(135deg,#15803d,#22c55e)' }}>
+              <span className="text-[26px] leading-none shrink-0">🎬</span>
+              <span>¡El cliente aprobó! <span className="underline decoration-2 underline-offset-2">Sube el video</span> ⬆️</span>
+            </div>
+          )}
         </div>
-      ) : aprobadoCliente ? (
-        <div className="fixed z-50 inline-flex items-center gap-1.5 px-4 h-11 rounded-full text-white font-bold text-[13px] animate-pulse"
-          style={{ top: 72, right: 20, background: 'linear-gradient(135deg,#16a34a,#22c55e)', boxShadow: '0 8px 28px -6px rgba(22,163,74,0.9)' }}>
-          🎉 ¡El cliente aprobó! Sube el video
-        </div>
-      ) : null}
+      )}
       <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
       {/* COLUMNA IZQUIERDA — HEADER + Card del copy + resto */}
       <div className="space-y-4 min-w-0">
@@ -813,11 +858,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                 Pedro pidió tener WORKFLOW y PROPIEDADES en el mismo
                 bloque vertical al costado del copy, para no scrollear
                 buscando estado/editor/fechas mientras edita el texto.
-                En mobile va full-width arriba. En CELULAR angosto (<640px) se
-                apila en 1 columna para que se lea bien; desde tablet (≥640px) el
-                workflow y las propiedades se reparten en 2 columnas para no
-                ocupar tanto alto. Fix responsive Pedro 06-ago-2026. */}
-            <aside className="w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-muted/30 p-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 lg:block lg:space-y-4">
+                En mobile va full-width arriba, en UNA sola columna para que cada
+                dropdown/fecha/botón use todo el ancho y se lea bien (antes iban
+                en 2 columnas y se veía apretado/distorsionado — fix Pedro 15-jul). */}
+            <aside className="w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-muted/30 p-4 lg:p-3 flex flex-col gap-5 lg:gap-0 lg:block lg:space-y-4">
               {/* Workflow checklist */}
               <div className="space-y-2">
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -988,20 +1032,68 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                     portal. */}
                 <div className="space-y-2 pt-3 border-t">
                   <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
-                    📲 Video publicado (para el cliente)
+                    📲 Aprobación y publicación
                   </label>
-                  <input value={linkTiktok} onChange={(e) => setLinkTiktok(e.target.value)} placeholder="🎵 Link de TikTok"
-                    className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30" />
-                  <input value={linkInstagram} onChange={(e) => setLinkInstagram(e.target.value)} placeholder="📸 Link de Instagram"
-                    className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30" />
-                  <button type="button" onClick={avisarCliente} disabled={avisando}
-                    className="w-full h-10 rounded-lg text-white font-semibold text-[12px] inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
-                    style={{ background: yaPublicado ? '#14b8a6' : 'linear-gradient(135deg, #16a34a, #22c55e)', boxShadow: '0 4px 12px -4px rgba(22,163,74,0.6)' }}
-                    title="Marca la publicación como publicada y avisa al cliente por notificación push">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    {avisando ? 'Avisando…' : yaPublicado ? '✓ Cliente avisado · reenviar' : 'Video ya subido — avisar al cliente'}
-                  </button>
-                  <p className="text-[10.5px] text-muted-foreground leading-tight">Le llega una notificación al celular del cliente y verá estos links en su portal.</p>
+
+                  {/* Links del post — solo cuando el cliente ya aprobó (o ya se
+                      publicó), que es cuando toca subirlo y avisar. */}
+                  {(aprobadoCliente || yaPublicado) && (
+                    <>
+                      <input value={linkTiktok} onChange={(e) => setLinkTiktok(e.target.value)} placeholder="🎵 Link de TikTok"
+                        className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30" />
+                      <input value={linkInstagram} onChange={(e) => setLinkInstagram(e.target.value)} placeholder="📸 Link de Instagram"
+                        className="w-full h-9 px-3 rounded-lg bg-background/70 border border-border/40 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#ba41f7]/30" />
+                    </>
+                  )}
+
+                  {/* Botón por ETAPAS del flujo (Pedro 27-jul-2026):
+                      1) "Mandar a aprobar" → notifica al cliente para que apruebe.
+                      2) Esperando aprobación (deshabilitado).
+                      3) Cliente aprobó → "Subir publicación y notificar al cliente".
+                      4) Publicado → reenviar aviso. */}
+                  {yaPublicado ? (
+                    <button type="button" onClick={avisarCliente} disabled={avisando}
+                      className="w-full h-10 rounded-lg text-white font-semibold text-[12px] inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      style={{ background: '#14b8a6' }}
+                      title="Reenviar al cliente el aviso de que el video ya está publicado">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      {avisando ? 'Avisando…' : '✓ Publicado · avisar de nuevo'}
+                    </button>
+                  ) : aprobadoCliente ? (
+                    <button type="button" onClick={avisarCliente} disabled={avisando}
+                      className="w-full h-10 rounded-lg text-white font-semibold text-[12px] inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      style={{ background: 'linear-gradient(135deg, #16a34a, #22c55e)', boxShadow: '0 4px 12px -4px rgba(22,163,74,0.6)' }}
+                      title="Marca la publicación como publicada y avisa al cliente (se abre WhatsApp con el mensaje)">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      {avisando ? 'Avisando…' : 'Subir publicación y notificar al cliente'}
+                    </button>
+                  ) : form.estado === 'aprobar' ? (
+                    <button type="button" disabled
+                      className="w-full h-10 rounded-lg font-semibold text-[12px] inline-flex items-center justify-center gap-1.5 cursor-default"
+                      style={{ background: 'rgba(245,158,11,0.14)', color: '#92400e' }}
+                      title="El cliente recibió la notificación para aprobar; esperando su aprobación">
+                      <Clock className="w-4 h-4 shrink-0" />
+                      Esperando aprobación del cliente…
+                    </button>
+                  ) : (
+                    <button type="button" onClick={handleMandarAprobar} disabled={isAprobando}
+                      className="w-full h-10 rounded-lg text-white font-semibold text-[12px] inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      style={{ background: 'linear-gradient(135deg, #7170ff, #a855f7)', boxShadow: '0 4px 12px -4px rgba(113,112,255,0.6)' }}
+                      title="Envía a aprobar y le llega una notificación al cliente para ver y aprobar el video">
+                      <Send className="w-4 h-4 shrink-0" />
+                      {isAprobando ? 'Enviando…' : 'Mandar a aprobar'}
+                    </button>
+                  )}
+
+                  <p className="text-[10.5px] text-muted-foreground leading-tight">
+                    {yaPublicado
+                      ? 'El video ya está publicado. Puedes reenviarle el aviso al cliente si hace falta.'
+                      : aprobadoCliente
+                      ? 'El cliente aprobó ✓. Sube el video a las redes, pega los links y toca el botón: se marca publicado, le llega la notificación de que ya está en redes y se abre WhatsApp con el mensaje.'
+                      : form.estado === 'aprobar'
+                      ? 'Ya le llegó al cliente la notificación para ver y aprobar el video. Cuando apruebe, aquí aparecerá el botón para subir la publicación.'
+                      : 'Al tocar “Mandar a aprobar”, al cliente le llega una notificación para ver el video y aprobarlo.'}
+                  </p>
 
                   {/* Caption de WhatsApp para el grupo del equipo — los links se
                       colocan solos desde los inputs de arriba. Aparece apenas hay
@@ -1012,22 +1104,34 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                           💬 Caption WhatsApp
                         </span>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(captionWhatsApp)
-                              toast.success('Caption copiado al portapapeles 📋')
-                            } catch {
-                              toast.error('No se pudo copiar — copiá manualmente')
-                            }
-                          }}
-                          title="Copiar el caption para pegarlo en el grupo de WhatsApp"
-                          className="flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted transition-colors"
-                        >
-                          <CopyIcon className="w-3 h-3" />
-                          Copiar
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={`https://wa.me/?text=${encodeURIComponent(captionWhatsApp)}`}
+                            target="_blank" rel="noopener noreferrer"
+                            title="Abrir WhatsApp y elegir a quién enviarlo (persona o grupo)"
+                            className="flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-semibold text-white transition-opacity hover:opacity-90"
+                            style={{ background: '#16a34a' }}
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                            WhatsApp
+                          </a>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(captionWhatsApp)
+                                toast.success('Caption copiado al portapapeles 📋')
+                              } catch {
+                                toast.error('No se pudo copiar — copiá manualmente')
+                              }
+                            }}
+                            title="Copiar el caption para pegarlo en el grupo de WhatsApp"
+                            className="flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border border-input bg-background hover:bg-muted transition-colors"
+                          >
+                            <CopyIcon className="w-3 h-3" />
+                            Copiar
+                          </button>
+                        </div>
                       </div>
                       <pre className="px-3 py-2 text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono text-foreground/90 m-0">{captionWhatsApp}</pre>
                     </div>
@@ -1602,10 +1706,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[9px]">
-                  {previewMode === 'editada' && '✅ Editada'}
-                  {previewMode === 'cruda' && '🖼️ Cruda'}
-                  {previewMode === 'drive' && '📁 Tomas'}
-                  {previewMode === 'empty' && '➖'}
+                  {esCarrusel && carruselFolderId ? '🎠 Carrusel'
+                    : previewMode === 'editada' ? '✅ Editada'
+                    : previewMode === 'cruda' ? '🖼️ Cruda'
+                    : previewMode === 'drive' ? '📁 Tomas'
+                    : '➖'}
                 </Badge>
               </div>
               {/* Aspect 9:16 (vertical TikTok/Reel 1920×1080 → invertido).
@@ -1625,7 +1730,60 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
 
                 return (
                   <div className="aspect-[9/16] bg-black flex items-center justify-center relative">
-                    {hayVideo && activeId ? (
+                    {esCarrusel && carruselFolderId ? (
+                      <div className="w-full h-full relative flex items-center justify-center">
+                        {carruselEstado === 'cargando' && (
+                          <div className="text-white/60 text-xs">Cargando imágenes…</div>
+                        )}
+                        {carruselEstado === 'sin_token' && (
+                          <div className="text-white/70 text-[11px] text-center px-4 leading-relaxed">
+                            Conecta Google Drive para ver el carrusel.
+                            <div className="text-white/40 text-[10px] mt-1">Reconecta Google (con permiso de Drive).</div>
+                          </div>
+                        )}
+                        {carruselEstado === 'vacio' && (
+                          <div className="text-white/60 text-xs text-center px-4">La carpeta no tiene imágenes.</div>
+                        )}
+                        {carruselEstado === 'error' && (
+                          <div className="text-white/60 text-xs text-center px-4">No se pudieron cargar las imágenes.</div>
+                        )}
+                        {carruselEstado === 'listo' && carruselImgs && carruselImgs[carruselIdx] && (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              key={carruselImgs[carruselIdx].id}
+                              src={`https://drive.google.com/thumbnail?id=${carruselImgs[carruselIdx].id}&sz=w1000`}
+                              alt={carruselImgs[carruselIdx].name}
+                              className="w-full h-full object-contain"
+                            />
+                            {carruselImgs.length > 1 && (
+                              <>
+                                <button type="button" aria-label="Imagen anterior"
+                                  onClick={() => setCarruselIdx((i) => (i - 1 + carruselImgs.length) % carruselImgs.length)}
+                                  className="absolute left-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors">
+                                  <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                <button type="button" aria-label="Imagen siguiente"
+                                  onClick={() => setCarruselIdx((i) => (i + 1) % carruselImgs.length)}
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors">
+                                  <ChevronRight className="w-5 h-5" />
+                                </button>
+                                <div className="absolute top-2 right-2 text-[10px] font-semibold bg-black/60 text-white px-2 py-0.5 rounded-full">
+                                  {carruselIdx + 1}/{carruselImgs.length}
+                                </div>
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                                  {carruselImgs.map((_, i) => (
+                                    <button key={i} type="button" aria-label={`Imagen ${i + 1}`}
+                                      onClick={() => setCarruselIdx(i)}
+                                      className={`w-1.5 h-1.5 rounded-full transition-colors ${i === carruselIdx ? 'bg-white' : 'bg-white/40 hover:bg-white/70'}`} />
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ) : hayVideo && activeId ? (
                       <>
                         <iframe
                           key={activeId} // forzar reload al cambiar audio mode
@@ -1697,7 +1855,12 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   el video preview, no el mock del caption. */}
             </CardContent>
           </Card>
-          {previewMode === 'drive' && form.enlace_tomas && (
+          {esCarrusel && carruselFolderId && (form.drive_resultado_url || form.enlace_tomas) && (
+            <a href={form.drive_resultado_url || form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-blue-600 hover:underline">
+              ↗ Abrir carpeta del carrusel en Drive
+            </a>
+          )}
+          {!esCarrusel && previewMode === 'drive' && form.enlace_tomas && (
             <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-blue-600 hover:underline">
               ↗ Abrir carpeta de tomas en Drive
             </a>
