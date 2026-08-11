@@ -207,6 +207,12 @@ function ReporteCard({ r, admin }: { r: Reporte; admin: boolean }) {
   const [pending, start] = useTransition()
   const m = TIPO_META[r.tipo]
 
+  /* Mensaje de WhatsApp para avisar al usuario. Se arma ACÁ (en el cliente) y NO
+     se trae del servidor: los emojis se corrompían al viajar server→cliente
+     (aparecían como "�"). Pedro 06-ago-2026. */
+  const fraseTipo = r.tipo === 'falla' ? 'la falla' : r.tipo === 'pedido' ? 'el pedido' : 'la consulta'
+  const msgWhatsApp = `¡Hola ${r.autorNombre}! 👋✨\n\n✅ Ya resolvimos ${fraseTipo} que nos reportaste:\n🔧 «${r.descripcion}»\n\nYa quedó listo, puedes usarlo con normalidad 🙌\n¡Cualquier otra cosa, con confianza me avisas! 💙`
+
   function abrirWhatsApp(mensaje: string, id: string) {
     try { window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank') } catch { /* ignore */ }
     void marcarAvisado(id)
@@ -248,7 +254,9 @@ function ReporteCard({ r, admin }: { r: Reporte; admin: boolean }) {
       const res = await resolverReporte(r.id)
       if (!res.ok) { toast.error(res.error); return }
       toast.success('Resuelto ✓ — al usuario le llegó la notificación.')
-      abrirWhatsApp(res.whatsapp, r.id)
+      /* Usamos el mensaje armado EN EL CLIENTE (msgWhatsApp), no el que devuelve
+         el servidor: los emojis se corrompían al viajar del server al cliente. */
+      abrirWhatsApp(msgWhatsApp, r.id)
       router.refresh()
     })
   }
@@ -260,10 +268,6 @@ function ReporteCard({ r, admin }: { r: Reporte; admin: boolean }) {
     r.estado === 'resuelto' ? { txt: 'Resuelto', color: '#16a34a', bg: '#f0fdf4' } :
     r.estado === 'en_proceso' ? { txt: 'En proceso', color: '#2563eb', bg: '#eff6ff' } :
     { txt: 'Pendiente', color: '#d97706', bg: '#fffbeb' }
-
-  /* Mensaje para el botón "avisar de nuevo" en tarjetas ya resueltas. */
-  const fraseTipo = r.tipo === 'falla' ? 'la falla' : r.tipo === 'pedido' ? 'el pedido' : 'la consulta'
-  const msgWhatsApp = `Hola ${r.autorNombre} 👋\n\nYa resolvimos ${fraseTipo} que reportaste:\n"${r.descripcion}"\n\n¡Cualquier otra cosa, avísame! 💙`
 
   return (
     <article className="rounded-2xl bg-card ring-1 ring-black/[0.06] shadow-sm p-4 flex flex-col gap-2.5" style={{ borderLeft: `4px solid ${m.color}`, opacity: r.estado === 'resuelto' ? 0.9 : 1 }}>
