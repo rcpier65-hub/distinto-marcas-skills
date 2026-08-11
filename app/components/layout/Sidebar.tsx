@@ -245,7 +245,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
                 icon={<MarcaLogo slug={m.slug} nombre={m.nombre} emoji={m.emoji} size={20} />}
                 label={m.nombreCorto}
                 active={isActive(`/grilla/${m.slug}`)}
-                badge={m.pendientes > 0 ? m.pendientes : undefined}
+                /* Sin número al costado: era el conteo de comentarios pendientes,
+                   que ya no se usa. Pedro 06-ago-2026. */
               />
             ))}
             {/* "Agregar marca": director/admin/owner */}
