@@ -6,8 +6,9 @@
 import { useState, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Bug, Lightbulb, HelpCircle, Send, CheckCircle2, Clock, MessageCircle, LifeBuoy, ImagePlus, X, Copy } from 'lucide-react'
+import { Bug, Lightbulb, HelpCircle, Send, CheckCircle2, Clock, MessageCircle, LifeBuoy, ImagePlus, X, Copy, Mic, MicOff } from 'lucide-react'
 import { crearReporte, resolverReporte, tomarReporte, marcarAvisado, subirImagenSoporte } from '../_actions'
+import { useDictado } from '@/lib/hooks/use-dictado'
 
 export type Reporte = {
   id: string
@@ -68,6 +69,16 @@ function NuevoReporte({ meNombre }: { meNombre: string }) {
   const [pending, start] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
 
+  /* Dictado por voz: cada fragmento reconocido se agrega al texto (con un
+     espacio si hace falta), respetando el tope de 2000 caracteres. */
+  const { soportado: vozOk, grabando, parcial, alternar, parar } = useDictado({
+    onFinal: (frag) => setTexto((cur) => {
+      const sep = cur && !/\s$/.test(cur) ? ' ' : ''
+      return (cur + sep + frag).slice(0, 2000)
+    }),
+    onError: (msg) => toast.error(msg),
+  })
+
   async function subirVarios(files: File[]) {
     const imgFiles = files.filter((f) => f.type.startsWith('image/'))
     if (!imgFiles.length) return
@@ -89,6 +100,7 @@ function NuevoReporte({ meNombre }: { meNombre: string }) {
   }
 
   function enviar() {
+    parar() // si estaba dictando, deja de escuchar al enviar
     const t = texto.trim()
     if (!t) { toast.error('Escribe qué necesitas o qué falló.'); return }
     if (subiendo) { toast.error('Espera a que terminen de subir las capturas.'); return }
@@ -125,6 +137,14 @@ function NuevoReporte({ meNombre }: { meNombre: string }) {
         className="w-full resize-none rounded-xl border bg-background px-3.5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-[#7170ff]/40"
       />
 
+      {/* Mientras dicta: muestra en vivo lo que va escuchando */}
+      {grabando && (
+        <p className="-mt-1 text-[12px] flex items-center gap-1.5" style={{ color: '#dc2626' }}>
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          Escuchando…{parcial && <span className="text-muted-foreground italic">«{parcial}»</span>}
+        </p>
+      )}
+
       {/* Miniaturas de las capturas adjuntas */}
       {imgs.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -145,10 +165,21 @@ function NuevoReporte({ meNombre }: { meNombre: string }) {
         onChange={(e) => { const fs = Array.from(e.target.files ?? []); void subirVarios(fs); e.target.value = '' }} />
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <button type="button" onClick={() => fileRef.current?.click()} disabled={subiendo || imgs.length >= 6}
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-semibold border hover:bg-muted transition-colors disabled:opacity-50">
-          <ImagePlus className="w-4 h-4" /> {subiendo ? 'Subiendo…' : 'Adjuntar captura'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={subiendo || imgs.length >= 6}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-semibold border hover:bg-muted transition-colors disabled:opacity-50">
+            <ImagePlus className="w-4 h-4" /> {subiendo ? 'Subiendo…' : 'Adjuntar captura'}
+          </button>
+          {vozOk && (
+            <button type="button" onClick={alternar}
+              title={grabando ? 'Detener dictado' : 'Dictar por voz'}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-semibold border hover:bg-muted transition-colors"
+              style={grabando ? { borderColor: '#dc2626', color: '#dc2626', background: '#fef2f2' } : undefined}>
+              {grabando ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              {grabando ? 'Detener' : 'Dictar'}
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-3 ml-auto">
           <span className="text-[11px] text-muted-foreground hidden sm:inline">{texto.length}/2000 · {meNombre || 'tú'}</span>
           <button type="button" onClick={enviar} disabled={pending || subiendo || !texto.trim()}
