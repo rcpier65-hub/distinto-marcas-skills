@@ -27,20 +27,46 @@ async function currentMember(service: Service, authUserId: string): Promise<{ id
   return { id: data?.id ?? null, nombre: data?.nombre ?? '', esAdmin: !data || data.rol_base === 'director' }
 }
 
-/* Cualquier miembro crea un reporte. */
-export async function crearReporte(tipo: string, descripcion: string): Promise<Result> {
+/* Sube una captura al bucket público `soporte` y devuelve la URL. Cada quien
+   sube a su carpeta (member_id). Mismo patrón que subirAvatar del perfil. */
+export async function subirImagenSoporte(formData: FormData): Promise<
+  { ok: true; url: string } | { ok: false; error: string }
+> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const file = formData.get('file')
+  if (!(file instanceof File)) return { ok: false, error: 'No se recibió imagen' }
+  if (file.size > 6 * 1024 * 1024) return { ok: false, error: 'La imagen debe pesar menos de 6 MB' }
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (!allowed.includes(file.type)) return { ok: false, error: 'Usa JPG, PNG, WebP o GIF' }
+  const me = await currentMember(service, user.id)
+  const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+  const path = `${me.id ?? 'anon'}/${crypto.randomUUID()}.${ext}`
+  const buf = Buffer.from(await file.arrayBuffer())
+  const { error: upErr } = await service.storage.from('soporte').upload(path, buf, { contentType: file.type, upsert: false })
+  if (upErr) return { ok: false, error: upErr.message }
+  const { data: urlData } = service.storage.from('soporte').getPublicUrl(path)
+  const url = urlData?.publicUrl as string | undefined
+  if (!url) return { ok: false, error: 'No se pudo obtener la URL' }
+  return { ok: true, url }
+}
+
+/* Cualquier miembro crea un reporte (con capturas opcionales). */
+export async function crearReporte(tipo: string, descripcion: string, imagenes: string[] = []): Promise<Result> {
   const user = await requireUser()
   const service = createServiceClient() as Service
   const texto = (descripcion ?? '').trim()
   if (!texto) return { ok: false, error: 'Escribe qué necesitas o qué falló.' }
   if (texto.length > 2000) return { ok: false, error: 'Demasiado largo (máx. 2000).' }
   const t: Tipo = (TIPOS as readonly string[]).includes(tipo) ? (tipo as Tipo) : 'falla'
+  /* Solo URLs de nuestro bucket, máximo 6 capturas. */
+  const imgs = (Array.isArray(imagenes) ? imagenes : []).filter((u) => typeof u === 'string' && u.includes('/storage/')).slice(0, 6)
   const me = await currentMember(service, user.id)
   const nombre = me.nombre || user.email?.split('@')[0] || 'Alguien'
 
   const { data, error } = await service
     .from('soporte_reportes')
-    .insert({ team_member_id: me.id, autor_nombre: nombre, tipo: t, descripcion: texto, estado: 'pendiente' })
+    .insert({ team_member_id: me.id, autor_nombre: nombre, tipo: t, descripcion: texto, estado: 'pendiente', imagenes: imgs })
     .select('id')
     .single()
   if (error) return { ok: false, error: error.message }

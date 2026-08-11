@@ -3,11 +3,11 @@
 /* Vista del módulo "Soporte". Formulario para reportar (todos) + panel para
    resolver (solo Erick/Pedro). Pedro 06-ago-2026. */
 
-import { useState, useTransition } from 'react'
+import { useState, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Bug, Lightbulb, HelpCircle, Send, CheckCircle2, Clock, MessageCircle, LifeBuoy } from 'lucide-react'
-import { crearReporte, resolverReporte, tomarReporte, marcarAvisado } from '../_actions'
+import { Bug, Lightbulb, HelpCircle, Send, CheckCircle2, Clock, MessageCircle, LifeBuoy, ImagePlus, X, Copy } from 'lucide-react'
+import { crearReporte, resolverReporte, tomarReporte, marcarAvisado, subirImagenSoporte } from '../_actions'
 
 export type Reporte = {
   id: string
@@ -17,8 +17,10 @@ export type Reporte = {
   descripcion: string
   estado: 'pendiente' | 'en_proceso' | 'resuelto'
   notaResolucion: string | null
+  imagenes: string[]
   createdAt: string
   resueltoAt: string | null
+  resueltoPor: string | null
   avisado: boolean
 }
 
@@ -61,15 +63,39 @@ function NuevoReporte({ meNombre }: { meNombre: string }) {
   const router = useRouter()
   const [tipo, setTipo] = useState<Reporte['tipo']>('falla')
   const [texto, setTexto] = useState('')
+  const [imgs, setImgs] = useState<string[]>([])
+  const [subiendo, setSubiendo] = useState(false)
   const [pending, start] = useTransition()
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function subirVarios(files: File[]) {
+    const imgFiles = files.filter((f) => f.type.startsWith('image/'))
+    if (!imgFiles.length) return
+    setSubiendo(true)
+    for (const f of imgFiles) {
+      if (imgs.length + 1 > 6) { toast.error('Máximo 6 capturas'); break }
+      const fd = new FormData(); fd.append('file', f)
+      const r = await subirImagenSoporte(fd)
+      if (!r.ok) { toast.error(r.error); continue }
+      setImgs((cur) => (cur.length >= 6 ? cur : [...cur, r.url]))
+    }
+    setSubiendo(false)
+  }
+  /* Pegar captura con Ctrl+V directo en el cuadro de texto. */
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData?.items ?? []).map((it) => it.getAsFile()).filter(Boolean) as File[]
+    const imgFiles = files.filter((f) => f.type.startsWith('image/'))
+    if (imgFiles.length) { e.preventDefault(); void subirVarios(imgFiles) }
+  }
 
   function enviar() {
     const t = texto.trim()
     if (!t) { toast.error('Escribe qué necesitas o qué falló.'); return }
+    if (subiendo) { toast.error('Espera a que terminen de subir las capturas.'); return }
     start(async () => {
-      const r = await crearReporte(tipo, t)
+      const r = await crearReporte(tipo, t, imgs)
       if (!r.ok) { toast.error(r.error); return }
-      setTexto(''); setTipo('falla')
+      setTexto(''); setTipo('falla'); setImgs([])
       toast.success('¡Enviado! Erick ya recibió tu reporte. 💙')
       router.refresh()
     })
@@ -92,18 +118,45 @@ function NuevoReporte({ meNombre }: { meNombre: string }) {
       <textarea
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
+        onPaste={onPaste}
         rows={4}
         maxLength={2000}
-        placeholder={tipo === 'falla' ? 'Ej: en Publicaciones, cuando abro una pieza y salgo me regresa al día de hoy…' : tipo === 'pedido' ? 'Ej: quisiera que en el calendario se vea el nombre del editor…' : 'Ej: ¿cómo cambio la portada de un video ya subido?'}
+        placeholder={tipo === 'falla' ? 'Ej: en Publicaciones, cuando abro una pieza y salgo me regresa al día de hoy… (puedes pegar una captura con Ctrl+V)' : tipo === 'pedido' ? 'Ej: quisiera que en el calendario se vea el nombre del editor…' : 'Ej: ¿cómo cambio la portada de un video ya subido?'}
         className="w-full resize-none rounded-xl border bg-background px-3.5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-[#7170ff]/40"
       />
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">{texto.length}/2000 · lo firma {meNombre || 'tú'}</span>
-        <button type="button" onClick={enviar} disabled={pending || !texto.trim()}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl font-semibold text-white text-[14px] disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #7170ff, #ba41f7)', boxShadow: '0 6px 18px -6px rgba(113,112,255,0.7)' }}>
-          <Send className="w-4 h-4" /> {pending ? 'Enviando…' : 'Enviar reporte'}
+
+      {/* Miniaturas de las capturas adjuntas */}
+      {imgs.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {imgs.map((u, i) => (
+            <div key={u} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u} alt="captura" className="w-20 h-20 object-cover rounded-lg border" />
+              <button type="button" onClick={() => setImgs((cur) => cur.filter((_, j) => j !== i))}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center" title="Quitar">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+        onChange={(e) => { const fs = Array.from(e.target.files ?? []); void subirVarios(fs); e.target.value = '' }} />
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={subiendo || imgs.length >= 6}
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-semibold border hover:bg-muted transition-colors disabled:opacity-50">
+          <ImagePlus className="w-4 h-4" /> {subiendo ? 'Subiendo…' : 'Adjuntar captura'}
         </button>
+        <div className="flex items-center gap-3 ml-auto">
+          <span className="text-[11px] text-muted-foreground hidden sm:inline">{texto.length}/2000 · {meNombre || 'tú'}</span>
+          <button type="button" onClick={enviar} disabled={pending || subiendo || !texto.trim()}
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl font-semibold text-white text-[14px] disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, #7170ff, #ba41f7)', boxShadow: '0 6px 18px -6px rgba(113,112,255,0.7)' }}>
+            <Send className="w-4 h-4" /> {pending ? 'Enviando…' : 'Enviar reporte'}
+          </button>
+        </div>
       </div>
     </section>
   )
@@ -139,9 +192,9 @@ function PanelAdmin({ reportes }: { reportes: Reporte[] }) {
       {resueltos.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-[13px] font-bold uppercase tracking-wide flex items-center gap-2" style={{ color: '#16a34a' }}>
-            <CheckCircle2 className="w-4 h-4" /> Resueltos
+            <CheckCircle2 className="w-4 h-4" /> Historial · resueltos ({resueltos.length})
           </h2>
-          {resueltos.slice(0, 30).map((r) => <ReporteCard key={r.id} r={r} admin />)}
+          {resueltos.slice(0, 60).map((r) => <ReporteCard key={r.id} r={r} admin />)}
         </section>
       )}
     </div>
@@ -157,6 +210,37 @@ function ReporteCard({ r, admin }: { r: Reporte; admin: boolean }) {
   function abrirWhatsApp(mensaje: string, id: string) {
     try { window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank') } catch { /* ignore */ }
     void marcarAvisado(id)
+  }
+
+  /* Copiar la captura al portapapeles (para pegarla/enviarla). Chrome solo copia
+     PNG, así que si viene en otro formato la convierto con canvas. Si falla, abre
+     la imagen para copiarla a mano. */
+  async function copiarImagen(url: string) {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      let png = blob
+      if (blob.type !== 'image/png') {
+        png = await new Promise<Blob>((resolve, reject) => {
+          const img = new Image(); img.crossOrigin = 'anonymous'
+          img.onload = () => {
+            const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight
+            const ctx = cv.getContext('2d'); if (!ctx) return reject(new Error('ctx'))
+            ctx.drawImage(img, 0, 0)
+            cv.toBlob((b) => (b ? resolve(b) : reject(new Error('blob'))), 'image/png')
+          }
+          img.onerror = () => reject(new Error('img'))
+          img.src = URL.createObjectURL(blob)
+        })
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const CI = (window as any).ClipboardItem
+      await navigator.clipboard.write([new CI({ 'image/png': png })])
+      toast.success('Imagen copiada ✓ — pégala donde quieras')
+    } catch {
+      window.open(url, '_blank')
+      toast('Se abrió la imagen — cópiala desde ahí')
+    }
   }
 
   function resolver() {
@@ -194,6 +278,31 @@ function ReporteCard({ r, admin }: { r: Reporte; admin: boolean }) {
 
       <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-foreground/90">{r.descripcion}</p>
 
+      {/* Capturas del reporte — click abre en grande; el botón copia la imagen. */}
+      {r.imagenes.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {r.imagenes.map((u) => (
+            <div key={u} className="relative group">
+              <a href={u} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={u} alt="captura" className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border hover:brightness-95 transition" />
+              </a>
+              <button type="button" onClick={() => copiarImagen(u)} title="Copiar imagen"
+                className="absolute bottom-1 right-1 inline-flex items-center gap-1 h-6 px-1.5 rounded-md bg-black/65 text-white text-[10px] font-semibold opacity-0 group-hover:opacity-100 transition">
+                <Copy className="w-3 h-3" /> Copiar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Historial: quién resolvió y cuándo (visible para todos). */}
+      {r.estado === 'resuelto' && (
+        <p className="text-[12px] font-medium flex items-center gap-1.5" style={{ color: '#16a34a' }}>
+          <CheckCircle2 className="w-3.5 h-3.5" /> Resuelto{r.resueltoPor ? ` por ${r.resueltoPor}` : ''}{r.resueltoAt ? ` · ${fechaCorta(r.resueltoAt)}` : ''}
+        </p>
+      )}
+
       {admin && r.estado !== 'resuelto' && (
         <div className="flex items-center gap-2 pt-1">
           {r.estado === 'pendiente' && (
@@ -215,11 +324,6 @@ function ReporteCard({ r, admin }: { r: Reporte; admin: boolean }) {
         </div>
       )}
 
-      {!admin && r.estado === 'resuelto' && (
-        <p className="text-[12.5px] font-medium flex items-center gap-1.5" style={{ color: '#16a34a' }}>
-          <CheckCircle2 className="w-4 h-4" /> Resuelto{r.resueltoAt ? ` · ${fechaCorta(r.resueltoAt)}` : ''}
-        </p>
-      )}
     </article>
   )
 }

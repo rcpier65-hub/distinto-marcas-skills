@@ -29,12 +29,17 @@ export default async function SoportePage() {
 
   let q = service
     .from('soporte_reportes')
-    .select('id, team_member_id, autor_nombre, tipo, descripcion, estado, nota_resolucion, created_at, resuelto_at, avisado_at')
+    .select('id, team_member_id, autor_nombre, tipo, descripcion, estado, nota_resolucion, imagenes, created_at, resuelto_at, resuelto_por, avisado_at')
     .order('created_at', { ascending: false })
     .limit(300)
   /* Los que NO son admin ven SOLO sus reportes. */
   if (!esAdmin && meId) q = q.eq('team_member_id', meId)
   const { data } = await q
+
+  /* Nombres del equipo para mostrar "resuelto por X" en el historial. */
+  const { data: miembros } = await service.from('team_members').select('id, nombre')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nombrePorId = new Map<string, string>(((miembros ?? []) as any[]).map((mm) => [mm.id, mm.nombre]))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reportes: Reporte[] = ((data ?? []) as any[]).map((r) => ({
@@ -45,8 +50,10 @@ export default async function SoportePage() {
     descripcion: (r.descripcion ?? '') as string,
     estado: (r.estado ?? 'pendiente') as Reporte['estado'],
     notaResolucion: (r.nota_resolucion ?? null) as string | null,
+    imagenes: Array.isArray(r.imagenes) ? (r.imagenes as string[]) : [],
     createdAt: r.created_at as string,
     resueltoAt: (r.resuelto_at ?? null) as string | null,
+    resueltoPor: (r.resuelto_por ? (nombrePorId.get(r.resuelto_por) ?? null) : null) as string | null,
     avisado: !!r.avisado_at,
   }))
 
