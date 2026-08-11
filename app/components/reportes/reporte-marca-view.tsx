@@ -65,6 +65,7 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
     { key: 'ventasOmnicanal', label: 'Omnicanal', fmt: (n: number) => soles(n) },
     { key: 'gastoAdsSoles', label: 'Gasto Ads (S/)', fmt: (n: number) => soles(n) },
     { key: 'roasDirecto', label: 'ROAS', fmt: (n: number) => n.toFixed(2) + 'x' },
+    { key: 'ticketPromedio', label: 'Ticket promedio', fmt: (n: number) => soles(n, 2) },
   ] as const
   const [tKey, setTKey] = useState<(typeof TENDENCIAS)[number]['key']>('ventasTotales')
   const tSel = TENDENCIAS.find((t) => t.key === tKey)!
