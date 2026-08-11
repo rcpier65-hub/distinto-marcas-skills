@@ -7,11 +7,15 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
+  TrendingUp,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { FechasClienteView, type FechaClienteItem } from './fechas-cliente-view'
+import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
+import { PinGate } from '@/components/reportes/pin-gate'
+import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
 import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente } from '../_actions'
 import { ClienteRealtime } from './cliente-realtime'
@@ -211,6 +215,9 @@ const NAV = [
   { id: 'reuniones', label: 'Reuniones', corto: 'Reuniones', Icono: CalendarClock },
   { id: 'grabaciones', label: 'Grabación', corto: 'Grabación', Icono: Clapperboard },
   { id: 'diseno', label: 'Diseño', corto: 'Diseño', Icono: Palette },
+  /* Reporte mensual (embudo/inversión) — solo aparece si la marca tiene
+     reporte cargado (prop reporteNombre) y pide código al abrirlo. */
+  { id: 'reporte', label: 'Reporte mensual', corto: 'Reporte', Icono: TrendingUp },
 ] as const
 type VistaId = (typeof NAV)[number]['id']
 
@@ -227,6 +234,7 @@ function GrupoSidebar({ titulo, abierto, onToggle }: { titulo: string; abierto: 
 
 export function ClientePortalView({
   marcaId, marcaNombre, marcaSlug, marcaEmoji, marcaColor, marcaLogoUrl, driveUrl, contacto, hoy, pubs: pubsIniciales, observaciones, reuniones, grabaciones, fechasImportantes = [],
+  reporteNombre = null, reporteMeses = null,
 }: {
   marcaId: string
   marcaNombre: string
@@ -242,6 +250,10 @@ export function ClientePortalView({
   reuniones: Reunion[]
   grabaciones: GrabacionCliente[]
   fechasImportantes?: FechaClienteItem[]
+  /* Reporte mensual de la marca: nombre para mostrar + data. meses=null con
+     nombre presente = candado (aún sin código). nombre=null = sin reporte. */
+  reporteNombre?: string | null
+  reporteMeses?: MesReporte[] | null
 }) {
   const router = useRouter()
   /* pubs en estado local: para poder MOVER una tarjeta de fecha al instante
@@ -253,6 +265,9 @@ export function ClientePortalView({
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
   const [vista, setVista] = useState<VistaId | 'drive' | 'pendientes'>('cal')
+  /* ¿Esta marca tiene reporte mensual cargado? (si no, el ítem no aparece) */
+  const tieneReporte = !!reporteNombre
+  const navVisible = NAV.filter(({ id }) => id !== 'reporte' || tieneReporte)
   /* Secciones plegables del menú lateral (como la app: ▼ WORKSPACE / MARCAS).
      Pedro 19-jul-2026. */
   const [secAbierta, setSecAbierta] = useState<{ marca: boolean; herram: boolean }>({ marca: true, herram: true })
@@ -481,7 +496,7 @@ export function ClientePortalView({
         <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
           {/* ===== Sección plegable: TU MARCA ===== */}
           <GrupoSidebar titulo="Tu marca" abierto={secAbierta.marca} onToggle={() => setSecAbierta((s) => ({ ...s, marca: !s.marca }))} />
-          {secAbierta.marca && NAV.map(({ id, label, Icono }) => {
+          {secAbierta.marca && navVisible.map(({ id, label, Icono }) => {
             const activo = vista === id
             return (
               <button
@@ -605,7 +620,7 @@ export function ClientePortalView({
 
           {/* Toggle — solo MÓVIL (en PC está el menú lateral) */}
           <div className="lg:hidden grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-muted/60 w-full">
-            {NAV.map(({ id, corto, Icono }) => (
+            {navVisible.map(({ id, corto, Icono }) => (
               <ToggleBtn
                 key={id}
                 active={vista === id}
@@ -833,6 +848,14 @@ export function ClientePortalView({
 
       {vista === 'grabaciones' && (
         <GrabacionesView grabaciones={grabaciones} color={marcaColor} hoy={hoy} />
+      )}
+
+      {/* Reporte mensual — privado: si aún no ingresó el código (meses=null),
+          se muestra el candado; al validar, el server refresca y manda la data. */}
+      {vista === 'reporte' && tieneReporte && (
+        reporteMeses
+          ? <ReporteMarcaView nombre={reporteNombre!} meses={reporteMeses} />
+          : <div className="pt-8"><PinGate titulo="Reporte mensual" /></div>
       )}
 
       {vista === 'pendientes' && (

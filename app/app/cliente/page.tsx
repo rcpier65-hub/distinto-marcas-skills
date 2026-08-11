@@ -8,7 +8,6 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getClienteActual } from '@/lib/cliente/get-cliente'
 import { ClientePortalView, type PubCliente } from './_components/cliente-portal-view'
-import { ReporteClienteSection } from './_components/reporte-cliente'
 import { getReporteBySlug } from '@/lib/reportes/registry'
 import { pinReportesOk } from '@/app/reportes/_actions'
 
@@ -112,29 +111,23 @@ export default async function ClientePortalPage() {
   const reporteDesbloqueado = reporte ? await pinReportesOk() : false
 
   return (
-    <>
-      <ClientePortalView
-        marcaId={cliente.marcaId}
-        observaciones={observaciones}
-        reuniones={reuniones}
-        grabaciones={grabaciones}
-        marcaNombre={cliente.marcaNombre}
-        marcaSlug={cliente.marcaSlug}
-        marcaEmoji={cliente.marcaEmoji}
-        marcaColor={cliente.marcaColor}
-        marcaLogoUrl={cliente.marcaLogoUrl}
-        driveUrl={cliente.driveUrl}
-        contacto={cliente.nombre}
-        hoy={hoy}
-        pubs={pubs}
-        fechasImportantes={fechasImportantes}
-      />
-      {reporte && (
-        <ReporteClienteSection
-          nombre={reporte.nombre}
-          meses={reporteDesbloqueado ? reporte.meses : null}
-        />
-      )}
-    </>
+    <ClientePortalView
+      marcaId={cliente.marcaId}
+      observaciones={observaciones}
+      reuniones={reuniones}
+      grabaciones={grabaciones}
+      marcaNombre={cliente.marcaNombre}
+      marcaSlug={cliente.marcaSlug}
+      marcaEmoji={cliente.marcaEmoji}
+      marcaColor={cliente.marcaColor}
+      marcaLogoUrl={cliente.marcaLogoUrl}
+      driveUrl={cliente.driveUrl}
+      contacto={cliente.nombre}
+      hoy={hoy}
+      pubs={pubs}
+      fechasImportantes={fechasImportantes}
+      reporteNombre={reporte?.nombre ?? null}
+      reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
+    />
   )
 }
