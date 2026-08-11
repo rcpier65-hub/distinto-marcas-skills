@@ -52,5 +52,7 @@ async function ReportesHubServer() {
     nombre: m.nombre as string,
     emoji: (m.emoji_marca ?? null) as string | null,
   }))
-  return <ReportesHub reportes={getReportes()} marcas={marcas} />
+  const nombres = Object.fromEntries(marcas.map((m) => [m.slug, m.nombre]))
+  const reportes = await getReportes(nombres)
+  return <ReportesHub reportes={reportes} marcas={marcas} />
 }

@@ -107,7 +107,7 @@ export default async function ClientePortalPage() {
   /* Reporte mensual de SU marca (si existe) — protegido por código.
      El desbloqueo (cookie 12h) se decide en el server: la data del reporte
      solo se envía al navegador si ya ingresó el código. */
-  const reporte = getReporteBySlug(cliente.marcaSlug)
+  const reporte = await getReporteBySlug(cliente.marcaSlug, cliente.marcaNombre)
   const reporteDesbloqueado = reporte ? await pinReportesOk() : false
 
   return (
