@@ -47,6 +47,9 @@ const TABLAS_REACTIVAS = [
   // veía una tarea vieja que ya se había cerrado). Pedro 06-ago-2026.
   'tareas',
   'pendientes_rapidos',
+  // Soporte: el panel de Erick se actualiza solo al llegar un reporte nuevo, y
+  // el usuario ve "resuelto" en vivo. Pedro 06-ago-2026.
+  'soporte_reportes',
 ]
 
 /* Tiempo de espera para agrupar eventos consecutivos.
