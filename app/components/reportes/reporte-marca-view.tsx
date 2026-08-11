@@ -5,8 +5,8 @@
    vista omnicanal, tendencia mensual clickeable y tabla comparativa.
    Data: lib/reportes/typhouse.ts (fuente de verdad, ex-Excel). */
 
-import { useMemo, useState } from 'react'
-import { getReporteTyphouse, labelMes, COSTO_GESTION, type MesReporte } from '@/lib/reportes/typhouse'
+import { useState } from 'react'
+import { labelMes, COSTO_GESTION, type MesReporte } from '@/lib/reportes/typhouse'
 
 const AZUL = '#1E5EDA'
 const CELESTE = '#3BA5E8'
@@ -51,8 +51,8 @@ function Kpi({ label, value, sub, delta, accent }: {
   )
 }
 
-export function ReporteTyphouseView() {
-  const meses = useMemo(() => getReporteTyphouse(), [])
+export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: MesReporte[] }) {
+  
   const [idx, setIdx] = useState(meses.length - 1)
   const m = meses[idx]
   const prev: MesReporte | null = idx > 0 ? meses[idx - 1] : null
@@ -92,7 +92,7 @@ export function ReporteTyphouseView() {
       {/* ── Embudo ── */}
       <div className="rounded-2xl border bg-card p-6">
         <div className="text-center mb-5">
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: AZUL }}>Typhouse / Little Joe</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: AZUL }}>{nombre}</div>
           <h2 className="text-2xl font-extrabold tracking-tight">{labelMes(m.mes)}</h2>
           <div className="text-xs text-muted-foreground mt-1">Meta Ads (WhatsApp) + Shopify — Embudo de ventas</div>
         </div>
