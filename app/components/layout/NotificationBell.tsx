@@ -10,14 +10,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Bell, CalendarClock, Scissors, MessageCircle, ClipboardList, X } from 'lucide-react'
+import { Bell, CalendarClock, Scissors, ClipboardList, LifeBuoy, X } from 'lucide-react'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
 
 const ICONO: Record<Notificacion['tipo'], typeof Bell> = {
   grabacion: CalendarClock,
   editar: Scissors,
-  comentario: MessageCircle,
   observacion: ClipboardList,
+  soporte: LifeBuoy,
 }
 
 export function NotificationBell({ notificaciones }: { notificaciones: Notificacion[] }) {

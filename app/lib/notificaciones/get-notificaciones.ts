@@ -12,7 +12,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 export type Notificacion = {
   id: string
-  tipo: 'grabacion' | 'editar' | 'comentario' | 'observacion'
+  tipo: 'grabacion' | 'editar' | 'observacion' | 'soporte'
   titulo: string
   detalle: string
   href: string
@@ -55,11 +55,53 @@ function marcaDe(r: any): { nombre: string; color: string | null; emoji: string 
 export async function getNotificaciones(): Promise<Notificacion[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+
+  /* ¿Es director (Erick/Pedro) o admin/owner? Ellos son los que resuelven los
+     reportes de Soporte, así que solo a ellos les mostramos esos avisos.
+     getCurrentMemberPermisos está cacheado por request → no cuesta una query
+     extra aunque el layout ya lo haya llamado. */
+  let esDirector = false
+  try {
+    const { getCurrentMemberPermisos } = await import('@/lib/team/permisos-helper')
+    const p = await getCurrentMemberPermisos()
+    esDirector = !p || p.member.rol_base === 'director'
+  } catch { /* si falla, tratamos como NO director */ }
+
   const hoy = ymdLima(new Date())
   const en2 = addDaysLima(new Date(), 2)
   const hace3 = addDaysLima(new Date(), -3)
 
   const out: Notificacion[] = []
+
+  /* 0) SOPORTE — reportes del equipo (fallas/pedidos/consultas) sin resolver.
+     Solo para directores (Erick/Pedro), que son quienes resuelven. Aparecen en
+     la campanita para que Erick los vea aunque el push al celular no llegue.
+     Pedro 06-ago-2026. */
+  if (esDirector) {
+    try {
+      const res = await service
+        .from('soporte_reportes')
+        .select('id, autor_nombre, tipo, descripcion, created_at')
+        .neq('estado', 'resuelto')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      const LABEL: Record<string, string> = { falla: '🐞 Falla', pedido: '💡 Pedido', consulta: '❓ Consulta' }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const r of (res.data ?? []) as any[]) {
+        const desc = (r.descripcion ?? '').replace(/\s+/g, ' ').trim()
+        out.push({
+          id: `sop-${r.id}`,
+          tipo: 'soporte',
+          titulo: `${LABEL[r.tipo] ?? 'Reporte'} — ${r.autor_nombre ?? 'Alguien'}`,
+          detalle: desc.length > 72 ? desc.slice(0, 72) + '…' : desc,
+          href: '/soporte',
+          urgencia: 'alta',
+          marcaColor: '#7170ff',
+          marcaEmoji: null,
+        })
+      }
+    } catch { /* tabla no existe aún */ }
+  }
 
   /* 1) Grabaciones a <=2 días sin guion listo. */
   try {
@@ -128,33 +170,8 @@ export async function getNotificaciones(): Promise<Notificacion[]> {
     }
   } catch { /* ignore */ }
 
-  /* 3) Comentarios pendientes muy atrasados (>3 días sin responder). */
-  try {
-    const res = await service
-      .from('comentarios_inbox')
-      .select('id, author_username, author_display_name, comment_created_at, marcas:marca_id (nombre, color_primario_hex, emoji_marca)')
-      .eq('status', 'pending')
-      .lte('comment_created_at', `${hace3}T23:59:59`)
-      .order('comment_created_at', { ascending: true })
-      .limit(15)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of (res.data ?? []) as any[]) {
-      const m = marcaDe(r)
-      const fechaCom = (r.comment_created_at ?? '').slice(0, 10)
-      const dd = fechaCom ? Math.abs(diasEntre(hoy, fechaCom)) : 0
-      const autor = r.author_display_name || r.author_username || 'alguien'
-      out.push({
-        id: `com-${r.id}`,
-        tipo: 'comentario',
-        titulo: `Comentario sin responder — ${m.nombre}`,
-        detalle: `@${autor} escribió hace ${dd} día${dd === 1 ? '' : 's'}`,
-        href: '/comentarios',
-        urgencia: dd >= 7 ? 'alta' : 'media',
-        marcaColor: m.color,
-        marcaEmoji: m.emoji,
-      })
-    }
-  } catch { /* ignore */ }
+  /* (Los "Comentarios sin responder" se quitaron de la campanita — ya no se
+     usan y aparecían muy viejos. Pedro 06-ago-2026.) */
 
   /* 4) Observaciones del CLIENTE sin atender. Garantiza que el pedido del
      cliente le aparezca a Erick/Pedro en la campanita aunque el push no le

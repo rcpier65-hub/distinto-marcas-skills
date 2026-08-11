@@ -92,8 +92,18 @@ export async function tomarReporte(id: string): Promise<Result> {
   const service = createServiceClient() as Service
   const me = await currentMember(service, user.id)
   if (!me.esAdmin) return { ok: false, error: 'Solo Erick/Pedro pueden gestionar reportes.' }
+  const { data: r } = await service.from('soporte_reportes').select('team_member_id, descripcion, estado').eq('id', id).maybeSingle()
   const { error } = await service.from('soporte_reportes').update({ estado: 'en_proceso', tomado_at: new Date().toISOString() }).eq('id', id).eq('estado', 'pendiente')
   if (error) return { ok: false, error: error.message }
+  /* Avisar al AUTOR que ya lo están viendo (solo si venía pendiente). */
+  if (r?.estado === 'pendiente' && r?.team_member_id) {
+    await enviarPushAMiembroId(r.team_member_id, {
+      title: '👀 Ya estamos viendo tu reporte',
+      body: `${me.nombre || 'Erick'} está revisando: ${(r.descripcion ?? '').slice(0, 80)}`,
+      url: '/soporte',
+      tag: `soporte-visto-${id}`,
+    })
+  }
   revalidatePath('/soporte')
   return { ok: true }
 }
