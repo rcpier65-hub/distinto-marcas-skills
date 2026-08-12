@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp,
+  TrendingUp, Search,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -289,6 +289,12 @@ export function ClientePortalView({
   /* Presentación de la pestaña LISTA: cuadrícula (cards) o lista (filas).
      Toggle en la esquina de la vista Lista, estilo Assets. Pedro 17-jul-2026. */
   const [listaFmt, setListaFmt] = useState<'grid' | 'lista'>('grid')
+  /* Área de diseño: presentación (tarjetas / lista), filtro por estado y
+     búsqueda por nombre. Pedro 12-ago-2026: "que sean cuadraditos tipo card y
+     un toggle a lista; así en lista larga se ve feo". */
+  const [disenoVista, setDisenoVista] = useState<'cards' | 'lista'>('cards')
+  const [disenoFiltro, setDisenoFiltro] = useState<'todos' | 'proceso' | 'listos'>('todos')
+  const [disenoBuscar, setDisenoBuscar] = useState('')
   /* Publicación abierta en la ventana de detalle (al tocar una tarjeta del
      calendario). El cliente ve el video ahí y puede aprobarlo. */
   const [modalPub, setModalPub] = useState<PubCliente | null>(null)
@@ -810,29 +816,73 @@ export function ClientePortalView({
           ) : (() => {
             const enProceso = disenos.filter((p) => !disenoTerminado(p))
             const listos = disenos.filter((p) => disenoTerminado(p))
+            const base = disenoFiltro === 'proceso' ? enProceso : disenoFiltro === 'listos' ? listos : disenos
+            const q = disenoBuscar.trim().toLowerCase()
+            const mostrados = (q ? base.filter((p) => (p.titulo ?? '').toLowerCase().includes(q)) : base)
+              .slice()
+              // pendientes primero; dentro de cada grupo, fecha más reciente arriba
+              .sort((a, b) => {
+                const ta = disenoTerminado(a) ? 1 : 0
+                const tb = disenoTerminado(b) ? 1 : 0
+                if (ta !== tb) return ta - tb
+                return (b.fechaEntrega ?? b.fecha ?? '').localeCompare(a.fechaEntrega ?? a.fecha ?? '')
+              })
+            const chips: Array<{ id: 'todos' | 'proceso' | 'listos'; label: string; n: number }> = [
+              { id: 'todos', label: 'Todos', n: disenos.length },
+              { id: 'proceso', label: 'En proceso', n: enProceso.length },
+              { id: 'listos', label: 'Entregados', n: listos.length },
+            ]
             return (
-              <>
-                {enProceso.length > 0 && (
-                  <section>
-                    <SecHeader icon={<Clock className="w-4 h-4" />} label="En proceso / pendientes" count={enProceso.length} color="#8b5cf6" />
-                    <div className="space-y-2">
-                      {enProceso.map((p) => (
-                        <FilaCompacta key={p.id} p={p} color="#8b5cf6" badge={disenoLabel(p)} onClick={() => setModalPub(p)} />
-                      ))}
+              <div className="space-y-3">
+                {/* Controles: filtro por estado · búsqueda · toggle tarjetas/lista */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {chips.map((c) => {
+                      const on = disenoFiltro === c.id
+                      return (
+                        <button key={c.id} type="button" onClick={() => setDisenoFiltro(c.id)}
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12.5px] font-semibold border transition-colors"
+                          style={{ borderColor: on ? '#8b5cf6' : '#e5e7eb', background: on ? '#8b5cf614' : 'transparent', color: on ? '#8b5cf6' : '#6b7280' }}>
+                          {c.label} <span className="text-[11px] opacity-70">{c.n}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input value={disenoBuscar} onChange={(e) => setDisenoBuscar(e.target.value)} placeholder="Buscar…"
+                        className="h-8 w-28 sm:w-44 pl-8 pr-2 rounded-full border bg-background text-[13px] outline-none focus:ring-2 focus:ring-[#8b5cf6]/30" />
                     </div>
-                  </section>
-                )}
-                {listos.length > 0 && (
-                  <section className="mt-4">
-                    <SecHeader icon={<CheckCircle2 className="w-4 h-4" />} label="Listos" count={listos.length} color={C_PUBLICADO} />
-                    <div className="space-y-2">
-                      {listos.map((p) => (
-                        <FilaCompacta key={p.id} p={p} color="#8b5cf6" badge={disenoLabel(p)} onClick={() => setModalPub(p)} />
-                      ))}
+                    <div className="inline-flex items-center rounded-full border p-0.5 bg-background shrink-0">
+                      <button type="button" onClick={() => setDisenoVista('cards')} title="Ver en tarjetas" aria-label="Ver en tarjetas"
+                        className="inline-flex items-center justify-center w-8 h-7 rounded-full transition-colors"
+                        style={{ background: disenoVista === 'cards' ? '#8b5cf6' : 'transparent', color: disenoVista === 'cards' ? '#fff' : '#6b7280' }}>
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button type="button" onClick={() => setDisenoVista('lista')} title="Ver en lista" aria-label="Ver en lista"
+                        className="inline-flex items-center justify-center w-8 h-7 rounded-full transition-colors"
+                        style={{ background: disenoVista === 'lista' ? '#8b5cf6' : 'transparent', color: disenoVista === 'lista' ? '#fff' : '#6b7280' }}>
+                        <List className="w-4 h-4" />
+                      </button>
                     </div>
-                  </section>
+                  </div>
+                </div>
+
+                {mostrados.length === 0 ? (
+                  <Vacio texto="No hay diseños que coincidan con el filtro." />
+                ) : disenoVista === 'cards' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {mostrados.map((p) => <DisenoCard key={p.id} p={p} onClick={() => setModalPub(p)} />)}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {mostrados.map((p) => (
+                      <FilaCompacta key={p.id} p={p} color="#8b5cf6" badge={disenoLabel(p)} onClick={() => setModalPub(p)} />
+                    ))}
+                  </div>
                 )}
-              </>
+              </div>
             )
           })()}
         </div>
@@ -1951,6 +2001,32 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
    cuadrito con el color de la marca y el ICONO del sistema (lucide) según el
    tipo — claqueta para video, paleta para diseño. Pedro 24-jul-2026: "usa los
    iconos de la agencia, no emojis". */
+/* Tarjeta de un diseño (vista de cuadrícula del "Área de diseño"). Miniatura
+   grande + estado + nombre + fecha. Pedro 12-ago-2026: "cuadraditos tipo card". */
+function DisenoCard({ p, onClick }: { p: PubCliente; onClick: () => void }) {
+  const terminado = disenoTerminado(p)
+  const badgeColor = terminado ? '#16a34a' : '#8b5cf6'
+  const fecha = p.fechaEntrega ?? p.fecha
+  return (
+    <button onClick={onClick}
+      className="group text-left rounded-2xl border bg-card overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <div className="aspect-square w-full relative">
+        <Thumb portada={p.portada} color="#8b5cf6" kind="diseno" big />
+        <span className="absolute top-2 right-2 inline-flex items-center text-[10.5px] font-bold px-2 py-0.5 rounded-full shadow-sm"
+          style={{ background: badgeColor, color: '#fff' }}>
+          {disenoLabel(p)}
+        </span>
+      </div>
+      <div className="p-2.5">
+        <div className="text-[13px] font-bold leading-tight line-clamp-2 min-h-[2.4em]">{p.titulo}</div>
+        <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+          <CalendarDays className="w-3 h-3 shrink-0" /> <span className="truncate">{fecha ? fechaBonita(fecha) : 'Sin fecha'}</span>
+        </div>
+      </div>
+    </button>
+  )
+}
+
 function Thumb({ portada, color, kind = 'video', size, big }: { portada: string | null; color: string; kind?: 'video' | 'diseno'; size?: number; big?: boolean }) {
   const [failed, setFailed] = useState(false)
   const url = urlOk(portada)
