@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MarcaSelect } from '@/components/marca-select'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
+import { hoyLima } from '@/lib/fechas/hoy'
 import {
   updateDisenoEntry,
   marcarParaDisenarHoy,
@@ -198,7 +199,7 @@ export function DisenoView({
   }, [])
 
   const marcaBySlug = useMemo(() => new Map(marcas.map((m) => [m.slug, m])), [marcas])
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLima() // hora Lima, no UTC (ver lib/fechas/hoy)
 
   /* ============ Métricas ============ */
   const metricas = useMemo(() => {
@@ -1302,7 +1303,11 @@ function NuevaTareaModal({
       subEstado: 'sin_empezar',
       plataformas: [],
       tipoContenido: [],
-      fechaMarcadaParaDisenar: null,
+      /* Si marcó "Trabajar HOY", reflejamos la fecha de hoy (Lima) en la copia
+         local — igual que lo que ya guardó marcarParaDisenarHoy en la BD. Antes
+         estaba fijo en null → la tarea no aparecía en "Mi trabajo HOY" hasta
+         recargar. Ese era el bug que reportó Aylin. */
+      fechaMarcadaParaDisenar: paraHoy ? hoyLima() : null,
       startedAt: null,
       archivedAt: null,
     })

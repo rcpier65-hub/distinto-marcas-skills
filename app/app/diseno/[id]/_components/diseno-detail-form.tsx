@@ -20,6 +20,7 @@ import { deletePublicacion } from '@/app/publicaciones/[id]/_actions'
 import { esRedireccion } from '@/lib/utils/is-redirect-error'
 import { sincronizarReunion } from '../_reunion-actions'
 import { MarcaSelect } from '@/components/marca-select'
+import { hoyLima } from '@/lib/fechas/hoy'
 import {
   formatDateTimeES,
   formatDuracion,
@@ -79,7 +80,7 @@ export function DisenoDetailForm({
   /* "Trabajar HOY": marca fecha_marcada_para_disenar = hoy. Ancla la tarea a la
      lista de hoy de Aylin (filtro "solo hoy") — así, aunque cambie el estado y
      la tarjeta se mueva de columna en el Kanban, no la pierde. Aylin 10-jul. */
-  const HOY = new Date().toISOString().slice(0, 10)
+  const HOY = hoyLima() // hora Lima, no UTC (ver lib/fechas/hoy)
   const [marcadaHoy, setMarcadaHoy] = useState<boolean>(publicacion.fechaMarcadaParaDisenar === HOY)
   const [togglingHoy, setTogglingHoy] = useState(false)
 

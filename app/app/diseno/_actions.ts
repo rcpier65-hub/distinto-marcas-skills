@@ -12,6 +12,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { hoyLima } from '@/lib/fechas/hoy'
 import type { SubEstadoDiseno } from '@/lib/diseno/types'
 
 type ActionResult<T = undefined> =
@@ -27,7 +28,7 @@ export async function marcarParaDisenarHoy(id: string): Promise<ActionResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLima() // hora Lima, no UTC (ver lib/fechas/hoy)
   const { error } = await service
     .from('publicaciones')
     .update({ fecha_marcada_para_disenar: hoy, updated_by: user.id })
