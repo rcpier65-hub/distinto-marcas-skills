@@ -156,7 +156,7 @@ export function NuevaGrabacionForm({ marcas }: { marcas: MarcaOption[] }) {
       </div>
 
       {/* Fecha + Hora + Duración */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground block mb-1">Fecha</label>
           <input

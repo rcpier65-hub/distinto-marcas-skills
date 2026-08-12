@@ -672,6 +672,7 @@ function ReporteImage({
 
         {/* ===== STATS GRANDES — fila de 4 ===== */}
         <div
+          className="mk-reporte-stats"
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${stats.length}, 1fr)`,

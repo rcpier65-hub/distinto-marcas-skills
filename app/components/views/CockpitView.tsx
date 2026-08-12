@@ -218,7 +218,7 @@ export function CockpitView({ data, nombreUsuario = 'amigo', puedeVerFinanzas = 
     : { flex: 1, overflow: 'auto', padding: '24px 28px 80px' }
 
   return (
-    <div style={containerStyle}>
+    <div className={embedded ? undefined : 'mk-workview'} style={containerStyle}>
       {/* HEADER del cockpit — solo en modo standalone (sin /inicio) */}
       {!embedded && (
         <header

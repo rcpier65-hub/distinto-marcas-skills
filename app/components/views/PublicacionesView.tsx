@@ -277,7 +277,7 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
 
   return (
    <MarcasNavContext.Provider value={marcas}>
-    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }}>
+    <div className="mk-workview" style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--mk-bg-base)' }}>
       {/* ============== HEADER ==============
           Responsive: en mobile el header se apila/comprime — Pedro usa
           mucho la app en celular. Ocultamos el breadcrumb "Workspace /",

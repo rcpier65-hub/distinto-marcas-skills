@@ -1381,7 +1381,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   onClick={() => setOpenPopover(openPopover === 'portada' ? null : 'portada')}
                   badge={form.portada_editada_url ? '✓' : form.portada_cruda_url ? '~' : undefined}
                 >
-                  <div className="space-y-2 w-[280px]">
+                  <div className="space-y-2 w-[min(280px,90vw)]">
                     <div className="font-semibold text-xs text-muted-foreground">Portada</div>
                     <div className="block text-xs">
                       <span className="text-muted-foreground flex items-center gap-1.5"><ImageIcon className="w-3 h-3" /> Cruda (sin editar)</span>
@@ -1415,7 +1415,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   onClick={() => setOpenPopover(openPopover === 'musica' ? null : 'musica')}
                   badge={form.enlace_musica ? '✓' : undefined}
                 >
-                  <div className="space-y-2 w-[280px]">
+                  <div className="space-y-2 w-[min(280px,90vw)]">
                     <div className="font-semibold text-xs text-muted-foreground">Música</div>
                     <LinkInput
                       value={form.enlace_musica}
@@ -1440,7 +1440,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                     : undefined
                   }
                 >
-                  <div className="space-y-3 w-[320px]">
+                  <div className="space-y-3 w-[min(320px,90vw)]">
                     <div className="font-semibold text-xs text-muted-foreground">Videos editados (Drive)</div>
                     <div className="block text-xs">
                       <span className="text-muted-foreground flex items-center gap-1.5">
@@ -1481,7 +1481,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   onClick={() => setOpenPopover(openPopover === 'tomas' ? null : 'tomas')}
                   badge={form.enlace_tomas ? '✓' : undefined}
                 >
-                  <div className="space-y-2 w-[280px]">
+                  <div className="space-y-2 w-[min(280px,90vw)]">
                     <div className="font-semibold text-xs text-muted-foreground">Carpeta de tomas</div>
                     <LinkInput
                       value={form.enlace_tomas}
@@ -1510,7 +1510,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   onClick={() => setOpenPopover(openPopover === 'diseno' ? null : 'diseno')}
                   badge={form.drive_resultado_url ? '✓' : undefined}
                 >
-                  <div className="space-y-2 w-[280px]">
+                  <div className="space-y-2 w-[min(280px,90vw)]">
                     <div className="font-semibold text-xs text-muted-foreground">Diseño terminado</div>
                     <LinkInput
                       value={form.drive_resultado_url}

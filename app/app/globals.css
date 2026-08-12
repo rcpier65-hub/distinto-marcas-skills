@@ -602,6 +602,30 @@
   .mk-inicio-main h1 {
     font-size: 24px !important;
   }
+
+  /* ===== FIX responsividad móvil — Pedro 12-ago-2026 ===== */
+
+  /* Vistas de trabajo (Publicaciones/Editor/Diseño/Cockpit) fijan height:100vh
+     inline, pero el topbar móvil ocupa 52px extra → se cortaba la parte de
+     abajo (la última fila / controles quedaban inalcanzables). Ajustamos la
+     altura al espacio REAL debajo del topbar. `dvh` maneja la barra dinámica
+     del navegador móvil (la de vh se queda corta al aparecer/desaparecer). */
+  .mk-workview {
+    height: calc(100vh - var(--mk-mobile-topbar-height)) !important;
+    height: calc(100dvh - var(--mk-mobile-topbar-height)) !important;
+  }
+
+  /* Salvavidas: si algún elemento se desborda a lo ancho, que NO deslice TODA
+     la página de lado (el peor síntoma en celular). `clip` no rompe
+     position:sticky; los scrollers internos (tablas, kanban) siguen andando. */
+  .mk-main {
+    overflow-x: clip;
+  }
+
+  /* Stats del "Reporte del día" (/inicio): 4 columnas apretadas → 2 en móvil. */
+  .mk-reporte-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
 /* Por encima de 768px: garantizar que el shell NO use overlay */
