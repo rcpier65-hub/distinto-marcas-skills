@@ -127,7 +127,14 @@ export function TareasView({
     setTareas((cur) => cur.filter((t) => t.id !== id))
     if (tarea) setCompletadas((cur) => [{ ...tarea, completada: true, completadaAt: new Date().toISOString() }, ...cur])
     const r = await completarTarea(id, true)
-    if (!r.ok) { toast.error(r.error ?? 'No se pudo completar'); window.location.reload() }
+    if (!r.ok) {
+      toast.error(r.error ?? 'No se pudo completar')
+      /* Revertir SOLO esta tarea. NUNCA window.location.reload(): una recarga
+         abortaba las OTRAS completaciones en curso y esas tareas "reaparecían"
+         aunque se marcaron. Pedro 12-ago-2026 (Lorena). */
+      setCompletadas((cur) => cur.filter((t) => t.id !== id))
+      if (tarea) setTareas((cur) => (cur.some((t) => t.id === id) ? cur : [tarea, ...cur]))
+    }
   }, [tareas, triggerFly])
 
   /* Restaurar (des-completar) una tarea desde el archivo → vuelve al tablero. */
@@ -136,7 +143,12 @@ export function TareasView({
     setCompletadas((cur) => cur.filter((t) => t.id !== id))
     if (tarea) setTareas((cur) => [{ ...tarea, completada: false, completadaAt: null, focusLane: null }, ...cur])
     const r = await completarTarea(id, false)
-    if (!r.ok) { toast.error(r.error ?? 'No se pudo restaurar'); window.location.reload() }
+    if (!r.ok) {
+      toast.error(r.error ?? 'No se pudo restaurar')
+      // Revertir solo esta tarea (sin recargar la página).
+      setTareas((cur) => cur.filter((t) => t.id !== id))
+      if (tarea) setCompletadas((cur) => (cur.some((t) => t.id === id) ? cur : [tarea, ...cur]))
+    }
   }, [completadas])
 
   const onEliminar = useCallback(async (id: string) => {
@@ -151,13 +163,15 @@ export function TareasView({
        (Pedro: "no se pone el color a donde le arrastro"). Si la categoría es
        nueva (sin tareas previas), conserva el color hasta que el server asigne
        uno al recargar. */
+    const prev = tareas
     setTareas((cur) => {
       const destColor = cur.find((t) => t.categoria === categoria && t.id !== id)?.color
       return cur.map((t) => t.id === id ? { ...t, categoria, ...(destColor ? { color: destColor } : {}) } : t)
     })
     const r = await moverTareaCategoria(id, categoria)
-    if (!r.ok) { toast.error(r.error ?? 'No se pudo mover'); window.location.reload() }
-  }, [])
+    // Revertir solo si falló (sin recargar la página).
+    if (!r.ok) { toast.error(r.error ?? 'No se pudo mover'); setTareas(prev) }
+  }, [tareas])
 
   const onSetFocus = useCallback(async (id: string, lane: FocusLane | null) => {
     const prev = tareas

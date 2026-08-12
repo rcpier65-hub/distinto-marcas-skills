@@ -11,14 +11,21 @@ import type { Tarea, FocusLane } from '@/lib/tareas/types'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 
-/* Miembro actual + si es CEO (director). */
+/* Miembro actual + si es CEO (director). Reintenta una vez si la consulta
+   ERRÓ (parpadeo de red/BD): así no devolvemos id=null por un fallo transitorio,
+   que hacía que puedeEditar rechazara la tarea PROPIA del usuario ("Esta tarea
+   no es tuya") y la marca de completada se perdiera. Pedro 12-ago-2026. */
 async function currentMember(service: Service, authUserId: string): Promise<{ id: string | null; esCEO: boolean }> {
-  const { data: tm } = await service
-    .from('team_members')
-    .select('id, rol_base')
-    .eq('auth_user_id', authUserId)
-    .maybeSingle()
-  return { id: tm?.id ?? null, esCEO: tm?.rol_base === 'director' }
+  for (let intento = 0; intento < 2; intento++) {
+    const { data: tm, error } = await service
+      .from('team_members')
+      .select('id, rol_base')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle()
+    if (!error) return { id: tm?.id ?? null, esCEO: tm?.rol_base === 'director' }
+    // error transitorio → reintenta una vez
+  }
+  return { id: null, esCEO: false }
 }
 
 function primerNombre(n: string): string {
