@@ -136,12 +136,20 @@ function estaListoParaCliente(p: PubCliente): boolean {
   const proc = procesoLabel(p)
   return proc === 'Listo para revisar' || proc === 'Programado' || proc === 'Listo'
 }
-/* Etiqueta de estado de un diseño para el cliente. */
+/* Etiqueta de estado de un diseño para el cliente. Mapea las columnas del
+   tablero de Aylin a palabras claras para el cliente. Pedro 12-ago-2026. */
 function disenoLabel(p: PubCliente): string {
-  if (p.estadoTarea === 'listo') return 'Listo'
-  if (p.estadoTarea === 'en_progreso') return 'En proceso'
-  if (p.estadoTarea === 'pausada') return 'En pausa'
-  return 'Programado'
+  switch (p.estadoTarea) {
+    case 'listo':
+    case 'enviado':      return 'Entregado'
+    case 'en_progreso':  return 'En diseño'
+    case 'pausada':      return 'En pausa'
+    default:             return 'En cola' // sin_empezar / null → por hacer
+  }
+}
+/* ¿Un diseño ya está terminado (para separarlo en "Listos")? */
+function disenoTerminado(p: PubCliente): boolean {
+  return p.estadoTarea === 'listo' || p.estadoTarea === 'enviado'
 }
 
 function fechaBonita(iso: string | null): string {
@@ -315,7 +323,7 @@ export function ClientePortalView({
   const pendientes = useMemo(
     () => [
       ...pubsNormales.filter((p) => !esPublicada(p)),
-      ...disenos.filter((p) => p.estadoTarea !== 'listo'),
+      ...disenos.filter((p) => !disenoTerminado(p)),
     ],
     [pubsNormales, disenos],
   )
@@ -800,8 +808,8 @@ export function ClientePortalView({
           {disenos.length === 0 ? (
             <Vacio texto="Todavía no hay diseños. Cuando el equipo empiece uno, aparecerá acá con su estado." />
           ) : (() => {
-            const enProceso = disenos.filter((p) => p.estadoTarea !== 'listo')
-            const listos = disenos.filter((p) => p.estadoTarea === 'listo')
+            const enProceso = disenos.filter((p) => !disenoTerminado(p))
+            const listos = disenos.filter((p) => disenoTerminado(p))
             return (
               <>
                 {enProceso.length > 0 && (

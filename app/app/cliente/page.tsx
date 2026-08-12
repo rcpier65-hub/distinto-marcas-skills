@@ -82,6 +82,33 @@ export default async function ClientePortalPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pubs = (((data as any) ?? []) as any[]).map(mapRow)
 
+  /* DISEÑOS de la marca — alimentan el "Área de diseño" del portal. Los diseños
+     se ENTREGAN, no se publican: no tienen fecha_publicacion, así que el corte
+     por fecha de arriba (PORTAL_DESDE) los dejaba fuera y el área salía vacía.
+     Acá los traemos por marca SIN ese corte, con su estado, para que el cliente
+     vea TODOS sus diseños (por hacer, en proceso y listos). Se ocultan los
+     archivados. La consulta de videos de arriba queda intacta. Pedro 12-ago-2026. */
+  const { data: disenosData } = await service
+    .from('publicaciones')
+    .select(COLS)
+    .eq('marca_id', cliente.marcaId)
+    .eq('es_tarea_diseno', true)
+    .order('fecha_diseno', { ascending: false, nullsFirst: false })
+    .limit(200)
+    .then((r: unknown) => r, () => ({ data: [] }))
+
+  /* Merge (dedupe por id): agregamos los diseños que la consulta de videos no
+     trajo, saltando los archivados. Así el portal muestra los diseños por marca
+     sin tocar cómo se muestran los videos. */
+  const porId = new Map<string, PubCliente>()
+  for (const p of pubs) porId.set(p.id, p)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (((disenosData as any) ?? []) as any[])) {
+    if ((r.estado_tarea ?? '') === 'archivado') continue
+    if (!porId.has(r.id)) porId.set(r.id, mapRow(r))
+  }
+  const pubsConDisenos = [...porId.values()]
+
   const { getObservacionesMarca, getReunionesMarca, getGrabacionesMarca } = await import('@/lib/portal/coordinacion')
   const [observaciones, reuniones, grabaciones, fechasRes] = await Promise.all([
     getObservacionesMarca(service, cliente.marcaId).catch(() => []),
@@ -124,7 +151,7 @@ export default async function ClientePortalPage() {
       driveUrl={cliente.driveUrl}
       contacto={cliente.nombre}
       hoy={hoy}
-      pubs={pubs}
+      pubs={pubsConDisenos}
       fechasImportantes={fechasImportantes}
       reporteNombre={reporte?.nombre ?? null}
       reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
