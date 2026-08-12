@@ -88,7 +88,7 @@ export async function crearTareaEnMarca(marcaSlug: string, textoOriginal: string
   return { ok: true, tarea: rowToTarea(data) }
 }
 
-export async function crearTarea(textoOriginal: string): Promise<
+export async function crearTarea(textoOriginal: string, assigneeId?: string): Promise<
   { ok: true; tarea: Tarea } | { ok: false; error: string }
 > {
   const user = await requireUser()
@@ -127,14 +127,24 @@ export async function crearTarea(textoOriginal: string): Promise<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const miembros = (members ?? []) as any[]
   let ownerId = me.id
-  const mention = texto.match(/@([\p{L}][\p{L}.]*)/u)
-  if (mention) {
-    const mname = mention[1].toLowerCase().replace(/\.+$/, '')
-    const target = miembros.find((m) => {
-      const nombre = (m.nombre ?? '').toLowerCase().trim()
-      return primerNombre(m.nombre) === mname || nombre.replace(/\s+/g, '') === mname || nombre.split(/\s+/).includes(mname)
-    })
+  /* ASIGNACIÓN EXPLÍCITA por el selector "Para: [persona]" (gana sobre todo).
+     Es la forma CONFIABLE de que, p.ej., Lorena le pase una tarea a Ailyn, sin
+     depender de escribir "@Nombre" exacto (que casi nadie hacía → las tareas se
+     quedaban con el creador y nunca llegaban al asignado). Pedro 12-ago-2026. */
+  if (assigneeId) {
+    const target = miembros.find((m) => m.id === assigneeId)
     if (target) ownerId = target.id
+  } else {
+    // Fallback: @mención dentro del texto (por si alguien la usa).
+    const mention = texto.match(/@([\p{L}][\p{L}.]*)/u)
+    if (mention) {
+      const mname = mention[1].toLowerCase().replace(/\.+$/, '')
+      const target = miembros.find((m) => {
+        const nombre = (m.nombre ?? '').toLowerCase().trim()
+        return primerNombre(m.nombre) === mname || nombre.replace(/\s+/g, '') === mname || nombre.split(/\s+/).includes(mname)
+      })
+      if (target) ownerId = target.id
+    }
   }
 
   const color = colorByCat.get(categoria) ?? colorParaCategoria(usados)
@@ -153,6 +163,21 @@ export async function crearTarea(textoOriginal: string): Promise<
     .select(SELECT)
     .single()
   if (error) return { ok: false, error: error.message }
+
+  /* Si la tarea se le asignó a OTRA persona, avísale por push (así Ailyn se
+     entera de que Lorena le agendó algo, sin depender de que abra el tablero).
+     Best-effort: si el push falla, la tarea igual quedó creada. */
+  if (ownerId !== me.id) {
+    try {
+      const { enviarPushAMiembroId } = await import('@/lib/push/send')
+      const quien = miembros.find((m) => m.id === me.id)?.nombre?.split(' ')[0] ?? 'Alguien'
+      await enviarPushAMiembroId(ownerId, {
+        title: '📋 Nueva tarea para ti',
+        body: `${quien} te asignó: ${limpiarTexto(texto).slice(0, 70)}`,
+        url: '/tareas',
+      })
+    } catch { /* noop */ }
+  }
 
   revalidatePath('/tareas')
   revalidatePath('/inicio')

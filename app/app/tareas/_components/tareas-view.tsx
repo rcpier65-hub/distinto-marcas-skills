@@ -297,7 +297,7 @@ export function TareasView({
       </DndContext>
 
       {/* Composer */}
-      <Composer onCrear={onCrear} equipo={equipo} isMobile={isMobile} />
+      <Composer onCrear={onCrear} equipo={equipo} isMobile={isMobile} esCEO={esCEO} />
 
       {/* Cards volando hacia el ícono de Archivo al completarse. */}
       {flyers.map((f) => <FlyerEl key={f.key} flyer={f} />)}
@@ -605,10 +605,14 @@ function DropTarget({ id, label, Icon, color, sub }: { id: string; label: string
 }
 
 /* ============================ Composer ============================ */
-function Composer({ onCrear, equipo, isMobile }: {
-  onCrear: (t: Tarea) => void; equipo: { id: string; nombre: string }[]; isMobile: boolean
+function Composer({ onCrear, equipo, isMobile, esCEO }: {
+  onCrear: (t: Tarea) => void; equipo: { id: string; nombre: string }[]; isMobile: boolean; esCEO: boolean
 }) {
   const [text, setText] = useState('')
+  /* "Para:" — a quién se le asigna la tarea. '' = para mí. Selector visible (no
+     hace falta escribir @Nombre). Se queda fijo para poder asignar varias
+     seguidas; el chip morado deja claro a quién van. Pedro 12-ago-2026. */
+  const [para, setPara] = useState('')
   const [sending, setSending] = useState(false)
   const [escuchando, setEscuchando] = useState(false)
   const [micSoportado, setMicSoportado] = useState(false)
@@ -627,10 +631,19 @@ function Composer({ onCrear, equipo, isMobile }: {
     const t = text.trim()
     if (!t || sending) return
     setSending(true); setText('')
-    const r = await crearTarea(t)
+    const r = await crearTarea(t, para || undefined)
     setSending(false)
-    if (r.ok) onCrear(r.tarea)
-    else { toast.error(r.error); setText(t) }
+    if (r.ok) {
+      if (para) {
+        const nombre = equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'la persona'
+        toast.success(`Tarea asignada a ${nombre} ✓`)
+        /* La tarea es de OTRA persona: solo el dueño (que ve todo el tablero) la
+           agrega a su vista; los demás no (si no, aparecería y desaparecería). */
+        if (esCEO) onCrear(r.tarea)
+      } else {
+        onCrear(r.tarea)
+      }
+    } else { toast.error(r.error); setText(t) }
     inputRef.current?.focus()
   }
 
@@ -661,13 +674,25 @@ function Composer({ onCrear, equipo, isMobile }: {
   return (
     <div style={{ position: 'sticky', bottom: 0, padding: isMobile ? '8px 12px 14px' : '10px 24px 18px', background: 'linear-gradient(180deg, transparent, var(--mk-bg-base, #f7f7f8) 30%)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, boxShadow: '0 4px 16px -4px rgba(16,24,40,0.10)', padding: '8px 8px 8px 14px', maxWidth: 720, margin: '0 auto' }}>
-        <span style={{ opacity: 0.6 }} aria-hidden>✨</span>
+        {equipo.length > 0 ? (
+          <select
+            value={para}
+            onChange={(e) => setPara(e.target.value)}
+            title="¿Para quién es la tarea?"
+            style={{ border: 'none', outline: 'none', borderRadius: 8, padding: '5px 6px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0, maxWidth: 120, background: para ? '#ede9fe' : '#f3f4f6', color: para ? '#6d28d9' : '#6b7280' }}
+          >
+            <option value="">Para: yo</option>
+            {equipo.map((m) => <option key={m.id} value={m.id}>Para: {m.nombre.split(' ')[0]}</option>)}
+          </select>
+        ) : (
+          <span style={{ opacity: 0.6 }} aria-hidden>✨</span>
+        )}
         <input
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); enviar() } }}
-          placeholder='Escribe la tarea… ej: "@Lorena revisar guiones que faltan"'
+          placeholder={para ? 'Escribe la tarea a asignar…' : 'Escribe la tarea…'}
           disabled={sending}
           style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#111827', background: 'transparent', minWidth: 0 }}
         />
@@ -682,10 +707,12 @@ function Composer({ onCrear, equipo, isMobile }: {
           {sending ? '…' : <Plus size={18} strokeWidth={2.6} />}
         </button>
       </div>
-      {/* hint @equipo */}
+      {/* confirmación de asignación */}
       {equipo.length > 0 && (
-        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 10.5, color: '#9ca3af', textAlign: 'center' }}>
-          Asignar a: {equipo.map((m) => `@${m.nombre.split(' ')[0]}`).join('  ')}
+        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: para ? '#6d28d9' : '#9ca3af', fontWeight: para ? 700 : 400 }}>
+          {para
+            ? `📋 Se le asignará a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'} y le llegará un aviso al celular.`
+            : 'Tip: usa "Para:" para asignarle la tarea a alguien del equipo.'}
         </div>
       )}
       <style>{`@keyframes mk-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}.mk-mic-on{animation:mk-mic-pulse 1.2s ease-in-out infinite}`}</style>
