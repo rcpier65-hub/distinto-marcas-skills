@@ -55,8 +55,8 @@ export async function marcarPublicado(id: string): Promise<Result> {
     .maybeSingle()
   const porQuien = quien?.nombre ? ` · por ${quien.nombre}` : ''
   await enviarPushAMiembros(['lorena'], {
-    title: `📢 Publicación confirmada — ${marcaNombre} ${m?.emoji_marca ?? ''}`.trim(),
-    body: `${pub?.nombre ?? marcaNombre}${redes} · ${hora}${porQuien}`,
+    title: `✅ Publicado en redes — ${marcaNombre} ${m?.emoji_marca ?? ''}`.trim(),
+    body: `Ya se subió a las redes: «${pub?.nombre ?? marcaNombre}»${redes} · ${hora}${porQuien}`,
     url: `/publicaciones/${id}`,
     tag: `pub-confirmada-eq-${id}`,
   })
