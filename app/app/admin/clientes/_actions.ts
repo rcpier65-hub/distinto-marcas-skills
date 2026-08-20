@@ -199,8 +199,21 @@ export async function eliminarAccesoCliente(id: string): Promise<Result> {
   if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso' }
   const service = createServiceClient() as Service
   const { data: row } = await service.from('marca_clientes').select('auth_user_id').eq('id', id).maybeSingle()
-  await service.from('marca_clientes').delete().eq('id', id)
-  if (row?.auth_user_id) { try { await service.auth.admin.deleteUser(row.auth_user_id) } catch { /* noop */ } }
+  const { error: delErr } = await service.from('marca_clientes').delete().eq('id', id)
+  if (delErr) return { ok: false, error: delErr.message }
+  /* Borrar el USUARIO de login SOLO si ya no le queda ningún otro acceso a
+     marcas. Un cliente multi-marca (p.ej. Praktico + Retoz shop, mismo login)
+     conserva su login mientras tenga al menos una marca; si borráramos el auth
+     al quitar UN acceso, tumbaríamos su acceso a las demás. Pedro 17-ago-2026. */
+  if (row?.auth_user_id) {
+    const { count } = await service
+      .from('marca_clientes')
+      .select('id', { count: 'exact', head: true })
+      .eq('auth_user_id', row.auth_user_id)
+    if (!count || count === 0) {
+      try { await service.auth.admin.deleteUser(row.auth_user_id) } catch { /* noop */ }
+    }
+  }
   revalidatePath('/admin/clientes')
   return { ok: true }
 }
