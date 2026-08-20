@@ -11,6 +11,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      /* Los avisos ("Fecha actualizada ✓", etc.) desaparecen rápido. El default
+         de sonner es 4s y se sentía eterno (Pedro). 1.8s alcanza para leerlos.
+         Al pasar el mouse por encima se pausan. Un caller puede sobreescribir
+         con `duration` gracias al {...props} de abajo. */
+      duration={1800}
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
