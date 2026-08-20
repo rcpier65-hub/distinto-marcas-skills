@@ -148,6 +148,7 @@ export default async function ClientePortalPage() {
       marcaEmoji={cliente.marcaEmoji}
       marcaColor={cliente.marcaColor}
       marcaLogoUrl={cliente.marcaLogoUrl}
+      marcasDisponibles={cliente.marcasDisponibles}
       driveUrl={cliente.driveUrl}
       contacto={cliente.nombre}
       hoy={hoy}

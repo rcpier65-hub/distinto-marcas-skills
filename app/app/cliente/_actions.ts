@@ -2,15 +2,38 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { getClienteActual } from '@/lib/cliente/get-cliente'
+import { getClienteActual, COOKIE_MARCA_CLIENTE } from '@/lib/cliente/get-cliente'
 import { enviarPushAMiembros } from '@/lib/push/send'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 type Result = { ok: true; aprobadoAt: string } | { ok: false; error: string }
 type Ok = { ok: true } | { ok: false; error: string }
+
+/* Cambiar de marca activa (cliente multi-marca). SEGURIDAD: la marca destino
+   DEBE estar vinculada a este login en marca_clientes; jamás puede activar una
+   marca ajena. Guarda la elección en una cookie que lee getClienteActual.
+   Pedro 17-ago-2026 (Praktico ↔ Retoz shop, mismo cliente). */
+export async function cambiarMarcaCliente(marcaId: string): Promise<Ok> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const { data } = await service
+    .from('marca_clientes')
+    .select('marca_id')
+    .eq('auth_user_id', user.id)
+    .eq('marca_id', marcaId)
+    .maybeSingle()
+  if (!data) return { ok: false, error: 'Esa marca no está disponible para tu cuenta.' }
+  const cookieStore = await cookies()
+  cookieStore.set(COOKIE_MARCA_CLIENTE, marcaId, {
+    httpOnly: true, sameSite: 'lax', secure: true, path: '/', maxAge: 60 * 60 * 24 * 365,
+  })
+  revalidatePath('/cliente')
+  return { ok: true }
+}
 
 /* El CLIENTE mueve una publicación a otra fecha desde su calendario (arrastrando
    o con el selector de fecha). Seguridad: solo publicaciones de SU marca y que

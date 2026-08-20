@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search,
+  TrendingUp, Search, RefreshCw,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -17,7 +17,8 @@ import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
-import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente } from '../_actions'
+import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente } from '../_actions'
+import type { MarcaCliente } from '@/lib/cliente/get-cliente'
 import { ClienteRealtime } from './cliente-realtime'
 import { DriveExplorer } from './drive-explorer'
 import type { Observacion, Reunion, GrabacionCliente } from '@/lib/portal/coordinacion'
@@ -240,8 +241,66 @@ function GrupoSidebar({ titulo, abierto, onToggle }: { titulo: string; abierto: 
   )
 }
 
+/* Selector "Cambiar de marca" para clientes que manejan VARIAS marcas con el
+   mismo login (p.ej. Praktico ↔ Retoz shop). Solo aparece si hay >1 marca. Al
+   elegir otra, el server guarda la cookie (validando que sea suya) y recargamos
+   el portal con TODO de esa marca — sin pedir correo ni clave. Pedro 17-ago-2026. */
+function SwitcherMarca({ marcas, activaId, color }: {
+  marcas: MarcaCliente[]; activaId: string; color: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [cambiando, setCambiando] = useState(false)
+  if (!marcas || marcas.length < 2) return null
+
+  async function ir(id: string) {
+    if (cambiando) return
+    if (id === activaId) { setOpen(false); return }
+    setCambiando(true)
+    const r = await cambiarMarcaCliente(id)
+    if (r?.ok) { window.location.assign('/cliente') } // recarga limpia ya con la marca nueva
+    else { toast.error(r?.error ?? 'No se pudo cambiar de marca'); setCambiando(false); setOpen(false) }
+  }
+
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} disabled={cambiando}
+        title="Cambiar de marca"
+        className="w-full inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-[12.5px] font-bold transition-opacity hover:opacity-90 disabled:opacity-60"
+        style={{ background: `${color}14`, color }}>
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${cambiando ? 'animate-spin' : ''}`} />
+          <span className="truncate">{cambiando ? 'Cambiando…' : 'Cambiar de marca'}</span>
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+      </button>
+      {open && !cambiando && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute left-0 z-50 mt-1 w-60 max-w-[85vw] rounded-xl border bg-card shadow-xl p-1.5">
+            <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">Tus marcas</div>
+            {marcas.map((m) => {
+              const activa = m.id === activaId
+              return (
+                <button key={m.id} type="button" onClick={() => ir(m.id)}
+                  className="w-full flex items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] font-semibold hover:bg-muted transition-colors text-left">
+                  <MarcaLogo slug={m.slug} nombre={m.nombre} emoji={m.emoji} logoUrl={m.logoUrl} size={24} />
+                  <span className="flex-1 min-w-0 truncate">{m.nombre}</span>
+                  {activa
+                    ? <Check className="w-4 h-4 shrink-0" style={{ color: m.color }} />
+                    : <span className="text-[11px] text-muted-foreground shrink-0">Entrar →</span>}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function ClientePortalView({
   marcaId, marcaNombre, marcaSlug, marcaEmoji, marcaColor, marcaLogoUrl, driveUrl, contacto, hoy, pubs: pubsIniciales, observaciones, reuniones, grabaciones, fechasImportantes = [],
+  marcasDisponibles = [],
   reporteNombre = null, reporteMeses = null,
 }: {
   marcaId: string
@@ -250,6 +309,8 @@ export function ClientePortalView({
   marcaEmoji: string | null
   marcaColor: string
   marcaLogoUrl: string | null
+  /* Marcas de este login. Si hay >1, se muestra el selector "Cambiar de marca". */
+  marcasDisponibles?: MarcaCliente[]
   driveUrl: string | null
   contacto: string | null
   hoy: string
@@ -507,6 +568,13 @@ export function ClientePortalView({
           </div>
         </div>
 
+        {/* Cliente multi-marca: selector para saltar entre sus marcas (PC). */}
+        {marcasDisponibles.length > 1 && (
+          <div className="px-4 pt-3">
+            <SwitcherMarca marcas={marcasDisponibles} activaId={marcaId} color={marcaColor} />
+          </div>
+        )}
+
         <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
           {/* ===== Sección plegable: TU MARCA ===== */}
           <GrupoSidebar titulo="Tu marca" abierto={secAbierta.marca} onToggle={() => setSecAbierta((s) => ({ ...s, marca: !s.marca }))} />
@@ -622,6 +690,13 @@ export function ClientePortalView({
               </button>
             </div>
           </header>
+
+          {/* Cliente multi-marca: selector en móvil (en PC va en el menú lateral). */}
+          {marcasDisponibles.length > 1 && (
+            <div className="lg:hidden">
+              <SwitcherMarca marcas={marcasDisponibles} activaId={marcaId} color={marcaColor} />
+            </div>
+          )}
 
           {/* Activar notificaciones */}
           <div className="rounded-2xl border-2 bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderColor: `${marcaColor}33` }}>
