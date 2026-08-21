@@ -307,9 +307,9 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     })
   }
 
-  /* Grabaciones próximas — para roles que SÍ graban (editor, CM, SMM,
-     director, admin). Pedro: 'editor y Lorena deben ver aviso tienes
-     grabación el día X. Ailyn no porque ella no graba'. */
+  /* Grabaciones próximas — aviso "tienes grabación el día X" para quien VA a
+     grabar. Pedro: 'editor y Lorena deben verlo. Ailyn no porque no graba'. La
+     lista de roles y el gating están abajo (rolesQueGraban). */
   type GrabacionProxima = {
     id: string
     fechaCorta: string  // 'Mié 17 jun'
@@ -321,8 +321,12 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     esManana: boolean
   }
   let grabacionesProximas: GrabacionProxima[] = []
-  const rolesQueGraban = ['editor', 'community_manager', 'social_media_manager', 'director']
-  const grabaAlgo = esCEO || rolesQueGraban.includes(memberData.rol_base)
+  /* SOLO los roles que REALMENTE graban (editor, CM, SMM). Los DIRECTORES
+     (Pedro, Erick) y admin NO graban → no les aparece "Próximas grabaciones" en
+     su inicio. Pedro 20-ago-2026: "a Erick le salen pero él no las graba, no
+     tiene por qué salir en su reporte". (Antes incluía 'director' + esCEO.) */
+  const rolesQueGraban = ['editor', 'community_manager', 'social_media_manager']
+  const grabaAlgo = rolesQueGraban.includes(memberData.rol_base)
   if (grabaAlgo) {
     const { data: grRaw } = await service
       .from('grabaciones')
