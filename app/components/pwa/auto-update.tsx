@@ -45,10 +45,25 @@ export function AutoUpdate() {
     async function aplicarActualizacion() {
       if (recargando.current) return
       recargando.current = true
+      /* ⚠️ GUARDA CRÍTICA (Pedro 11-ago-2026: "This page couldn't load"):
+         antes borrábamos TODAS las cachés y recién recargábamos. Si la recarga
+         caía con mala señal o en pleno cambio de deploy, el equipo quedaba SIN
+         caché y SIN red → pantalla de error del webview/PWA. Ahora primero
+         verificamos que la red pueda servir la app nueva; si no puede, NO
+         tocamos la caché y lo reintentamos en el próximo ciclo. */
       try {
+        const alcanzable = await fetch('/api/version', { cache: 'no-store', signal: AbortSignal.timeout(8000) })
+          .then((r) => r.ok)
+          .catch(() => false)
+        if (!alcanzable) {
+          recargando.current = false
+          pendiente.current = true
+          return
+        }
         if (typeof caches !== 'undefined') {
+          /* Solo las cachés PROPIAS del SW (prefijo 'distinto-'), no todo. */
           const keys = await caches.keys()
-          await Promise.all(keys.map((k) => caches.delete(k)))
+          await Promise.all(keys.filter((k) => k.startsWith('distinto-')).map((k) => caches.delete(k)))
         }
         if ('serviceWorker' in navigator) {
           const reg = await navigator.serviceWorker.getRegistration()
@@ -57,7 +72,7 @@ export function AutoUpdate() {
             reg.waiting?.postMessage({ type: 'SKIP_WAITING' })
           }
         }
-      } catch { /* si algo falla, igual recargamos */ }
+      } catch { /* si algo falla, igual recargamos (la red ya respondió arriba) */ }
       window.location.reload()
     }
 

@@ -24,6 +24,10 @@ async function pgConnect(): Promise<PgClient | null> {
     port: parseInt(u.port || '5432', 10),
     database: u.pathname.replace(/^\//, '') || 'postgres',
     ssl: { rejectUnauthorized: false },
+    /* Nunca colgar una página por la BD: si no conecta en 5s, falla y el
+       caller cae a su fallback (seed / vacío). */
+    connectionTimeoutMillis: 5000,
+    query_timeout: 8000,
   })
   await client.connect()
   return client

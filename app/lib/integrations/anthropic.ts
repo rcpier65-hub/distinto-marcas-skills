@@ -46,6 +46,9 @@ export async function getAnthropicApiKey(): Promise<string | null> {
         port: parseInt(u.port || '5432', 10),
         database: u.pathname.replace(/^\//, '') || 'postgres',
         ssl: { rejectUnauthorized: false },
+        /* No colgar la generación si la BD directa no responde. */
+        connectionTimeoutMillis: 5000,
+        query_timeout: 8000,
       })
       await client.connect()
       try {
