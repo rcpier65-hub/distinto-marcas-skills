@@ -679,10 +679,10 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
             value={para}
             onChange={(e) => setPara(e.target.value)}
             title="¿Para quién es la tarea?"
-            style={{ border: 'none', outline: 'none', borderRadius: 8, padding: '5px 6px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0, maxWidth: 120, background: para ? '#ede9fe' : '#f3f4f6', color: para ? '#6d28d9' : '#6b7280' }}
+            style={{ border: `1.5px solid ${para ? '#a78bfa' : '#c7d2fe'}`, outline: 'none', borderRadius: 10, padding: '7px 8px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0, maxWidth: 155, background: para ? '#ede9fe' : '#eef2ff', color: para ? '#6d28d9' : '#4338ca' }}
           >
-            <option value="">Para: yo</option>
-            {equipo.map((m) => <option key={m.id} value={m.id}>Para: {m.nombre.split(' ')[0]}</option>)}
+            <option value="">👤 Para mí</option>
+            {equipo.map((m) => <option key={m.id} value={m.id}>👤 Para {m.nombre.split(' ')[0]}</option>)}
           </select>
         ) : (
           <span style={{ opacity: 0.6 }} aria-hidden>✨</span>
@@ -711,8 +711,8 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
       {equipo.length > 0 && (
         <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: para ? '#6d28d9' : '#9ca3af', fontWeight: para ? 700 : 400 }}>
           {para
-            ? `📋 Se le asignará a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'} y le llegará un aviso al celular.`
-            : 'Tip: usa "Para:" para asignarle la tarea a alguien del equipo.'}
+            ? `📋 Se la asignas a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'}: le aparece en SU tablero y le llega un aviso al celular.`
+            : '👈 ¿La tarea es para otra persona? Toca "Para mí" y elige a quién (ej. Ailyn). Si no, se queda contigo.'}
         </div>
       )}
       <style>{`@keyframes mk-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}.mk-mic-on{animation:mk-mic-pulse 1.2s ease-in-out infinite}`}</style>
