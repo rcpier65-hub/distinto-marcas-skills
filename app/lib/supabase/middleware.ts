@@ -49,14 +49,32 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
+      /* ⚠️ TIMEOUT GLOBAL (Pedro 27-ago-2026, 504 MIDDLEWARE_INVOCATION_TIMEOUT):
+         getUser() hace una llamada de red a Supabase Auth SIN timeout propio; un
+         pico de lentitud colgaba el middleware (corre en CADA request) hasta que
+         Vercel lo mataba con 504 → app caída para todos. Mismo mal (y mismo
+         remedio) que esClienteDeMarca() en jul-2026. Todas las llamadas de este
+         cliente llevan tope de 5s. */
+      global: {
+        fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, signal: AbortSignal.timeout(5000) })) as typeof fetch,
+      },
     }
   )
 
   // IMPORTANT: getUser() refresca el token automáticamente si está vencido.
   // NO usar getSession() en middleware (no valida con el servidor).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Si Auth no responde a tiempo → FAIL-OPEN: dejamos pasar sin bloquear (las
+  // páginas protegidas igual validan sesión con requireUser() en el server).
+  // Jamás redirigir a /login por un timeout: el equipo SÍ tiene sesión.
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null
+  let authRespondio = true
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    authRespondio = false
+  }
 
   // Si NO hay user y la ruta NO es /login, /auth, /api/*, ni /, redirigir a /login.
   // /api/cron/* y /api/render-grilla hacen su propia auth con Bearer token (no requiere sesión user).
@@ -82,7 +100,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === '/favicon-32.png' ||
     request.nextUrl.pathname === '/favicon.ico'
 
-  if (!user && !isPublicPath) {
+  if (!user && authRespondio && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
