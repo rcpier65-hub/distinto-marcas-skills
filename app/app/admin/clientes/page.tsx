@@ -39,7 +39,7 @@ export default async function AdminClientesPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const accesos: AccesoCliente[] = ((accesosRes?.data ?? []) as any[]).map((r) => {
     const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
-    return { id: r.id, nombre: r.nombre ?? '', email: r.email ?? '', passwordInicial: r.password_inicial ?? null, marcaNombre: m?.nombre ?? '—', marcaEmoji: m?.emoji_marca ?? null }
+    return { id: r.id, nombre: r.nombre ?? '', email: r.email ?? '', passwordInicial: r.password_inicial ?? null, marcaNombre: m?.nombre ?? '—', marcaSlug: m?.slug ?? '', marcaEmoji: m?.emoji_marca ?? null }
   })
 
   return <ClientesAdminView marcas={marcas} accesos={accesos} />
