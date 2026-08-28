@@ -54,16 +54,77 @@ export async function crearAccesoCliente(input: {
     return { ok: false, error: authErr?.message ?? 'No se pudo crear el usuario' }
   }
 
-  const { error: linkErr } = await service.from('marca_clientes').insert({
+  const { data: fila, error: linkErr } = await service.from('marca_clientes').insert({
     auth_user_id: created.user.id,
     marca_id: marca.id,
     nombre: (input.nombre ?? '').trim() || marca.nombre,
     email,
-  })
+  }).select('id').single()
   if (linkErr) {
     // Si falla el vínculo, borramos el usuario recién creado para no dejar basura.
     try { await service.auth.admin.deleteUser(created.user.id) } catch { /* noop */ }
     return { ok: false, error: linkErr.message }
+  }
+
+  /* Guardar la contraseña inicial para poder COPIARLA/enviar la invitación
+     después — mismo patrón que team_members.password_inicial en Mi equipo
+     (Pedro 27-ago-2026). Best-effort: si falla, el acceso igual quedó creado. */
+  try { await guardarPasswordInicial(service, fila.id, password) } catch (e) {
+    console.error('[crearAccesoCliente] no se pudo guardar password_inicial:', e)
+  }
+
+  revalidatePath('/admin/clientes')
+  return { ok: true }
+}
+
+/* Guarda la contraseña inicial en marca_clientes (columna password_inicial).
+   Si la columna aún no existe (42703/PGRST204), la CREA vía pg directa y
+   reintenta — patrón writeAnthropicKeyViaPg de Settings. */
+async function guardarPasswordInicial(service: Service, clienteId: string, password: string): Promise<void> {
+  const { error } = await service.from('marca_clientes').update({ password_inicial: password }).eq('id', clienteId)
+  if (!error) return
+  const dbUrl = process.env.SUPABASE_DB_URL || process.env.SUPABASE_DB_URL_DIRECT
+  if (!dbUrl) throw new Error(error.message)
+  const { Client } = await import('pg')
+  const u = new URL(dbUrl)
+  const client = new Client({
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    host: u.hostname,
+    port: parseInt(u.port || '5432', 10),
+    database: u.pathname.replace(/^\//, '') || 'postgres',
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+    query_timeout: 8000,
+  })
+  await client.connect()
+  try {
+    await client.query('ALTER TABLE marca_clientes ADD COLUMN IF NOT EXISTS password_inicial text')
+    await client.query('UPDATE marca_clientes SET password_inicial = $1 WHERE id = $2', [password, clienteId])
+    try { await client.query("NOTIFY pgrst, 'reload schema'") } catch { /* best-effort */ }
+  } finally {
+    await client.end()
+  }
+}
+
+/* Asigna/cambia la contraseña de un cliente y la deja guardada para copiar.
+   La escribe Pedro/Erick EN LA APP (nunca en el chat) — espejo de
+   setPasswordMiembro de Mi equipo. */
+export async function setPasswordCliente(id: string, password: string): Promise<Result> {
+  await requireUser()
+  if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso para cambiar contraseñas de cliente' }
+  if ((password ?? '').length < 8) return { ok: false, error: 'La contraseña debe tener al menos 8 caracteres' }
+  const service = createServiceClient() as Service
+
+  const { data: row } = await service.from('marca_clientes').select('auth_user_id').eq('id', id).maybeSingle()
+  if (!row) return { ok: false, error: 'Cliente no encontrado' }
+  if (!row.auth_user_id) return { ok: false, error: 'Este cliente no tiene login creado' }
+
+  const { error: authErr } = await service.auth.admin.updateUserById(row.auth_user_id, { password })
+  if (authErr) return { ok: false, error: authErr.message }
+
+  try { await guardarPasswordInicial(service, id, password) } catch (e) {
+    console.error('[setPasswordCliente] no se pudo guardar password_inicial:', e)
   }
 
   revalidatePath('/admin/clientes')

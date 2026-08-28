@@ -18,17 +18,28 @@ export default async function AdminClientesPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
-  const [marcasRes, accesosRes] = await Promise.all([
-    service.from('marcas').select('slug, nombre, emoji_marca').eq('activa', true).order('nombre'),
-    service.from('marca_clientes').select('id, nombre, email, created_at, marca:marcas(slug, nombre, emoji_marca)').order('created_at', { ascending: false }),
-  ])
+  const marcasRes = await service.from('marcas').select('slug, nombre, emoji_marca').eq('activa', true).order('nombre')
+
+  /* Accesos con la contraseña guardada (password_inicial, para copiar/invitar).
+     DEFENSIVO: la columna se auto-crea recién al primer guardado — si aún no
+     existe (42703), reintentamos el select sin ella. */
+  let accesosRes = await service
+    .from('marca_clientes')
+    .select('id, nombre, email, password_inicial, created_at, marca:marcas(slug, nombre, emoji_marca)')
+    .order('created_at', { ascending: false })
+  if (accesosRes?.error) {
+    accesosRes = await service
+      .from('marca_clientes')
+      .select('id, nombre, email, created_at, marca:marcas(slug, nombre, emoji_marca)')
+      .order('created_at', { ascending: false })
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const marcas: MarcaMini[] = ((marcasRes?.data ?? []) as any[]).map((m) => ({ slug: m.slug, nombre: m.nombre, emoji: m.emoji_marca ?? null }))
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const accesos: AccesoCliente[] = ((accesosRes?.data ?? []) as any[]).map((r) => {
     const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
-    return { id: r.id, nombre: r.nombre ?? '', email: r.email ?? '', marcaNombre: m?.nombre ?? '—', marcaEmoji: m?.emoji_marca ?? null }
+    return { id: r.id, nombre: r.nombre ?? '', email: r.email ?? '', passwordInicial: r.password_inicial ?? null, marcaNombre: m?.nombre ?? '—', marcaEmoji: m?.emoji_marca ?? null }
   })
 
   return <ClientesAdminView marcas={marcas} accesos={accesos} />

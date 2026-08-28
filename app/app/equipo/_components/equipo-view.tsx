@@ -97,6 +97,24 @@ export function EquipoView({ members: initial, roles, marcas, pubsPorEditor }: P
             </p>
           </div>
           <div style={{ flex: 1 }} />
+          {/* Accesos de CLIENTES (portal): usuarios + contraseñas + invitación,
+              igual que los miembros del equipo. Viven en /admin/clientes
+              (los gestiona Pedro/Erick). Pedro 27-ago-2026: "ponlos en roles
+              y usuarios para copiarlos y enviar invitación". */}
+          <a
+            href="/admin/clientes"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              height: 40, padding: '0 14px', marginRight: 10,
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 10,
+              color: '#374151', textDecoration: 'none',
+              fontFamily: 'inherit', fontSize: 13.5, fontWeight: 500,
+            }}
+          >
+            🏷️ Accesos de clientes
+          </a>
           <button
             onClick={() => setNuevoOpen(true)}
             style={{
