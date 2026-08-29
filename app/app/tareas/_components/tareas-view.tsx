@@ -28,14 +28,40 @@ const LANE_META: Record<FocusLane, { label: string; color: string; Icon: typeof 
 
 type Flyer = { key: string; texto: string; color: string; from: { x: number; y: number; w: number }; to: { x: number; y: number } }
 
+/* Últimos 7 días (hoy → 6 atrás) en horario Lima, para que Erick indique cuándo
+   hizo la tarea. Devuelve {iso:'YYYY-MM-DD', label} con "Hoy"/"Ayer". Usamos el
+   mediodía UTC de cada día para que el componente de fecha en Lima sea correcto
+   (Lima = UTC-5, sin horario de verano). Pedro 26-ago-2026. */
+function opcionesDiaHecho(): { iso: string; label: string }[] {
+  const hoyIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const [y, m, d] = hoyIso.split('-').map(Number)
+  const out: { iso: string; label: string }[] = []
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(Date.UTC(y, m - 1, d - i, 12))
+    const iso = dt.toISOString().slice(0, 10)
+    let label: string
+    if (i === 0) label = 'Hoy'
+    else if (i === 1) label = 'Ayer'
+    else {
+      const s = dt.toLocaleDateString('es-PE', { timeZone: 'America/Lima', weekday: 'long', day: 'numeric' })
+      label = s.charAt(0).toUpperCase() + s.slice(1)
+    }
+    out.push({ iso, label })
+  }
+  return out
+}
+
 export function TareasView({
-  tareasIniciales, completadasIniciales = [], esCEO, meId, equipo,
+  tareasIniciales, completadasIniciales = [], esCEO, meId, equipo, esErick = false,
 }: {
   tareasIniciales: Tarea[]
   completadasIniciales?: Tarea[]
   esCEO: boolean
   meId: string | null
   equipo: { id: string; nombre: string }[]
+  /* Solo Erick: al completar una tarea le preguntamos QUÉ DÍA la hizo, para que
+     su reporte semanal la ubique en el día correcto. Pedro 26-ago-2026. */
+  esErick?: boolean
 }) {
   const isMobile = useIsMobile()
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales)
@@ -49,6 +75,8 @@ export function TareasView({
   const [flyers, setFlyers] = useState<Flyer[]>([])
   const [archivoPulse, setArchivoPulse] = useState(false)
   const archivoBtnRef = useRef<HTMLButtonElement>(null)
+  /* Solo Erick: tarea pendiente de elegir "¿qué día la hiciste?". */
+  const [preguntaFecha, setPreguntaFecha] = useState<{ id: string; titulo: string; fromRect?: DOMRect } | null>(null)
   /* Orden ESTABLE de columnas: se fija en el 1er render (por cantidad) y NO se
      reordena al completar/mover tareas → el tablero no "salta". Antes el re-sort
      por cantidad hacía que completar UNA tarea reacomodara TODAS las columnas,
@@ -121,12 +149,13 @@ export function TareasView({
     setTareas((cur) => [tarea, ...cur])
   }, [])
 
-  const onCompletar = useCallback(async (id: string, fromRect?: DOMRect) => {
+  const hacerCompletar = useCallback(async (id: string, fromRect?: DOMRect, fechaHecha?: string) => {
     const tarea = tareas.find((t) => t.id === id)
     if (fromRect && tarea) triggerFly(fromRect, tarea)
     setTareas((cur) => cur.filter((t) => t.id !== id))
-    if (tarea) setCompletadas((cur) => [{ ...tarea, completada: true, completadaAt: new Date().toISOString() }, ...cur])
-    const r = await completarTarea(id, true)
+    const completadaAt = fechaHecha ? `${fechaHecha}T12:00:00-05:00` : new Date().toISOString()
+    if (tarea) setCompletadas((cur) => [{ ...tarea, completada: true, completadaAt }, ...cur])
+    const r = await completarTarea(id, true, fechaHecha)
     if (!r.ok) {
       toast.error(r.error ?? 'No se pudo completar')
       /* Revertir SOLO esta tarea. NUNCA window.location.reload(): una recarga
@@ -136,6 +165,17 @@ export function TareasView({
       if (tarea) setTareas((cur) => (cur.some((t) => t.id === id) ? cur : [tarea, ...cur]))
     }
   }, [tareas, triggerFly])
+
+  /* Puerta: para Erick abrimos el "¿qué día la hiciste?"; los demás completan
+     como hoy (comportamiento de siempre). Pedro 26-ago-2026. */
+  const onCompletar = useCallback((id: string, fromRect?: DOMRect) => {
+    if (esErick) {
+      const tarea = tareas.find((t) => t.id === id)
+      setPreguntaFecha({ id, titulo: tarea?.texto ?? 'esta tarea', fromRect })
+      return
+    }
+    void hacerCompletar(id, fromRect)
+  }, [esErick, tareas, hacerCompletar])
 
   /* Restaurar (des-completar) una tarea desde el archivo → vuelve al tablero. */
   const onRestaurar = useCallback(async (id: string) => {
@@ -311,7 +351,62 @@ export function TareasView({
           onRestaurar={onRestaurar}
         />
       )}
+
+      {/* SOLO ERICK: "¿Qué día hiciste esta tarea?" — así su reporte semanal la
+          pone en el día correcto (a veces marca hoy algo que hizo el lunes). */}
+      {preguntaFecha && (
+        <DiaHechoModal
+          titulo={preguntaFecha.titulo}
+          onElegir={(iso) => {
+            const p = preguntaFecha
+            setPreguntaFecha(null)
+            void hacerCompletar(p.id, p.fromRect, iso)
+          }}
+          onCancelar={() => setPreguntaFecha(null)}
+        />
+      )}
     </main>
+  )
+}
+
+/* ============================ Modal "¿Qué día la hiciste?" (Erick) ============================ */
+function DiaHechoModal({ titulo, onElegir, onCancelar }: {
+  titulo: string
+  onElegir: (iso: string) => void
+  onCancelar: () => void
+}) {
+  const dias = useMemo(() => opcionesDiaHecho(), [])
+  return (
+    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} onClick={onCancelar}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="w-full sm:max-w-sm bg-card rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col">
+        <div className="flex items-start gap-2.5 p-4 border-b">
+          <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl shrink-0" style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
+            <Check className="w-5 h-5 text-white" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-bold leading-tight">¿Qué día la hiciste?</div>
+            <div className="text-[12px] text-muted-foreground truncate">{titulo}</div>
+          </div>
+          <button onClick={onCancelar} className="w-8 h-8 rounded-lg inline-flex items-center justify-center hover:bg-muted shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-3 grid grid-cols-2 gap-2">
+          {dias.map((d) => (
+            <button key={d.iso} type="button" onClick={() => onElegir(d.iso)}
+              className="h-11 rounded-xl border font-semibold text-[13.5px] capitalize transition-colors hover:text-white"
+              style={{ borderColor: 'rgba(113,112,255,0.35)', color: '#5b21b6' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg,#7170ff,#ba41f7)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '' }}>
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <div className="px-4 pb-4 pt-1">
+          <p className="text-[11.5px] text-muted-foreground text-center">Toca el día real en que la terminaste.</p>
+        </div>
+      </div>
+    </div>
   )
 }
 

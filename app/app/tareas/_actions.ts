@@ -199,14 +199,20 @@ async function puedeEditar(service: Service, authUserId: string, tareaId: string
   return { ok: false, error: 'Esta tarea no es tuya' }
 }
 
-export async function completarTarea(id: string, completada = true): Promise<{ ok: boolean; error?: string }> {
+export async function completarTarea(id: string, completada = true, fechaHecha?: string): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser()
   const service = createServiceClient() as Service
   const perm = await puedeEditar(service, user.id, id)
   if (!perm.ok) return perm
+  /* completada_at: si viene fechaHecha (YYYY-MM-DD) usamos el mediodía Lima de
+     ESE día — sirve para que Erick indique el día REAL en que hizo la tarea, y su
+     reporte semanal la ubique en el día correcto. Si no, ahora. Pedro 26-ago-2026. */
+  const completadaAt = completada
+    ? (fechaHecha && /^\d{4}-\d{2}-\d{2}$/.test(fechaHecha) ? `${fechaHecha}T12:00:00-05:00` : new Date().toISOString())
+    : null
   const { error } = await service
     .from('tareas')
-    .update({ completada, completada_at: completada ? new Date().toISOString() : null, focus_lane: completada ? null : undefined })
+    .update({ completada, completada_at: completadaAt, focus_lane: completada ? null : undefined })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/tareas'); revalidatePath('/inicio')

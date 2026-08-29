@@ -30,6 +30,10 @@ export default async function TareasPage() {
      director-administrador— ven SOLO sus propias tareas. Las tareas son
      personales; si se asigna a alguien, esa persona la ve en su tablero. */
   const esOwner = !tm || (tm?.nombre ?? '').trim().toLowerCase() === 'pedro'
+  /* Solo Erick: al completar una tarea le preguntamos QUÉ DÍA la hizo, para que
+     su reporte semanal la ubique en el día correcto (a veces marca hoy algo que
+     hizo el lunes). Comparamos por primer nombre. Pedro 26-ago-2026. */
+  const esErick = ((tm?.nombre ?? '').trim().split(/\s+/)[0] || '').toLowerCase() === 'erick'
 
   let q = service
     .from('tareas')
@@ -72,7 +76,7 @@ export default async function TareasPage() {
           Este AutoRefresh es RED DE SEGURIDAD por si el WebSocket se cae (celular
           en segundo plano, red inestable). Pedro 06-ago-2026. */}
       <AutoRefresh intervalMs={15000} />
-      <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esOwner} meId={meId} equipo={equipo} />
+      <TareasView tareasIniciales={tareas} completadasIniciales={completadas} esCEO={esOwner} meId={meId} equipo={equipo} esErick={esErick} />
     </>
   )
 }
