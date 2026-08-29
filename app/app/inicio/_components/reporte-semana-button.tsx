@@ -10,10 +10,10 @@
    actual. Cada semana previa se muestra completa (lunes→domingo); la semana en
    curso llega hasta hoy. */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
-import { CalendarRange, Copy, X, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
-import { generarReporteSemana, type ReporteSemana } from '../_reporte-semana-actions'
+import { CalendarRange, Copy, X, Loader2, Check, ChevronLeft, ChevronRight, ImageDown } from 'lucide-react'
+import { generarReporteSemana, type ReporteSemana, type DiaReporte } from '../_reporte-semana-actions'
 
 /* Fecha de HOY en Lima (YYYY-MM-DD), estable en cualquier runtime. */
 function hoyLima(): string {
@@ -51,7 +51,9 @@ export function ReporteSemanaButton({ variant = 'default' }: { variant?: 'defaul
   const [cargando, setCargando] = useState(false)
   const [data, setData] = useState<Extract<ReporteSemana, { ok: true }> | null>(null)
   const [copiado, setCopiado] = useState(false)
+  const [copiando, setCopiando] = useState<null | 'img' | 'txt'>(null)
   const [offset, setOffset] = useState(0) // 0 = esta semana
+  const cardRef = useRef<HTMLDivElement | null>(null)
 
   const cargarSemana = useCallback(async (off: number) => {
     setCargando(true)
@@ -67,13 +69,72 @@ export function ReporteSemanaButton({ variant = 'default' }: { variant?: 'defaul
     await cargarSemana(0)
   }
 
-  async function copiar() {
+  async function copiarTexto() {
     if (!data) return
+    setCopiando('txt')
     try {
       await navigator.clipboard.writeText(data.texto)
       setCopiado(true); setTimeout(() => setCopiado(false), 2000)
-      toast.success('Reporte semanal copiado — pégalo en el grupo')
+      toast.success('Resumen copiado — pégalo en el grupo')
     } catch { toast.error('No se pudo copiar') }
+    finally { setCopiando(null) }
+  }
+
+  /* Genera la tarjeta de la semana como IMAGEN PNG (igual que el reporte diario).
+     Mismo patrón: html-to-image sobre cardRef, con reintento tolerante y, si el
+     portapapeles no acepta imágenes, descarga el PNG. Pedro 29-ago-2026. */
+  async function copiarImagen() {
+    if (!cardRef.current) return
+    setCopiando('img')
+    try {
+      const { toBlob } = await import('html-to-image')
+      if (document.fonts?.ready) await document.fonts.ready
+      const node = cardRef.current
+      const baseOpts = {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+        skipFonts: false,
+        width: node.offsetWidth,
+        height: node.offsetHeight,
+      }
+      let blob: Blob | null = null
+      try { blob = await toBlob(node, baseOpts) } catch { blob = null }
+      if (!blob) {
+        try {
+          blob = await toBlob(node, {
+            ...baseOpts,
+            skipFonts: true,
+            cacheBust: false,
+            filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && !!n.src && !n.src.startsWith(location.origin) && !n.src.startsWith('data:')),
+          })
+        } catch { blob = null }
+      }
+      if (!blob) throw new Error('sin blob')
+
+      let ok = false
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ClipboardItemCtor = (window as any).ClipboardItem
+      if (navigator.clipboard?.write && ClipboardItemCtor) {
+        try {
+          await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })])
+          ok = true
+          toast.success('Imagen copiada — pégala en WhatsApp')
+        } catch { ok = false }
+      }
+      if (!ok) {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `reporte-semana-${data?.usuarioNombre ?? 'distinto'}.png`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('Imagen descargada — adjúntala en WhatsApp')
+      }
+    } catch (e) {
+      console.error('[reporte-semana] copiarImagen:', e)
+      toast.error('No se pudo generar la imagen')
+    } finally { setCopiando(null) }
   }
 
   const btnClass = variant === 'link'
@@ -123,36 +184,86 @@ export function ReporteSemanaButton({ variant = 'default' }: { variant?: 'defaul
               </button>
             </div>
 
-            {/* Cuerpo: días */}
-            <div className="overflow-y-auto p-4 flex flex-col gap-3">
+            {/* Cuerpo: la MISMA tarjeta que se captura como imagen (cardRef). Así
+                el preview es idéntico al PNG que se manda. */}
+            <div className="overflow-y-auto p-4" style={{ background: '#f1f0fb' }}>
               {data.dias.every((d) => d.vacio) ? (
                 <p className="text-center text-[13px] text-muted-foreground py-6">
                   Sin actividad registrada en {tituloSemana(offset).toLowerCase()}.<br />
                   <span className="text-[12px]">Usa ◀ Anterior para ver otra semana.</span>
                 </p>
-              ) : data.dias.filter((d) => !d.vacio).map((d) => (
-                <div key={d.fechaIso} className="rounded-xl border p-3" style={{ borderColor: 'rgba(113,112,255,0.2)' }}>
-                  <div className="text-[13.5px] font-bold capitalize mb-1.5" style={{ color: '#6d28d9' }}>📅 {d.fechaLabel}</div>
-                  <ul className="space-y-1">
-                    {d.items.map((it, i) => (
-                      <li key={i} className="text-[13.5px] leading-snug">{it.replace(/[*_]/g, '')}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              ) : (
+                <ReporteSemanaImage
+                  ref={cardRef}
+                  usuario={data.usuarioNombre}
+                  subtitulo={`${tituloSemana(offset)} · ${data.rangoLabel}`}
+                  dias={data.dias.filter((d) => !d.vacio)}
+                />
+              )}
             </div>
 
-            {/* Footer: copiar */}
+            {/* Footer: imagen + texto (igual que el reporte diario). */}
             <div className="p-4 border-t shrink-0 flex items-center gap-2">
-              <button onClick={copiar}
-                className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl font-semibold text-white text-[14px]"
+              <button onClick={copiarImagen} disabled={copiando !== null || data.dias.every((d) => d.vacio)}
+                className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl font-semibold text-white text-[14px] disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
-                {copiado ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copiado ? 'Copiado ✓' : 'Copiar para WhatsApp'}
+                {copiando === 'img' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageDown className="w-4 h-4" />}
+                {copiando === 'img' ? 'Generando…' : 'Copiar imagen'}
+              </button>
+              <button onClick={copiarTexto} disabled={copiando !== null}
+                className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl font-semibold text-[14px] border disabled:opacity-50"
+                style={{ borderColor: '#cbd5e1', color: '#1e293b', background: '#fff' }}>
+                {copiado ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copiado ? 'Copiado ✓' : 'Copiar texto'}
               </button>
             </div>
           </div>
         </div>
       )}
     </>
+  )
+}
+
+/* ============================ Tarjeta visual de la semana (se captura a PNG) ============================
+   Documento tipo "story" con encabezado en gradiente, un bloque por día y el
+   pie con la marca Distinto. Ancho fluido (llena el modal); se captura con
+   html-to-image a pixelRatio 2 → PNG nítido para WhatsApp. */
+const ReporteSemanaImage = ({ ref, usuario, subtitulo, dias }: {
+  ref: React.Ref<HTMLDivElement>
+  usuario: string
+  subtitulo: string
+  dias: DiaReporte[]
+}) => {
+  return (
+    <div ref={ref} style={{ width: '100%', background: '#ffffff', borderRadius: 18, overflow: 'hidden', border: '1px solid #e9e7ff', boxShadow: '0 6px 22px rgba(88,28,135,0.10)' }}>
+      {/* Header gradiente */}
+      <div style={{ background: 'linear-gradient(135deg,#7170ff 0%,#ba41f7 100%)', padding: '20px 22px', color: '#fff' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.9 }}>📆 Reporte de la semana</div>
+        <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4, lineHeight: 1.1 }}>{usuario}</div>
+        <div style={{ fontSize: 13, opacity: 0.92, marginTop: 3, textTransform: 'capitalize' }}>{subtitulo}</div>
+      </div>
+      {/* Días */}
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, background: '#faf9ff' }}>
+        {dias.map((d) => (
+          <div key={d.fechaIso} style={{ background: '#fff', border: '1px solid #efeafe', borderRadius: 14, padding: '13px 15px' }}>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: '#6d28d9', marginBottom: 8, textTransform: 'capitalize' }}>
+              📅 {d.fechaLabel}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {d.items.map((it, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, color: '#0f172a', lineHeight: 1.35 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7170ff', flexShrink: 0, marginTop: 6 }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>{it.replace(/[*_]/g, '')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Footer marca */}
+      <div style={{ padding: '13px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #eee', background: '#fff' }}>
+        <span style={{ fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Distinto Agencia</span>
+        <span style={{ fontSize: 10, color: '#94a3b8' }}>vía Distinto</span>
+      </div>
+    </div>
   )
 }
