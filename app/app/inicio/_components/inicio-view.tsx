@@ -33,6 +33,7 @@ import { AvisoGrabaciones } from './aviso-grabaciones'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
+import { AgendarReunionBox } from './agendar-reunion-box'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { RecordatorioMes } from '@/components/fechas/recordatorio-mes'
 
@@ -527,6 +528,14 @@ export function InicioView({ data }: { data: InicioData }) {
             <ActivarNotificaciones />
           </div>
         </div>
+
+        {/* Asistente "Agendar reunión" — solo directores (Pedro y Erick). Dices
+            "agenda para Manrique mañana 10am" y agenda + manda la invitación. */}
+        {(data.nombre === 'Erick' || data.rolBase === 'director' || data.rolBase === 'admin') && (
+          <div style={{ marginBottom: 20 }}>
+            <AgendarReunionBox />
+          </div>
+        )}
 
         {/* Recordatorio de FECHAS IMPORTANTES del mes (función de Lorena/Erick).
             Lista lo que viene este mes para coordinarlo con las marcas. Solo se

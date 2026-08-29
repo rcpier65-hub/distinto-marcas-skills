@@ -271,6 +271,10 @@ export type ReunionEventInput = {
   hora: string           // HH:MM (24h)
   durationMin?: number   // duración, default 45
   attendees?: string[]   // emails de invitados (clientes)
+  /* Si true, Google MANDA la invitación por correo a los invitados
+     (sendUpdates=all). Default false (solo aparecen en el evento, sin correo).
+     Lo usa el asistente "Agendar reunión". Pedro 25-ago-2026. */
+  enviarInvitacion?: boolean
 }
 
 /**
@@ -304,7 +308,8 @@ export async function createReunionEvent(
   const requestId = globalThis.crypto?.randomUUID?.() ?? `meet-${input.fecha}-${horaHM}`
 
   const calId = await getGrabacionesCalendarId(token)
-  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events?conferenceDataVersion=1&sendUpdates=none`, {
+  const sendUpdates = input.enviarInvitacion ? 'all' : 'none'
+  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events?conferenceDataVersion=1&sendUpdates=${sendUpdates}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
