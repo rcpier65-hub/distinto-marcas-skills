@@ -120,9 +120,14 @@ export async function loadReporteDelDia(
        (el módulo /diseno no asigna diseñador — Ailyn es la única, así
        que todas las de diseño son suyas). */
     rolBase?: string
+    /* Día a reportar (YYYY-MM-DD, Lima). Default: hoy. Lo usa el reporte
+       SEMANAL para pedir cada día por separado. Pedro/Erick 26-ago-2026. */
+    fechaObjetivo?: string
   },
 ): Promise<ReporteDelDiaData> {
-  const hoy = fechaLimaIso(new Date())
+  const hoy = (opts.fechaObjetivo && /^\d{4}-\d{2}-\d{2}$/.test(opts.fechaObjetivo))
+    ? opts.fechaObjetivo
+    : fechaLimaIso(new Date())
   const inicioDiaIso = `${hoy}T00:00:00.000-05:00`
   const finDiaIso = `${hoy}T23:59:59.999-05:00`
 

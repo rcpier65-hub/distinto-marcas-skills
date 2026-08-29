@@ -34,6 +34,7 @@ import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import { WelcomeAnimation } from './welcome-animation'
 import { ReporteDelDiaCard } from './reporte-del-dia'
 import { AgendarReunionBox } from './agendar-reunion-box'
+import { ReporteSemanaButton } from './reporte-semana-button'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { RecordatorioMes } from '@/components/fechas/recordatorio-mes'
 
@@ -696,6 +697,13 @@ export function InicioView({ data }: { data: InicioData }) {
               rolBase={data.rolBase}
             />
             {data.reporteDelDia && <ReporteDelDiaCard data={data.reporteDelDia} />}
+            {/* Reporte de la SEMANA agrupado por día (para mandar varios días de
+                una — Erick lo pidió). Pedro 26-ago-2026. */}
+            {data.reporteDelDia && (
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
+                <ReporteSemanaButton />
+              </div>
+            )}
           </div>
 
           {/* Sidebar: tracker de hábitos estilo /habitos.
