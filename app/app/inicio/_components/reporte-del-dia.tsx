@@ -14,6 +14,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { ClipboardCheck } from 'lucide-react'
 import type { ReporteDelDiaData } from '@/lib/inicio/load-reporte-del-dia'
+import { ReporteSemanaButton } from './reporte-semana-button'
 
 type Props = {
   data: ReporteDelDiaData
@@ -430,65 +431,79 @@ export function ReporteDelDiaCard({ data }: Props) {
             </div>
 
             {/* ============= BOTONES ============= */}
-            <div
-              style={{
-                padding: 16,
-                display: 'flex',
-                gap: 10,
-                borderTop: '1px solid #e5e7eb',
-              }}
-            >
-              <button
-                type="button"
-                onClick={copiarImagen}
-                disabled={copiando !== null}
-                className="mk-focusable"
+            {total === 0 ? (
+              /* Nada cerrado HOY: en vez de ofrecer copiar una imagen vacía, lo
+                 mandamos a su Reporte de la SEMANA — que agrupa por día y sí
+                 tiene su trabajo (Erick marca las tareas en el día real que las
+                 hizo, así que "hoy" queda vacío). Pedro 29-ago-2026. */
+              <div style={{ padding: 16, borderTop: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+                <div style={{ fontSize: 13, color: '#475569', textAlign: 'center', lineHeight: 1.4 }}>
+                  Hoy no cerraste tareas todavía. Para rendir cuenta de <b>varios días</b>,
+                  arma tu reporte de la semana 👇
+                </div>
+                <ReporteSemanaButton variant="link" />
+              </div>
+            ) : (
+              <div
                 style={{
-                  flex: 1,
-                  padding: '14px 16px',
-                  background: copiando === 'img' ? '#a78bfa' : '#6d28d9',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 12,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: copiando ? 'wait' : 'pointer',
+                  padding: 16,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  opacity: copiando && copiando !== 'img' ? 0.5 : 1,
+                  gap: 10,
+                  borderTop: '1px solid #e5e7eb',
                 }}
               >
-                <span aria-hidden>📷</span>
-                {copiando === 'img' ? 'Generando…' : 'Copiar imagen'}
-              </button>
-              <button
-                type="button"
-                onClick={copiarTexto}
-                disabled={copiando !== null}
-                className="mk-focusable"
-                style={{
-                  flex: 1,
-                  padding: '14px 16px',
-                  background: '#fff',
-                  color: '#1e293b',
-                  border: '1.5px solid #cbd5e1',
-                  borderRadius: 12,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: copiando ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  opacity: copiando && copiando !== 'txt' ? 0.5 : 1,
-                }}
-              >
-                <span aria-hidden>📋</span>
-                {copiando === 'txt' ? 'Copiando…' : 'Copiar resumen'}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={copiarImagen}
+                  disabled={copiando !== null}
+                  className="mk-focusable"
+                  style={{
+                    flex: 1,
+                    padding: '14px 16px',
+                    background: copiando === 'img' ? '#a78bfa' : '#6d28d9',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: copiando ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    opacity: copiando && copiando !== 'img' ? 0.5 : 1,
+                  }}
+                >
+                  <span aria-hidden>📷</span>
+                  {copiando === 'img' ? 'Generando…' : 'Copiar imagen'}
+                </button>
+                <button
+                  type="button"
+                  onClick={copiarTexto}
+                  disabled={copiando !== null}
+                  className="mk-focusable"
+                  style={{
+                    flex: 1,
+                    padding: '14px 16px',
+                    background: '#fff',
+                    color: '#1e293b',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: copiando ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    opacity: copiando && copiando !== 'txt' ? 0.5 : 1,
+                  }}
+                >
+                  <span aria-hidden>📋</span>
+                  {copiando === 'txt' ? 'Copiando…' : 'Copiar resumen'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
