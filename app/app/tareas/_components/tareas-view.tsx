@@ -609,9 +609,9 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
   onCrear: (t: Tarea) => void; equipo: { id: string; nombre: string }[]; isMobile: boolean; esCEO: boolean
 }) {
   const [text, setText] = useState('')
-  /* "Para:" — a quién se le asigna la tarea. '' = para mí. Selector visible (no
-     hace falta escribir @Nombre). Se queda fijo para poder asignar varias
-     seguidas; el chip morado deja claro a quién van. Pedro 12-ago-2026. */
+  /* "Para:" — a quién se le asigna la tarea. '' = AÚN NO ELEGIDO (obligatorio
+     elegir antes de crear). 'yo' = para mí. <id> = para esa persona. Se reinicia
+     tras cada tarea para que SIEMPRE pregunte. Pedro 25-ago-2026. */
   const [para, setPara] = useState('')
   const [sending, setSending] = useState(false)
   const [escuchando, setEscuchando] = useState(false)
@@ -630,19 +630,28 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
   async function enviar() {
     const t = text.trim()
     if (!t || sending) return
+    /* SIEMPRE preguntar "¿para quién?": no se crea hasta elegir "Para mí" o una
+       persona. Antes había un default 'Para: yo' que se colaba y por eso Lorena
+       nunca le asignaba a Ailyn. Pedro 25-ago-2026: "que siempre pregunte". */
+    if (equipo.length > 0 && !para) {
+      toast.error('👆 Primero elige para quién es la tarea')
+      return
+    }
+    const asignadaAOtro = !!para && para !== 'yo'
     setSending(true); setText('')
-    const r = await crearTarea(t, para || undefined)
+    const r = await crearTarea(t, asignadaAOtro ? para : undefined)
     setSending(false)
     if (r.ok) {
-      if (para) {
+      if (asignadaAOtro) {
         const nombre = equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'la persona'
         toast.success(`Tarea asignada a ${nombre} ✓`)
-        /* La tarea es de OTRA persona: solo el dueño (que ve todo el tablero) la
-           agrega a su vista; los demás no (si no, aparecería y desaparecería). */
+        /* Es de OTRA persona: solo el dueño (que ve todo el tablero) la agrega a
+           su vista; los demás no (si no, aparecería y desaparecería). */
         if (esCEO) onCrear(r.tarea)
       } else {
         onCrear(r.tarea)
       }
+      setPara('') // reset → vuelve a preguntar en la siguiente tarea
     } else { toast.error(r.error); setText(t) }
     inputRef.current?.focus()
   }
@@ -679,9 +688,11 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
             value={para}
             onChange={(e) => setPara(e.target.value)}
             title="¿Para quién es la tarea?"
-            style={{ border: `1.5px solid ${para ? '#a78bfa' : '#c7d2fe'}`, outline: 'none', borderRadius: 10, padding: '7px 8px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0, maxWidth: 155, background: para ? '#ede9fe' : '#eef2ff', color: para ? '#6d28d9' : '#4338ca' }}
+            className={!para ? 'mk-para-pulse' : undefined}
+            style={{ border: `1.5px solid ${para ? '#a78bfa' : '#f59e0b'}`, outline: 'none', borderRadius: 10, padding: '7px 8px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0, maxWidth: 165, background: para ? '#ede9fe' : '#fffbeb', color: para ? '#6d28d9' : '#b45309' }}
           >
-            <option value="">👤 Para mí</option>
+            <option value="">👉 ¿Para quién?</option>
+            <option value="yo">👤 Para mí</option>
             {equipo.map((m) => <option key={m.id} value={m.id}>👤 Para {m.nombre.split(' ')[0]}</option>)}
           </select>
         ) : (
@@ -692,7 +703,7 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); enviar() } }}
-          placeholder={para ? 'Escribe la tarea a asignar…' : 'Escribe la tarea…'}
+          placeholder={equipo.length > 0 && !para ? 'Primero elige para quién 👆' : para && para !== 'yo' ? 'Escribe la tarea a asignar…' : 'Escribe la tarea…'}
           disabled={sending}
           style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#111827', background: 'transparent', minWidth: 0 }}
         />
@@ -702,20 +713,27 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
             <Mic size={17} strokeWidth={2} />
           </button>
         )}
-        <button onClick={enviar} disabled={!text.trim() || sending} title="Agregar"
-          style={{ width: 34, height: 34, borderRadius: 10, border: 'none', cursor: text.trim() ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: text.trim() ? '#16a34a' : '#e5e7eb', color: '#fff' }}>
-          {sending ? '…' : <Plus size={18} strokeWidth={2.6} />}
-        </button>
+        {(() => {
+          const listo = !!text.trim() && !sending && (equipo.length === 0 || !!para)
+          return (
+            <button onClick={enviar} disabled={!listo} title={equipo.length > 0 && !para ? 'Elige para quién es' : 'Agregar'}
+              style={{ width: 34, height: 34, borderRadius: 10, border: 'none', cursor: listo ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: listo ? '#16a34a' : '#e5e7eb', color: '#fff' }}>
+              {sending ? '…' : <Plus size={18} strokeWidth={2.6} />}
+            </button>
+          )
+        })()}
       </div>
-      {/* confirmación de asignación */}
+      {/* confirmación de asignación — SIEMPRE hay que elegir "¿Para quién?" */}
       {equipo.length > 0 && (
-        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: para ? '#6d28d9' : '#9ca3af', fontWeight: para ? 700 : 400 }}>
-          {para
-            ? `📋 Se la asignas a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'}: le aparece en SU tablero y le llega un aviso al celular.`
-            : '👈 ¿La tarea es para otra persona? Toca "Para mí" y elige a quién (ej. Ailyn). Si no, se queda contigo.'}
+        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: !para ? '#b45309' : '#6d28d9', fontWeight: 700 }}>
+          {!para
+            ? '👆 Elige "¿Para quién?" antes de crear: "Para mí" o alguien del equipo (ej. Ailyn).'
+            : para === 'yo'
+              ? '✅ Esta tarea es para ti.'
+              : `📋 Se la asignas a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'}: le aparece en SU tablero y le llega un aviso.`}
         </div>
       )}
-      <style>{`@keyframes mk-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}.mk-mic-on{animation:mk-mic-pulse 1.2s ease-in-out infinite}`}</style>
+      <style>{`@keyframes mk-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}.mk-mic-on{animation:mk-mic-pulse 1.2s ease-in-out infinite}@keyframes mk-para-pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}50%{box-shadow:0 0 0 5px rgba(245,158,11,0)}}.mk-para-pulse{animation:mk-para-pulse 1.4s ease-in-out infinite}`}</style>
     </div>
   )
 }
