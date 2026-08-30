@@ -209,6 +209,11 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {puede('metricas') && (
             <NavItem href="/reportes" icon={<ChartIcon />} label="Reportes" active={isActive('/reportes')} />
           )}
+          {/* Influencers: kanban de pedidos a influencers (TypHouse). Mismo
+              permiso que publicaciones. Pedro 27-ago-2026. */}
+          {puede('publicaciones') && (
+            <NavItem href="/influencers" icon={<InfluencerIcon />} label="Influencers" active={isActive('/influencers')} />
+          )}
         </Section>
 
         {/* Sección marcas: controlada por el permiso 'marcas' (nuevo).
@@ -526,6 +531,7 @@ function TareasIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" f
 function SparklesIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5L8 5L11.5 6L8 7L7 10.5L6 7L2.5 6L6 5L7 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M11 9.5L11.4 10.6L12.5 11L11.4 11.4L11 12.5L10.6 11.4L9.5 11L10.6 10.6L11 9.5Z" fill="currentColor" /></svg> }
 function SoporteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.2" stroke="currentColor" strokeWidth="1.2" /><circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M3.4 3.4L5.5 5.5M8.5 8.5L10.6 10.6M10.6 3.4L8.5 5.5M5.5 8.5L3.4 10.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function ChartIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 12H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /><rect x="3" y="7" width="2" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.2" /><rect x="6.5" y="4" width="2" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.2" /><rect x="10" y="2" width="2" height="9" rx="0.5" stroke="currentColor" strokeWidth="1.2" /></svg> }
+function InfluencerIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5.5" cy="4.5" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M2 11.5C2 9.5 3.5 8.2 5.5 8.2C6.3 8.2 7 8.4 7.6 8.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /><path d="M10.5 8L11 9.3L12.4 9.4L11.35 10.3L11.7 11.7L10.5 10.95L9.3 11.7L9.65 10.3L8.6 9.4L10 9.3L10.5 8Z" fill="currentColor" /></svg> }
 function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8.5 8.5L11 11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function ChevronUpDown() { return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><path d="M3 4L5 2L7 4M3 6L5 8L7 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function SettingsIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--mk-text-tertiary)' }}><circle cx="7" cy="7" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M7 1.5V3M7 11V12.5M2.55 3.55L3.5 4.5M10.5 9.5L11.45 10.45M1.5 7H3M11 7H12.5M2.55 10.45L3.5 9.5M10.5 4.5L11.45 3.55" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
