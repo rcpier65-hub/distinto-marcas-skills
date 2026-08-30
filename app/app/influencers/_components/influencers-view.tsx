@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { FolderOpen, Plus, Trash2, Instagram, Link2, ChevronLeft, ChevronRight, Play } from 'lucide-react'
+import { FolderOpen, Plus, Trash2, AtSign, Link2, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 import { crearInfluencer, moverInfluencer, editarInfluencer, eliminarInfluencer } from '../_actions'
 import type { EstadoInfluencer } from '@/lib/influencers/db'
 
@@ -159,7 +159,7 @@ export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }:
                       <a href={`https://instagram.com/${it.usuarioIg}`} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold hover:underline min-w-0"
                         style={{ color: '#111827' }}>
-                        <Instagram className="w-3.5 h-3.5 shrink-0" style={{ color: '#e1306c' }} />
+                        <AtSign className="w-3.5 h-3.5 shrink-0" style={{ color: '#e1306c' }} />
                         <span className="truncate">@{it.usuarioIg}</span>
                       </a>
                       <div className="flex-1" />
