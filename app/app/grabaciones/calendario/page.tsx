@@ -127,21 +127,10 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     }
   } catch { /* sin reuniones */ }
 
-  /* Tareas de DISEÑO con fecha de entrega en el rango — salen en el
-     calendario como 🎨 (Pedro 31-ago-2026: "sincroniza las tareas de diseño
-     con el calendario; si se tiene que presentar algo con fecha que salga"). */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let disenoRows: any[] = []
-  try {
-    const r = await service
-      .from('publicaciones')
-      .select('id, nombre, marca_id, fecha_entrega, estado')
-      .eq('es_tarea_diseno', true)
-      .gte('fecha_entrega', desde)
-      .lte('fecha_entrega', hasta)
-      .order('fecha_entrega', { ascending: true })
-    if (!r.error) disenoRows = r.data ?? []
-  } catch { /* sin tareas de diseño */ }
+  /* Las tareas de diseño NO salen acá por sí solas — Pedro 31-ago-2026: "el
+     calendario es solo para grabaciones y reuniones, no para una tarea sin
+     día ni hora". Una tarea entra al calendario únicamente cuando se le
+     agenda su reunión de revisión (aparece como 🤝 vía marca_reuniones). */
 
   /* ===== Unificar todo en AgendaEvento[] ===== */
   /* Miembros con acceso restringido a ciertas marcas solo ven los eventos de
@@ -150,7 +139,6 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const eventos: AgendaEvento[] = []
   const grabRows = (grabRes.ok ? grabRes.rows : []).filter((g) => !marcasPermitidas || marcasPermitidas.has(g.marca_id))
   reunionesRows = reunionesRows.filter((r) => !marcasPermitidas || marcasPermitidas.has(r.marca_id))
-  disenoRows = disenoRows.filter((d) => !marcasPermitidas || marcasPermitidas.has(d.marca_id))
   const idsDeLaApp = new Set([
     ...grabRows.map((g) => g.google_event_id),
     ...reunionesRows.map((r) => r.google_event_id),
@@ -210,26 +198,6 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: esLink ? r.lugar_enlace : null,
       notas: r.notas ?? (r.modalidad === 'presencial' && r.lugar_enlace && !esLink ? `Lugar: ${r.lugar_enlace}` : null),
       videosGrabados: null,
-    })
-  }
-
-  for (const d of disenoRows) {
-    const marca = marcasById.get(d.marca_id)
-    eventos.push({
-      id: d.id,
-      tipo: 'diseno',
-      fecha: d.fecha_entrega,
-      hora: null,
-      titulo: `Entrega · ${d.nombre ?? 'Tarea de diseño'}`,
-      marcaSlug: marca?.slug ?? null,
-      marcaNombre: marca?.nombre ?? null,
-      marcaEmoji: marca?.emoji_marca ?? null,
-      color: marca?.color_calendario ?? '#d97706',
-      estado: null,
-      meetLink: null,
-      notas: null,
-      videosGrabados: null,
-      href: `/diseno/${d.id}`,
     })
   }
 

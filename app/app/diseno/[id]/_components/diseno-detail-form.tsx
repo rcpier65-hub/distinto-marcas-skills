@@ -8,14 +8,14 @@
  * Auto-save: cada campo guarda al onBlur. No requiere botón Guardar.
  */
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Calendar, CalendarCheck, Clock, Folder, Image as ImageIcon, Users,
   Save, Trash2, Archive, Hourglass, Copy as CopyIcon, ExternalLink, Video, Loader2,
 } from 'lucide-react'
-import { updateDisenoEntry, archivarTarea, marcarParaDisenarHoy, desmarcarParaDisenarHoy } from '../../_actions'
+import { updateDisenoEntry, archivarTarea, marcarParaDisenarHoy, desmarcarParaDisenarHoy, obtenerCorreosDeMarca } from '../../_actions'
 import { deletePublicacion } from '@/app/publicaciones/[id]/_actions'
 import { esRedireccion } from '@/lib/utils/is-redirect-error'
 import { sincronizarReunion } from '../_reunion-actions'
@@ -96,6 +96,19 @@ export function DisenoDetailForm({
     })
   }
 
+  /* Correos del CLIENTE de la marca (Settings): se invitan SOLOS a la reunión
+     de revisión — acá solo los mostramos para que se sepa quiénes van.
+     Pedro 31-ago-2026: "ya debe saber quiénes son los invitados". */
+  const [correosMarca, setCorreosMarca] = useState<string[] | null>(null)
+  useEffect(() => {
+    let vivo = true
+    if (!form.marcaSlug || form.marcaSlug === 'interno') { setCorreosMarca([]); return }
+    obtenerCorreosDeMarca(form.marcaSlug)
+      .then((r) => { if (vivo) setCorreosMarca(r.ok ? r.correos : []) })
+      .catch(() => { if (vivo) setCorreosMarca([]) })
+    return () => { vivo = false }
+  }, [form.marcaSlug])
+
   // Crea/actualiza la reunión en Google Calendar (con hora + Meet + invitados).
   function handleSincronizarReunion() {
     setSyncing(true)
@@ -104,7 +117,7 @@ export function DisenoDetailForm({
       setSyncing(false)
       if (r.ok) {
         setMeetLink(r.meetLink)
-        toast.success(r.meetLink ? '✅ Reunión creada en Calendar con Meet' : '✅ Reunión creada en Calendar', { duration: 5000 })
+        toast.success('✅ Reunión creada — invitación enviada al cliente y visible en el calendario', { duration: 5000 })
       } else {
         toast.error(r.error, { duration: 8000 })
       }
@@ -387,14 +400,26 @@ export function DisenoDetailForm({
             />
           </Field>
         </div>
-        <Field label="Invitados (correos separados por coma)" icon={<Users className="w-3.5 h-3.5" />}>
+        {/* Invitados automáticos: los correos del cliente de la marca. */}
+        {correosMarca && correosMarca.length > 0 && (
+          <div className="px-3 py-2 rounded-md text-xs border" style={{ background: '#f5f3ff', borderColor: '#ddd6fe', color: '#5b21b6' }}>
+            ✓ Se invitará automáticamente al cliente de <strong>{form.marcaNombre}</strong>:{' '}
+            <strong>{correosMarca.join(', ')}</strong>
+          </div>
+        )}
+        {correosMarca && correosMarca.length === 0 && form.marcaSlug !== 'interno' && (
+          <div className="px-3 py-2 rounded-md text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
+            ⚠ {form.marcaNombre} no tiene correos de cliente guardados (Settings → Correos de cliente por marca). Agrégalos ahí o escribe correos abajo.
+          </div>
+        )}
+        <Field label="Invitados adicionales (opcional, separados por coma)" icon={<Users className="w-3.5 h-3.5" />}>
           <textarea
             value={form.invitadosEmails.join(', ')}
             onChange={(e) => setForm((s) => ({
               ...s, invitadosEmails: e.target.value.split(/[,;\n]/).map((x) => x.trim()),
             }))}
             onBlur={(e) => setInvitados(e.target.value)}
-            placeholder="cliente@empresa.com, otrocorreo@cliente.com"
+            placeholder="algún correo extra… (el cliente ya va invitado solo)"
             rows={2}
             className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring resize-y"
           />
@@ -423,8 +448,7 @@ export function DisenoDetailForm({
               </a>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Crea el evento el <strong>{form.fechaEntrega}</strong> a las <strong>{form.horaReunion}</strong>, con enlace de Meet e invitados.
-              Necesitas Google Calendar conectado (Grabaciones → “Conectar Google Calendar”).
+              Crea el evento el <strong>{form.fechaEntrega}</strong> a las <strong>{form.horaReunion}</strong> con Meet, le <strong>manda la invitación por correo al cliente</strong> y la reunión aparece en el calendario de <strong>Grabaciones y Reuniones</strong>.
             </p>
           </div>
         )}

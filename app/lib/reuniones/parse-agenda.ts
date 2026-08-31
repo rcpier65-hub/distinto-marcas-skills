@@ -47,9 +47,9 @@ Devuelve SOLO JSON válido con esta estructura exacta:
   "fecha": "YYYY-MM-DD resolviendo 'mañana', 'pasado mañana', 'el martes', 'el 5', etc. respecto a HOY en Lima; null si no se menciona",
   "hora": "HH:MM en 24h resolviendo '10am'->10:00, '3pm'->15:00, '10 y media'->10:30; null si no se menciona",
   "durationMin": número en minutos (default 45),
-  "titulo": "título corto y claro de la reunión, ej. 'Reunión con Manrique ABA'"
+  "titulo": "asunto PROFESIONAL de la reunión. Si el usuario menciona el MOTIVO/TEMA, inclúyelo SIEMPRE, ej. 'agenda reunión vid natur para revisión de la web' → 'Revisión de la web · Vid Natur'. Sin motivo → 'Reunión con {nombre de la marca}'"
 }
-Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el martes' = el PRÓXIMO martes. Responde SOLO el JSON.`
+Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el martes' = el PRÓXIMO martes. NUNCA descartes el motivo de la reunión si el usuario lo dijo. Responde SOLO el JSON.`
 
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {

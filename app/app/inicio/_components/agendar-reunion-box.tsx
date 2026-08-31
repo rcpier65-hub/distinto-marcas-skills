@@ -51,6 +51,9 @@ export function AgendarReunionBox() {
   const [staffSel, setStaffSel] = useState<Record<string, boolean>>({})
   const [extras, setExtras] = useState<string[]>([])
   const [extraVal, setExtraVal] = useState('')
+  /* Asunto EDITABLE: es lo que el cliente ve en la invitación de Google.
+     Pedro 31-ago-2026: "el asunto no puedo cambiarlo, debería poder". */
+  const [tituloEdit, setTituloEdit] = useState('')
 
   const { soportado: vozOk, grabando, parcial, alternar } = useDictado({
     onFinal: (frag) => setTexto((cur) => (cur ? cur + ' ' : '') + frag),
@@ -63,7 +66,7 @@ export function AgendarReunionBox() {
     setInterpretando(true)
     const r = await interpretarAgenda(t)
     setInterpretando(false)
-    if (r.ok) { setPreview(r); setCorreoManual(''); setStaffSel({}); setExtras([]); setExtraVal('') }
+    if (r.ok) { setPreview(r); setCorreoManual(''); setStaffSel({}); setExtras([]); setExtraVal(''); setTituloEdit(r.titulo) }
     else toast.error(r.error)
   }
 
@@ -92,7 +95,7 @@ export function AgendarReunionBox() {
       fecha: preview.fecha,
       hora: preview.hora,
       durationMin: preview.durationMin,
-      titulo: preview.titulo,
+      titulo: tituloEdit.trim() || preview.titulo,
       correos,
       correosGuardar: correosCliente,
       guardarCorreos: preview.correos.length === 0 && guardarCorreo && correosCliente.length > 0,
@@ -155,10 +158,21 @@ export function AgendarReunionBox() {
       ) : (
         /* ===== Tarjeta de confirmación ===== */
         <div className="mt-3 rounded-xl border p-3.5" style={{ borderColor: '#c7d2fe', background: '#f5f3ff' }}>
-          <div className="text-[15px] font-extrabold flex items-center gap-2">
-            <span>{preview.marcaEmoji ?? '📌'}</span>
-            <span className="truncate">{preview.titulo}</span>
+          {/* Asunto editable: tal cual quede acá le llega al cliente en la
+              invitación de Google. */}
+          <div className="flex items-center gap-2">
+            <span className="text-[15px]">{preview.marcaEmoji ?? '📌'}</span>
+            <input
+              value={tituloEdit}
+              onChange={(e) => setTituloEdit(e.target.value)}
+              maxLength={120}
+              className="flex-1 min-w-0 text-[15px] font-extrabold bg-white rounded-lg border px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#7170ff]/40"
+              style={{ borderColor: '#ddd6fe' }}
+              placeholder="Asunto de la reunión"
+              title="Este asunto es el que verá el cliente en la invitación — puedes editarlo"
+            />
           </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">✏️ Puedes editar el asunto — así llegará en la invitación.</p>
           <div className="mt-2 space-y-1.5 text-[13.5px]">
             <div className="flex items-center gap-2"><CalendarClock className="w-4 h-4 shrink-0 text-[#6d28d9]" /> <span className="capitalize">{fechaBonita(preview.fecha)}</span> · <b>{horaBonita(preview.hora)}</b> <span className="text-muted-foreground">({preview.durationMin} min)</span></div>
             <div className="flex items-center gap-2"><Video className="w-4 h-4 shrink-0 text-[#6d28d9]" /> Con link de Google Meet</div>
