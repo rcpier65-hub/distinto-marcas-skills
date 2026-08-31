@@ -9,6 +9,7 @@
    - Zona Focus en el mismo tablero + cronómetro ("Entrar en Focus"). */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   DndContext, useDraggable, useDroppable, DragOverlay,
@@ -249,6 +250,17 @@ export function TareasView({
             {' · escribe @Nombre para asignar'}
           </p>
         </div>
+
+        {/* Vista PLAN del mismo módulo: estados + responsables + Gantt +
+            calendario (misma ruta, ?vista=plan). Pedro 31-ago-2026: "en el
+            mismo módulo de tareas". */}
+        <Link
+          href="/tareas?vista=plan"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 32, padding: '0 12px', borderRadius: 999, background: '#fff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 600, color: '#6b7280', textDecoration: 'none', flexShrink: 0 }}
+          title="Estados, responsables, Gantt y calendario de estas mismas tareas"
+        >
+          🗂️ Plan · Gantt
+        </Link>
 
         {/* Filtro por persona — solo para el CEO (un miembro ya ve solo lo suyo). */}
         {esCEO && equipo.length > 0 && (

@@ -175,8 +175,6 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio') || isActive('/cockpit')} shortcut="1" />
           {/* Tareas: tablero personal de cada uno (estilo Notas). Todos lo ven. */}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
-          {/* Plan de tareas: estados + responsables + Gantt + calendario. */}
-          <NavItem href="/tareas/plan" icon={<ChartIcon />} label="Plan · Gantt" active={isActive('/tareas/plan')} indent />
           {/* "Inbox global" eliminado del menú — ya no se usa. Pedro 06-ago-2026. */}
           {puede('publicaciones') && (
             <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
