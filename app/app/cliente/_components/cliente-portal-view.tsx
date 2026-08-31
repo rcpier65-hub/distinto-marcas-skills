@@ -19,6 +19,7 @@ import { SoporteClienteView, type ReporteClienteItem } from './soporte-cliente-v
 import { AgendaClienteView } from './agenda-cliente'
 import { InfluencersView, type InfluencerItem } from '@/app/influencers/_components/influencers-view'
 import { normalizeSubEstado, type SubEstadoDiseno } from '@/lib/diseno/types'
+import { TareasClienteView, type TareaClienteItem } from './tareas-cliente-view'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
@@ -312,6 +313,7 @@ export function ClientePortalView({
   marcasDisponibles = [],
   reportesSoporte = [],
   influencersActivo = false, influencers = [], influencersDriveUrl = null,
+  tareasMarca = [], equipoTareas = [],
   reporteNombre = null, reporteMeses = null,
 }: {
   marcaId: string
@@ -336,6 +338,9 @@ export function ClientePortalView({
   influencersActivo?: boolean
   influencers?: InfluencerItem[]
   influencersDriveUrl?: string | null
+  /* Tareas del MÓDULO de tareas del sistema (solo su marca) + equipo asignable. */
+  tareasMarca?: TareaClienteItem[]
+  equipoTareas?: Array<{ id: string; nombre: string }>
   /* Reporte mensual de la marca: nombre para mostrar + data. meses=null con
      nombre presente = candado (aún sin código). nombre=null = sin reporte. */
   reporteNombre?: string | null
@@ -350,7 +355,7 @@ export function ClientePortalView({
   const [aprobados, setAprobados] = useState<Record<string, string>>({})
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
-  const [vista, setVista] = useState<VistaId | 'drive' | 'pendientes'>('cal')
+  const [vista, setVista] = useState<VistaId | 'drive' | 'tareas'>('cal')
   /* ¿Esta marca tiene reporte mensual cargado? (si no, el ítem no aparece) */
   const tieneReporte = !!reporteNombre
   const navVisible = NAV.filter(({ id }) =>
@@ -358,10 +363,12 @@ export function ClientePortalView({
   /* Secciones plegables del menú lateral (como la app: ▼ WORKSPACE / MARCAS).
      Pedro 19-jul-2026. */
   const [secAbierta, setSecAbierta] = useState<{ marca: boolean; herram: boolean }>({ marca: true, herram: true })
-  /* "Tareas pendientes" también se despliega en sub-opciones (Publicaciones /
-     Diseños), como "Publicaciones" en la app. Pedro 19-jul-2026. */
-  const [tareasAbierto, setTareasAbierto] = useState(true)
-  const [pendFiltro, setPendFiltro] = useState<'todas' | 'publicaciones' | 'disenos'>('todas')
+  /* Área de diseño: filtros del MISMO modelo del sistema (métricas clicables,
+     búsqueda, rango de fechas y chip HOY). Pedro 31-ago-2026. */
+  const [dzFiltro, setDzFiltro] = useState<SubEstadoDiseno | 'todos' | 'hoy'>('todos')
+  const [dzBuscar, setDzBuscar] = useState('')
+  const [dzDesde, setDzDesde] = useState('')
+  const [dzHasta, setDzHasta] = useState('')
   /* Modo del calendario. Arranca en SEMANA (Pedro 31-ago-2026: "cuando ingreso
      primera vez a calendario siempre debe mostrarse la vista semanal"). La
      LISTA ahora también vive aquí como un modo más del calendario. */
@@ -594,7 +601,7 @@ export function ClientePortalView({
        ocupando toda la pantalla. En MÓVIL se queda EXACTAMENTE como estaba
        (cabecera + toggle arriba), que ya funcionaba bien. */
     <div className="lg:flex lg:h-[100dvh] lg:overflow-hidden">
-      <ClienteRealtime marcaId={marcaId} />
+      <ClienteRealtime marcaId={marcaId} marcaSlug={marcaSlug} />
 
       {/* ===== MENÚ LATERAL — solo PC ===== */}
       <aside className="hidden lg:flex lg:flex-col w-[250px] shrink-0 border-r bg-card">
@@ -640,37 +647,18 @@ export function ClientePortalView({
             <GrupoSidebar titulo="Herramientas" abierto={secAbierta.herram} onToggle={() => setSecAbierta((s) => ({ ...s, herram: !s.herram }))} />
             {secAbierta.herram && (
               <>
-                {/* Tareas pendientes — se despliega en Publicaciones / Diseños. */}
+                {/* TAREAS — el módulo real de tareas del sistema, solo su marca.
+                    (Reemplaza a "Tareas pendientes" con sub-filtros. Pedro 31-ago.) */}
                 <button
-                  onClick={() => setTareasAbierto((a) => !a)}
-                  className="w-full flex items-center gap-2.5 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors"
-                  style={vista === 'pendientes' ? { color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
+                  onClick={() => setVista('tareas')}
+                  className="w-full flex items-center gap-2.5 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors hover:bg-muted"
+                  style={vista === 'tareas' ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
                 >
-                  <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${tareasAbierto ? '' : '-rotate-90'}`} />
-                  <ListTodo className="w-4 h-4 shrink-0" /> Tareas pendientes
-                  {pendientes.length > 0 && (
-                    <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{pendientes.length}</span>
+                  <ListTodo className="w-4 h-4 shrink-0" /> Tareas
+                  {tareasMarca.length > 0 && (
+                    <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{tareasMarca.length}</span>
                   )}
                 </button>
-                {tareasAbierto && (
-                  <div className="ml-4 pl-2 border-l space-y-0.5">
-                    {([
-                      { id: 'todas', label: 'Todas' },
-                      { id: 'publicaciones', label: 'Publicaciones' },
-                      { id: 'disenos', label: 'Diseños' },
-                    ] as const).map((f) => {
-                      const act = vista === 'pendientes' && pendFiltro === f.id
-                      return (
-                        <button key={f.id}
-                          onClick={() => { setVista('pendientes'); setPendFiltro(f.id) }}
-                          className="w-full text-left h-9 px-3 rounded-lg text-[13px] font-semibold transition-colors"
-                          style={act ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}>
-                          {f.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
                 {driveUrl && (
                   /* Pedro 5-ago-2026: el botón lleva DIRECTO a la carpeta de Drive
                      de la marca (abre Google Drive en otra pestaña), sin abrir una
@@ -763,17 +751,17 @@ export function ClientePortalView({
               />
             ))}
           </div>
-          {/* Tareas pendientes + Drive — acceso en móvil (en PC va en el menú). */}
+          {/* Tareas + Drive — acceso en móvil (en PC va en el menú). */}
           <button
-            onClick={() => { setVista('pendientes'); setPendFiltro('todas') }}
+            onClick={() => setVista('tareas')}
             className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-2xl text-[13.5px] font-bold border-2"
-            style={vista === 'pendientes'
+            style={vista === 'tareas'
               ? { background: `${marcaColor}14`, color: marcaColor, borderColor: `${marcaColor}55` }
               : { color: 'var(--muted-foreground, #64748b)', borderColor: 'var(--border, #e5e7eb)' }}
           >
-            <ListTodo className="w-4 h-4" /> Tareas pendientes
-            {pendientes.length > 0 && (
-              <span className="min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{pendientes.length}</span>
+            <ListTodo className="w-4 h-4" /> Tareas
+            {tareasMarca.length > 0 && (
+              <span className="min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{tareasMarca.length}</span>
             )}
           </button>
           {driveUrl && (
@@ -970,9 +958,29 @@ export function ClientePortalView({
           enviado:     { label: 'Enviado',     color: '#14b8a6' },
           archivado:   { label: 'Archivado',   color: '#a78bfa' },
         }
+        /* Métricas sobre TODAS las piezas (como la barra del sistema). */
+        const conteo = Object.fromEntries(COLS.map((c) => [c, 0])) as Record<SubEstadoDiseno, number>
+        for (const p of disenos) {
+          const sub = normalizeSubEstado(p.estadoTarea)
+          if (sub !== 'archivado') conteo[sub] = (conteo[sub] ?? 0) + 1
+        }
+        const fechaDe = (p: PubCliente) => (p.fechaEntrega ?? p.fecha ?? '').slice(0, 10)
+        const nHoy = disenos.filter((p) => fechaDe(p) === hoy).length
+
+        /* Filtros: métrica clicable + HOY + búsqueda + rango de fechas. */
+        const q = dzBuscar.trim().toLowerCase()
+        const visibles = disenos.filter((p) => {
+          if (q && !(p.titulo ?? '').toLowerCase().includes(q)) return false
+          const f = fechaDe(p)
+          if (dzDesde && (!f || f < dzDesde)) return false
+          if (dzHasta && (!f || f > dzHasta)) return false
+          if (dzFiltro === 'hoy') return f === hoy
+          if (dzFiltro !== 'todos' && normalizeSubEstado(p.estadoTarea) !== dzFiltro) return false
+          return true
+        })
         const porCol = new Map<SubEstadoDiseno, PubCliente[]>()
         for (const c of COLS) porCol.set(c, [])
-        for (const p of disenos) {
+        for (const p of visibles) {
           const sub = normalizeSubEstado(p.estadoTarea)
           if (sub === 'archivado') continue  // archivadas no llegan al portal
           ;(porCol.get(sub) ?? porCol.get('sin_empezar'))!.push(p)
@@ -988,8 +996,59 @@ export function ClientePortalView({
               <SecHeader icon={<Palette className="w-4 h-4" />} label="Área de diseño" count={disenos.length} color="#8b5cf6" />
               <p className="text-[12px] text-muted-foreground -mt-1">El mismo tablero que usa el equipo — aquí ves en qué etapa va cada pieza de tu marca. 🎨</p>
             </div>
+
+            {/* MÉTRICAS clicables + HOY — misma barra que el módulo del sistema */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {COLS.map((cid) => {
+                const cfg = CFG[cid]
+                const on = dzFiltro === cid
+                return (
+                  <button key={cid} type="button"
+                    onClick={() => setDzFiltro(on ? 'todos' : cid)}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[11.5px] font-bold uppercase tracking-wide transition-colors"
+                    style={on
+                      ? { background: `${cfg.color}1a`, borderColor: cfg.color, color: cfg.color }
+                      : { background: '#fff', borderColor: '#e5e7eb', color: '#6b7280' }}>
+                    <span style={{ color: cfg.color }}>{conteo[cid] ?? 0}</span> {cfg.label}
+                  </button>
+                )
+              })}
+              <button type="button"
+                onClick={() => setDzFiltro(dzFiltro === 'hoy' ? 'todos' : 'hoy')}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[11.5px] font-bold uppercase tracking-wide transition-colors"
+                style={dzFiltro === 'hoy'
+                  ? { background: '#fffbeb', borderColor: '#f59e0b', color: '#b45309' }
+                  : { background: '#fff', borderColor: '#e5e7eb', color: '#6b7280' }}>
+                <span style={{ color: '#f59e0b' }}>{nHoy}</span> Hoy
+              </button>
+            </div>
+
+            {/* Búsqueda + rango de fechas (solo el filtro de fechas, como pidió Pedro) */}
+            <div className="flex items-center gap-2 flex-wrap rounded-xl border bg-card p-2">
+              <div className="relative flex-1 min-w-[160px]">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input value={dzBuscar} onChange={(e) => setDzBuscar(e.target.value)} placeholder="Buscar…"
+                  className="w-full h-9 pl-8 pr-2 rounded-lg border bg-background text-[13px] outline-none focus:ring-2 focus:ring-[#8b5cf6]/30" />
+              </div>
+              <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground font-semibold">📅 Fechas:
+                <input type="date" value={dzDesde} onChange={(e) => setDzDesde(e.target.value)}
+                  className="h-9 px-2 rounded-lg border bg-background text-[12.5px] outline-none" />
+                <span>–</span>
+                <input type="date" value={dzHasta} onChange={(e) => setDzHasta(e.target.value)}
+                  className="h-9 px-2 rounded-lg border bg-background text-[12.5px] outline-none" />
+              </label>
+              {(dzFiltro !== 'todos' || dzBuscar || dzDesde || dzHasta) && (
+                <button type="button" onClick={() => { setDzFiltro('todos'); setDzBuscar(''); setDzDesde(''); setDzHasta('') }}
+                  className="h-9 px-3 rounded-lg text-[12px] font-bold" style={{ color: '#8b5cf6', background: '#8b5cf614' }}>
+                  Limpiar
+                </button>
+              )}
+            </div>
+
             {disenos.length === 0 ? (
               <Vacio texto="Todavía no hay diseños. Cuando el equipo empiece uno, aparecerá acá con su estado." />
+            ) : visibles.length === 0 ? (
+              <Vacio texto="Ninguna pieza coincide con el filtro. Toca 'Limpiar' para ver todo." />
             ) : (
               <div className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0">
                 {COLS.map((cid) => {
@@ -1062,9 +1121,11 @@ export function ClientePortalView({
           : <div className="pt-8"><PinGate titulo="Reporte mensual" /></div>
       )}
 
-      {vista === 'pendientes' && (
-        <TareasPendientesView items={pendientes} color={marcaColor} onChip={onChip} estadoLabel={estadoLabel} esAprobado={esAprobado}
-          filtro={pendFiltro} onFiltro={setPendFiltro} />
+      {/* TAREAS — el módulo real del sistema, solo su marca (Pedro 31-ago-2026:
+          fuera "Tareas pendientes" con publicaciones/diseños; esto son las
+          tareas de verdad y el cliente también crea y asigna). */}
+      {vista === 'tareas' && (
+        <TareasClienteView tareas={tareasMarca} equipo={equipoTareas} marcaNombre={marcaNombre} color={marcaColor} />
       )}
 
       {vista === 'drive' && driveUrl && (

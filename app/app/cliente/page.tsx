@@ -207,6 +207,48 @@ export default async function ClientePortalPage() {
     }
   } catch { /* sin influencers */ }
 
+  /* TAREAS de la marca — el MISMO módulo de tareas del sistema (Pedro
+     31-ago-2026): el cliente ve las tareas activas de su marca y puede crear
+     y asignar. Se buscan por marca_slug Y por categoría=nombre de la marca
+     (dos queries, merge por id — el .or de PostgREST se atora con nombres
+     con espacios). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tareasMarca: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let equipoTareas: any[] = []
+  try {
+    const SEL = `id, texto, color, categoria, marca_slug, created_at, completada,
+      miembro:team_members!tareas_team_member_id_fkey(nombre)`
+    const [porSlug, porCategoria, eq] = await Promise.all([
+      service.from('tareas').select(SEL).eq('completada', false).eq('marca_slug', cliente.marcaSlug)
+        .order('created_at', { ascending: false }).limit(100).then((r: unknown) => r, () => ({ data: [] })),
+      service.from('tareas').select(SEL).eq('completada', false).eq('categoria', cliente.marcaNombre)
+        .order('created_at', { ascending: false }).limit(100).then((r: unknown) => r, () => ({ data: [] })),
+      service.from('team_members').select('id, nombre').eq('activo', true).order('nombre')
+        .then((r: unknown) => r, () => ({ data: [] })),
+    ])
+    const porId = new Map<string, unknown>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of ([...(((porSlug as any).data) ?? []), ...(((porCategoria as any).data) ?? [])] as any[])) {
+      if (!porId.has(r.id)) porId.set(r.id, r)
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareasMarca = ([...porId.values()] as any[])
+      .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+      .map((r) => {
+        const m = Array.isArray(r.miembro) ? r.miembro[0] : r.miembro
+        return {
+          id: r.id as string,
+          texto: (r.texto ?? '') as string,
+          color: (r.color ?? '#db2777') as string,
+          asignadoNombre: (m?.nombre ?? null) as string | null,
+          createdAt: (r.created_at ?? '') as string,
+        }
+      })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    equipoTareas = ((((eq as any).data) ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+  } catch { /* sin tareas */ }
+
   return (
     <ClientePortalView
       marcaId={cliente.marcaId}
@@ -228,6 +270,8 @@ export default async function ClientePortalPage() {
       influencersActivo={influencersActivo}
       influencers={influencersRows}
       influencersDriveUrl={DRIVE_INFLUENCERS[cliente.marcaSlug] ?? cliente.driveUrl ?? null}
+      tareasMarca={tareasMarca}
+      equipoTareas={equipoTareas}
       reporteNombre={reporte?.nombre ?? null}
       reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
     />

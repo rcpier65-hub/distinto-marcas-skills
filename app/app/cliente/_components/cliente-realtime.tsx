@@ -19,7 +19,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export function ClienteRealtime({ marcaId }: { marcaId: string }) {
+export function ClienteRealtime({ marcaId, marcaSlug }: { marcaId: string; marcaSlug?: string }) {
   const router = useRouter()
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -71,7 +71,17 @@ export function ClienteRealtime({ marcaId }: { marcaId: string }) {
         { event: '*', schema: 'public', table: 'marca_reuniones', filter: `marca_id=eq.${marcaId}` },
         () => scheduleRefresh(),
       )
-      .subscribe()
+    // Tareas de la marca — el módulo de Tareas del portal se refresca cuando
+    // el equipo crea/completa una tarea (filtra por marca_slug). Pedro 31-ago.
+    if (marcaSlug) {
+      channel.on(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'tareas', filter: `marca_slug=eq.${marcaSlug}` },
+        () => scheduleRefresh(),
+      )
+    }
+    channel.subscribe()
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)

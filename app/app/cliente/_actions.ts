@@ -427,3 +427,105 @@ export async function crearReporteSoporteCliente(tipo: string, descripcion: stri
   revalidatePath('/soporte')
   return { ok: true }
 }
+
+/* ==================== TAREAS (portal del cliente) ====================
+   Pedro 31-ago-2026: "las tareas son tareas del módulo de tareas del sistema;
+   al cliente debe salirle todas las de su marca y también puede asignar
+   tareas así como nosotros". Mismas filas de la tabla `tareas` — lo que el
+   cliente crea aparece en el tablero del equipo (/tareas) al instante. */
+
+const PALETA_TAREAS = ['#e11d48', '#db2777', '#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626']
+
+export async function crearTareaClientePortal(texto: string, asignadoId?: string): Promise<Ok> {
+  await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+
+  const t = (texto ?? '').trim()
+  if (!t) return { ok: false, error: 'Escribe la tarea.' }
+  if (t.length > 600) return { ok: false, error: 'La tarea es demasiado larga.' }
+
+  const service = createServiceClient() as Service
+
+  /* Asignado: SOLO un miembro activo real (validado server-side). Sin
+     asignado → queda sin dueño (la ve Pedro en el tablero del equipo). */
+  let ownerId: string | null = null
+  let ownerNombre: string | null = null
+  if (asignadoId) {
+    const { data: m } = await service.from('team_members').select('id, nombre').eq('id', asignadoId).eq('activo', true).maybeSingle()
+    if (m) { ownerId = m.id; ownerNombre = m.nombre }
+  }
+
+  /* Columna del tablero = el nombre de la marca (igual que crearTareaEnMarca).
+     Reusar el color existente de esa columna para no romper el tablero. */
+  const categoria = cliente.marcaNombre
+  let color = PALETA_TAREAS[Math.abs(categoria.length * 7) % PALETA_TAREAS.length]
+  try {
+    const { data: fila } = await service.from('tareas').select('color').eq('categoria', categoria).limit(1).maybeSingle()
+    if (fila?.color) color = fila.color
+  } catch { /* color por defecto */ }
+
+  const { error } = await service.from('tareas').insert({
+    team_member_id: ownerId,
+    created_by: null,                          // el cliente no es team_member
+    /* Se marca el origen para que el equipo sepa que la pidió el cliente. */
+    texto: `${t} · pedido por ${cliente.nombre ?? 'el cliente'}`,
+    categoria,
+    color,
+    completada: false,
+    focus_lane: null,
+    marca_slug: cliente.marcaSlug,
+  })
+  if (error) return { ok: false, error: error.message }
+
+  /* Aviso push: al asignado (si hay) o a Erick, para que nada se pierda. */
+  try {
+    const destino = ownerNombre ? [ownerNombre.split(/\s+/)[0].toLowerCase()] : ['erick']
+    await enviarPushAMiembros(destino, {
+      title: `📝 Tarea nueva del cliente · ${cliente.marcaNombre}`,
+      body: t.slice(0, 110),
+      url: '/tareas',
+      tag: `tarea-cli-${cliente.marcaId}-${Date.now()}`,
+    })
+  } catch { /* noop */ }
+
+  revalidatePath('/cliente')
+  revalidatePath('/tareas')
+  revalidatePath('/inicio')
+  return { ok: true }
+}
+
+/* Guard común: la tarea debe ser de LA MARCA del cliente. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function tareaDeMiMarca(service: Service, id: string, cliente: { marcaSlug: string; marcaNombre: string }): Promise<any | null> {
+  const { data } = await service.from('tareas').select('id, categoria, marca_slug, texto').eq('id', id).maybeSingle()
+  if (!data) return null
+  if (data.marca_slug !== cliente.marcaSlug && data.categoria !== cliente.marcaNombre) return null
+  return data
+}
+
+export async function completarTareaClientePortal(id: string): Promise<Ok> {
+  await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+  const service = createServiceClient() as Service
+  const tarea = await tareaDeMiMarca(service, id, cliente)
+  if (!tarea) return { ok: false, error: 'Esa tarea no es de tu marca.' }
+  const { error } = await service.from('tareas').update({ completada: true, completada_at: new Date().toISOString() }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/cliente'); revalidatePath('/tareas')
+  return { ok: true }
+}
+
+export async function eliminarTareaClientePortal(id: string): Promise<Ok> {
+  await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+  const service = createServiceClient() as Service
+  const tarea = await tareaDeMiMarca(service, id, cliente)
+  if (!tarea) return { ok: false, error: 'Esa tarea no es de tu marca.' }
+  const { error } = await service.from('tareas').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/cliente'); revalidatePath('/tareas')
+  return { ok: true }
+}
