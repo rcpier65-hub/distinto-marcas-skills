@@ -1,12 +1,13 @@
 // app/app/influencers/_actions.ts
 'use server'
 
-// Módulo Influencers (TypHouse): pedidos a influencers y su avance.
+// Módulo Influencers (por marca): pedidos a influencers y su avance.
 // Estados: pedido_enviado → pedido_entregado → video_enviado.
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
+import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import {
-  crearInfluencerDb, actualizarInfluencerDb, eliminarInfluencerDb,
+  crearInfluencerDb, actualizarInfluencerDb, eliminarInfluencerDb, setInfluencersActivoDb,
   type EstadoInfluencer,
 } from '@/lib/influencers/db'
 
@@ -84,6 +85,27 @@ export async function eliminarInfluencer(id: string): Promise<Result> {
   try {
     await eliminarInfluencerDb(id)
     revalidatePath('/influencers')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/**
+ * Activa/desactiva el módulo Influencers para una marca (solo directores).
+ * Controla en qué marcas aparece el módulo (sidebar + tabs de /influencers).
+ */
+export async function toggleInfluencersMarca(marcaSlug: string, activo: boolean): Promise<Result> {
+  await requireUser()
+  const permisos = await getCurrentMemberPermisos()
+  const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
+  if (!esDirector) return { ok: false, error: 'Solo los directores pueden activar Influencers por marca.' }
+  const slug = (marcaSlug ?? '').trim()
+  if (!slug) return { ok: false, error: 'Falta la marca.' }
+  try {
+    await setInfluencersActivoDb(slug, activo)
+    revalidatePath('/influencers')
+    revalidatePath('/', 'layout')  // refresca el sidebar (gate por marca)
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }

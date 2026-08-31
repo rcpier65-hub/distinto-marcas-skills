@@ -89,6 +89,29 @@ export async function eliminarInfluencerDb(id: string): Promise<void> {
   await conTabla(async (c) => { await c.query('DELETE FROM influencers WHERE id = $1', [id]) })
 }
 
+/* ==================== Activación POR MARCA ====================
+   El módulo se activa/desactiva por marca vía marcas.influencers_activo
+   (columna auto-creada — sin migraciones). Default histórico: si la columna
+   no existe o está NULL, solo TypHouse (little-joe) está activa. */
+
+const DDL_FLAG = `ALTER TABLE marcas ADD COLUMN IF NOT EXISTS influencers_activo boolean`
+
+export async function setInfluencersActivoDb(marcaSlug: string, activo: boolean): Promise<void> {
+  const client = await pgConnect()
+  try {
+    await client.query(DDL_FLAG)
+    await client.query('UPDATE marcas SET influencers_activo = $2 WHERE slug = $1', [marcaSlug, activo])
+    try { await client.query("NOTIFY pgrst, 'reload schema'") } catch { /* best-effort */ }
+  } finally {
+    await client.end()
+  }
+}
+
+/** ¿Está activo Influencers para esta marca? (aplica el default little-joe) */
+export function influencersActivoDe(slug: string, flag: boolean | null | undefined): boolean {
+  return flag ?? slug === 'little-joe'
+}
+
 export async function leerInfluencersDb(marcaSlug: string): Promise<Influencer[]> {
   // 1) PostgREST (rápido cuando el cache ya conoce la tabla)
   try {

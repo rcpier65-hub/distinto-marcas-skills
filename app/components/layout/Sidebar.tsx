@@ -210,9 +210,11 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {puede('metricas') && (
             <NavItem href="/reportes" icon={<ChartIcon />} label="Reportes" active={isActive('/reportes')} />
           )}
-          {/* Influencers: kanban de pedidos a influencers (TypHouse). Mismo
-              permiso que publicaciones. Pedro 27-ago-2026. */}
-          {puede('publicaciones') && (
+          {/* Influencers: kanban de pedidos a influencers, POR MARCA. Solo
+              aparece si alguna de las marcas visibles del usuario tiene el
+              módulo activado (marcas.influencers_activo — hoy solo TypHouse).
+              Pedro 31-ago-2026: "solo debe aparecerle a esa marca". */}
+          {puede('publicaciones') && marcasVisibles.some((m) => (m as { influencersActivo?: boolean }).influencersActivo) && (
             <NavItem href="/influencers" icon={<InfluencerIcon />} label="Influencers" active={isActive('/influencers')} />
           )}
         </Section>

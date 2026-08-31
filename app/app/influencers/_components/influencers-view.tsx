@@ -29,7 +29,7 @@ const COLUMNAS: Array<{ id: EstadoInfluencer; label: string; color: string; bg: 
 ]
 
 export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }: {
-  marcaSlug: string; marcaNombre: string; driveUrl: string; iniciales: InfluencerItem[]
+  marcaSlug: string; marcaNombre: string; driveUrl: string | null; iniciales: InfluencerItem[]
 }) {
   const router = useRouter()
   const [items, setItems] = useState<InfluencerItem[]>(iniciales)
@@ -95,11 +95,13 @@ export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }:
             <p className="text-[13.5px]" style={{ color: '#6b7280' }}>{items.length} colaboraciones · pedidos y videos de influencers</p>
           </div>
           <div className="flex-1" />
-          <a href={driveUrl} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-[10px] text-[13.5px] font-medium"
-            style={{ background: '#fff', border: '1px solid #e5e7eb', color: '#374151', textDecoration: 'none' }}>
-            <FolderOpen className="w-4 h-4" style={{ color: '#f59e0b' }} /> Carpeta de videos (Drive)
-          </a>
+          {driveUrl && (
+            <a href={driveUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-[10px] text-[13.5px] font-medium"
+              style={{ background: '#fff', border: '1px solid #e5e7eb', color: '#374151', textDecoration: 'none' }}>
+              <FolderOpen className="w-4 h-4" style={{ color: '#f59e0b' }} /> Carpeta de videos (Drive)
+            </a>
+          )}
         </header>
 
         {/* NUEVO */}
@@ -222,8 +224,8 @@ export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }:
         </div>
 
         <p className="text-[11.5px]" style={{ color: '#9ca3af' }}>
-          Tip: arrastra las cards entre columnas (en compu) o usa las flechas. El enlace del video se puede pegar en cualquier etapa;
-          los archivos viven en la <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="underline">carpeta de Drive</a>.
+          Tip: arrastra las cards entre columnas (en compu) o usa las flechas. El enlace del video se puede pegar en cualquier etapa
+          {driveUrl ? <>; los archivos viven en la <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="underline">carpeta de Drive</a></> : null}.
         </p>
       </div>
     </main>

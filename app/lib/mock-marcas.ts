@@ -12,6 +12,12 @@ export type MarcaNav = {
   color: string        /* CSS var Linear */
   industria: string
   pendientes: number   /* suma comentarios+grilla+pubs */
+  /* id real de la tabla marcas (para filtrar por marcasAcceso). Opcional:
+     el fallback mock no lo tiene. */
+  id?: string
+  /* Módulo Influencers activado para esta marca (marcas.influencers_activo).
+     Solo las marcas con esto en true muestran el módulo. */
+  influencersActivo?: boolean
 }
 
 // IMPORTANTE: los slugs DEBEN coincidir EXACTAMENTE con los de la tabla

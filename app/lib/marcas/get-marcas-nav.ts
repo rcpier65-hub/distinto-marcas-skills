@@ -25,11 +25,21 @@ export async function getMarcasNav(): Promise<MarcaNav[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const service = createServiceClient() as any
-    const { data, error } = await service
+    /* influencers_activo puede no existir aún (columna auto-creada al activar
+       el módulo por primera vez) — retry defensivo sin ella. */
+    let res = await service
       .from('marcas')
-      .select('id, slug, nombre, emoji_marca, color_primario_hex')
+      .select('id, slug, nombre, emoji_marca, color_primario_hex, influencers_activo')
       .eq('activa', true)
       .order('slug')
+    if (res.error && /influencers_activo/i.test(res.error.message ?? '')) {
+      res = await service
+        .from('marcas')
+        .select('id, slug, nombre, emoji_marca, color_primario_hex')
+        .eq('activa', true)
+        .order('slug')
+    }
+    const { data, error } = res
 
     if (error || !data || data.length === 0) return MARCAS_NAV
 
@@ -54,6 +64,10 @@ export async function getMarcasNav(): Promise<MarcaNav[]> {
         industria: meta?.industria ?? 'Marca',
         // Pendientes REALES (status='pending' en comentarios_inbox). 0 = sin badge.
         pendientes: pendientesPorMarca[m.id] ?? 0,
+        id: m.id,
+        /* Influencers: activo si la columna lo dice; si la columna no existe
+           o está NULL, el default histórico es solo TypHouse (little-joe). */
+        influencersActivo: m.influencers_activo ?? m.slug === 'little-joe',
       }
     })
   } catch {
