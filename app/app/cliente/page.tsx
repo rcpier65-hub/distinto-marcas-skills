@@ -222,7 +222,9 @@ export default async function ClientePortalPage() {
     const [porSlug, porCategoria, eq] = await Promise.all([
       service.from('tareas').select(SEL).eq('completada', false).eq('marca_slug', cliente.marcaSlug)
         .order('created_at', { ascending: false }).limit(100).then((r: unknown) => r, () => ({ data: [] })),
-      service.from('tareas').select(SEL).eq('completada', false).eq('categoria', cliente.marcaNombre)
+      /* ilike sin comodines = igualdad case-insensitive: la columna del
+         tablero dice "Typhouse" y la marca "TypHouse" — deben coincidir. */
+      service.from('tareas').select(SEL).eq('completada', false).ilike('categoria', cliente.marcaNombre)
         .order('created_at', { ascending: false }).limit(100).then((r: unknown) => r, () => ({ data: [] })),
       service.from('team_members').select('id, nombre').eq('activo', true).order('nombre')
         .then((r: unknown) => r, () => ({ data: [] })),

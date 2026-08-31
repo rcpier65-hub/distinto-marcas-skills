@@ -149,6 +149,12 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
 
   const color = colorByCat.get(categoria) ?? colorParaCategoria(usados)
 
+  /* Etiquetar la MARCA cuando la categoría es una marca (case-insensitive):
+     así toda tarea de "Typhouse" queda con marca_slug='little-joe' y el
+     PORTAL del cliente la ve, se escriba donde se escriba. Pedro 31-ago-2026:
+     "todas las de typhouse deben sincronizarse con la app directamente". */
+  const marcaDeCategoria = marcas.find((m) => m.nombre.trim().toLowerCase() === categoria.trim().toLowerCase())
+
   const { data, error } = await service
     .from('tareas')
     .insert({
@@ -159,6 +165,7 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
       color,
       completada: false,
       focus_lane: null,
+      marca_slug: marcaDeCategoria?.slug ?? null,
     })
     .select(SELECT)
     .single()
@@ -245,8 +252,15 @@ export async function moverTareaCategoria(id: string, nuevaCategoria: string): P
   for (const r of (existentes ?? []) as any[]) {
     if (!colorByCat.has(r.categoria)) { colorByCat.set(r.categoria, r.color); usados.push(r.color) }
   }
+  /* Mantener la etiqueta de marca al mover de columna: si la columna destino
+     es una marca (case-insensitive), la tarea queda con su marca_slug; si no,
+     se limpia. Así el portal del cliente siempre refleja SU columna. */
+  const { data: marcasData } = await service.from('marcas').select('nombre, slug')
+  const marcaDestino = (((marcasData ?? []) as { nombre: string; slug: string }[]))
+    .find((m) => m.nombre.trim().toLowerCase() === cat.toLowerCase())
+
   const color = colorByCat.get(cat) ?? colorParaCategoria(usados)
-  const { error } = await service.from('tareas').update({ categoria: cat, color }).eq('id', id)
+  const { error } = await service.from('tareas').update({ categoria: cat, color, marca_slug: marcaDestino?.slug ?? null }).eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/tareas')
   return { ok: true }
