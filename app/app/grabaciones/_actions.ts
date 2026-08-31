@@ -19,6 +19,12 @@ function eventoTitulo(marcaNombre: string): string {
   return `🎬 Grabación · ${marcaNombre}`
 }
 
+/* Lorena dirige TODAS las grabaciones — va invitada a cada evento de
+   grabación de cualquier marca (Google le manda invitación + recordatorio).
+   Pedro 31-ago-2026: "a las grabaciones a todos les pones a
+   lorechavarry@gmail.com porque ella es la directora de las grabaciones". */
+const CORREO_DIRECTORA_GRABACIONES = 'lorechavarry@gmail.com'
+
 export type GrabacionWithMarca = {
   id: string
   marca_id: string
@@ -302,7 +308,8 @@ export async function createGrabacion(args: {
   const correosForm = (args.invitados_emails ?? [])
     .map((e) => e.trim().toLowerCase())
     .filter((e) => /@/.test(e))
-  const invitados = Array.from(new Set([...correosMarca, ...correosForm]))
+  // La directora de grabaciones (Lorena) SIEMPRE va invitada.
+  const invitados = Array.from(new Set([CORREO_DIRECTORA_GRABACIONES, ...correosMarca, ...correosForm]))
 
   // Insert con todas las columnas. Si alguna OPCIONAL no existe en prod
   // (migraciones 028/029 sin aplicar), la PODAMOS y reintentamos — pero
