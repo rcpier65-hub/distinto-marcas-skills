@@ -118,7 +118,10 @@ export async function agendarReunion(input: {
   // panel de reuniones de la marca). El Meet queda como lugar/enlace.
   const fechaHoraIso = new Date(`${input.fecha}T${input.hora}:00-05:00`).toISOString()
   try {
-    await service.from('marca_reuniones').insert({
+    /* supabase-js NO lanza en errores de BD — hay que mirar .error, si no un
+       insert fallido (tabla/columna faltante) pasa desapercibido y la reunión
+       existe en Google pero no en el sistema. */
+    const ins = await service.from('marca_reuniones').insert({
       marca_id: input.marcaId,
       titulo: (input.titulo || 'Reunión').trim(),
       fecha_hora: fechaHoraIso,
@@ -126,6 +129,7 @@ export async function agendarReunion(input: {
       lugar_enlace: gen.meetLink,
       notas: null,
     })
+    if (ins.error) console.error('[agendarReunion] insert marca_reuniones falló:', ins.error.message)
   } catch { /* el evento ya se creó en Calendar igual */ }
 
   // Recordar los correos en la marca para la próxima (si el usuario lo pidió).

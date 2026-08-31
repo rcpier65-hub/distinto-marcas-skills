@@ -537,7 +537,16 @@ function isoALima(iso: string): { ymd: string; hm: string } {
  * Google. Best-effort: cualquier fallo devuelve [] — la vista sigue viva.
  */
 export async function listCalendarEvents(desde: string, hasta: string): Promise<GCalEventLite[]> {
-  const token = await getValidAccessToken()
+  /* Best-effort DE VERDAD: esta función corre en el render de la página del
+     calendario — un refresh de token que falle o se cuelgue no puede tumbar
+     ni frenar la vista. Tope duro de 6s para conseguir token. */
+  let token: string | null = null
+  try {
+    token = await Promise.race([
+      getValidAccessToken(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ])
+  } catch { return [] }
   if (!token) return []
 
   const grabCal = await getGrabacionesCalendarId(token)

@@ -100,9 +100,15 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const grabRows = (grabRes.ok ? grabRes.rows : []).filter((g) => !marcasPermitidas || marcasPermitidas.has(g.marca_id))
   reunionesRows = reunionesRows.filter((r) => !marcasPermitidas || marcasPermitidas.has(r.marca_id))
   const idsDeLaApp = new Set(grabRows.map((g) => g.google_event_id).filter(Boolean) as string[])
-  /* Dedup robusto de reuniones vs GCal: además del prefijo 📌, el link de Meet
-     (si Pedro renombra el evento en Google, el Meet sigue siendo el mismo). */
+  /* Dedup robusto de reuniones vs GCal: link de Meet (sobrevive a renombres
+     en Google) y clave fecha|hora. Un evento 📌 SIN fila espejo en
+     marca_reuniones (insert fallido) NO se salta — se muestra como evento
+     de Google en vez de desaparecer del calendario. */
   const meetsDeReuniones = new Set(reunionesRows.map((r) => r.lugar_enlace).filter(Boolean) as string[])
+  const clavesReuniones = new Set(reunionesRows.map((r) => {
+    const { ymd, hm } = tsALima(r.fecha_hora)
+    return `${ymd}|${hm}`
+  }))
 
   for (const g of grabRows) {
     const marca = marcasById.get(g.marca_id)
@@ -148,9 +154,9 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
      reuniones por el prefijo 📌 con el que la app titula sus eventos). */
   for (const ev of gcalEvents) {
     if (idsDeLaApp.has(ev.id)) continue
-    if (ev.summary.startsWith('📌')) continue
-    if (ev.summary.startsWith('🎬')) continue
     if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
+    if (ev.summary.startsWith('🎬')) continue
+    if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
     eventos.push({
       id: ev.id,
       tipo: 'gcal',
@@ -228,8 +234,10 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         </div>
       )}
 
-      {/* CALENDARIO UNIFICADO */}
-      <AgendaCalendar mes={desde} eventos={eventos} marcas={marcasMes} hoy={hoyLima} />
+      {/* CALENDARIO UNIFICADO — key={desde} remonta el componente al cambiar
+          de mes: si no, el filtro de marca y el día seleccionado del mes
+          anterior quedan pegados y pueden dejar la grilla vacía en silencio. */}
+      <AgendaCalendar key={desde} mes={desde} eventos={eventos} marcas={marcasMes} hoy={hoyLima} />
 
       <p className="text-xs text-muted-foreground text-center">
         💡 Toca un día para ver su detalle. Las grabaciones se editan en la vista{' '}
