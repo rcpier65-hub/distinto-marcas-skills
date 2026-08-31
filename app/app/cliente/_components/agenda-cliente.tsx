@@ -105,7 +105,9 @@ export function AgendaClienteView({ reuniones, grabaciones, color, marcaNombre, 
     const out: Evento[] = []
     for (const g of grabaciones) {
       out.push({
-        id: g.id, tipo: 'grabacion', fecha: g.fechaPlaneada,
+        id: g.id, tipo: 'grabacion',
+        /* Cumplida con fecha real distinta → se muestra el día que SÍ se grabó. */
+        fecha: g.estado === 'cumplida' && g.fechaReal ? g.fechaReal : g.fechaPlaneada,
         hora: g.horaPlaneada ? g.horaPlaneada.slice(0, 5) : null,
         titulo: `Grabación · ${marcaNombre}`, estado: g.estado,
         meetLink: null, notas: g.notas, videosGrabados: g.videosGrabados,
@@ -113,12 +115,15 @@ export function AgendaClienteView({ reuniones, grabaciones, color, marcaNombre, 
     }
     for (const r of reuniones) {
       const { ymd, hm } = tsALima(r.fechaHora)
-      const esLink = typeof r.lugarEnlace === 'string' && /^https?:\/\//.test(r.lugarEnlace)
+      /* Meet sin protocolo ("meet.google.com/xyz") también cuenta como link. */
+      const crudo = (r.lugarEnlace ?? '').trim()
+      const link = /^https?:\/\//i.test(crudo) ? crudo
+        : /^(meet\.google\.com|www\.)/i.test(crudo) ? `https://${crudo}` : null
       out.push({
         id: r.id, tipo: 'reunion', fecha: ymd, hora: hm,
         titulo: r.titulo || 'Reunión', estado: r.estado,
-        meetLink: esLink ? r.lugarEnlace : null,
-        notas: r.notas ?? (r.modalidad === 'presencial' && r.lugarEnlace && !esLink ? `Lugar: ${r.lugarEnlace}` : null),
+        meetLink: link,
+        notas: r.notas ?? (r.modalidad === 'presencial' && crudo && !link ? `Lugar: ${crudo}` : null),
         videosGrabados: null,
       })
     }

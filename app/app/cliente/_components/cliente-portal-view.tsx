@@ -17,6 +17,8 @@ import { categoriaInfo } from '@/lib/fechas/categorias'
 import { FechaDetalleModal } from '@/components/fechas/fecha-detalle-modal'
 import { SoporteClienteView, type ReporteClienteItem } from './soporte-cliente-view'
 import { AgendaClienteView } from './agenda-cliente'
+import { InfluencersView, type InfluencerItem } from '@/app/influencers/_components/influencers-view'
+import { normalizeSubEstado, type SubEstadoDiseno } from '@/lib/diseno/types'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
@@ -228,6 +230,8 @@ const NAV = [
   { id: 'stats', label: 'Estadísticas', corto: 'Stats', Icono: BarChart3 },
   { id: 'reuniones', label: 'Grabaciones y Reuniones', corto: 'Agenda', Icono: CalendarClock },
   { id: 'diseno', label: 'Diseño', corto: 'Diseño', Icono: Palette },
+  /* Influencers — solo marcas con el módulo activado (hoy TypHouse). */
+  { id: 'influencers', label: 'Influencers', corto: 'Influ.', Icono: Star },
   { id: 'soporte', label: 'Soporte', corto: 'Soporte', Icono: LifeBuoy },
   /* Reporte mensual (embudo/inversión) — solo aparece si la marca tiene
      reporte cargado (prop reporteNombre) y pide código al abrirlo. */
@@ -307,6 +311,7 @@ export function ClientePortalView({
   marcaId, marcaNombre, marcaSlug, marcaEmoji, marcaColor, marcaLogoUrl, driveUrl, contacto, hoy, pubs: pubsIniciales, observaciones, reuniones, grabaciones, fechasImportantes = [],
   marcasDisponibles = [],
   reportesSoporte = [],
+  influencersActivo = false, influencers = [], influencersDriveUrl = null,
   reporteNombre = null, reporteMeses = null,
 }: {
   marcaId: string
@@ -327,6 +332,10 @@ export function ClientePortalView({
   fechasImportantes?: FechaClienteItem[]
   /* Reportes de soporte de ESTA marca (los que mandó el cliente). */
   reportesSoporte?: ReporteClienteItem[]
+  /* Influencers — solo si la marca tiene el módulo activado. */
+  influencersActivo?: boolean
+  influencers?: InfluencerItem[]
+  influencersDriveUrl?: string | null
   /* Reporte mensual de la marca: nombre para mostrar + data. meses=null con
      nombre presente = candado (aún sin código). nombre=null = sin reporte. */
   reporteNombre?: string | null
@@ -344,7 +353,8 @@ export function ClientePortalView({
   const [vista, setVista] = useState<VistaId | 'drive' | 'pendientes'>('cal')
   /* ¿Esta marca tiene reporte mensual cargado? (si no, el ítem no aparece) */
   const tieneReporte = !!reporteNombre
-  const navVisible = NAV.filter(({ id }) => id !== 'reporte' || tieneReporte)
+  const navVisible = NAV.filter(({ id }) =>
+    (id !== 'reporte' || tieneReporte) && (id !== 'influencers' || influencersActivo))
   /* Secciones plegables del menú lateral (como la app: ▼ WORKSPACE / MARCAS).
      Pedro 19-jul-2026. */
   const [secAbierta, setSecAbierta] = useState<{ marca: boolean; herram: boolean }>({ marca: true, herram: true })
@@ -362,9 +372,6 @@ export function ClientePortalView({
   /* Área de diseño: presentación (tarjetas / lista), filtro por estado y
      búsqueda por nombre. Pedro 12-ago-2026: "que sean cuadraditos tipo card y
      un toggle a lista; así en lista larga se ve feo". */
-  const [disenoVista, setDisenoVista] = useState<'cards' | 'lista'>('cards')
-  const [disenoFiltro, setDisenoFiltro] = useState<'todos' | 'proceso' | 'listos'>('todos')
-  const [disenoBuscar, setDisenoBuscar] = useState('')
   /* Publicación abierta en la ventana de detalle (al tocar una tarjeta del
      calendario). El cliente ve el video ahí y puede aprobarlo. */
   const [modalPub, setModalPub] = useState<PubCliente | null>(null)
@@ -558,6 +565,12 @@ export function ClientePortalView({
   useEffect(() => {
     if (typeof window === 'undefined') return
     const qs = new URLSearchParams(window.location.search)
+    /* El deep-link se CONSUME una sola vez: sin esto, cada refresh de pubs
+       (realtime / volver a la pestaña) re-forzaba la vista o reabría el modal
+       y el cliente no podía salir de la sección. Fix 31-ago-2026. */
+    if (qs.get('reunion') || qs.get('obs') || qs.get('pub')) {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
     // Deep-links de notificaciones: reunión nueva o respuesta (ahora Soporte).
     if (qs.get('reunion')) { setVista('reuniones'); return }
     if (qs.get('obs')) { setVista('soporte'); return }
@@ -943,89 +956,86 @@ export function ClientePortalView({
       )}
 
 
-      {/* Pestaña propia de DISEÑO: banners/posts que hace el equipo, con el estado
-          que va marcando el diseñador. Pedro 5-ago-2026. */}
-      {vista === 'diseno' && (
-        <div className="space-y-4">
-          <div>
-            <SecHeader icon={<Palette className="w-4 h-4" />} label="Área de diseño" count={disenos.length} color="#8b5cf6" />
-            <p className="text-[12px] text-muted-foreground -mt-1">Banners, posts y piezas gráficas que el equipo diseña para tu marca. El estado lo va marcando el diseñador. 🎨</p>
-          </div>
-          {disenos.length === 0 ? (
-            <Vacio texto="Todavía no hay diseños. Cuando el equipo empiece uno, aparecerá acá con su estado." />
-          ) : (() => {
-            const enProceso = disenos.filter((p) => !disenoTerminado(p))
-            const listos = disenos.filter((p) => disenoTerminado(p))
-            const base = disenoFiltro === 'proceso' ? enProceso : disenoFiltro === 'listos' ? listos : disenos
-            const q = disenoBuscar.trim().toLowerCase()
-            const mostrados = (q ? base.filter((p) => (p.titulo ?? '').toLowerCase().includes(q)) : base)
-              .slice()
-              // pendientes primero; dentro de cada grupo, fecha más reciente arriba
-              .sort((a, b) => {
-                const ta = disenoTerminado(a) ? 1 : 0
-                const tb = disenoTerminado(b) ? 1 : 0
-                if (ta !== tb) return ta - tb
-                return (b.fechaEntrega ?? b.fecha ?? '').localeCompare(a.fechaEntrega ?? a.fecha ?? '')
-              })
-            const chips: Array<{ id: 'todos' | 'proceso' | 'listos'; label: string; n: number }> = [
-              { id: 'todos', label: 'Todos', n: disenos.length },
-              { id: 'proceso', label: 'En proceso', n: enProceso.length },
-              { id: 'listos', label: 'Entregados', n: listos.length },
-            ]
-            return (
-              <div className="space-y-3">
-                {/* Controles: filtro por estado · búsqueda · toggle tarjetas/lista */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {chips.map((c) => {
-                      const on = disenoFiltro === c.id
-                      return (
-                        <button key={c.id} type="button" onClick={() => setDisenoFiltro(c.id)}
-                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12.5px] font-semibold border transition-colors"
-                          style={{ borderColor: on ? '#8b5cf6' : '#e5e7eb', background: on ? '#8b5cf614' : 'transparent', color: on ? '#8b5cf6' : '#6b7280' }}>
-                          {c.label} <span className="text-[11px] opacity-70">{c.n}</span>
+      {/* DISEÑO — MISMO modelo que el módulo /diseno del sistema: kanban por
+          sub-estado (Sin empezar → En progreso → Pausada → Listo → Enviado),
+          solo con las piezas de SU marca. Pedro 31-ago-2026: "el área de diseño
+          debe ser el mismo modelo de diseño que tiene nuestro sistema". */}
+      {vista === 'diseno' && (() => {
+        const COLS: SubEstadoDiseno[] = ['sin_empezar', 'en_progreso', 'pausada', 'listo', 'enviado']
+        const CFG: Record<SubEstadoDiseno, { label: string; color: string }> = {
+          sin_empezar: { label: 'Sin empezar', color: '#737373' },
+          en_progreso: { label: 'En progreso', color: '#60a5fa' },
+          pausada:     { label: 'Pausada',     color: '#f59e0b' },
+          listo:       { label: 'Listo',       color: '#34d399' },
+          enviado:     { label: 'Enviado',     color: '#14b8a6' },
+          archivado:   { label: 'Archivado',   color: '#a78bfa' },
+        }
+        const porCol = new Map<SubEstadoDiseno, PubCliente[]>()
+        for (const c of COLS) porCol.set(c, [])
+        for (const p of disenos) {
+          const sub = normalizeSubEstado(p.estadoTarea)
+          if (sub === 'archivado') continue  // archivadas no llegan al portal
+          ;(porCol.get(sub) ?? porCol.get('sin_empezar'))!.push(p)
+        }
+        const M_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+        const fCorta = (iso: string) => {
+          const d = new Date(iso.slice(0, 10) + 'T12:00:00')
+          return isNaN(d.getTime()) ? '—' : `${d.getDate()} ${M_CORTOS[d.getMonth()]}`
+        }
+        return (
+          <div className="space-y-4">
+            <div>
+              <SecHeader icon={<Palette className="w-4 h-4" />} label="Área de diseño" count={disenos.length} color="#8b5cf6" />
+              <p className="text-[12px] text-muted-foreground -mt-1">El mismo tablero que usa el equipo — aquí ves en qué etapa va cada pieza de tu marca. 🎨</p>
+            </div>
+            {disenos.length === 0 ? (
+              <Vacio texto="Todavía no hay diseños. Cuando el equipo empiece uno, aparecerá acá con su estado." />
+            ) : (
+              <div className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0">
+                {COLS.map((cid) => {
+                  const cfg = CFG[cid]
+                  const cards = porCol.get(cid) ?? []
+                  return (
+                    <div key={cid} className="min-w-[210px] flex-shrink-0 lg:min-w-0 rounded-2xl p-2.5 space-y-2" style={{ background: '#f4f4f6', minHeight: 160 }}>
+                      <div className="flex items-center gap-2 px-1 pb-1">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cfg.color }} />
+                        <span className="text-[12px] font-bold" style={{ color: cfg.color }}>{cfg.label}</span>
+                        <span className="ml-auto text-[11px] font-bold text-muted-foreground">{cards.length}</span>
+                      </div>
+                      {cards.length === 0 && <div className="text-center text-[11px] text-muted-foreground/50 py-4">—</div>}
+                      {cards.map((p) => (
+                        <button key={p.id} onClick={() => setModalPub(p)}
+                          className="w-full text-left rounded-[10px] p-2.5 bg-card transition-all hover:shadow-md hover:-translate-y-px"
+                          style={{ border: '1px solid #ececf0', borderLeft: `3px solid ${marcaColor}` }}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="w-[22px] h-[22px] rounded-full text-white inline-flex items-center justify-center shrink-0"
+                              style={{ background: marcaColor, fontSize: marcaEmoji ? 13 : 10, fontWeight: 700, boxShadow: `0 0 0 1px ${marcaColor}40` }}>
+                              {marcaEmoji || marcaNombre.slice(0, 2).toUpperCase()}
+                            </span>
+                            <span className="text-[10.5px] text-muted-foreground truncate">{marcaNombre}</span>
+                          </div>
+                          <div className="text-[12.5px] font-semibold leading-snug line-clamp-2">{p.titulo}</div>
+                          {(p.fechaEntrega || p.fecha) && (
+                            <div className="mt-1.5 text-[10.5px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3 h-3 shrink-0" /> Entrega: {fCorta((p.fechaEntrega ?? p.fecha)!)}
+                            </div>
+                          )}
                         </button>
-                      )
-                    })}
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input value={disenoBuscar} onChange={(e) => setDisenoBuscar(e.target.value)} placeholder="Buscar…"
-                        className="h-8 w-28 sm:w-44 pl-8 pr-2 rounded-full border bg-background text-[13px] outline-none focus:ring-2 focus:ring-[#8b5cf6]/30" />
+                      ))}
                     </div>
-                    <div className="inline-flex items-center rounded-full border p-0.5 bg-background shrink-0">
-                      <button type="button" onClick={() => setDisenoVista('cards')} title="Ver en tarjetas" aria-label="Ver en tarjetas"
-                        className="inline-flex items-center justify-center w-8 h-7 rounded-full transition-colors"
-                        style={{ background: disenoVista === 'cards' ? '#8b5cf6' : 'transparent', color: disenoVista === 'cards' ? '#fff' : '#6b7280' }}>
-                        <LayoutGrid className="w-4 h-4" />
-                      </button>
-                      <button type="button" onClick={() => setDisenoVista('lista')} title="Ver en lista" aria-label="Ver en lista"
-                        className="inline-flex items-center justify-center w-8 h-7 rounded-full transition-colors"
-                        style={{ background: disenoVista === 'lista' ? '#8b5cf6' : 'transparent', color: disenoVista === 'lista' ? '#fff' : '#6b7280' }}>
-                        <List className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {mostrados.length === 0 ? (
-                  <Vacio texto="No hay diseños que coincidan con el filtro." />
-                ) : disenoVista === 'cards' ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {mostrados.map((p) => <DisenoCard key={p.id} p={p} onClick={() => setModalPub(p)} />)}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {mostrados.map((p) => (
-                      <FilaCompacta key={p.id} p={p} color="#8b5cf6" badge={disenoLabel(p)} onClick={() => setModalPub(p)} />
-                    ))}
-                  </div>
-                )}
+                  )
+                })}
               </div>
-            )
-          })()}
-        </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* INFLUENCERS — el MISMO kanban del sistema (embebido), solo su marca.
+          Solo aparece si la marca tiene el módulo activado. Pedro 31-ago-2026. */}
+      {vista === 'influencers' && influencersActivo && (
+        <InfluencersView embebido marcaSlug={marcaSlug} marcaNombre={marcaNombre}
+          driveUrl={influencersDriveUrl ?? driveUrl} iniciales={influencers} />
       )}
 
       {vista === 'stats' && (
@@ -1339,7 +1349,7 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
     /* En desktop: grilla bordeada tipo tabla — MISMO look que el calendario
        unificado de la agencia (Pedro 31-ago-2026: "igual al diseño del
        calendario de la agencia"). En móvil se mantiene el carrusel. */
-    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 lg:grid lg:grid-cols-7 lg:gap-0 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0 lg:border lg:rounded-xl lg:overflow-hidden lg:bg-card">
+    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 lg:grid lg:grid-cols-7 lg:gap-0 lg:mx-0 lg:px-0 lg:pb-0 lg:border lg:rounded-xl lg:overflow-hidden lg:bg-card">
       {weekDays.map((k) => {
         const dt = parseYmd(k)
         const dow = (dt.getDay() + 6) % 7

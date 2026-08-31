@@ -35,6 +35,7 @@ export async function crearInfluencer(input: {
       notas: (input.notas ?? '').trim() || null,
     })
     revalidatePath('/influencers')
+    revalidatePath('/cliente')
     return { ok: true, id }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -47,6 +48,7 @@ export async function moverInfluencer(id: string, estado: EstadoInfluencer): Pro
   try {
     await actualizarInfluencerDb(id, { estado })
     revalidatePath('/influencers')
+    revalidatePath('/cliente')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -74,6 +76,7 @@ export async function editarInfluencer(id: string, patch: {
   try {
     await actualizarInfluencerDb(id, p)
     revalidatePath('/influencers')
+    revalidatePath('/cliente')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -85,6 +88,7 @@ export async function eliminarInfluencer(id: string): Promise<Result> {
   try {
     await eliminarInfluencerDb(id)
     revalidatePath('/influencers')
+    revalidatePath('/cliente')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -105,6 +109,7 @@ export async function toggleInfluencersMarca(marcaSlug: string, activo: boolean)
   try {
     await setInfluencersActivoDb(slug, activo)
     revalidatePath('/influencers')
+    revalidatePath('/cliente')
     revalidatePath('/', 'layout')  // refresca el sidebar (gate por marca)
     return { ok: true }
   } catch (e) {

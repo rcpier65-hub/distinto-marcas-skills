@@ -54,16 +54,19 @@ export async function getObservacionesMarca(service: any, marcaId: string, limit
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getReunionesMarca(service: any, marcaId: string, limit = 100): Promise<Reunion[]> {
+export async function getReunionesMarca(service: any, marcaId: string, limit = 200): Promise<Reunion[]> {
+  /* DESC + reverse: con ASC y limit, una marca con muchas reuniones viejas
+     RECORTABA las próximas (las más importantes). Traemos las últimas N y
+     las devolvemos en orden ascendente como siempre. Fix 31-ago-2026. */
   const { data } = await service
     .from('marca_reuniones')
     .select('id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado')
     .eq('marca_id', marcaId)
-    .order('fecha_hora', { ascending: true })
+    .order('fecha_hora', { ascending: false })
     .limit(limit)
     .then((r: unknown) => r, () => ({ data: [] }))
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (((data as any) ?? []) as any[]).map((r) => ({
+  return (((data as any) ?? []) as any[]).reverse().map((r) => ({
     id: r.id as string,
     titulo: (r.titulo ?? '') as string,
     fechaHora: r.fecha_hora as string,
@@ -75,7 +78,7 @@ export async function getReunionesMarca(service: any, marcaId: string, limit = 1
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getGrabacionesMarca(service: any, marcaId: string, limit = 60): Promise<GrabacionCliente[]> {
+export async function getGrabacionesMarca(service: any, marcaId: string, limit = 200): Promise<GrabacionCliente[]> {
   const { data } = await service
     .from('grabaciones')
     .select('id, fecha_planeada, hora_planeada, fecha_real, estado, videos_grabados, notas, agendada_por_cliente')

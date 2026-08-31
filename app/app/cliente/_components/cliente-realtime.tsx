@@ -56,13 +56,13 @@ export function ClienteRealtime({ marcaId }: { marcaId: string }) {
         { event: '*', schema: 'public', table: 'publicaciones', filter: `marca_id=eq.${marcaId}` },
         () => scheduleRefresh(),
       )
-      // Observaciones y reuniones: el portal (Observaciones / Reuniones) se
-      // actualiza solo cuando el equipo agenda una reunión o cambia algo.
-      // Pedro 15-jul-2026.
+      // Soporte y reuniones: el portal (Soporte / Agenda) se actualiza solo
+      // cuando el equipo toma/resuelve un reporte o agenda una reunión.
+      // (Antes escuchaba marca_observaciones — módulo reemplazado por Soporte.)
       .on(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         'postgres_changes' as any,
-        { event: '*', schema: 'public', table: 'marca_observaciones', filter: `marca_id=eq.${marcaId}` },
+        { event: '*', schema: 'public', table: 'soporte_reportes', filter: `marca_id=eq.${marcaId}` },
         () => scheduleRefresh(),
       )
       .on(

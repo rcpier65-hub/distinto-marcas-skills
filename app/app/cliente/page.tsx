@@ -143,12 +143,24 @@ export default async function ClientePortalPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let reportesSoporte: any[] = []
   try {
-    const r = await service
+    let r = await service
       .from('soporte_reportes')
       .select('id, tipo, descripcion, estado, nota_resolucion, imagenes, created_at')
       .eq('marca_id', cliente.marcaId)
       .order('created_at', { ascending: false })
       .limit(50)
+    /* Fallback: si la columna marca_id aún no existe (o el insert cayó al
+       camino sin ella), identificamos sus reportes por el autor_nombre que
+       siempre lleva "· NombreDeMarca" al final. Así nunca quedan invisibles. */
+    if (r.error || (r.data ?? []).length === 0) {
+      const r2 = await service
+        .from('soporte_reportes')
+        .select('id, tipo, descripcion, estado, nota_resolucion, imagenes, created_at')
+        .ilike('autor_nombre', `%· ${cliente.marcaNombre}`)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (!r2.error && (r2.data ?? []).length > 0) r = r2
+    }
     if (!r.error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       reportesSoporte = ((r.data ?? []) as any[]).map((x) => ({
@@ -162,6 +174,38 @@ export default async function ClientePortalPage() {
       }))
     }
   } catch { /* sin soporte todavía */ }
+
+  /* INFLUENCERS — si la marca tiene el módulo activado (hoy TypHouse), el
+     cliente ve el MISMO kanban del sistema en su portal. Pedro 31-ago-2026.
+     Carpeta de videos: TypHouse usa su carpeta específica de influencers;
+     otras marcas caen a su Drive general. */
+  const DRIVE_INFLUENCERS: Record<string, string> = {
+    'little-joe': 'https://drive.google.com/drive/folders/1feYgjVXukpORKqeKbmovzALOrBMYUDFq?usp=drive_link',
+  }
+  let influencersActivo = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let influencersRows: any[] = []
+  try {
+    const { influencersActivoDe, leerInfluencersDb } = await import('@/lib/influencers/db')
+    let flag: boolean | null | undefined
+    try {
+      const rm = await service.from('marcas').select('influencers_activo').eq('id', cliente.marcaId).maybeSingle()
+      flag = rm.error ? undefined : rm.data?.influencers_activo
+    } catch { flag = undefined }
+    influencersActivo = influencersActivoDe(cliente.marcaSlug, flag)
+    if (influencersActivo) {
+      const filas = await leerInfluencersDb(cliente.marcaSlug)
+      influencersRows = filas.map((f) => ({
+        id: f.id,
+        usuarioIg: f.usuario_ig,
+        nombre: f.nombre,
+        estado: f.estado,
+        videoUrl: f.video_url,
+        notas: f.notas,
+        creadoEl: f.created_at,
+      }))
+    }
+  } catch { /* sin influencers */ }
 
   return (
     <ClientePortalView
@@ -181,6 +225,9 @@ export default async function ClientePortalPage() {
       pubs={pubsConDisenos}
       fechasImportantes={fechasImportantes}
       reportesSoporte={reportesSoporte}
+      influencersActivo={influencersActivo}
+      influencers={influencersRows}
+      influencersDriveUrl={DRIVE_INFLUENCERS[cliente.marcaSlug] ?? cliente.driveUrl ?? null}
       reporteNombre={reporte?.nombre ?? null}
       reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
     />

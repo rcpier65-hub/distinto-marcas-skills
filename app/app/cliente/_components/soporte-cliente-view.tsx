@@ -53,7 +53,7 @@ export function SoporteClienteView({ reportes, color }: { reportes: ReporteClien
   const [enviando, start] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const { soportado: vozOk, grabando, parcial, alternar } = useDictado({
+  const { soportado: vozOk, grabando, parcial, alternar, parar } = useDictado({
     onFinal: (frag) => setTexto((cur) => ((cur ? cur + ' ' : '') + frag).slice(0, 2000)),
     onError: (m) => toast.error(m),
   })
@@ -73,6 +73,7 @@ export function SoporteClienteView({ reportes, color }: { reportes: ReporteClien
   }
 
   function enviar() {
+    parar()  // detener el dictado: que no repueble el textarea tras limpiar
     const t = texto.trim()
     if (!t) { toast.error('Cuéntanos qué pasó o qué necesitas'); return }
     start(async () => {

@@ -28,8 +28,10 @@ const COLUMNAS: Array<{ id: EstadoInfluencer; label: string; color: string; bg: 
   { id: 'video_enviado', label: '🎬 Video enviado', color: '#15803d', bg: '#dcfce7' },
 ]
 
-export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }: {
+export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales, embebido = false }: {
   marcaSlug: string; marcaNombre: string; driveUrl: string | null; iniciales: InfluencerItem[]
+  /* true = vive dentro de otra página (portal del cliente): sin <main> propio. */
+  embebido?: boolean
 }) {
   const router = useRouter()
   const [items, setItems] = useState<InfluencerItem[]>(iniciales)
@@ -85,9 +87,10 @@ export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }:
     eliminarInfluencer(id).then((r) => { if (!r.ok) { setItems(prev); toast.error(r.error) } })
   }
 
+  const Wrapper = embebido ? 'section' : 'main'
   return (
-    <main className="p-6 md:p-8" style={{ minHeight: '100vh', background: '#fafafa' }}>
-      <div className="max-w-6xl mx-auto space-y-5">
+    <Wrapper className={embebido ? '' : 'p-6 md:p-8'} style={embebido ? undefined : { minHeight: '100vh', background: '#fafafa' }}>
+      <div className={embebido ? 'space-y-5' : 'max-w-6xl mx-auto space-y-5'}>
         {/* HEADER */}
         <header className="flex items-center gap-3 flex-wrap">
           <div>
@@ -228,6 +231,6 @@ export function InfluencersView({ marcaSlug, marcaNombre, driveUrl, iniciales }:
           {driveUrl ? <>; los archivos viven en la <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="underline">carpeta de Drive</a></> : null}.
         </p>
       </div>
-    </main>
+    </Wrapper>
   )
 }
