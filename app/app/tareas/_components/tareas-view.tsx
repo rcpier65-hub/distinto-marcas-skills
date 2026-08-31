@@ -337,7 +337,7 @@ export function TareasView({
       </DndContext>
 
       {/* Composer */}
-      <Composer onCrear={onCrear} equipo={equipo} isMobile={isMobile} esCEO={esCEO} meId={meId} />
+      <Composer onCrear={onCrear} equipo={equipo} isMobile={isMobile} esCEO={esCEO} />
 
       {/* Cards volando hacia el ícono de Archivo al completarse. */}
       {flyers.map((f) => <FlyerEl key={f.key} flyer={f} />)}
@@ -700,21 +700,16 @@ function DropTarget({ id, label, Icon, color, sub }: { id: string; label: string
 }
 
 /* ============================ Composer ============================ */
-/* Primer nombre en minúsculas (para matchear @menciones en el cliente). */
-function primerNombreCli(n: string | null | undefined): string {
-  return (n ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? ''
-}
-
-function Composer({ onCrear, equipo, isMobile, esCEO, meId }: {
-  onCrear: (t: Tarea) => void; equipo: { id: string; nombre: string }[]; isMobile: boolean; esCEO: boolean; meId: string | null
+function Composer({ onCrear, equipo, isMobile, esCEO }: {
+  onCrear: (t: Tarea) => void; equipo: { id: string; nombre: string }[]; isMobile: boolean; esCEO: boolean
 }) {
   const [text, setText] = useState('')
-  /* Asignación por @mención (Pedro 31-ago-2026: "quita esa pregunta, solo con @").
-     Antes había un selector OBLIGATORIO "¿Para quién?" que Lorena tenía que
-     re-elegir en CADA tarea (se reseteaba a vacío) → mucha fricción. Ahora: sin
-     @ la tarea es TUYA; con "@Nombre" se asigna, y al escribir "@" aparece un
-     autocompletado del equipo para no tener que tipear el nombre exacto. */
-  const [mencion, setMencion] = useState<{ start: number; query: string } | null>(null)
+  /* "Para:" — a quién se asigna la tarea. 'yo' = para mí (default). <id> = esa
+     persona. CLAVE (Lorena 31-ago-2026): NO se resetea tras crear — se QUEDA en
+     la última elección. Arranca en "Para mí" y solo cambia si el usuario lo
+     cambia (antes se reseteaba a vacío y tenía que re-elegir su nombre en CADA
+     tarea). Se asigna a otro solo cuando ella lo elige a propósito. */
+  const [para, setPara] = useState('yo')
   const [sending, setSending] = useState(false)
   const [escuchando, setEscuchando] = useState(false)
   const [micSoportado, setMicSoportado] = useState(false)
@@ -729,59 +724,16 @@ function Composer({ onCrear, equipo, isMobile, esCEO, meId }: {
     setMicSoportado(!!SR)
   }, [])
 
-  /* A quién se asignaría según el PRIMER @token que matchee un miembro (para el
-     texto de confirmación). Sin @ → es para el creador. */
-  const asignado = useMemo(() => {
-    const m = text.match(/@([\p{L}][\p{L}.]*)/u)
-    if (!m) return null
-    const q = m[1].toLowerCase().replace(/\.+$/, '')
-    const t = equipo.find((p) => {
-      const nom = p.nombre.toLowerCase().trim()
-      return primerNombreCli(p.nombre) === q || nom.replace(/\s+/g, '') === q || nom.split(/\s+/).includes(q)
-    })
-    return t ? t.nombre.split(' ')[0] : null
-  }, [text, equipo])
-
-  /* Sugerencias del autocompletado mientras se escribe "@…". */
-  const sugerencias = useMemo(() => {
-    if (!mencion || equipo.length === 0) return []
-    const q = mencion.query.toLowerCase()
-    return equipo.filter((m) => primerNombreCli(m.nombre).startsWith(q)).slice(0, 6)
-  }, [mencion, equipo])
-
-  /* Detecta el @token activo (el que está justo antes del cursor) para abrir/
-     cerrar el autocompletado. Requiere que el @ vaya al inicio o tras un espacio
-     (así "correo@x" no lo dispara). */
-  function onChangeText(value: string, caret: number) {
-    setText(value)
-    const before = value.slice(0, caret)
-    const m = before.match(/(?:^|\s)@([\p{L}.]*)$/u)
-    if (m && equipo.length > 0) setMencion({ start: caret - (m[1]?.length ?? 0) - 1, query: m[1] ?? '' })
-    else setMencion(null)
-  }
-
-  /* Inserta "@Nombre " reemplazando el @token que se estaba escribiendo. */
-  function elegirMencion(miembro: { id: string; nombre: string }) {
-    if (!mencion) return
-    const first = miembro.nombre.split(' ')[0]
-    const tokenEnd = mencion.start + 1 + mencion.query.length
-    const nuevo = text.slice(0, mencion.start) + '@' + first + ' ' + text.slice(tokenEnd)
-    const pos = mencion.start + first.length + 2
-    setText(nuevo); setMencion(null)
-    requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.setSelectionRange(pos, pos) })
-  }
-
   async function enviar() {
     const t = text.trim()
     if (!t || sending) return
-    setSending(true); setText(''); setMencion(null)
-    // El server asigna por @mención dentro del texto; sin @, la tarea es del creador.
-    const r = await crearTarea(t)
+    const asignadaAOtro = para !== 'yo'
+    setSending(true); setText('')
+    const r = await crearTarea(t, asignadaAOtro ? para : undefined)
     setSending(false)
     if (r.ok) {
-      const paraOtro = !!meId && r.tarea.teamMemberId !== meId
-      if (paraOtro) {
-        const nombre = equipo.find((m) => m.id === r.tarea.teamMemberId)?.nombre.split(' ')[0] ?? 'la persona'
+      if (asignadaAOtro) {
+        const nombre = equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'la persona'
         toast.success(`Tarea asignada a ${nombre} ✓`)
         /* Es de OTRA persona: solo el dueño (que ve todo el tablero) la agrega a
            su vista; los demás no (si no, aparecería y desaparecería). */
@@ -789,6 +741,7 @@ function Composer({ onCrear, equipo, isMobile, esCEO, meId }: {
       } else {
         onCrear(r.tarea)
       }
+      /* NO se resetea `para`: se queda donde el usuario lo dejó (pegajoso). */
     } else { toast.error(r.error); setText(t) }
     inputRef.current?.focus()
   }
@@ -820,33 +773,28 @@ function Composer({ onCrear, equipo, isMobile, esCEO, meId }: {
   return (
     <div style={{ position: 'sticky', bottom: 0, padding: isMobile ? '8px 12px 14px' : '10px 24px 18px', background: 'linear-gradient(180deg, transparent, var(--mk-bg-base, #f7f7f8) 30%)' }}>
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, boxShadow: '0 4px 16px -4px rgba(16,24,40,0.10)', padding: '8px 8px 8px 14px', maxWidth: 720, margin: '0 auto' }}>
-        {/* Autocompletado de @menciones (aparece arriba del input). */}
-        {mencion && sugerencias.length > 0 && (
-          <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 12px 32px -6px rgba(16,24,40,0.22)', overflow: 'hidden', zIndex: 40 }}>
-            <div style={{ padding: '7px 12px', fontSize: 10.5, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, borderBottom: '1px solid #f1f5f9' }}>Asignar a…</div>
-            {sugerencias.map((m) => (
-              <button key={m.id} type="button" onMouseDown={(e) => { e.preventDefault(); elegirMencion(m) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', background: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#111827' }}>
-                <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#ede9fe', color: '#6d28d9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{(m.nombre.trim().charAt(0) || '?').toUpperCase()}</span>
-                <span>@{m.nombre.split(' ')[0]}</span>
-              </button>
-            ))}
-          </div>
+        {/* Selector "Para:" — arranca en "Para mí" y se QUEDA en la última
+            elección (no se resetea). Ámbar cuando NO es para ti, para que se note
+            que se la estás asignando a otra persona. */}
+        {equipo.length > 0 ? (
+          <select
+            value={para}
+            onChange={(e) => setPara(e.target.value)}
+            title="¿Para quién es la tarea?"
+            style={{ border: `1.5px solid ${para === 'yo' ? '#a78bfa' : '#f59e0b'}`, outline: 'none', borderRadius: 10, padding: '7px 8px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0, maxWidth: 165, background: para === 'yo' ? '#ede9fe' : '#fffbeb', color: para === 'yo' ? '#6d28d9' : '#b45309' }}
+          >
+            <option value="yo">👤 Para mí</option>
+            {equipo.map((m) => <option key={m.id} value={m.id}>👤 Para {m.nombre.split(' ')[0]}</option>)}
+          </select>
+        ) : (
+          <span style={{ opacity: 0.6 }} aria-hidden>✨</span>
         )}
-        <span style={{ opacity: 0.6 }} aria-hidden>✨</span>
         <input
           ref={inputRef}
           value={text}
-          onChange={(e) => onChangeText(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') { setMencion(null); return }
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              if (mencion && sugerencias.length > 0) { elegirMencion(sugerencias[0]); return }
-              enviar()
-            }
-          }}
-          placeholder={equipo.length > 0 ? 'Escribe la tarea…  (@ para asignar)' : 'Escribe la tarea…'}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); enviar() } }}
+          placeholder={para !== 'yo' ? 'Escribe la tarea a asignar…' : 'Escribe la tarea…'}
           disabled={sending}
           style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#111827', background: 'transparent', minWidth: 0 }}
         />
@@ -866,12 +814,13 @@ function Composer({ onCrear, equipo, isMobile, esCEO, meId }: {
           )
         })()}
       </div>
-      {/* A quién va la tarea (según el @). Sin @ = para ti. */}
-      {equipo.length > 0 && !!text.trim() && (
-        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: asignado ? '#6d28d9' : '#64748b', fontWeight: 700 }}>
-          {asignado
-            ? `📨 Se la asignas a ${asignado}: le aparece en SU tablero y le llega un aviso.`
-            : '👤 Es para ti. Escribe "@" y elige a alguien del equipo para asignársela (ej. @Ailyn).'}
+      {/* Estado del selector: recuerda que se queda en "Para mí" y avisa cuando
+          está apuntando a otra persona (para no asignarle algo sin querer). */}
+      {equipo.length > 0 && (
+        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: para === 'yo' ? '#6d28d9' : '#b45309', fontWeight: 700 }}>
+          {para === 'yo'
+            ? '✅ Es para ti. Cambia "Para mí" solo cuando quieras asignársela a alguien del equipo.'
+            : `📋 Se la asignas a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'}: le llega a SU tablero. Vuelve a "Para mí" para tus tareas.`}
         </div>
       )}
       <style>{`@keyframes mk-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}.mk-mic-on{animation:mk-mic-pulse 1.2s ease-in-out infinite}`}</style>
