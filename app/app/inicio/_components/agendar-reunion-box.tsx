@@ -13,6 +13,19 @@ import { interpretarAgenda, agendarReunion, type AgendaPreview } from '../_agend
 
 type PreviewOk = Extract<AgendaPreview, { ok: true }>
 
+/* Staff de Distinto Studio invitable con un toque desde la tarjeta de
+   confirmación. Pedro 31-ago-2026 (dictó los correos). Paolo (asistente)
+   aún sin correo — se agrega cuando Pedro lo pase. */
+const STAFF_DISTINTO: Array<{ nombre: string; rol: string; email: string }> = [
+  { nombre: 'Erick',  rol: 'Director',     email: 'erickramirezgarcia15@gmail.com' },
+  { nombre: 'Lorena', rol: 'Social media', email: 'lorechavarry@gmail.com' },
+  { nombre: 'Ailyn',  rol: 'Diseño',       email: 'isaguirre0803@gmail.com' },
+  { nombre: 'Pieer',  rol: 'Editor',       email: 'pieermedina99@gmail.com' },
+  { nombre: 'Feling', rol: 'Sistemas',     email: 'reyescalderonfeling@gmail.com' },
+]
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function fechaBonita(ymd: string): string {
   try {
     return new Date(`${ymd}T12:00:00-05:00`).toLocaleDateString('es-PE', {
@@ -34,6 +47,10 @@ export function AgendarReunionBox() {
   // Para marcas SIN correo configurado: se escribe acá.
   const [correoManual, setCorreoManual] = useState('')
   const [guardarCorreo, setGuardarCorreo] = useState(true)
+  // Invitados adicionales: staff de Distinto (chips) + correos libres.
+  const [staffSel, setStaffSel] = useState<Record<string, boolean>>({})
+  const [extras, setExtras] = useState<string[]>([])
+  const [extraVal, setExtraVal] = useState('')
 
   const { soportado: vozOk, grabando, parcial, alternar } = useDictado({
     onFinal: (frag) => setTexto((cur) => (cur ? cur + ' ' : '') + frag),
@@ -46,16 +63,28 @@ export function AgendarReunionBox() {
     setInterpretando(true)
     const r = await interpretarAgenda(t)
     setInterpretando(false)
-    if (r.ok) { setPreview(r); setCorreoManual(''); }
+    if (r.ok) { setPreview(r); setCorreoManual(''); setStaffSel({}); setExtras([]); setExtraVal('') }
     else toast.error(r.error)
+  }
+
+  /* Agrega lo tipeado en "otro correo" a la lista de extras (chips). */
+  function agregarExtra() {
+    const nuevos = extraVal.split(/[,;\s]+/).map((c) => c.trim().toLowerCase()).filter((c) => EMAIL_RE.test(c))
+    if (nuevos.length === 0) { if (extraVal.trim()) toast.error('Ese correo no se ve válido'); return }
+    setExtras((cur) => [...new Set([...cur, ...nuevos])])
+    setExtraVal('')
   }
 
   async function confirmar() {
     if (!preview || agendando) return
-    // Correos: los de la marca, o el que se escribió a mano.
-    const correos = preview.correos.length > 0
+    // Correos del CLIENTE: los de la marca, o el que se escribió a mano.
+    const correosCliente = preview.correos.length > 0
       ? preview.correos
       : correoManual.split(/[,;\s]+/).map((c) => c.trim()).filter((c) => /@.+\./.test(c))
+    // + staff seleccionado + correos libres. Todo recibe la invitación,
+    // pero en la marca solo se guardan los del cliente (correosGuardar).
+    const staff = STAFF_DISTINTO.filter((s) => staffSel[s.email]).map((s) => s.email)
+    const correos = [...new Set([...correosCliente, ...staff, ...extras].map((c) => c.toLowerCase()))]
     setAgendando(true)
     const r = await agendarReunion({
       marcaId: preview.marcaId,
@@ -65,7 +94,8 @@ export function AgendarReunionBox() {
       durationMin: preview.durationMin,
       titulo: preview.titulo,
       correos,
-      guardarCorreos: preview.correos.length === 0 && guardarCorreo,
+      correosGuardar: correosCliente,
+      guardarCorreos: preview.correos.length === 0 && guardarCorreo && correosCliente.length > 0,
     })
     setAgendando(false)
     if (r.ok) {
@@ -144,9 +174,51 @@ export function AgendarReunionBox() {
             ) : (
               <div className="flex items-start gap-2"><Users className="w-4 h-4 shrink-0 text-[#6d28d9] mt-0.5" /> <span>Invitar a: <b>{preview.correos.join(', ')}</b> <span className="text-muted-foreground">(Google les manda el correo)</span></span></div>
             )}
+
+            {/* ===== Invitar también: staff de Distinto + correos libres ===== */}
+            <div className="pt-2 border-t" style={{ borderColor: '#ddd6fe' }}>
+              <div className="text-[12px] font-semibold" style={{ color: '#6d28d9' }}>➕ Invitar también (equipo Distinto):</div>
+              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                {STAFF_DISTINTO.map((s) => {
+                  const on = !!staffSel[s.email]
+                  return (
+                    <button
+                      key={s.email}
+                      type="button"
+                      onClick={() => setStaffSel((cur) => ({ ...cur, [s.email]: !cur[s.email] }))}
+                      className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full text-[12px] font-medium"
+                      style={on
+                        ? { background: '#7c3aed', color: '#fff', border: '1px solid #7c3aed' }
+                        : { background: '#fff', color: '#6b7280', border: '1px solid #e5e7eb' }}
+                      title={`${s.email} · ${s.rol}`}
+                    >
+                      {on ? '✓ ' : ''}{s.nombre} <span style={{ opacity: 0.7 }}>· {s.rol}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Correo libre (no necesita estar registrado) */}
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                {extras.map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1 h-7 px-2 rounded-full text-[12px]" style={{ background: '#ede9fe', color: '#5b21b6' }}>
+                    {c}
+                    <button type="button" onClick={() => setExtras((cur) => cur.filter((x) => x !== c))} title="Quitar" style={{ fontWeight: 700 }}>×</button>
+                  </span>
+                ))}
+                <input
+                  value={extraVal}
+                  onChange={(e) => setExtraVal(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); agregarExtra() } }}
+                  onBlur={agregarExtra}
+                  placeholder="otro correo… (Enter para agregar)"
+                  className="flex-1 min-w-[180px] rounded-lg border bg-white px-2.5 py-1.5 text-[12.5px] outline-none focus:ring-2 focus:ring-[#7170ff]/40"
+                />
+              </div>
+            </div>
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <button type="button" onClick={confirmar} disabled={agendando || (sinCorreo && !correoManual.trim())}
+            <button type="button" onClick={confirmar} disabled={agendando || (sinCorreo && !correoManual.trim() && !Object.values(staffSel).some(Boolean) && extras.length === 0)}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl font-semibold text-white text-[14px] disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
               {agendando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Confirmar y enviar

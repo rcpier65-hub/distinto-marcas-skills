@@ -84,6 +84,10 @@ export async function agendarReunion(input: {
   titulo: string
   correos: string[]      // a quién invitar (Google les manda el correo)
   guardarCorreos?: boolean
+  /* Si viene, al guardar en la marca se persiste SOLO esta sublista (los
+     correos del CLIENTE) — así invitar al staff de Distinto o a un correo
+     suelto no los mete como "correos del cliente". Pedro 31-ago-2026. */
+  correosGuardar?: string[]
 }): Promise<{ ok: true; meetLink: string | null; invitados: number } | { ok: false; error: string }> {
   await requireUser()
   if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden agendar reuniones.' }
@@ -132,9 +136,13 @@ export async function agendarReunion(input: {
     if (ins.error) console.error('[agendarReunion] insert marca_reuniones falló:', ins.error.message)
   } catch { /* el evento ya se creó en Calendar igual */ }
 
-  // Recordar los correos en la marca para la próxima (si el usuario lo pidió).
-  if (input.guardarCorreos && correos.length > 0) {
-    try { await service.from('marcas').update({ correos_clientes: correos }).eq('id', input.marcaId) } catch { /* noop */ }
+  // Recordar los correos DEL CLIENTE en la marca para la próxima (si el
+  // usuario lo pidió). correosGuardar acota la lista: staff/correos sueltos
+  // invitados no se guardan como correos del cliente.
+  const aGuardar = [...new Set((input.correosGuardar ?? input.correos ?? [])
+    .map((c) => c.trim().toLowerCase()).filter((c) => /@.+\./.test(c)))]
+  if (input.guardarCorreos && aGuardar.length > 0) {
+    try { await service.from('marcas').update({ correos_clientes: aGuardar }).eq('id', input.marcaId) } catch { /* noop */ }
   }
 
   // Aviso push al cliente (además del correo de Google).
