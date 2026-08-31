@@ -9,13 +9,17 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { CalendarCheck, CalendarX } from 'lucide-react'
 
 export function GoogleCalendarConnect({ connected, email }: { connected: boolean; email: string | null }) {
   const router = useRouter()
+  const pathname = usePathname()
   const sp = useSearchParams()
+  /* El flujo OAuth vuelve a la vista desde donde se inició (calendario o
+     por-marca) — se pasa como ?from= y start/callback lo respetan. */
+  const startHref = `/api/auth/google/start?from=${encodeURIComponent(pathname || '/grabaciones')}`
 
   // Mostrar toast del resultado del OAuth + limpiar el query param
   useEffect(() => {
@@ -30,11 +34,12 @@ export function GoogleCalendarConnect({ connected, email }: { connected: boolean
     }
     const m = messages[gcal]
     if (m) (m.type === 'success' ? toast.success : toast.error)(m.msg, { duration: 6000 })
-    // Limpiar el query param para no repetir el toast en refresh
+    // Limpiar el query param para no repetir el toast en refresh — quedándonos
+    // en la MISMA vista (antes mandaba siempre a /grabaciones).
     const params = new URLSearchParams(sp)
     params.delete('gcal'); params.delete('msg')
-    router.replace(`/grabaciones${params.toString() ? '?' + params.toString() : ''}`)
-  }, [sp, router])
+    router.replace(`${pathname || '/grabaciones'}${params.toString() ? '?' + params.toString() : ''}`)
+  }, [sp, router, pathname])
 
   if (connected) {
     return (
@@ -44,7 +49,7 @@ export function GoogleCalendarConnect({ connected, email }: { connected: boolean
           {email ? `Sincronizado · ${email}` : 'Google Calendar conectado'}
         </span>
         <a
-          href="/api/auth/google/start"
+          href={startHref}
           className="text-[11px] text-muted-foreground hover:text-foreground underline"
           title="Reconectar (si cambiaste de cuenta o el permiso expiró)"
         >
@@ -56,7 +61,7 @@ export function GoogleCalendarConnect({ connected, email }: { connected: boolean
 
   return (
     <a
-      href="/api/auth/google/start"
+      href={startHref}
       className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-[#ba41f7] text-white text-sm font-medium hover:bg-[#9f37db] transition-colors shadow-sm"
     >
       <CalendarX className="w-4 h-4" />

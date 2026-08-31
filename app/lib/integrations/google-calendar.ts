@@ -506,3 +506,78 @@ export async function deleteCalendarEvent(eventId: string): Promise<{ ok: true }
   }
   return { ok: true }
 }
+
+/* ==================== LECTURA (scope calendar.readonly) ==================== */
+
+export type GCalEventLite = {
+  id: string
+  summary: string
+  fecha: string        // YYYY-MM-DD en Lima
+  hora: string | null  // HH:MM en Lima; null = evento de día completo
+  meetLink: string | null
+  allDay: boolean
+}
+
+/* Fecha/hora de Lima a partir de un ISO con offset (GCal manda dateTime). */
+function isoALima(iso: string): { ymd: string; hm: string } {
+  const d = new Date(iso)
+  const ymd = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d)
+  const hm = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(d)
+  return { ymd, hm }
+}
+
+/**
+ * Lista los eventos del Google Calendar de Pedro en un rango de fechas (Lima).
+ * Lee el calendario de grabaciones Y el primary (si son distintos) para que
+ * el calendario de la app muestre también lo que Pedro agenda directo en
+ * Google. Best-effort: cualquier fallo devuelve [] — la vista sigue viva.
+ */
+export async function listCalendarEvents(desde: string, hasta: string): Promise<GCalEventLite[]> {
+  const token = await getValidAccessToken()
+  if (!token) return []
+
+  const grabCal = await getGrabacionesCalendarId(token)
+  const calIds = [...new Set([grabCal, 'primary'])]
+
+  const params = new URLSearchParams({
+    timeMin: `${desde}T00:00:00-05:00`,
+    timeMax: `${hasta}T23:59:59-05:00`,
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '250',
+    fields: 'items(id,summary,status,start,end,hangoutLink)',
+  })
+
+  /* Los calendarios se consultan EN PARALELO y con timeout corto — esta
+     lectura corre en el render de la página y no debe frenarla. */
+  const respuestas = await Promise.all(calIds.map(async (calId) => {
+    try {
+      const res = await fetch(
+        `${CAL_API}/calendars/${encodeURIComponent(calId)}/events?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) },
+      )
+      if (!res.ok) return []
+      const data = await res.json()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data.items ?? []) as any[]
+    } catch { return [] }  /* best-effort */
+  }))
+
+  const vistos = new Set<string>()
+  const out: GCalEventLite[] = []
+  for (const ev of respuestas.flat()) {
+    if (!ev?.id || vistos.has(ev.id) || ev.status === 'cancelled') continue
+    vistos.add(ev.id)
+    if (ev.start?.dateTime) {
+      const { ymd, hm } = isoALima(ev.start.dateTime)
+      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ymd, hora: hm, meetLink: ev.hangoutLink ?? null, allDay: false })
+    } else if (ev.start?.date) {
+      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ev.start.date, hora: null, meetLink: ev.hangoutLink ?? null, allDay: true })
+    }
+  }
+  return out
+}

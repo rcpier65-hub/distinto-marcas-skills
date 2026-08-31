@@ -1,11 +1,26 @@
 // app/app/grabaciones/calendario/page.tsx
-// Vista calendario mensual de grabaciones — server component.
+//
+// Vista CALENDARIO unificada del módulo "Grabaciones y Reuniones" — server
+// component. Pedro 31-ago-2026: la vista principal del módulo es un calendario
+// tipo Google Calendar (no por marcas), con filtros de grabaciones/reuniones,
+// sincronizado con Google Calendar y con el asistente agendador embebido.
+//
+// Fuentes de eventos:
+//   1. Tabla `grabaciones` (con hora_planeada) — color por marca
+//   2. Tabla `marca_reuniones` (agendadas con clientes, con link de Meet)
+//   3. Google Calendar de Pedro (lectura) — lo agendado FUERA de la app
+//      (dedup: se saltan los eventos que la propia app creó)
 
 import Link from 'next/link'
 import { requireUser } from '@/lib/auth/get-user'
+import { ensureAccesoModulo, getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { createServiceClient } from '@/lib/supabase/service'
-import { CalendarGrid } from './_components/calendar-grid'
+import { getGoogleCalendarStatus, listCalendarEvents } from '@/lib/integrations/google-calendar'
+import { listGrabaciones } from '../_actions'
 import { MesSelector } from '../_components/mes-selector'
+import { GoogleCalendarConnect } from '../_components/gcal-connect'
+import { AgendarReunionBox } from '@/app/inicio/_components/agendar-reunion-box'
+import { AgendaCalendar, type AgendaEvento } from './_components/agenda-calendar'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,71 +28,175 @@ type SP = { desde?: string; hasta?: string }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
+/* Fecha/hora Lima desde un timestamptz ISO (marca_reuniones.fecha_hora). */
+function tsALima(iso: string): { ymd: string; hm: string } {
+  const d = new Date(iso)
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+  const hm = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
+  return { ymd, hm }
+}
+
 export default async function GrabacionesCalendarioPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
+  await ensureAccesoModulo('publicaciones')
   const sp = await searchParams
 
-  // Mes actual o el indicado en query
-  const today = new Date()
-  const desde = sp.desde ?? new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10)
-  const hasta = sp.hasta ?? new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10)
+  /* El mes por defecto se deriva de la fecha en LIMA, no del reloj UTC del
+     server — si no, en la noche del último día del mes la vista aterriza en
+     el mes siguiente vacío (mismo bug ya corregido en /grabaciones). */
+  const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
+  const [hoyY, hoyM] = hoyLima.split('-').map(Number)
+  const desde = sp.desde ?? `${hoyY}-${String(hoyM).padStart(2, '0')}-01`
+  const hasta = sp.hasta ?? new Date(Date.UTC(hoyY, hoyM, 0)).toISOString().slice(0, 10)
   const monthDate = new Date(desde + 'T12:00:00Z')
   const mesLabel = `${MESES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  // Cargar grabaciones del rango con JOIN para color por marca
-  // Defensive: si tabla no existe (pre-migration 016), array vacío
+  /* Solo directores ven el asistente agendador (la action igual valida server-side). */
+  const permisos = await getCurrentMemberPermisos()
+  const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
+
+  /* Todo en paralelo — incluida la lectura del Google Calendar de Pedro
+     (solo directores; devuelve [] sola si no está conectado). */
+  const [grabRes, marcasRes, gcalStatus, gcalEvents] = await Promise.all([
+    listGrabaciones(desde, hasta),
+    service.from('marcas').select('id, slug, nombre, emoji_marca, color_calendario'),
+    getGoogleCalendarStatus(),
+    esDirector ? listCalendarEvents(desde, hasta) : Promise.resolve([]),
+  ])
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let rows: any[] = []
-  let loadError: string | null = null
-  {
-    const r = await service
-      .from('grabaciones')
-      .select('id, marca_id, fecha_planeada, fecha_real, estado, videos_grabados, marcas:marca_id (slug, nombre, emoji_marca, color_calendario)')
-      .gte('fecha_planeada', desde)
-      .lte('fecha_planeada', hasta)
-      .order('fecha_planeada', { ascending: true })
-    if (r.error && !(r.error.message ?? '').includes('does not exist')) {
-      loadError = r.error.message
-    } else {
-      rows = r.data ?? []
+  const marcasById = new Map<string, any>(((marcasRes.data ?? []) as any[]).map((m) => [m.id as string, m]))
+
+  /* Reuniones del mes (rango sobre timestamptz, en horario Lima). Defensivo:
+     si la tabla/columna no existe todavía, la vista sigue sin reuniones. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let reunionesRows: any[] = []
+  try {
+    let r = await service
+      .from('marca_reuniones')
+      .select('id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado')
+      .gte('fecha_hora', `${desde}T00:00:00-05:00`)
+      .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
+      .order('fecha_hora', { ascending: true })
+    if (r.error && /estado/i.test(r.error.message ?? '')) {
+      r = await service
+        .from('marca_reuniones')
+        .select('id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas')
+        .gte('fecha_hora', `${desde}T00:00:00-05:00`)
+        .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
+        .order('fecha_hora', { ascending: true })
     }
+    if (!r.error) reunionesRows = r.data ?? []
+  } catch { /* sin reuniones */ }
+
+  /* ===== Unificar todo en AgendaEvento[] ===== */
+  /* Miembros con acceso restringido a ciertas marcas solo ven los eventos de
+     SUS marcas (mismo criterio que el sidebar). marcasAcceso null = todas. */
+  const marcasPermitidas = permisos?.marcasAcceso ? new Set(permisos.marcasAcceso) : null
+  const eventos: AgendaEvento[] = []
+  const grabRows = (grabRes.ok ? grabRes.rows : []).filter((g) => !marcasPermitidas || marcasPermitidas.has(g.marca_id))
+  reunionesRows = reunionesRows.filter((r) => !marcasPermitidas || marcasPermitidas.has(r.marca_id))
+  const idsDeLaApp = new Set(grabRows.map((g) => g.google_event_id).filter(Boolean) as string[])
+  /* Dedup robusto de reuniones vs GCal: además del prefijo 📌, el link de Meet
+     (si Pedro renombra el evento en Google, el Meet sigue siendo el mismo). */
+  const meetsDeReuniones = new Set(reunionesRows.map((r) => r.lugar_enlace).filter(Boolean) as string[])
+
+  for (const g of grabRows) {
+    const marca = marcasById.get(g.marca_id)
+    eventos.push({
+      id: g.id,
+      tipo: 'grabacion',
+      fecha: g.fecha_planeada,
+      hora: g.hora_planeada ? g.hora_planeada.slice(0, 5) : null,
+      titulo: `Grabación · ${g.marca_nombre}`,
+      marcaSlug: g.marca_slug,
+      marcaNombre: g.marca_nombre,
+      marcaEmoji: g.marca_emoji,
+      color: marca?.color_calendario ?? '#6366F1',
+      estado: g.estado,
+      meetLink: null,
+      notas: g.notas,
+      videosGrabados: g.videos_grabados,
+    })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const grabaciones = rows.map((r: any) => ({
-    id: r.id,
-    marca_id: r.marca_id,
-    marca_slug: r.marcas?.slug ?? '',
-    marca_nombre: r.marcas?.nombre ?? '?',
-    marca_emoji: r.marcas?.emoji_marca ?? null,
-    color_calendario: r.marcas?.color_calendario ?? '#6366F1',
-    fecha_planeada: r.fecha_planeada,
-    fecha_real: r.fecha_real,
-    estado: r.estado,
-    videos_grabados: r.videos_grabados,
-  }))
+  for (const r of reunionesRows) {
+    const marca = marcasById.get(r.marca_id)
+    const { ymd, hm } = tsALima(r.fecha_hora)
+    const esLink = typeof r.lugar_enlace === 'string' && /^https?:\/\//.test(r.lugar_enlace)
+    eventos.push({
+      id: r.id,
+      tipo: 'reunion',
+      fecha: ymd,
+      hora: hm,
+      titulo: r.titulo || `Reunión${marca ? ` con ${marca.nombre}` : ''}`,
+      marcaSlug: marca?.slug ?? null,
+      marcaNombre: marca?.nombre ?? null,
+      marcaEmoji: marca?.emoji_marca ?? null,
+      color: marca?.color_calendario ?? '#7c3aed',
+      estado: r.estado ?? 'agendada',
+      meetLink: esLink ? r.lugar_enlace : null,
+      notas: r.notas ?? (r.modalidad === 'presencial' && r.lugar_enlace && !esLink ? `Lugar: ${r.lugar_enlace}` : null),
+      videosGrabados: null,
+    })
+  }
 
-  // Leyenda de marcas — extraer únicas del set
-  const marcasUnicas = Array.from(
+  /* GCal externo: saltar lo que la app misma creó (grabaciones por event_id;
+     reuniones por el prefijo 📌 con el que la app titula sus eventos). */
+  for (const ev of gcalEvents) {
+    if (idsDeLaApp.has(ev.id)) continue
+    if (ev.summary.startsWith('📌')) continue
+    if (ev.summary.startsWith('🎬')) continue
+    if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
+    eventos.push({
+      id: ev.id,
+      tipo: 'gcal',
+      fecha: ev.fecha,
+      hora: ev.hora,
+      titulo: ev.summary,
+      marcaSlug: null,
+      marcaNombre: null,
+      marcaEmoji: null,
+      color: '#3b82f6',
+      estado: null,
+      meetLink: ev.meetLink,
+      videosGrabados: null,
+      notas: null,
+    })
+  }
+
+  /* Marcas para filtro + leyenda: solo las presentes en el mes. */
+  const marcasMes = Array.from(
     new Map(
-      grabaciones.map((g) => [g.marca_id, { nombre: g.marca_nombre, emoji: g.marca_emoji, color: g.color_calendario }])
-    ).values()
-  )
+      eventos
+        .filter((e) => e.marcaSlug)
+        .map((e) => [e.marcaSlug as string, {
+          slug: e.marcaSlug as string,
+          nombre: e.marcaNombre ?? '',
+          emoji: e.marcaEmoji,
+          color: e.color,
+        }]),
+    ).values(),
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+  const nGrab = eventos.filter((e) => e.tipo === 'grabacion').length
+  const nReu = eventos.filter((e) => e.tipo === 'reunion').length
 
   return (
     <main className="container mx-auto p-6 max-w-7xl space-y-4">
-      {/* HEADER con tabs */}
+      {/* HEADER */}
       <header className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold mb-1">🎬 Grabaciones — Calendario</h1>
+          <h1 className="text-3xl font-bold mb-1">📅 Grabaciones y Reuniones</h1>
           <p className="text-sm text-muted-foreground capitalize">
-            {mesLabel} · {grabaciones.length} grabaciones programadas
+            {mesLabel} · {nGrab} grabaciones · {nReu} reuniones
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <GoogleCalendarConnect connected={gcalStatus.connected} email={gcalStatus.email} />
           <MesSelector />
         </div>
       </header>
@@ -85,44 +204,36 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       {/* TABS */}
       <nav className="flex items-center gap-1 border-b border-border">
         <Link
-          href="/grabaciones"
-          className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
-        >
-          📋 Lista
-        </Link>
-        <Link
           href="/grabaciones/calendario"
           className="px-3 py-2 text-sm font-medium border-b-2 border-primary text-foreground"
         >
           📅 Calendario
         </Link>
+        <Link
+          href="/grabaciones"
+          className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
+        >
+          📋 Por marca
+        </Link>
       </nav>
 
-      {loadError && (
+      {/* ASISTENTE AGENDADOR (solo directores) — "agéndame una reunión a las
+          3:30 con Vid Natur" → detecta correos de la marca y Google manda la
+          invitación + recordatorio. */}
+      {esDirector && <AgendarReunionBox />}
+
+      {grabRes.ok === false && (
         <div className="p-4 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-          ⚠️ {loadError}
+          ⚠️ {grabRes.error}
         </div>
       )}
 
-      {/* LEYENDA por marca */}
-      {marcasUnicas.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-          <span className="font-medium">Marcas en este mes:</span>
-          {marcasUnicas.map((m, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm" style={{ background: m.color }} />
-              <span>{m.emoji} {m.nombre}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* CALENDARIO UNIFICADO */}
+      <AgendaCalendar mes={desde} eventos={eventos} marcas={marcasMes} hoy={hoyLima} />
 
-      {/* GRID */}
-      <CalendarGrid mes={desde} grabaciones={grabaciones} />
-
-      {/* HINT */}
       <p className="text-xs text-muted-foreground text-center">
-        💡 Click en un día → ver / agregar grabaciones de esa fecha en la vista <Link href="/grabaciones" className="underline">Lista</Link>.
+        💡 Toca un día para ver su detalle. Las grabaciones se editan en la vista{' '}
+        <Link href="/grabaciones" className="underline">Por marca</Link>.
       </p>
     </main>
   )

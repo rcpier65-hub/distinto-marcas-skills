@@ -57,7 +57,7 @@ function getPageTitle(pathname: string | null): string {
     publicaciones: 'Publicaciones',
     editor: 'Editor',
     diseno: 'Diseño',
-    grabaciones: 'Grabaciones',
+    grabaciones: 'Grabaciones y Reuniones',
     comentarios: 'Comentarios',
     habitos: 'Hábitos',
     historial: 'Historial',

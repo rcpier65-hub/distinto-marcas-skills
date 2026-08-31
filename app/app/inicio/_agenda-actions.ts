@@ -144,5 +144,8 @@ export async function agendarReunion(input: {
   } catch { /* noop */ }
 
   revalidatePath('/inicio')
+  // El asistente también vive en el calendario unificado — refrescarlo para
+  // que la reunión recién agendada aparezca al toque.
+  revalidatePath('/grabaciones/calendario')
   return { ok: true, meetLink: gen.meetLink, invitados: correos.length }
 }

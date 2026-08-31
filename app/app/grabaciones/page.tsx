@@ -155,7 +155,7 @@ export default async function GrabacionesPage({ searchParams }: { searchParams: 
           href="/grabaciones"
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 border-[#ba41f7] text-foreground"
         >
-          <List className="w-4 h-4" /> Lista
+          <List className="w-4 h-4" /> Por marca
         </Link>
         <Link
           href="/grabaciones/calendario"

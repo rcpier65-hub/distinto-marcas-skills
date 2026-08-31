@@ -189,9 +189,10 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {puede('diseno') && (
             <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent={puede('publicaciones')} />
           )}
-          {/* Grabaciones: parte de publicaciones — mismo permiso */}
+          {/* Grabaciones y Reuniones: parte de publicaciones — mismo permiso.
+              Aterriza en la vista calendario (Pedro 31-ago-2026). */}
           {puede('publicaciones') && (
-            <NavItem href="/grabaciones"   icon={<VideoIcon />}    label="Grabaciones"    active={isActive('/grabaciones')}   shortcut="4" />
+            <NavItem href="/grabaciones/calendario" icon={<VideoIcon />} label="Grabaciones y Reuniones" active={isActive('/grabaciones')} shortcut="4" />
           )}
           {/* Creación de Ideas: estudio de contenido para creadores (guiones
               virales, banco de ideas, teleprompter…). Visible para todo el equipo. */}

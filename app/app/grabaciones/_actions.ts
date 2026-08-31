@@ -450,6 +450,7 @@ export async function updateGrabacionEstado(args: {
   const { error } = await service.from('grabaciones').update(payload).eq('id', args.id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
 
@@ -476,6 +477,7 @@ export async function deleteGrabacion(id: string): Promise<{ ok: true } | { ok: 
   const { error } = await service.from('grabaciones').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
 
@@ -600,6 +602,7 @@ export async function updateMarcaObjetivoMensual(
     .eq('slug', slug)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
 
@@ -637,6 +640,7 @@ export async function updateMarcaNotasGrabaciones(
     return { ok: false, error: error.message }
   }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
 
@@ -666,6 +670,7 @@ export async function toggleCoordinacionConfirmada(
     return { ok: false, error: error.message }
   }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
 
@@ -701,6 +706,7 @@ export async function updateGrabacionEnlaceGuiones(
     return { ok: false, error: error.message }
   }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
 
@@ -728,5 +734,6 @@ export async function updateGrabacionGuionListo(
     return { ok: false, error: error.message }
   }
   revalidatePath('/grabaciones')
+  revalidatePath('/grabaciones/calendario')
   return { ok: true }
 }
