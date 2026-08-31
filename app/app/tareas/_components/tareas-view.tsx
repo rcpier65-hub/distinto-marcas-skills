@@ -9,7 +9,7 @@
    - Zona Focus en el mismo tablero + cronómetro ("Entrar en Focus"). */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   DndContext, useDraggable, useDroppable, DragOverlay,
@@ -20,6 +20,13 @@ import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles,
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane } from '../_actions'
+import { setEstadoTarea, setFechasTarea } from '../_plan-actions'
+import { Gantt, CalendarioTareas, type TareaPlan } from '@/components/tareas/tareas-plan-view'
+import { type EstadoTarea } from '@/lib/tareas/pro-types'
+
+/* Info de PLAN por tarea (estado + fechas) — viene del server como mapa
+   aparte para no tocar el SELECT compartido de tareas. */
+export type PlanInfo = { estado: EstadoTarea; fechaInicio: string | null; fechaEntrega: string | null }
 
 const LANE_META: Record<FocusLane, { label: string; color: string; Icon: typeof Bot }> = {
   ia: { label: 'Focus IA', color: '#8E24AA', Icon: Bot },
@@ -54,6 +61,7 @@ function opcionesDiaHecho(): { iso: string; label: string }[] {
 
 export function TareasView({
   tareasIniciales, completadasIniciales = [], esCEO, meId, equipo, esErick = false,
+  marcas = [], planPorId = {}, hoy,
 }: {
   tareasIniciales: Tarea[]
   completadasIniciales?: Tarea[]
@@ -63,8 +71,14 @@ export function TareasView({
   /* Solo Erick: al completar una tarea le preguntamos QUÉ DÍA la hizo, para que
      su reporte semanal la ubique en el día correcto. Pedro 26-ago-2026. */
   esErick?: boolean
+  /* Vistas Gantt/Calendario + filtro por marca DENTRO del tablero
+     (Pedro 31-ago-2026: "dentro de la oficial, sin abrir otra pestaña"). */
+  marcas?: { slug: string; nombre: string }[]
+  planPorId?: Record<string, PlanInfo>
+  hoy?: string
 }) {
   const isMobile = useIsMobile()
+  const router = useRouter()
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales)
   const [completadas, setCompletadas] = useState<Tarea[]>(completadasIniciales)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -72,6 +86,12 @@ export function TareasView({
   /* Archivo (historial) + filtro por persona (Pedro 20-jun-2026). */
   const [archivoOpen, setArchivoOpen] = useState(false)
   const [filtroUser, setFiltroUser] = useState<string | 'todos'>('todos')
+  /* Vista del tablero (todo en la MISMA pantalla, composer intacto). */
+  const [vistaBoard, setVistaBoard] = useState<'tablero' | 'gantt' | 'cal'>('tablero')
+  const [marcaFiltro, setMarcaFiltro] = useState<string>('todas')
+  const [verArchivadasPlan, setVerArchivadasPlan] = useState(false)
+  const hoyLima = hoy ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
+  const [mesCal, setMesCal] = useState(hoyLima.slice(0, 7))
   /* Animación "vuela al archivo" al completar. */
   const [flyers, setFlyers] = useState<Flyer[]>([])
   const [archivoPulse, setArchivoPulse] = useState(false)
@@ -100,15 +120,56 @@ export function TareasView({
     [completadas, filtroUser],
   )
   const enFocus = useMemo(() => activasVis.filter((t) => t.focusLane), [activasVis])
-  const enBoard = useMemo(() => activasVis.filter((t) => !t.focusLane), [activasVis])
 
-  /* Columnas por categoría (orden: más tareas primero). */
+  /* Filtro por MARCA (Pedro 31-ago-2026): match por marca_slug o por
+     categoría = nombre de la marca. Con marca elegida, las columnas del
+     tablero pasan a ser por RESPONSABLE. */
+  const marcaObj = useMemo(() => marcas.find((m) => m.slug === marcaFiltro) ?? null, [marcas, marcaFiltro])
+  const porResponsable = marcaFiltro !== 'todas'
+  const activasMarca = useMemo(() => {
+    if (!porResponsable) return activasVis
+    return activasVis.filter((t) =>
+      t.marcaSlug === marcaFiltro ||
+      (marcaObj && t.categoria.trim().toLowerCase() === marcaObj.nombre.trim().toLowerCase()),
+    )
+  }, [activasVis, porResponsable, marcaFiltro, marcaObj])
+
+  /* Archivadas (estado plan) salen del tablero salvo que se pidan ver. */
+  const nArchivadas = useMemo(
+    () => activasMarca.filter((t) => planPorId[t.id]?.estado === 'archivado').length,
+    [activasMarca, planPorId],
+  )
+  const enBoard = useMemo(
+    () => activasMarca.filter((t) => !t.focusLane && (verArchivadasPlan || planPorId[t.id]?.estado !== 'archivado')),
+    [activasMarca, verArchivadasPlan, planPorId],
+  )
+
+  /* Tareas en formato PLAN (para Gantt y Calendario). */
+  const planTareas: TareaPlan[] = useMemo(() => enBoard.map((t) => ({
+    id: t.id,
+    texto: t.texto,
+    categoria: t.categoria,
+    color: t.color,
+    marcaSlug: t.marcaSlug,
+    responsableNombre: t.teamMemberNombre,
+    estado: planPorId[t.id]?.estado ?? 'sin_empezar',
+    fechaInicio: planPorId[t.id]?.fechaInicio ?? null,
+    fechaEntrega: planPorId[t.id]?.fechaEntrega ?? null,
+    createdAt: t.createdAt,
+  })), [enBoard, planPorId])
+
+  /* Al cambiar el modo de agrupación, olvidar el orden memorizado (los
+     nombres de columna cambian de marcas a personas). */
+  useEffect(() => { ordenColsRef.current = [] }, [marcaFiltro])
+
+  /* Columnas por categoría — o por RESPONSABLE con filtro de marca activo. */
   const columnas = useMemo(() => {
     const m = new Map<string, { categoria: string; color: string; items: Tarea[] }>()
     for (const t of enBoard) {
-      const g = m.get(t.categoria) ?? { categoria: t.categoria, color: t.color, items: [] }
+      const key = porResponsable ? (t.teamMemberNombre?.split(' ')[0] ?? 'Sin asignar') : t.categoria
+      const g = m.get(key) ?? { categoria: key, color: t.color, items: [] }
       g.items.push(t)
-      m.set(t.categoria, g)
+      m.set(key, g)
     }
     const cols = [...m.values()]
     /* Orden estable: respeta el orden previo (memorizado); las categorías que
@@ -231,7 +292,12 @@ export function TareasView({
     if (!over) return
     if (over === 'drop:complete') { onCompletar(id); return }
     if (over.startsWith('drop:focus:')) { onSetFocus(id, over.replace('drop:focus:', '') as FocusLane); return }
-    if (over.startsWith('col:')) { onMover(id, over.replace('col:', '')); return }
+    if (over.startsWith('col:')) {
+      /* Con filtro de marca las columnas son PERSONAS, no categorías — mover
+         ahí crearía una categoría con nombre de persona. */
+      if (porResponsable) { toast.info('Para mover de columna vuelve a "Todas las marcas"'); return }
+      onMover(id, over.replace('col:', '')); return
+    }
   }
 
   const dragTarea = dragId ? activas.find((t) => t.id === dragId) ?? null : null
@@ -251,16 +317,47 @@ export function TareasView({
           </p>
         </div>
 
-        {/* Vista PLAN del mismo módulo: estados + responsables + Gantt +
-            calendario (misma ruta, ?vista=plan). Pedro 31-ago-2026: "en el
-            mismo módulo de tareas". */}
-        <Link
-          href="/tareas?vista=plan"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 32, padding: '0 12px', borderRadius: 999, background: '#fff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 600, color: '#6b7280', textDecoration: 'none', flexShrink: 0 }}
-          title="Estados, responsables, Gantt y calendario de estas mismas tareas"
-        >
-          🗂️ Plan · Gantt
-        </Link>
+        {/* Vistas del MISMO tablero (sin salir de la pantalla): Tablero /
+            Gantt / Calendario. Pedro 31-ago-2026: "dentro de la oficial". */}
+        <div style={{ display: 'inline-flex', border: '1px solid #e5e7eb', borderRadius: 999, overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
+          {([['tablero', '📋'], ['gantt', '📊 Gantt'], ['cal', '📅']] as const).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setVistaBoard(id)}
+              title={id === 'tablero' ? 'Tablero' : id === 'gantt' ? 'Cronograma (Gantt)' : 'Calendario'}
+              style={{
+                height: 30, padding: '0 11px', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
+                background: vistaBoard === id ? '#111827' : 'transparent', color: vistaBoard === id ? '#fff' : '#6b7280',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filtro por MARCA: elegir una desglosa las columnas por responsable. */}
+        {marcas.length > 0 && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 999, padding: '4px 10px', flexShrink: 0 }}>
+            <span style={{ fontSize: 11 }}>🏷️</span>
+            <select
+              value={marcaFiltro}
+              onChange={(e) => setMarcaFiltro(e.target.value)}
+              title="Ver por marca — columnas por responsable"
+              style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, fontWeight: 600, color: marcaFiltro === 'todas' ? '#374151' : '#7170ff', cursor: 'pointer', maxWidth: 130 }}
+            >
+              <option value="todas">Todas las marcas</option>
+              {marcas.map((m) => <option key={m.slug} value={m.slug}>{m.nombre}</option>)}
+            </select>
+          </div>
+        )}
+
+        {nArchivadas > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerArchivadasPlan((v) => !v)}
+            title={verArchivadasPlan ? 'Ocultar tareas archivadas' : 'Mostrar tareas archivadas'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 30, padding: '0 10px', borderRadius: 999, border: '1px solid #e5e7eb', background: verArchivadasPlan ? '#f3f4f6' : '#fff', fontSize: 11.5, fontWeight: 600, color: '#6b7280', cursor: 'pointer', flexShrink: 0 }}
+          >
+            ▣ {nArchivadas}
+          </button>
+        )}
 
         {/* Filtro por persona — solo para el CEO (un miembro ya ve solo lo suyo). */}
         {esCEO && equipo.length > 0 && (
@@ -324,17 +421,24 @@ export function TareasView({
         )}
 
         {/* Tablero de columnas — WRAP: las columnas bajan a la siguiente fila
-            cuando se llena el ancho (sin scroll horizontal). Scroll vertical. */}
+            cuando se llena el ancho (sin scroll horizontal). Scroll vertical.
+            Las vistas Gantt/Calendario se renderizan EN ESTE MISMO espacio
+            (el header y el composer no se mueven). */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: isMobile ? '8px 12px 140px' : '8px 20px 140px' }}>
-          {columnas.length === 0 ? (
+          {vistaBoard === 'gantt' ? (
+            <Gantt tareas={planTareas} hoy={hoyLima} puedeEditar onCambio={() => router.refresh()} />
+          ) : vistaBoard === 'cal' ? (
+            <CalendarioTareas tareas={planTareas} hoy={hoyLima} mes={mesCal} setMes={setMesCal} />
+          ) : columnas.length === 0 ? (
             <div style={{ padding: '48px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-              {enFocus.length > 0 ? 'Todo lo demás está en Focus 🎯' : 'No hay tareas todavía. Escribe una abajo 👇'}
+              {porResponsable ? 'Esta marca no tiene tareas activas.' : enFocus.length > 0 ? 'Todo lo demás está en Focus 🎯' : 'No hay tareas todavía. Escribe una abajo 👇'}
             </div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
               {columnas.map((c) => (
                 <Columna key={c.categoria} columna={c} esCEO={esCEO} todasCategorias={todasCategorias}
-                  onComplete={onCompletar} onDelete={onEliminar} onMover={onMover} />
+                  onComplete={onCompletar} onDelete={onEliminar} onMover={onMover}
+                  plan={planPorId} hoy={hoyLima} onPlanCambio={() => router.refresh()} />
               ))}
             </div>
           )}
@@ -532,13 +636,16 @@ function fechaRelativa(iso: string): string {
 }
 
 /* ============================ Columna ============================ */
-function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMover }: {
+function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio }: {
   columna: { categoria: string; color: string; items: Tarea[] }
   esCEO: boolean
   todasCategorias: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void
   onDelete: (id: string) => void
   onMover: (id: string, cat: string) => void
+  plan?: Record<string, PlanInfo>
+  hoy?: string
+  onPlanCambio?: () => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${columna.categoria}` })
   return (
@@ -556,7 +663,8 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {columna.items.map((t) => (
           <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} otras={todasCategorias.filter((c) => c !== t.categoria)}
-            onComplete={onComplete} onDelete={onDelete} onMover={onMover} />
+            onComplete={onComplete} onDelete={onDelete} onMover={onMover}
+            planInfo={plan?.[t.id]} hoy={hoy} onPlanCambio={onPlanCambio} />
         ))}
       </div>
     </section>
@@ -564,9 +672,10 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
 }
 
 /* ============================ Card ============================ */
-function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }: {
+function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio }: {
   tarea: Tarea; esCEO: boolean; otras: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
+  planInfo?: PlanInfo; hoy?: string; onPlanCambio?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: tarea.id })
   const [menu, setMenu] = useState(false)
@@ -604,6 +713,8 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }:
             <Trash2 size={12} strokeWidth={2.2} />
           </button>
         </div>
+        {/* Estado + fecha de entrega (Plan) — dentro de la card oficial. */}
+        <PlanChips tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} />
       </div>
       {menu && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.14)', padding: 6, minWidth: 170 }}>
@@ -617,6 +728,85 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover }:
           </form>
           <button onClick={() => { if (confirm(`¿Eliminar esta tarea?\n\n"${tarea.texto.slice(0, 60)}${tarea.texto.length > 60 ? '…' : ''}"`)) { onDelete(tarea.id); setMenu(false) } }} style={{ ...menuItem, color: '#dc2626', marginTop: 2 }}>🗑️ Eliminar</button>
         </div>
+      )}
+    </div>
+  )
+}
+
+/* Estado + fecha de entrega dentro de la card oficial (Pedro 31-ago-2026).
+   Estado cicla al toque: ○ sin empezar → ◐ en proceso → ▣ archivado.
+   La fecha abre inputs inline (inicio opcional → entrega). */
+const PLAN_ESTADO_UI: Record<EstadoTarea, { label: string; bg: string; fg: string; icon: string }> = {
+  sin_empezar: { label: 'Sin empezar', bg: 'rgba(255,255,255,0.22)', fg: '#fff', icon: '○' },
+  en_proceso:  { label: 'En proceso',  bg: '#fbbf24', fg: '#78350f', icon: '◐' },
+  archivado:   { label: 'Archivado',   bg: 'rgba(17,24,39,0.4)', fg: '#fff', icon: '▣' },
+}
+const PLAN_SIGUIENTE: Record<EstadoTarea, EstadoTarea> = {
+  sin_empezar: 'en_proceso', en_proceso: 'archivado', archivado: 'sin_empezar',
+}
+function fmtFechaCorta(ymd: string): string {
+  try { return new Date(ymd + 'T12:00:00-05:00').toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short' }) } catch { return ymd }
+}
+
+function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
+  tareaId: string; planInfo?: PlanInfo; hoy?: string; onCambio?: () => void
+}) {
+  const [estado, setEstado] = useState<EstadoTarea>(planInfo?.estado ?? 'sin_empezar')
+  useEffect(() => { setEstado(planInfo?.estado ?? 'sin_empezar') }, [planInfo?.estado])
+  const [editFechas, setEditFechas] = useState(false)
+  const [fi, setFi] = useState('')
+  const [fe, setFe] = useState('')
+  const [cargando, setCargando] = useState(false)
+
+  const ui = PLAN_ESTADO_UI[estado]
+  const fechaEntrega = planInfo?.fechaEntrega ?? null
+  const fechaInicio = planInfo?.fechaInicio ?? null
+  const vencida = !!(fechaEntrega && hoy && fechaEntrega < hoy && estado !== 'archivado')
+
+  async function ciclar() {
+    if (cargando) return
+    const nuevo = PLAN_SIGUIENTE[estado]
+    setEstado(nuevo)  // optimista
+    setCargando(true)
+    const r = await setEstadoTarea(tareaId, nuevo)
+    setCargando(false)
+    if (!r.ok) { setEstado(estado); toast.error(r.error); return }
+    onCambio?.()
+  }
+
+  async function guardarFechas() {
+    setCargando(true)
+    const r = await setFechasTarea(tareaId, { fechaInicio: fi || null, fechaEntrega: fe || null })
+    setCargando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    setEditFechas(false)
+    onCambio?.()
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+      <button type="button" onClick={ciclar} disabled={cargando} title="Cambiar estado (toca para avanzar)"
+        style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 6px', borderRadius: 5, border: 'none', background: ui.bg, color: ui.fg, cursor: 'pointer' }}>
+        {ui.icon} {ui.label}
+      </button>
+      {!editFechas ? (
+        <button type="button"
+          onClick={() => { setFi(fechaInicio ?? ''); setFe(fechaEntrega ?? ''); setEditFechas(true) }}
+          title="Fecha de entrega (o rango inicio–entrega)"
+          style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 6px', borderRadius: 5, border: 'none', background: vencida ? '#111827' : 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer' }}>
+          📅 {fechaEntrega ? `${fechaInicio ? fmtFechaCorta(fechaInicio) + '→' : ''}${fmtFechaCorta(fechaEntrega)}${vencida ? ' ⚠' : ''}` : 'fecha'}
+        </button>
+      ) : (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+          <input type="date" value={fi} onChange={(e) => setFi(e.target.value)} title="Inicio (opcional)"
+            style={{ fontSize: 8.5, borderRadius: 5, border: 'none', padding: '1px 3px', color: '#111827' }} />
+          <input type="date" value={fe} onChange={(e) => setFe(e.target.value)} title="Entrega"
+            style={{ fontSize: 8.5, borderRadius: 5, border: 'none', padding: '1px 3px', color: '#111827' }} />
+          <button type="button" onClick={guardarFechas} disabled={cargando}
+            style={{ fontSize: 8.5, fontWeight: 700, border: 'none', borderRadius: 5, padding: '1px 6px', background: '#10b981', color: '#fff', cursor: 'pointer' }}>✓</button>
+          <button type="button" onClick={() => setEditFechas(false)}
+            style={{ fontSize: 8.5, border: 'none', borderRadius: 5, padding: '1px 5px', background: 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer' }}>✕</button>
+        </span>
       )}
     </div>
   )

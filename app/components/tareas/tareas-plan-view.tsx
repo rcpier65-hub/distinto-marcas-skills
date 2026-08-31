@@ -196,7 +196,7 @@ function Vacio({ texto }: { texto: string }) {
 }
 
 /* ===== Card — mismo diseño que el tablero de Tareas + estado y fechas ===== */
-function CardPlan({ t, hoy, puedeEditar, mostrarResponsable, onCambio, apagada }: {
+export function CardPlan({ t, hoy, puedeEditar, mostrarResponsable, onCambio, apagada }: {
   t: TareaPlan; hoy: string; puedeEditar: boolean; mostrarResponsable: boolean
   onCambio: () => void; apagada?: boolean
 }) {
@@ -282,7 +282,7 @@ function CardPlan({ t, hoy, puedeEditar, mostrarResponsable, onCambio, apagada }
 }
 
 /* ===== GANTT — cronograma por fechas, agrupado por responsable ===== */
-function Gantt({ tareas, hoy, puedeEditar, onCambio }: {
+export function Gantt({ tareas, hoy, puedeEditar, onCambio }: {
   tareas: TareaPlan[]; hoy: string; puedeEditar: boolean; onCambio: () => void
 }) {
   const conFecha = tareas.filter((t) => t.fechaEntrega)
@@ -410,7 +410,7 @@ function SinFechaLista({ tareas, hoy, puedeEditar, onCambio }: {
 }
 
 /* ===== Calendario mensual — tareas en su fecha de entrega ===== */
-function CalendarioTareas({ tareas, hoy, mes, setMes }: {
+export function CalendarioTareas({ tareas, hoy, mes, setMes }: {
   tareas: TareaPlan[]; hoy: string; mes: string; setMes: (m: string) => void
 }) {
   const DIAS_SEM = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
