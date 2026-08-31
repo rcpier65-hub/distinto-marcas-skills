@@ -1,0 +1,26 @@
+// app/app/api/debug/sync-pubs/route.ts
+//
+// Disparo manual de la sincronización de publicaciones → Google Calendar
+// para una marca. Protegido con CRON_SECRET (mismo patrón que los debug
+// endpoints existentes). Uso:
+//   GET /api/debug/sync-pubs?marca=little-joe&debug_key=$CRON_SECRET
+
+import { sincronizarPubsMarca } from '@/lib/publicaciones/gcal-sync'
+
+export const runtime = 'nodejs'
+export const maxDuration = 120
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const key = url.searchParams.get('debug_key')
+  const secret = process.env.CRON_SECRET
+  if (!secret || key !== secret) {
+    return Response.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+  }
+  const marca = (url.searchParams.get('marca') ?? '').trim()
+  if (!marca) return Response.json({ ok: false, error: 'Falta ?marca=slug' }, { status: 400 })
+
+  const r = await sincronizarPubsMarca(marca)
+  return Response.json(r, { status: r.ok ? 200 : 500 })
+}

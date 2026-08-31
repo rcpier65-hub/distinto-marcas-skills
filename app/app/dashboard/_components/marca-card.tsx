@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { MarcaLogo } from '@/components/marca-logo'
 import { toggleMarcaActiva } from '../_actions'
 import { crearTareaEnMarca } from '@/app/tareas/_actions'
+import { sincronizarPublicacionesGcal } from '../_gcal-actions'
 
 export type MarcaCardData = {
   slug: string
@@ -18,6 +19,9 @@ export type MarcaCardData = {
   emoji_marca: string | null
   color_primario_hex: string | null
   activa: boolean
+  /* Publicaciones sincronizadas con Google Calendar (marcas.sync_pubs_gcal).
+     Opcional: columna self-healing, puede no existir aún. */
+  sync_pubs_gcal?: boolean | null
 }
 
 /* Tarea rápida pendiente de esta marca (NO publicaciones). */
@@ -38,6 +42,28 @@ export function MarcaCard({
   mostrarTareas?: boolean
 }) {
   const [activa, setActiva] = useState(marca.activa)
+  const [syncPubs, setSyncPubs] = useState(false)
+  const [sincronizada, setSincronizada] = useState(!!marca.sync_pubs_gcal)
+
+  async function sincronizarGcal() {
+    if (syncPubs) return
+    setSyncPubs(true)
+    const r = await sincronizarPublicacionesGcal(marca.slug)
+    setSyncPubs(false)
+    if (!r.ok) { toast.error(r.error, { duration: 8000 }); return }
+    setSincronizada(true)
+    const partes = [
+      r.creadas > 0 ? `${r.creadas} eventos creados` : null,
+      r.actualizadas > 0 ? `${r.actualizadas} actualizados` : null,
+      r.fallidas > 0 ? `⚠ ${r.fallidas} fallaron` : null,
+    ].filter(Boolean).join(' · ')
+    toast.success(
+      r.total === 0
+        ? `${marca.nombre}: sin publicaciones con fecha de esta semana en adelante.`
+        : `📆 ${marca.nombre}: ${partes || 'todo al día'} — el cliente recibe la invitación de cada publicación (6–8 pm).`,
+      { duration: 7000 },
+    )
+  }
   const [pending, startTransition] = useTransition()
 
   /* "+ Tarea": crea una tarea rápida ya asociada a esta marca. Se sincroniza
@@ -134,6 +160,23 @@ export function MarcaCard({
             📋 Publicaciones
           </Link>
         </div>
+
+        {/* Sincronizar publicaciones → Google Calendar (evento 6–8 pm por
+            publicación, invitando al cliente). Pedro 31-ago-2026: "clientes
+            quieren que sus publicaciones también se pongan en su calendario". */}
+        <button
+          type="button"
+          onClick={sincronizarGcal}
+          disabled={syncPubs}
+          title="Manda las publicaciones (de esta semana en adelante) al Google Calendar como eventos de 6 a 8 pm, invitando al cliente con sus correos. Re-tócalo cuando cambien fechas."
+          className={`w-full inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md text-xs font-medium border transition-colors disabled:opacity-60 ${
+            sincronizada
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          {syncPubs ? '⏳ Sincronizando…' : sincronizada ? '📆 Calendario sincronizado · re-sincronizar' : '📆 Sincronizar publicaciones al calendario'}
+        </button>
 
         {/* ===== Tareas rápidas de esta marca (NO publicaciones) ===== */}
         <div className="pt-1 space-y-2">

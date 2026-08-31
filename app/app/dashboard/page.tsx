@@ -19,11 +19,20 @@ export default async function DashboardPage({
   const user = await requireUser()
   const supabase = await createClient()
 
-  const { data: marcas, error } = await supabase
+  /* sync_pubs_gcal puede no existir aún (columna self-healing) → retry sin ella. */
+  let mres = await supabase
     .from('marcas')
-    .select('slug, nombre, emoji_marca, color_primario_hex, activa')
+    .select('slug, nombre, emoji_marca, color_primario_hex, activa, sync_pubs_gcal')
     .order('activa', { ascending: false })
     .order('slug')
+  if (mres.error && /sync_pubs_gcal/i.test(mres.error.message ?? '')) {
+    mres = await supabase
+      .from('marcas')
+      .select('slug, nombre, emoji_marca, color_primario_hex, activa')
+      .order('activa', { ascending: false })
+      .order('slug')
+  }
+  const { data: marcas, error } = mres
 
   if (error) {
     return (
@@ -40,12 +49,14 @@ export default async function DashboardPage({
     )
   }
 
-  const cards: MarcaCardData[] = (marcas ?? []).map((m) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cards: MarcaCardData[] = ((marcas ?? []) as any[]).map((m) => ({
     slug: m.slug,
     nombre: m.nombre,
     emoji_marca: m.emoji_marca,
     color_primario_hex: m.color_primario_hex,
     activa: m.activa ?? true,
+    sync_pubs_gcal: m.sync_pubs_gcal ?? null,
   }))
   const activasCount = cards.filter((c) => c.activa).length
 
