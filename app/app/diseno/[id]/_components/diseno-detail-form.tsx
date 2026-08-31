@@ -438,14 +438,32 @@ export function DisenoDetailForm({
               {meetLink ? 'Actualizar reunión en Calendar' : 'Crear reunión en Calendar (con Meet)'}
             </button>
             {meetLink && (
-              <a
-                href={meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-emerald-600 hover:underline w-fit"
-              >
-                <Video className="w-4 h-4" /> Unirse por Google Meet <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href={meetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-emerald-600 hover:underline w-fit"
+                >
+                  <Video className="w-4 h-4" /> Unirse por Google Meet <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                {/* Copiar el enlace para mandarlo a quien deba unirse. */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(meetLink)
+                      toast.success('🔗 Enlace de Meet copiado — pégalo y envíalo')
+                    } catch {
+                      toast.error('No pude copiar. Mantén presionado el enlace para copiarlo.')
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-medium hover:bg-muted"
+                  title="Copiar el enlace de Meet"
+                >
+                  <CopyIcon className="w-3.5 h-3.5" /> Copiar enlace
+                </button>
+              </div>
             )}
             <p className="text-[11px] text-muted-foreground">
               Crea el evento el <strong>{form.fechaEntrega}</strong> a las <strong>{form.horaReunion}</strong> con Meet, le <strong>manda la invitación por correo al cliente</strong> y la reunión aparece en el calendario de <strong>Grabaciones y Reuniones</strong>.

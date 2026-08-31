@@ -398,6 +398,7 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
                       ▶ Meet
                     </a>
                   )}
+                  {e.meetLink && <CopiarMeet enlace={e.meetLink} />}
                   {e.href && (
                     <Link href={e.href} className="inline-flex items-center h-8 px-3 rounded-lg border text-[12px] font-medium hover:bg-muted">
                       Abrir tarea →
@@ -410,6 +411,51 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
         </ul>
       )}
     </section>
+  )
+}
+
+/* Botoncito "copiar enlace de Meet" — para pegarlo y mandarlo a quien deba
+   unirse (Pedro 31-ago-2026). Fallback textarea para navegadores/PWA donde
+   navigator.clipboard no está disponible. */
+function CopiarMeet({ enlace }: { enlace: string }) {
+  const [copiado, setCopiado] = useState(false)
+
+  async function copiar() {
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(enlace)
+      ok = true
+    } catch {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = enlace
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+      } catch { ok = false }
+    }
+    if (ok) {
+      setCopiado(true)
+      toast.success('🔗 Enlace de Meet copiado — pégalo y envíalo a quien deba unirse')
+      setTimeout(() => setCopiado(false), 2500)
+    } else {
+      toast.error('No pude copiar. Mantén presionado el botón ▶ Meet para copiar el enlace.')
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copiar}
+      title="Copiar el enlace de Meet para enviarlo"
+      className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border text-[12px] font-medium hover:bg-muted"
+      style={copiado ? { borderColor: '#86efac', background: '#dcfce7', color: '#15803d' } : undefined}
+    >
+      {copiado ? '✓ Copiado' : '🔗 Copiar enlace'}
+    </button>
   )
 }
 
