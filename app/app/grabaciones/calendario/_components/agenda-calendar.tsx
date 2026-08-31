@@ -20,7 +20,7 @@ import { vincularEventoGcal, editarReunionCal, eliminarReunionCal } from '../_ac
 
 export type AgendaEvento = {
   id: string
-  tipo: 'grabacion' | 'reunion' | 'gcal' | 'diseno'
+  tipo: 'grabacion' | 'reunion' | 'publicacion' | 'gcal' | 'diseno'
   fecha: string            // YYYY-MM-DD (Lima)
   hora: string | null      // HH:MM (24h, Lima); null = día completo
   titulo: string
@@ -93,10 +93,11 @@ function buildMonthGrid(monthStartStr: string): (string | null)[] {
 }
 
 const TIPO_META: Record<AgendaEvento['tipo'], { label: string; icon: string }> = {
-  grabacion: { label: 'Grabaciones', icon: '🎥' },
-  reunion:   { label: 'Reuniones',   icon: '🤝' },
-  diseno:    { label: 'Diseño',      icon: '🎨' },
-  gcal:      { label: 'Google Calendar', icon: '🟦' },
+  grabacion:   { label: 'Grabaciones',   icon: '🎥' },
+  reunion:     { label: 'Reuniones',     icon: '🤝' },
+  publicacion: { label: 'Publicaciones', icon: '📣' },
+  diseno:      { label: 'Diseño',        icon: '🎨' },
+  gcal:        { label: 'Google Calendar', icon: '🟦' },
 }
 
 /* Sugerir la marca de un evento de GCal por su título (ej. "Reunión Centro
@@ -117,16 +118,17 @@ function sugerirMarca(titulo: string, marcas: MarcaOpcion[]): string {
 
 export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas }: Props) {
   const [tipos, setTipos] = useState<Record<AgendaEvento['tipo'], boolean>>({
-    grabacion: true, reunion: true, diseno: true, gcal: true,
+    grabacion: true, reunion: true, publicacion: true, diseno: true, gcal: true,
   })
   const [marcaFiltro, setMarcaFiltro] = useState<string>('todas')
   const [diaSel, setDiaSel] = useState<string | null>(null)
 
   const counts = useMemo(() => ({
-    grabacion: eventos.filter((e) => e.tipo === 'grabacion').length,
-    reunion:   eventos.filter((e) => e.tipo === 'reunion').length,
-    diseno:    eventos.filter((e) => e.tipo === 'diseno').length,
-    gcal:      eventos.filter((e) => e.tipo === 'gcal').length,
+    grabacion:   eventos.filter((e) => e.tipo === 'grabacion').length,
+    reunion:     eventos.filter((e) => e.tipo === 'reunion').length,
+    publicacion: eventos.filter((e) => e.tipo === 'publicacion').length,
+    diseno:      eventos.filter((e) => e.tipo === 'diseno').length,
+    gcal:        eventos.filter((e) => e.tipo === 'gcal').length,
   }), [eventos])
 
   const filtrados = useMemo(() => eventos.filter((e) => {
@@ -166,8 +168,8 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
       {/* ===== Filtros ===== */}
       <div className="flex items-center gap-2 flex-wrap">
         {(Object.keys(TIPO_META) as AgendaEvento['tipo'][]).map((t) => {
-          // GCal y Diseño solo aparecen si hay eventos de ese tipo en el rango
-          if ((t === 'gcal' || t === 'diseno') && counts[t] === 0) return null
+          // GCal, Publicaciones y Diseño solo aparecen si hay eventos de ese tipo
+          if ((t === 'gcal' || t === 'diseno' || t === 'publicacion') && counts[t] === 0) return null
           const on = tipos[t]
           return (
             <button
@@ -309,7 +311,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
               {m.emoji} {m.nombre}
             </span>
           ))}
-          <span className="inline-flex items-center gap-1.5">🎥 grabación · 🤝 reunión{counts.gcal > 0 ? ' · 🟦 Google Calendar' : ''}</span>
+          <span className="inline-flex items-center gap-1.5">🎥 grabación · 🤝 reunión{counts.publicacion > 0 ? ' · 📣 publicación' : ''}{counts.gcal > 0 ? ' · 🟦 Google Calendar' : ''}</span>
         </div>
       )}
 
@@ -590,8 +592,8 @@ function ReunionAcciones({ e }: { e: AgendaEvento }) {
 function EventoCardSemana({ e }: { e: AgendaEvento }) {
   const cancelado = CANCELADO.has((e.estado ?? '').toLowerCase())
   const cumplido = e.estado === 'cumplida' || e.estado === 'realizada'
-  const bg = e.tipo === 'grabacion' ? e.color : e.tipo === 'reunion' ? '#ede9fe' : e.tipo === 'diseno' ? '#fef3c7' : '#eff6ff'
-  const fg = e.tipo === 'grabacion' ? '#fff' : e.tipo === 'reunion' ? '#5b21b6' : e.tipo === 'diseno' ? '#92400e' : '#1d4ed8'
+  const bg = e.tipo === 'grabacion' ? e.color : e.tipo === 'reunion' ? '#ede9fe' : e.tipo === 'publicacion' ? '#ffe4e6' : e.tipo === 'diseno' ? '#fef3c7' : '#eff6ff'
+  const fg = e.tipo === 'grabacion' ? '#fff' : e.tipo === 'reunion' ? '#5b21b6' : e.tipo === 'publicacion' ? '#be123c' : e.tipo === 'diseno' ? '#92400e' : '#1d4ed8'
 
   const card = (
     <div
@@ -641,6 +643,17 @@ function EventoChip({ e }: { e: AgendaEvento }) {
         title={`🤝 ${e.titulo}`}
       >
         🤝 {hora}{e.titulo}
+      </div>
+    )
+  }
+  if (e.tipo === 'publicacion') {
+    return (
+      <div
+        className={base + extra}
+        style={{ background: '#ffe4e6', color: '#be123c', borderLeft: `3px solid ${e.color}` }}
+        title={`📣 ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
+      >
+        📣 {hora}{e.titulo}
       </div>
     )
   }

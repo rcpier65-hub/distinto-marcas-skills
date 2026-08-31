@@ -132,6 +132,23 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
      día ni hora". Una tarea entra al calendario únicamente cuando se le
      agenda su reunión de revisión (aparece como 🤝 vía marca_reuniones). */
 
+  /* PUBLICACIONES sincronizadas con Google Calendar (gcal_pub_event_id) —
+     filtro 📣 propio, prendible/apagable (Pedro 31-ago-2026). Ventana fija
+     de publicación 6–8 pm. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pubsRows: any[] = []
+  try {
+    const r = await service
+      .from('publicaciones')
+      .select('id, nombre, marca_id, fecha_publicacion, gcal_pub_event_id')
+      .not('gcal_pub_event_id', 'is', null)
+      .gte('fecha_publicacion', desde)
+      .lte('fecha_publicacion', hasta)
+      .order('fecha_publicacion', { ascending: true })
+      .limit(200)
+    if (!r.error) pubsRows = r.data ?? []
+  } catch { /* sin publicaciones sincronizadas */ }
+
   /* ===== Unificar todo en AgendaEvento[] ===== */
   /* Miembros con acceso restringido a ciertas marcas solo ven los eventos de
      SUS marcas (mismo criterio que el sidebar). marcasAcceso null = todas. */
@@ -139,9 +156,11 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const eventos: AgendaEvento[] = []
   const grabRows = (grabRes.ok ? grabRes.rows : []).filter((g) => !marcasPermitidas || marcasPermitidas.has(g.marca_id))
   reunionesRows = reunionesRows.filter((r) => !marcasPermitidas || marcasPermitidas.has(r.marca_id))
+  pubsRows = pubsRows.filter((p) => !marcasPermitidas || marcasPermitidas.has(p.marca_id))
   const idsDeLaApp = new Set([
     ...grabRows.map((g) => g.google_event_id),
     ...reunionesRows.map((r) => r.google_event_id),
+    ...pubsRows.map((p) => p.gcal_pub_event_id),
   ].filter(Boolean) as string[])
   /* Dedup robusto de reuniones vs GCal: link de Meet (sobrevive a renombres
      en Google) y clave fecha|hora. Un evento 📌 SIN fila espejo en
@@ -201,12 +220,33 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     })
   }
 
+  for (const p of pubsRows) {
+    const marca = marcasById.get(p.marca_id)
+    eventos.push({
+      id: p.id,
+      tipo: 'publicacion',
+      fecha: p.fecha_publicacion,
+      hora: '18:00',
+      titulo: p.nombre ?? 'Publicación',
+      marcaSlug: marca?.slug ?? null,
+      marcaNombre: marca?.nombre ?? null,
+      marcaEmoji: marca?.emoji_marca ?? null,
+      color: marca?.color_calendario ?? '#e11d48',
+      estado: null,
+      meetLink: null,
+      notas: 'Ventana de publicación 6–8 pm',
+      videosGrabados: null,
+      href: `/publicaciones/${p.id}`,
+    })
+  }
+
   /* GCal externo: saltar lo que la app misma creó (grabaciones por event_id;
      reuniones por el prefijo 📌 con el que la app titula sus eventos). */
   for (const ev of gcalEvents) {
     if (idsDeLaApp.has(ev.id)) continue
     if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
     if (ev.summary.startsWith('🎬')) continue
+    if (ev.summary.startsWith('📣')) continue
     if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
     if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
     eventos.push({
