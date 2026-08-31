@@ -343,3 +343,87 @@ export async function enviarCorreccionesCliente(
   revalidatePath('/publicaciones')
   return { ok: true }
 }
+
+/* ==================== SOPORTE (portal del cliente) ====================
+   Pedro 31-ago-2026: "quita observaciones y pon enviar un reporte a soporte,
+   que salga lo mismo que tenemos ya en el sistema de soporte, que escriban
+   puedan subir captura y más". Los reportes del cliente caen en la MISMA
+   tabla soporte_reportes que usa el equipo (Erick los ve en /soporte), con
+   marca_id para poder mostrarle al cliente solo los de su marca. */
+
+const SOPORTE_TIPOS = new Set(['falla', 'pedido', 'consulta'])
+
+export async function subirImagenSoporteCliente(formData: FormData): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'No se recibió la imagen.' }
+  if (file.size > 6 * 1024 * 1024) return { ok: false, error: 'La imagen debe pesar menos de 6 MB.' }
+  const TIPOS_IMG = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (!TIPOS_IMG.includes(file.type)) return { ok: false, error: 'Formato no soportado (usa JPG, PNG, WEBP o GIF).' }
+
+  const service = createServiceClient() as Service
+  const ext = file.type.split('/')[1] ?? 'png'
+  const path = `cliente-${cliente.marcaSlug}/${crypto.randomUUID()}.${ext}`
+  const buf = Buffer.from(await file.arrayBuffer())
+  const { error: upErr } = await service.storage.from('soporte').upload(path, buf, { contentType: file.type, upsert: false })
+  if (upErr) return { ok: false, error: upErr.message }
+  const { data: urlData } = service.storage.from('soporte').getPublicUrl(path)
+  return { ok: true, url: urlData.publicUrl }
+}
+
+export async function crearReporteSoporteCliente(tipo: string, descripcion: string, imagenes: string[] = []): Promise<Ok> {
+  await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+
+  const t = SOPORTE_TIPOS.has(tipo) ? tipo : 'consulta'
+  const texto = (descripcion ?? '').trim()
+  if (!texto) return { ok: false, error: 'Escribe qué pasó o qué necesitas.' }
+  if (texto.length > 2000) return { ok: false, error: 'Máximo 2000 caracteres.' }
+  const imgs = (imagenes ?? []).filter((u) => typeof u === 'string' && u.includes('/storage/')).slice(0, 6)
+
+  const service = createServiceClient() as Service
+  /* team_member_id null = lo escribió un CLIENTE (no es del equipo). El nombre
+     lleva la marca para que Erick sepa de quién es de un vistazo. */
+  const fila = {
+    team_member_id: null,
+    autor_nombre: `${cliente.nombre ?? 'Cliente'} · ${cliente.marcaNombre}`,
+    tipo: t,
+    descripcion: texto,
+    estado: 'pendiente',
+    imagenes: imgs,
+    marca_id: cliente.marcaId,
+  }
+  let ins = await service.from('soporte_reportes').insert(fila).select('id').single()
+  if (ins.error && /marca_id|42703|PGRST204|schema cache/i.test(ins.error.message ?? '')) {
+    // La columna marca_id se auto-crea y se reintenta (patrón self-healing).
+    try {
+      const { ensureSoporteClienteCols } = await import('@/lib/soporte/ensure-cliente-cols')
+      await ensureSoporteClienteCols()
+      ins = await service.from('soporte_reportes').insert(fila).select('id').single()
+    } catch { /* probamos sin la columna */ }
+    if (ins.error) {
+      const { marca_id: _omit, ...sinCol } = fila
+      void _omit
+      ins = await service.from('soporte_reportes').insert(sinCol).select('id').single()
+    }
+  }
+  if (ins.error) return { ok: false, error: ins.error.message }
+
+  const EMOJI: Record<string, string> = { falla: '🐞', pedido: '💡', consulta: '❓' }
+  try {
+    await enviarPushAMiembros(['erick'], {
+      title: `${EMOJI[t]} Reporte de CLIENTE · ${cliente.marcaNombre}`,
+      body: `${cliente.nombre ?? 'Cliente'}: ${texto.slice(0, 100)}`,
+      url: '/soporte',
+      tag: `soporte-cli-${ins.data.id}`,
+    })
+  } catch { /* el reporte ya quedó guardado */ }
+
+  revalidatePath('/cliente')
+  revalidatePath('/soporte')
+  return { ok: true }
+}

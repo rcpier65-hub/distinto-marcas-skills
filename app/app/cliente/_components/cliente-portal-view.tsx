@@ -7,17 +7,21 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
-import { FechasClienteView, type FechaClienteItem } from './fechas-cliente-view'
+import { FormAgregarCliente, type FechaClienteItem } from './fechas-cliente-view'
+import { categoriaInfo } from '@/lib/fechas/categorias'
+import { FechaDetalleModal } from '@/components/fechas/fecha-detalle-modal'
+import { SoporteClienteView, type ReporteClienteItem } from './soporte-cliente-view'
+import { AgendaClienteView } from './agenda-cliente'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
-import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente } from '../_actions'
+import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente, eliminarFechaImportanteCliente } from '../_actions'
 import type { MarcaCliente } from '@/lib/cliente/get-cliente'
 import { ClienteRealtime } from './cliente-realtime'
 import { DriveExplorer } from './drive-explorer'
@@ -215,15 +219,16 @@ function videoAppUrl(url: string | null): string | null {
 
 /* Menú del portal. Una sola lista alimenta el sidebar (PC) y el toggle (móvil),
    así nunca se desincronizan. Pedro 17-jul-2026. */
+/* Pedro 31-ago-2026: la Lista vive DENTRO del Calendario (toggle), las fechas
+   importantes van integradas al calendario de contenido (no calendario aparte),
+   Observaciones se reemplaza por Soporte, y Reuniones+Grabación se unen en un
+   solo módulo "Grabaciones y Reuniones" (igual al de la agencia, solo su marca). */
 const NAV = [
   { id: 'cal', label: 'Calendario', corto: 'Calendario', Icono: CalendarDays },
-  { id: 'lista', label: 'Lista', corto: 'Lista', Icono: List },
   { id: 'stats', label: 'Estadísticas', corto: 'Stats', Icono: BarChart3 },
-  { id: 'fechas', label: 'Fechas importantes', corto: 'Fechas', Icono: Star },
-  { id: 'observaciones', label: 'Observaciones', corto: 'Observ.', Icono: ClipboardList },
-  { id: 'reuniones', label: 'Reuniones', corto: 'Reuniones', Icono: CalendarClock },
-  { id: 'grabaciones', label: 'Grabación', corto: 'Grabación', Icono: Clapperboard },
+  { id: 'reuniones', label: 'Grabaciones y Reuniones', corto: 'Agenda', Icono: CalendarClock },
   { id: 'diseno', label: 'Diseño', corto: 'Diseño', Icono: Palette },
+  { id: 'soporte', label: 'Soporte', corto: 'Soporte', Icono: LifeBuoy },
   /* Reporte mensual (embudo/inversión) — solo aparece si la marca tiene
      reporte cargado (prop reporteNombre) y pide código al abrirlo. */
   { id: 'reporte', label: 'Reporte mensual', corto: 'Reporte', Icono: TrendingUp },
@@ -301,6 +306,7 @@ function SwitcherMarca({ marcas, activaId, color }: {
 export function ClientePortalView({
   marcaId, marcaNombre, marcaSlug, marcaEmoji, marcaColor, marcaLogoUrl, driveUrl, contacto, hoy, pubs: pubsIniciales, observaciones, reuniones, grabaciones, fechasImportantes = [],
   marcasDisponibles = [],
+  reportesSoporte = [],
   reporteNombre = null, reporteMeses = null,
 }: {
   marcaId: string
@@ -319,6 +325,8 @@ export function ClientePortalView({
   reuniones: Reunion[]
   grabaciones: GrabacionCliente[]
   fechasImportantes?: FechaClienteItem[]
+  /* Reportes de soporte de ESTA marca (los que mandó el cliente). */
+  reportesSoporte?: ReporteClienteItem[]
   /* Reporte mensual de la marca: nombre para mostrar + data. meses=null con
      nombre presente = candado (aún sin código). nombre=null = sin reporte. */
   reporteNombre?: string | null
@@ -344,9 +352,10 @@ export function ClientePortalView({
      Diseños), como "Publicaciones" en la app. Pedro 19-jul-2026. */
   const [tareasAbierto, setTareasAbierto] = useState(true)
   const [pendFiltro, setPendFiltro] = useState<'todas' | 'publicaciones' | 'disenos'>('todas')
-  /* Modo del calendario. Arranca en MES (dashboard principal); el cliente puede
-     luego elegir Semana o Día. Pedro 14-jul-2026. */
-  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes'>('mes')
+  /* Modo del calendario. Arranca en SEMANA (Pedro 31-ago-2026: "cuando ingreso
+     primera vez a calendario siempre debe mostrarse la vista semanal"). La
+     LISTA ahora también vive aquí como un modo más del calendario. */
+  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes' | 'lista'>('semana')
   /* Presentación de la pestaña LISTA: cuadrícula (cards) o lista (filas).
      Toggle en la esquina de la vista Lista, estilo Assets. Pedro 17-jul-2026. */
   const [listaFmt, setListaFmt] = useState<'grid' | 'lista'>('grid')
@@ -363,6 +372,27 @@ export function ClientePortalView({
   // publicaciones y hay que elegir cuál ver). Con una sola, se abre el video
   // directo sin pop-up intermedio. Pedro 5-ago-2026.
   const [diaPopup, setDiaPopup] = useState<string | null>(null)
+
+  /* FECHAS IMPORTANTES integradas al calendario de contenido (Pedro 31-ago-2026:
+     "no un calendario aparte, todo pertenece al conjunto de la marca"). Se ven
+     como chips con estrella en semana/mes, y se agregan desde el botón ＋Fecha. */
+  const fechasPorDia = useMemo(() => {
+    const m = new Map<string, FechaClienteItem[]>()
+    for (const f of fechasImportantes) {
+      const k = f.fecha.slice(0, 10)
+      const arr = m.get(k)
+      if (arr) arr.push(f); else m.set(k, [f])
+    }
+    return m
+  }, [fechasImportantes])
+  const [detalleFecha, setDetalleFecha] = useState<FechaClienteItem | null>(null)
+  const [agregarFecha, setAgregarFecha] = useState<string | null>(null)
+  function borrarFecha(id: string) {
+    eliminarFechaImportanteCliente(id).then((r) => {
+      if (r.ok) { toast.success('Fecha eliminada'); setDetalleFecha(null); router.refresh() }
+      else toast.error(r.error)
+    })
+  }
 
   function esAprobado(p: PubCliente) { return !!p.aprobadoAt || !!aprobados[p.id] }
   /* Prioridad: PUBLICADO (gris, ya cerrado) gana sobre aprobado. Así un video ya
@@ -528,9 +558,9 @@ export function ClientePortalView({
   useEffect(() => {
     if (typeof window === 'undefined') return
     const qs = new URLSearchParams(window.location.search)
-    // Deep-links de notificaciones: reunión nueva o respuesta a observaciones.
+    // Deep-links de notificaciones: reunión nueva o respuesta (ahora Soporte).
     if (qs.get('reunion')) { setVista('reuniones'); return }
-    if (qs.get('obs')) { setVista('observaciones'); return }
+    if (qs.get('obs')) { setVista('soporte'); return }
     const pubId = qs.get('pub')
     if (!pubId) return
     const p = pubs.find((x) => x.id === pubId)
@@ -748,21 +778,37 @@ export function ClientePortalView({
       {vista === 'cal' && (
         <div className="space-y-4">
           <section className="rounded-2xl bg-card p-4 sm:p-5 lg:p-7 border">
-            {/* Barra: navegación + modo Día/Semana/Mes + conteo */}
+            {/* Barra: navegación + modo Semana/Mes/Día/Lista + agregar fecha.
+                La LISTA vive aquí como un modo más (Pedro 31-ago-2026). */}
             <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 mb-5 lg:mb-6">
-              <div className="flex items-center gap-1.5">
-                <button onClick={navPrev} aria-label="Anterior" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                <div className="font-extrabold text-[15px] lg:text-lg text-center min-w-[130px] lg:min-w-[190px] capitalize">{navLabel}</div>
-                <button onClick={navNext} aria-label="Siguiente" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors"><ChevronRight className="w-5 h-5" /></button>
-                <button onClick={navHoy} className="ml-1 h-9 px-3.5 rounded-xl text-[13px] font-bold transition-colors" style={{ background: `${marcaColor}18`, color: marcaColor }}>Hoy</button>
-              </div>
+              {calMode !== 'lista' ? (
+                <div className="flex items-center gap-1.5">
+                  <button onClick={navPrev} aria-label="Anterior" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                  <div className="font-extrabold text-[15px] lg:text-lg text-center min-w-[130px] lg:min-w-[190px] capitalize">{navLabel}</div>
+                  <button onClick={navNext} aria-label="Siguiente" className="w-9 h-9 rounded-xl inline-flex items-center justify-center hover:bg-muted transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                  <button onClick={navHoy} className="ml-1 h-9 px-3.5 rounded-xl text-[13px] font-bold transition-colors" style={{ background: `${marcaColor}18`, color: marcaColor }}>Hoy</button>
+                </div>
+              ) : (
+                <div className="font-extrabold text-[15px] lg:text-lg">Tus publicaciones</div>
+              )}
               <div className="flex items-center gap-1 p-1.5 rounded-xl bg-muted/60">
-                <ModoBtn active={calMode === 'mes'} onClick={() => setCalMode('mes')} color={marcaColor} label="Mes" />
                 <ModoBtn active={calMode === 'semana'} onClick={() => setCalMode('semana')} color={marcaColor} label="Semana" />
+                <ModoBtn active={calMode === 'mes'} onClick={() => setCalMode('mes')} color={marcaColor} label="Mes" />
                 <ModoBtn active={calMode === 'dia'} onClick={() => setCalMode('dia')} color={marcaColor} label="Día" />
+                <ModoBtn active={calMode === 'lista'} onClick={() => setCalMode('lista')} color={marcaColor} label="Lista" />
               </div>
-              <div className="text-[12px] font-semibold text-muted-foreground w-full text-center sm:w-auto sm:text-right">
-                {navCount} publicaci{navCount === 1 ? 'ón' : 'ones'}
+              <div className="flex items-center gap-2">
+                {calMode !== 'lista' && (
+                  <span className="text-[12px] font-semibold text-muted-foreground">
+                    {navCount} publicaci{navCount === 1 ? 'ón' : 'ones'}
+                  </span>
+                )}
+                {/* Agregar una fecha importante SIN salir del calendario */}
+                <button onClick={() => setAgregarFecha(calMode === 'dia' ? sel : hoy)}
+                  className="inline-flex items-center gap-1 h-9 px-3 rounded-xl text-[12.5px] font-bold text-white"
+                  style={{ background: marcaColor }} title="Agregar una fecha importante de tu marca">
+                  <Star className="w-3.5 h-3.5" fill="#fff" /> <span className="hidden sm:inline">Fecha importante</span><span className="sm:hidden"><Plus className="w-3.5 h-3.5" /></span>
+                </button>
               </div>
             </div>
 
@@ -773,6 +819,7 @@ export function ClientePortalView({
                 colorEstado={colorEstado} estadoLabel={estadoLabel} redesStr={redesStr}
                 onChip={onChip} expandidoId={expandido}
                 puedeMover={(p) => !esPublicada(p)} onMover={moverPub}
+                fechas={fechasPorDia} onFecha={setDetalleFecha}
               />
             )}
 
@@ -785,14 +832,20 @@ export function ClientePortalView({
                 <MobileMonthGrid
                   monthWeeks={monthWeeks} porDia={porDia} hoy={hoy} marcaColor={marcaColor}
                   mesFiltro={ym.m} colorEstado={colorEstado}
+                  fechas={fechasPorDia}
                   onPickDay={(k) => {
                     // Pedro 5-ago-2026: al tocar un día, MOSTRAR EL VIDEO DIRECTO
                     // en un pop-up, no mandar a la sección "Día". Con 1 publicación
                     // se abre su detalle (video) al toque; con varias, un pop-up
-                    // para elegir cuál ver.
+                    // para elegir cuál ver. Día sin pubs pero con fecha importante:
+                    // se abre el detalle de la fecha.
                     const items = porDia.get(k) ?? []
                     if (items.length === 1) setModalPub(items[0])
                     else if (items.length > 1) setDiaPopup(k)
+                    else {
+                      const fts = fechasPorDia.get(k) ?? []
+                      if (fts.length > 0) setDetalleFecha(fts[0])
+                    }
                   }}
                 />
                 <div className="hidden lg:block space-y-4">
@@ -800,19 +853,61 @@ export function ClientePortalView({
                     <WeekView key={i} weekDays={wk} porDia={porDia} hoy={hoy} marcaColor={marcaColor}
                       colorEstado={colorEstado} estadoLabel={estadoLabel} redesStr={redesStr}
                       onChip={onChip} expandidoId={expandido} mesFiltro={ym.m}
-                      puedeMover={(p) => !esPublicada(p)} onMover={moverPub} />
+                      puedeMover={(p) => !esPublicada(p)} onMover={moverPub}
+                      fechas={fechasPorDia} onFecha={setDetalleFecha} />
                   ))}
                 </div>
               </>
             )}
 
+            {/* LISTA — ahora vive dentro del calendario como un modo más. */}
+            {calMode === 'lista' && (() => {
+              const cont = listaFmt === 'grid'
+                ? 'space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start'
+                : 'space-y-2'
+              return (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-end">
+                    <ToggleFmt value={listaFmt} onChange={setListaFmt} color={marcaColor} />
+                  </div>
+                  <section>
+                    <SecHeader icon={<Clock className="w-4 h-4" />} label="Por publicar" count={porPublicar.length} color={marcaColor} />
+                    {porPublicar.length === 0 ? (
+                      <Vacio texto="No hay publicaciones programadas por ahora." />
+                    ) : listaFmt === 'grid' ? (
+                      <div className={cont}>{porPublicar.map(renderCard)}</div>
+                    ) : (
+                      <div className={cont}>{porPublicar.map((p) => (
+                        <FilaCompacta key={p.id} p={p} color={colorEstado(p)} badge={estadoLabel(p)} proceso={procesoLabel(p)} onClick={() => onChip(p)} />
+                      ))}</div>
+                    )}
+                  </section>
+                  <section>
+                    <SecHeader icon={<CheckCircle2 className="w-4 h-4" />} label="Publicadas" count={publicadas.length} color={C_PUBLICADO} />
+                    {publicadas.length === 0 ? (
+                      <Vacio texto="Todavía no hay publicaciones publicadas." />
+                    ) : listaFmt === 'grid' ? (
+                      <div className={cont}>{publicadas.map(renderCard)}</div>
+                    ) : (
+                      <div className={cont}>{publicadas.map((p) => (
+                        <FilaCompacta key={p.id} p={p} color={colorEstado(p)} badge={estadoLabel(p)} onClick={() => onChip(p)} />
+                      ))}</div>
+                    )}
+                  </section>
+                </div>
+              )
+            })()}
+
             {/* Leyenda */}
-            <div className="flex items-center justify-center gap-3 flex-wrap mt-3 pt-3 border-t text-[11px] text-muted-foreground">
-              <Leyenda color={C_EDITANDO} label="En edición" />
-              <Leyenda color={marcaColor} label="Por publicar" />
-              <Leyenda color={C_APROBADO} label="Aprobado" />
-              <Leyenda color={C_PUBLICADO} label="Publicado" />
-            </div>
+            {calMode !== 'lista' && (
+              <div className="flex items-center justify-center gap-3 flex-wrap mt-3 pt-3 border-t text-[11px] text-muted-foreground">
+                <Leyenda color={C_EDITANDO} label="En edición" />
+                <Leyenda color={marcaColor} label="Por publicar" />
+                <Leyenda color={C_APROBADO} label="Aprobado" />
+                <Leyenda color={C_PUBLICADO} label="Publicado" />
+                <span className="inline-flex items-center gap-1"><Star className="w-3 h-3" fill="#f59e0b" style={{ color: '#f59e0b' }} /> Fecha importante</span>
+              </div>
+            )}
           </section>
 
           {/* DÍA — lista de tarjetas del día (Semana/Mes abren ventana al tocar) */}
@@ -824,6 +919,19 @@ export function ClientePortalView({
                 </span>
                 {itemsDelDia.length > 0 && <span className="text-[12px] font-bold text-muted-foreground">{itemsDelDia.length}</span>}
               </div>
+              {/* Fechas importantes de este día — integradas al calendario */}
+              {(fechasPorDia.get(sel) ?? []).map((f) => {
+                const cat = categoriaInfo(f.categoria)
+                return (
+                  <button key={f.id} onClick={() => setDetalleFecha(f)}
+                    className="w-full text-left rounded-xl border bg-card p-3 mb-2 flex items-center gap-2.5"
+                    style={{ borderLeft: `4px solid ${cat.color}` }}>
+                    <Star className="w-4 h-4 shrink-0" style={{ color: cat.color }} fill={cat.color} />
+                    <span className="text-[13.5px] font-bold truncate">{f.titulo}</span>
+                    <span className="ml-auto text-[11.5px] font-bold shrink-0" style={{ color: cat.color }}>{cat.label}</span>
+                  </button>
+                )
+              })}
               {itemsDelDia.length === 0 ? (
                 <Vacio texto="No hay publicaciones este día. Usa ‹ › para ver otro día." />
               ) : (
@@ -834,49 +942,6 @@ export function ClientePortalView({
         </div>
       )}
 
-      {vista === 'lista' && (() => {
-        /* Contenedor de cada sección según el toggle: cuadrícula (varias
-           columnas) o lista (una columna de filas). */
-        const cont = listaFmt === 'grid'
-          ? 'space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start'
-          : 'space-y-2'
-        return (
-          <>
-            {/* Encabezado del área + toggle Lista/Cuadrícula a la derecha. Los
-                DISEÑOS ya no van acá: tienen su propia pestaña "Diseño". */}
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="text-[15px] font-extrabold">Tus publicaciones</div>
-              <ToggleFmt value={listaFmt} onChange={setListaFmt} color={marcaColor} />
-            </div>
-
-            <section>
-              <SecHeader icon={<Clock className="w-4 h-4" />} label="Por publicar" count={porPublicar.length} color={marcaColor} />
-              {porPublicar.length === 0 ? (
-                <Vacio texto="No hay publicaciones programadas por ahora." />
-              ) : listaFmt === 'grid' ? (
-                <div className={cont}>{porPublicar.map(renderCard)}</div>
-              ) : (
-                <div className={cont}>{porPublicar.map((p) => (
-                  <FilaCompacta key={p.id} p={p} color={colorEstado(p)} badge={estadoLabel(p)} proceso={procesoLabel(p)} onClick={() => onChip(p)} />
-                ))}</div>
-              )}
-            </section>
-
-            <section className="mt-5">
-              <SecHeader icon={<CheckCircle2 className="w-4 h-4" />} label="Publicadas" count={publicadas.length} color={C_PUBLICADO} />
-              {publicadas.length === 0 ? (
-                <Vacio texto="Todavía no hay publicaciones publicadas." />
-              ) : listaFmt === 'grid' ? (
-                <div className={cont}>{publicadas.map(renderCard)}</div>
-              ) : (
-                <div className={cont}>{publicadas.map((p) => (
-                  <FilaCompacta key={p.id} p={p} color={colorEstado(p)} badge={estadoLabel(p)} onClick={() => onChip(p)} />
-                ))}</div>
-              )}
-            </section>
-          </>
-        )
-      })()}
 
       {/* Pestaña propia de DISEÑO: banners/posts que hace el equipo, con el estado
           que va marcando el diseñador. Pedro 5-ago-2026. */}
@@ -967,20 +1032,16 @@ export function ClientePortalView({
         <StatsView pubs={pubsNormales} publicadas={publicadas} porPublicar={porPublicar} enDisenoCount={disenos.length} color={marcaColor} hoy={hoy} esAprobado={esAprobado} />
       )}
 
-      {vista === 'fechas' && (
-        <FechasClienteView fechas={fechasImportantes} color={marcaColor} marcaNombre={marcaNombre} />
-      )}
-
-      {vista === 'observaciones' && (
-        <ObservacionesView observaciones={observaciones} color={marcaColor} />
-      )}
-
+      {/* GRABACIONES Y REUNIONES — mismo módulo que la agencia, solo SU marca.
+          Pedro 31-ago-2026. Incluye el form para que el cliente agende. */}
       {vista === 'reuniones' && (
-        <ReunionesView reuniones={reuniones} color={marcaColor} />
+        <AgendaClienteView reuniones={reuniones} grabaciones={grabaciones} color={marcaColor} marcaNombre={marcaNombre} hoy={hoy} />
       )}
 
-      {vista === 'grabaciones' && (
-        <GrabacionesView grabaciones={grabaciones} color={marcaColor} hoy={hoy} />
+      {/* SOPORTE — reemplaza a Observaciones (Pedro 31-ago-2026): mismo sistema
+          que /soporte del equipo, con capturas y dictado. */}
+      {vista === 'soporte' && (
+        <SoporteClienteView reportes={reportesSoporte} color={marcaColor} />
       )}
 
       {/* Reporte mensual — privado: si aún no ingresó el código (meses=null),
@@ -1001,6 +1062,24 @@ export function ClientePortalView({
       )}
 
       <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>
+
+      {/* Detalle de una fecha importante (chips del calendario) — puede eliminarla */}
+      {detalleFecha && (
+        <FechaDetalleModal
+          fecha={{ id: detalleFecha.id, titulo: detalleFecha.titulo, fecha: detalleFecha.fecha, nota: detalleFecha.nota, categoria: detalleFecha.categoria, marcaNombre, marcaColor }}
+          onClose={() => setDetalleFecha(null)}
+          onDelete={borrarFecha}
+        />
+      )}
+
+      {/* Agregar fecha importante desde el calendario de contenido */}
+      {agregarFecha && (
+        <FormAgregarCliente
+          fechaInicial={agregarFecha} color={marcaColor}
+          onClose={() => setAgregarFecha(null)}
+          onDone={() => { setAgregarFecha(null); router.refresh() }}
+        />
+      )}
 
       {/* Pop-up del día (solo cuando ese día tiene VARIAS publicaciones): lista
           los videos de ese día para elegir cuál ver. Con una sola, no aparece —
@@ -1161,7 +1240,7 @@ function DisenoDetalle({ p }: { p: PubCliente }) {
    y puntitos (uno por publicación, con el color de su estado). Tocar un día con
    contenido abre la vista "Día". Reemplaza el scroll horizontal que hacía ver
    solo 2 días por semana. Pedro 27-jul-2026. */
-function MobileMonthGrid({ monthWeeks, porDia, hoy, marcaColor, mesFiltro, colorEstado, onPickDay }: {
+function MobileMonthGrid({ monthWeeks, porDia, hoy, marcaColor, mesFiltro, colorEstado, onPickDay, fechas }: {
   monthWeeks: string[][]
   porDia: Map<string, PubCliente[]>
   hoy: string
@@ -1169,6 +1248,8 @@ function MobileMonthGrid({ monthWeeks, porDia, hoy, marcaColor, mesFiltro, color
   mesFiltro: number
   colorEstado: (p: PubCliente) => string
   onPickDay: (iso: string) => void
+  /* Fechas importantes: estrellita en el día (Pedro 31-ago-2026). */
+  fechas?: Map<string, FechaClienteItem[]>
 }) {
   const cabecera = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
   const dias = monthWeeks.flat()
@@ -1183,9 +1264,11 @@ function MobileMonthGrid({ monthWeeks, porDia, hoy, marcaColor, mesFiltro, color
         {dias.map((k) => {
           const dt = parseYmd(k)
           const items = porDia.get(k) ?? []
+          const fts = fechas?.get(k) ?? []
           const isHoy = k === hoy
           const fuera = dt.getMonth() !== mesFiltro
           const hasItems = items.length > 0
+          const clickeable = hasItems || fts.length > 0
           // Color representativo del día = el del primer contenido (verde=aprobado,
           // gris=publicado, marrón=en edición, marca=listo). Tiñe la celda + puntitos.
           const colDia = hasItems ? colorEstado(items[0]) : marcaColor
@@ -1193,16 +1276,19 @@ function MobileMonthGrid({ monthWeeks, porDia, hoy, marcaColor, mesFiltro, color
             <button
               key={k}
               type="button"
-              onClick={hasItems ? () => onPickDay(k) : undefined}
-              aria-disabled={!hasItems}
+              onClick={clickeable ? () => onPickDay(k) : undefined}
+              aria-disabled={!clickeable}
               className="aspect-square min-w-0 rounded-lg flex flex-col items-center justify-start px-0.5 pt-1 transition-colors overflow-hidden"
               style={{
                 background: isHoy ? marcaColor : hasItems ? `${colDia}22` : 'transparent',
                 opacity: fuera ? 0.3 : 1,
-                cursor: hasItems ? 'pointer' : 'default',
+                cursor: clickeable ? 'pointer' : 'default',
               }}
             >
-              <span className="text-[12px] font-bold leading-none" style={{ color: isHoy ? '#fff' : undefined }}>{dt.getDate()}</span>
+              <span className="text-[12px] font-bold leading-none inline-flex items-center gap-0.5" style={{ color: isHoy ? '#fff' : undefined }}>
+                {dt.getDate()}
+                {fts.length > 0 && <Star className="w-2.5 h-2.5 shrink-0" style={{ color: isHoy ? '#fff' : categoriaInfo(fts[0].categoria).color }} fill={isHoy ? '#fff' : categoriaInfo(fts[0].categoria).color} />}
+              </span>
               {hasItems && (
                 <>
                   <span className="mt-1 flex flex-wrap items-center justify-center gap-[3px] max-w-full leading-none">
@@ -1229,7 +1315,7 @@ function MobileMonthGrid({ monthWeeks, porDia, hoy, marcaColor, mesFiltro, color
   )
 }
 
-function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel, redesStr, onChip, expandidoId, mesFiltro, puedeMover, onMover }: {
+function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel, redesStr, onChip, expandidoId, mesFiltro, puedeMover, onMover, fechas, onFecha }: {
   weekDays: string[]
   porDia: Map<string, PubCliente[]>
   hoy: string
@@ -1242,12 +1328,18 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
   mesFiltro?: number
   puedeMover?: (p: PubCliente) => boolean
   onMover?: (pubId: string, fecha: string) => void
+  /* Fechas importantes integradas al calendario (Pedro 31-ago-2026). */
+  fechas?: Map<string, FechaClienteItem[]>
+  onFecha?: (f: FechaClienteItem) => void
 }) {
   /* Día sobre el que se está soltando una tarjeta (para resaltarlo). */
   const [dropDia, setDropDia] = useState<string | null>(null)
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 lg:grid lg:grid-cols-7 lg:gap-2.5 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0">
+    /* En desktop: grilla bordeada tipo tabla — MISMO look que el calendario
+       unificado de la agencia (Pedro 31-ago-2026: "igual al diseño del
+       calendario de la agencia"). En móvil se mantiene el carrusel. */
+    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 lg:grid lg:grid-cols-7 lg:gap-0 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0 lg:border lg:rounded-xl lg:overflow-hidden lg:bg-card">
       {weekDays.map((k) => {
         const dt = parseYmd(k)
         const dow = (dt.getDay() + 6) % 7
@@ -1258,7 +1350,7 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
         return (
           <div
             key={k}
-            className="min-w-[150px] flex-shrink-0 lg:min-w-0 lg:flex-shrink rounded-xl transition-colors"
+            className="min-w-[150px] flex-shrink-0 lg:min-w-0 lg:flex-shrink rounded-xl lg:rounded-none lg:border-r lg:last:border-r-0 transition-colors"
             style={{ opacity: fuera ? 0.38 : 1, background: esDrop ? `${marcaColor}14` : undefined, outline: esDrop ? `2px dashed ${marcaColor}` : undefined }}
             onDragOver={(e) => { if (onMover) { e.preventDefault(); if (dropDia !== k) setDropDia(k) } }}
             onDragLeave={() => { if (dropDia === k) setDropDia(null) }}
@@ -1268,13 +1360,27 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
               if (id && onMover) onMover(id, k)
             }}
           >
-            <div className="rounded-xl px-2 py-1.5 mb-2 text-center" style={{ background: isHoy ? marcaColor : 'var(--muted, #f1f5f9)' }}>
+            <div className="rounded-xl lg:rounded-none lg:border-b px-2 py-1.5 mb-2 lg:mb-0 text-center" style={{ background: isHoy ? marcaColor : 'var(--muted, #f1f5f9)' }}>
               <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: isHoy ? '#fff' : 'var(--muted-foreground, #94a3b8)' }}>{DIAS_SEM_LARGO[dow]}</div>
               <div className="text-lg font-extrabold leading-tight" style={{ color: isHoy ? '#fff' : undefined }}>{dt.getDate()}</div>
               {items.length > 0 && <div className="text-[10px] font-bold" style={{ color: isHoy ? '#fff' : 'var(--muted-foreground, #94a3b8)' }}>{items.length} pub</div>}
             </div>
-            <div className="space-y-1.5 min-h-[40px]">
-              {items.length === 0 ? (
+            {/* Alto generoso solo en la vista SEMANA (mesFiltro==null); en el mes
+                apilado las semanas quedan compactas. */}
+            <div className={`space-y-1.5 min-h-[40px] lg:p-1.5 ${mesFiltro == null ? 'lg:min-h-[200px]' : ''}`}>
+              {/* Fechas importantes del día — chip con estrella y color de categoría */}
+              {(fechas?.get(k) ?? []).map((f) => {
+                const cat = categoriaInfo(f.categoria)
+                return (
+                  <button key={`f-${f.id}`} type="button" onClick={() => onFecha?.(f)}
+                    className="w-full flex items-center gap-1 text-[10px] font-bold px-1.5 py-1 rounded text-left"
+                    style={{ background: `${cat.color}22`, color: cat.color }} title={`${cat.label}: ${f.titulo}`}>
+                    <Star className="w-2.5 h-2.5 shrink-0" style={{ color: cat.color }} fill={cat.color} />
+                    <span className="truncate min-w-0">{f.titulo}</span>
+                  </button>
+                )
+              })}
+              {items.length === 0 && (fechas?.get(k) ?? []).length === 0 ? (
                 <div className="text-center text-[11px] text-muted-foreground/40 py-2">—</div>
               ) : items.map((p) => {
                 const c = colorEstado(p)

@@ -137,6 +137,32 @@ export default async function ClientePortalPage() {
   const reporte = await getReporteBySlug(cliente.marcaSlug, cliente.marcaNombre)
   const reporteDesbloqueado = reporte ? await pinReportesOk() : false
 
+  /* Reportes de SOPORTE de esta marca (los mandó el cliente desde su portal).
+     Defensivo: si la columna marca_id aún no existe en soporte_reportes
+     (se auto-crea al primer envío), la lista arranca vacía. Pedro 31-ago-2026. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let reportesSoporte: any[] = []
+  try {
+    const r = await service
+      .from('soporte_reportes')
+      .select('id, tipo, descripcion, estado, nota_resolucion, imagenes, created_at')
+      .eq('marca_id', cliente.marcaId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (!r.error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      reportesSoporte = ((r.data ?? []) as any[]).map((x) => ({
+        id: x.id as string,
+        tipo: (x.tipo ?? 'consulta') as string,
+        descripcion: (x.descripcion ?? '') as string,
+        estado: (x.estado ?? 'pendiente') as string,
+        notaResolucion: (x.nota_resolucion ?? null) as string | null,
+        imagenes: (Array.isArray(x.imagenes) ? x.imagenes : []) as string[],
+        createdAt: (x.created_at ?? '') as string,
+      }))
+    }
+  } catch { /* sin soporte todavía */ }
+
   return (
     <ClientePortalView
       marcaId={cliente.marcaId}
@@ -154,6 +180,7 @@ export default async function ClientePortalPage() {
       hoy={hoy}
       pubs={pubsConDisenos}
       fechasImportantes={fechasImportantes}
+      reportesSoporte={reportesSoporte}
       reporteNombre={reporte?.nombre ?? null}
       reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
     />

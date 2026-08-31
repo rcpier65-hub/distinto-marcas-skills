@@ -124,15 +124,29 @@ export async function agendarReunion(input: {
   try {
     /* supabase-js NO lanza en errores de BD — hay que mirar .error, si no un
        insert fallido (tabla/columna faltante) pasa desapercibido y la reunión
-       existe en Google pero no en el sistema. */
-    const ins = await service.from('marca_reuniones').insert({
+       existe en Google pero no en el sistema. Guardamos google_event_id para
+       poder editar/borrar la reunión desde el calendario con sync a Google;
+       si la columna falta, se auto-crea y reintenta (patrón self-healing). */
+    const fila = {
       marca_id: input.marcaId,
       titulo: (input.titulo || 'Reunión').trim(),
       fecha_hora: fechaHoraIso,
       modalidad: 'virtual',
       lugar_enlace: gen.meetLink,
       notas: null,
-    })
+      google_event_id: gen.eventId,
+    }
+    let ins = await service.from('marca_reuniones').insert(fila)
+    if (ins.error && /google_event_id|schema cache|42703/i.test(ins.error.message ?? '')) {
+      const { ensureReunionCols } = await import('@/lib/reuniones/db')
+      try { await ensureReunionCols() } catch { /* reintento igual */ }
+      ins = await service.from('marca_reuniones').insert(fila)
+      if (ins.error) {
+        const { google_event_id: _omit, ...sinCol } = fila
+        void _omit
+        ins = await service.from('marca_reuniones').insert(sinCol)
+      }
+    }
     if (ins.error) console.error('[agendarReunion] insert marca_reuniones falló:', ins.error.message)
   } catch { /* el evento ya se creó en Calendar igual */ }
 

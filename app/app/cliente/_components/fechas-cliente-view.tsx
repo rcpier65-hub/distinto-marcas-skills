@@ -176,7 +176,9 @@ export function FechasClienteView({ fechas, color, marcaNombre }: {
   )
 }
 
-function FormAgregarCliente({ fechaInicial, color, onClose, onDone }: {
+/* Exportado: el calendario de contenido del portal también lo usa para
+   agregar fechas importantes sin salir del calendario. Pedro 31-ago-2026. */
+export function FormAgregarCliente({ fechaInicial, color, onClose, onDone }: {
   fechaInicial: string; color: string; onClose: () => void; onDone: () => void
 }) {
   const [titulo, setTitulo] = useState('')

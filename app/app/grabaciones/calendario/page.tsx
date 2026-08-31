@@ -112,22 +112,36 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let reunionesRows: any[] = []
   try {
-    let r = await service
-      .from('marca_reuniones')
-      .select('id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado')
-      .gte('fecha_hora', `${desde}T00:00:00-05:00`)
-      .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
-      .order('fecha_hora', { ascending: true })
-    if (r.error && /estado/i.test(r.error.message ?? '')) {
-      r = await service
+    const COLS = ['id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id',
+                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado',
+                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas']
+    for (const cols of COLS) {
+      const r = await service
         .from('marca_reuniones')
-        .select('id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas')
+        .select(cols)
         .gte('fecha_hora', `${desde}T00:00:00-05:00`)
         .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
         .order('fecha_hora', { ascending: true })
+      if (!r.error) { reunionesRows = r.data ?? []; break }
+      if (!/estado|google_event_id|schema cache|42703/i.test(r.error.message ?? '')) break
     }
-    if (!r.error) reunionesRows = r.data ?? []
   } catch { /* sin reuniones */ }
+
+  /* Tareas de DISEÑO con fecha de entrega en el rango — salen en el
+     calendario como 🎨 (Pedro 31-ago-2026: "sincroniza las tareas de diseño
+     con el calendario; si se tiene que presentar algo con fecha que salga"). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let disenoRows: any[] = []
+  try {
+    const r = await service
+      .from('publicaciones')
+      .select('id, nombre, marca_id, fecha_entrega, estado')
+      .eq('es_tarea_diseno', true)
+      .gte('fecha_entrega', desde)
+      .lte('fecha_entrega', hasta)
+      .order('fecha_entrega', { ascending: true })
+    if (!r.error) disenoRows = r.data ?? []
+  } catch { /* sin tareas de diseño */ }
 
   /* ===== Unificar todo en AgendaEvento[] ===== */
   /* Miembros con acceso restringido a ciertas marcas solo ven los eventos de
@@ -136,7 +150,11 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const eventos: AgendaEvento[] = []
   const grabRows = (grabRes.ok ? grabRes.rows : []).filter((g) => !marcasPermitidas || marcasPermitidas.has(g.marca_id))
   reunionesRows = reunionesRows.filter((r) => !marcasPermitidas || marcasPermitidas.has(r.marca_id))
-  const idsDeLaApp = new Set(grabRows.map((g) => g.google_event_id).filter(Boolean) as string[])
+  disenoRows = disenoRows.filter((d) => !marcasPermitidas || marcasPermitidas.has(d.marca_id))
+  const idsDeLaApp = new Set([
+    ...grabRows.map((g) => g.google_event_id),
+    ...reunionesRows.map((r) => r.google_event_id),
+  ].filter(Boolean) as string[])
   /* Dedup robusto de reuniones vs GCal: link de Meet (sobrevive a renombres
      en Google) y clave fecha|hora. Un evento 📌 SIN fila espejo en
      marca_reuniones (insert fallido) NO se salta — se muestra como evento
@@ -145,6 +163,14 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const clavesReuniones = new Set(reunionesRows.map((r) => {
     const { ymd, hm } = tsALima(r.fecha_hora)
     return `${ymd}|${hm}`
+  }))
+  /* Dedup extra por título+fecha: cubre reuniones VINCULADAS en modo
+     degradado (sin google_event_id guardado) — el evento GCal no tiene 📌
+     ni Meet, pero comparte título y día con la reunión del sistema. */
+  const normTitulo = (s: string) => s.replace(/^[📌🎬🎥🤝]\s*/u, '').trim().toLowerCase()
+  const titulosReuniones = new Set(reunionesRows.map((r) => {
+    const { ymd } = tsALima(r.fecha_hora)
+    return `${ymd}|${normTitulo(String(r.titulo ?? ''))}`
   }))
 
   for (const g of grabRows) {
@@ -187,6 +213,26 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     })
   }
 
+  for (const d of disenoRows) {
+    const marca = marcasById.get(d.marca_id)
+    eventos.push({
+      id: d.id,
+      tipo: 'diseno',
+      fecha: d.fecha_entrega,
+      hora: null,
+      titulo: `Entrega · ${d.nombre ?? 'Tarea de diseño'}`,
+      marcaSlug: marca?.slug ?? null,
+      marcaNombre: marca?.nombre ?? null,
+      marcaEmoji: marca?.emoji_marca ?? null,
+      color: marca?.color_calendario ?? '#d97706',
+      estado: null,
+      meetLink: null,
+      notas: null,
+      videosGrabados: null,
+      href: `/diseno/${d.id}`,
+    })
+  }
+
   /* GCal externo: saltar lo que la app misma creó (grabaciones por event_id;
      reuniones por el prefijo 📌 con el que la app titula sus eventos). */
   for (const ev of gcalEvents) {
@@ -194,6 +240,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
     if (ev.summary.startsWith('🎬')) continue
     if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
+    if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
     eventos.push({
       id: ev.id,
       tipo: 'gcal',
@@ -208,6 +255,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: ev.meetLink,
       videosGrabados: null,
       notas: null,
+      duracionMin: ev.durationMin,
     })
   }
 
@@ -274,7 +322,17 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       {/* CALENDARIO UNIFICADO — key remonta el componente al cambiar de rango
           o vista: si no, el filtro de marca y el día seleccionado anteriores
           quedan pegados y pueden dejar la grilla vacía en silencio. */}
-      <AgendaCalendar key={`${vista}-${desde}`} vista={vista} desde={desde} eventos={eventos} marcas={marcasMes} hoy={hoyLima} />
+      <AgendaCalendar
+        key={`${vista}-${desde}`}
+        vista={vista}
+        desde={desde}
+        eventos={eventos}
+        marcas={marcasMes}
+        hoy={hoyLima}
+        esDirector={esDirector}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        marcasTodas={((marcasRes.data ?? []) as any[]).map((m) => ({ id: m.id as string, slug: m.slug as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))}
+      />
 
       <p className="text-xs text-muted-foreground text-center">
         💡 Toca un día para ver su detalle. Las grabaciones se editan en la vista{' '}

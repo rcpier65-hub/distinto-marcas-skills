@@ -414,48 +414,88 @@ export async function updateTimedCalendarEvent(
   const endHH = String(Math.floor(totalEnd / 60)).padStart(2, '0')
   const endMM = String(totalEnd % 60).padStart(2, '0')
 
-  const calId = await getGrabacionesCalendarId(token)
   const startISO = `${input.fecha}T${horaHM}:00`
   const endISO = `${endDate}T${endHH}:${endMM}:00`
 
-  /* Estrategia robusta:
-     1. Intentar PATCH normal con dateTime. Funciona si el evento ya era
-        timed o si Google acepta cambio de tipo all-day → timed.
-     2. Si Google rechaza con 400 (típicamente "ambiguous time" porque
-        el evento era all-day), fallback: PUT (replace completo) con
-        SOLO los campos dateTime — sin preservar nada del all-day. */
+  /* NO forzamos colorId en updates: un evento vinculado desde el calendario
+     personal de Pedro conserva su color. Los eventos de grabación ya nacen
+     con color 11, así que ese flujo no cambia. */
   const body = {
     summary: input.summary,
     description: input.description,
     start: { dateTime: startISO, timeZone: 'America/Lima' },
     end: { dateTime: endISO, timeZone: 'America/Lima' },
-    colorId: input.colorId ?? GRABACION_COLOR_ID,
+    ...(input.colorId ? { colorId: input.colorId } : {}),
   }
-  const url = `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
-  let res = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) })
+  /* El evento puede vivir en el calendario "Grabaciones" O en primary (los
+     dos únicos que la app usa) — si el primero da 404, reintenta en el otro. */
+  const grabCal = await getGrabacionesCalendarId(token)
+  const calIds = [...new Set([grabCal, 'primary'])]
+  let res: Response | null = null
+  for (const calId of calIds) {
+    const url = `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`
+    res = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) })
 
-  /* Fallback PUT — Google API acepta PUT como "replace event entirely".
-     PUT no permite ambigüedad start.date vs start.dateTime → resuelve el
-     400 cuando el evento estaba all-day. Necesita preservar campos
-     mínimos que GCal valida en PUT (status, summary). */
-  if (!res.ok && (res.status === 400 || res.status === 422)) {
-    console.warn('[gcal] PATCH falló', res.status, '→ intentando PUT fallback')
-    res = await fetch(url, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({ ...body, status: 'confirmed' }),
-    })
+    /* 400 "ambiguous time" = el evento era all-day. Reintento PATCH anulando
+       explícitamente el campo date (date: null) — convierte all-day → timed
+       PRESERVANDO invitados, descripción, Meet y recordatorios (el viejo
+       fallback PUT los borraba). */
+    if (!res.ok && (res.status === 400 || res.status === 422)) {
+      console.warn('[gcal] PATCH falló', res.status, '→ reintento con date:null')
+      res = await fetch(url, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          ...body,
+          start: { dateTime: startISO, timeZone: 'America/Lima', date: null },
+          end: { dateTime: endISO, timeZone: 'America/Lima', date: null },
+        }),
+      })
+    }
+    if (res.status !== 404) break  // 404 → probar el siguiente calendario
   }
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    const msg = data.error?.message ?? `HTTP ${res.status}`
+  if (!res || !res.ok) {
+    const data = res ? await res.json().catch(() => ({})) : {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const msg = (data as any).error?.message ?? `HTTP ${res?.status ?? '???'}`
     console.error('[gcal] updateTimedCalendarEvent falló:', msg, 'eventId:', eventId)
     return { ok: false, error: msg }
   }
   return { ok: true }
+}
+
+/**
+ * Lee un evento (busca en el calendario de grabaciones Y primary). Devuelve
+ * duración real y metadata para no pisarla al editar. null si no existe.
+ */
+export async function getCalendarEvent(eventId: string): Promise<
+  { summary: string; colorId: string | null; durationMin: number | null; allDay: boolean } | null
+> {
+  const token = await getValidAccessToken()
+  if (!token) return null
+  const grabCal = await getGrabacionesCalendarId(token)
+  for (const calId of [...new Set([grabCal, 'primary'])]) {
+    try {
+      const res = await fetch(
+        `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}?fields=summary,colorId,start,end`,
+        { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) },
+      )
+      if (res.status === 404) continue
+      if (!res.ok) return null
+      const ev = await res.json()
+      const allDay = !!ev.start?.date
+      let durationMin: number | null = null
+      if (ev.start?.dateTime && ev.end?.dateTime) {
+        const ms = new Date(ev.end.dateTime).getTime() - new Date(ev.start.dateTime).getTime()
+        if (Number.isFinite(ms) && ms > 0) durationMin = Math.round(ms / 60000)
+      }
+      return { summary: ev.summary ?? '', colorId: ev.colorId ?? null, durationMin, allDay }
+    } catch { return null }
+  }
+  return null
 }
 
 /**
@@ -496,15 +536,21 @@ export async function deleteCalendarEvent(eventId: string): Promise<{ ok: true }
   const token = await getValidAccessToken()
   if (!token) return { ok: false, error: 'not_connected' }
 
-  const calId = await getGrabacionesCalendarId(token)
-  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok && res.status !== 404 && res.status !== 410) {
-    return { ok: false, error: `HTTP ${res.status}` }
+  /* El evento puede estar en el calendario "Grabaciones" o en primary —
+     recorremos ambos ANTES de tratar el 404 como "ya no existe". */
+  const grabCal = await getGrabacionesCalendarId(token)
+  let ultimo = 404
+  for (const calId of [...new Set([grabCal, 'primary'])]) {
+    const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    ultimo = res.status
+    if (res.ok || res.status === 410) return { ok: true }
+    if (res.status !== 404) return { ok: false, error: `HTTP ${res.status}` }
   }
-  return { ok: true }
+  // 404 en todos = ya no existía (idempotente).
+  return ultimo === 404 ? { ok: true } : { ok: false, error: `HTTP ${ultimo}` }
 }
 
 /* ==================== LECTURA (scope calendar.readonly) ==================== */
@@ -516,6 +562,7 @@ export type GCalEventLite = {
   hora: string | null  // HH:MM en Lima; null = evento de día completo
   meetLink: string | null
   allDay: boolean
+  durationMin: number | null  // duración real del evento (min); null si all-day
 }
 
 /* Fecha/hora de Lima a partir de un ISO con offset (GCal manda dateTime). */
@@ -561,6 +608,12 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
     fields: 'items(id,summary,status,start,end,hangoutLink)',
   })
 
+  const durMin = (ev: { start?: { dateTime?: string }; end?: { dateTime?: string } }): number | null => {
+    if (!ev.start?.dateTime || !ev.end?.dateTime) return null
+    const ms = new Date(ev.end.dateTime).getTime() - new Date(ev.start.dateTime).getTime()
+    return Number.isFinite(ms) && ms > 0 ? Math.round(ms / 60000) : null
+  }
+
   /* Los calendarios se consultan EN PARALELO y con timeout corto — esta
      lectura corre en el render de la página y no debe frenarla. */
   const respuestas = await Promise.all(calIds.map(async (calId) => {
@@ -583,9 +636,9 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
     vistos.add(ev.id)
     if (ev.start?.dateTime) {
       const { ymd, hm } = isoALima(ev.start.dateTime)
-      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ymd, hora: hm, meetLink: ev.hangoutLink ?? null, allDay: false })
+      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ymd, hora: hm, meetLink: ev.hangoutLink ?? null, allDay: false, durationMin: durMin(ev) })
     } else if (ev.start?.date) {
-      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ev.start.date, hora: null, meetLink: ev.hangoutLink ?? null, allDay: true })
+      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ev.start.date, hora: null, meetLink: ev.hangoutLink ?? null, allDay: true, durationMin: null })
     }
   }
   return out
