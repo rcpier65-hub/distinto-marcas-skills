@@ -773,15 +773,16 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
   return (
     <div style={{ position: 'sticky', bottom: 0, padding: isMobile ? '8px 12px 14px' : '10px 24px 18px', background: 'linear-gradient(180deg, transparent, var(--mk-bg-base, #f7f7f8) 30%)' }}>
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, boxShadow: '0 4px 16px -4px rgba(16,24,40,0.10)', padding: '8px 8px 8px 14px', maxWidth: 720, margin: '0 auto' }}>
-        {/* Selector "Para:" — arranca en "Para mí" y se QUEDA en la última
-            elección (no se resetea). Ámbar cuando NO es para ti, para que se note
-            que se la estás asignando a otra persona. */}
+        {/* Selector "Para:" — arranca en "Para mí" (naranja, el look que le gusta
+            a Pedro) y se QUEDA en la última elección (no se resetea). Cambia a
+            morado cuando apunta a OTRA persona, para que se note que se la estás
+            asignando a alguien más. */}
         {equipo.length > 0 ? (
           <select
             value={para}
             onChange={(e) => setPara(e.target.value)}
             title="¿Para quién es la tarea?"
-            style={{ border: `1.5px solid ${para === 'yo' ? '#a78bfa' : '#f59e0b'}`, outline: 'none', borderRadius: 10, padding: '7px 8px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0, maxWidth: 165, background: para === 'yo' ? '#ede9fe' : '#fffbeb', color: para === 'yo' ? '#6d28d9' : '#b45309' }}
+            style={{ border: `1.5px solid ${para === 'yo' ? '#f59e0b' : '#a78bfa'}`, outline: 'none', borderRadius: 10, padding: '7px 8px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0, maxWidth: 165, background: para === 'yo' ? '#fffbeb' : '#ede9fe', color: para === 'yo' ? '#b45309' : '#6d28d9' }}
           >
             <option value="yo">👤 Para mí</option>
             {equipo.map((m) => <option key={m.id} value={m.id}>👤 Para {m.nombre.split(' ')[0]}</option>)}
@@ -817,7 +818,7 @@ function Composer({ onCrear, equipo, isMobile, esCEO }: {
       {/* Estado del selector: recuerda que se queda en "Para mí" y avisa cuando
           está apuntando a otra persona (para no asignarle algo sin querer). */}
       {equipo.length > 0 && (
-        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: para === 'yo' ? '#6d28d9' : '#b45309', fontWeight: 700 }}>
+        <div style={{ maxWidth: 720, margin: '6px auto 0', fontSize: 11, textAlign: 'center', color: para === 'yo' ? '#b45309' : '#6d28d9', fontWeight: 700 }}>
           {para === 'yo'
             ? '✅ Es para ti. Cambia "Para mí" solo cuando quieras asignársela a alguien del equipo.'
             : `📋 Se la asignas a ${equipo.find((m) => m.id === para)?.nombre.split(' ')[0] ?? 'esa persona'}: le llega a SU tablero. Vuelve a "Para mí" para tus tareas.`}
