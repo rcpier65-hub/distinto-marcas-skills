@@ -20,7 +20,8 @@ export default async function DashboardPage({
   const supabase = await createClient()
 
   /* sync_pubs_gcal puede no existir aún (columna self-healing) → retry sin ella. */
-  let mres = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mres: any = await supabase
     .from('marcas')
     .select('slug, nombre, emoji_marca, color_primario_hex, activa, sync_pubs_gcal')
     .order('activa', { ascending: false })
