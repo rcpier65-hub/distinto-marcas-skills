@@ -13,9 +13,11 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const key = url.searchParams.get('debug_key')
-  const secret = process.env.CRON_SECRET
-  if (!secret || key !== secret) {
+  /* Autorización: ?debug_key=CRON_SECRET o header x-debug-key con el
+     CRON_SECRET o la service role key (solo la tiene el equipo). */
+  const key = url.searchParams.get('debug_key') ?? request.headers.get('x-debug-key')
+  const validos = [process.env.CRON_SECRET, process.env.SUPABASE_SERVICE_ROLE_KEY].filter(Boolean)
+  if (!key || !validos.includes(key)) {
     return Response.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   }
   const marca = (url.searchParams.get('marca') ?? '').trim()
