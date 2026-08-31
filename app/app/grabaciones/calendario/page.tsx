@@ -17,16 +17,22 @@ import { ensureAccesoModulo, getCurrentMemberPermisos } from '@/lib/team/permiso
 import { createServiceClient } from '@/lib/supabase/service'
 import { getGoogleCalendarStatus, listCalendarEvents } from '@/lib/integrations/google-calendar'
 import { listGrabaciones } from '../_actions'
-import { MesSelector } from '../_components/mes-selector'
 import { GoogleCalendarConnect } from '../_components/gcal-connect'
 import { AgendarReunionBox } from '@/app/inicio/_components/agendar-reunion-box'
 import { AgendaCalendar, type AgendaEvento } from './_components/agenda-calendar'
+import { RangoNav, type VistaAgenda } from './_components/rango-nav'
 
 export const dynamic = 'force-dynamic'
 
-type SP = { desde?: string; hasta?: string }
+type SP = { desde?: string; hasta?: string; vista?: string }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+function addDias(ymd: string, n: number): string {
+  const d = new Date(ymd + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 
 /* Fecha/hora Lima desde un timestamptz ISO (marca_reuniones.fecha_hora). */
 function tsALima(iso: string): { ymd: string; hm: string } {
@@ -41,15 +47,46 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   await ensureAccesoModulo('publicaciones')
   const sp = await searchParams
 
-  /* El mes por defecto se deriva de la fecha en LIMA, no del reloj UTC del
-     server — si no, en la noche del último día del mes la vista aterriza en
-     el mes siguiente vacío (mismo bug ya corregido en /grabaciones). */
+  /* Vista: Día / Semana / Mes — SEMANA por defecto al abrir (Pedro
+     31-ago-2026: "siempre semanalmente debe mostrar el calendario"). */
+  const vista: VistaAgenda = sp.vista === 'dia' || sp.vista === 'mes' ? sp.vista : 'semana'
+
+  /* El rango por defecto se deriva de la fecha en LIMA, no del reloj UTC del
+     server — si no, en la noche del último día del mes/semana la vista
+     aterriza en el rango equivocado (mismo bug ya corregido en /grabaciones). */
   const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
   const [hoyY, hoyM] = hoyLima.split('-').map(Number)
-  const desde = sp.desde ?? `${hoyY}-${String(hoyM).padStart(2, '0')}-01`
-  const hasta = sp.hasta ?? new Date(Date.UTC(hoyY, hoyM, 0)).toISOString().slice(0, 10)
+  /* El querystring se valida — una URL compartida truncada o con typo
+     ("2026-8-31") produciría Invalid Date y rompería el render. */
+  const esYmd = (s?: string): s is string =>
+    !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T12:00:00Z'))
+  let desde: string
+  let hasta: string
+  if (esYmd(sp.desde) && esYmd(sp.hasta)) {
+    desde = sp.desde
+    hasta = sp.hasta
+  } else if (vista === 'dia') {
+    desde = hoyLima
+    hasta = hoyLima
+  } else if (vista === 'semana') {
+    const dowHoy = new Date(hoyLima + 'T12:00:00Z').getUTCDay()
+    desde = addDias(hoyLima, -(dowHoy === 0 ? 6 : dowHoy - 1))  // lunes de esta semana
+    hasta = addDias(desde, 6)
+  } else {
+    desde = `${hoyY}-${String(hoyM).padStart(2, '0')}-01`
+    hasta = new Date(Date.UTC(hoyY, hoyM, 0)).toISOString().slice(0, 10)
+  }
+
+  /* Etiqueta del rango para el header, según la vista. */
   const monthDate = new Date(desde + 'T12:00:00Z')
-  const mesLabel = `${MESES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`
+  const fmtCorto = (ymd: string) =>
+    new Date(ymd + 'T12:00:00-05:00').toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short' })
+  const rangoLabel =
+    vista === 'dia'
+      ? new Date(desde + 'T12:00:00-05:00').toLocaleDateString('es-PE', { timeZone: 'America/Lima', weekday: 'long', day: 'numeric', month: 'long' })
+      : vista === 'semana'
+        ? `semana del ${fmtCorto(desde)} al ${fmtCorto(hasta)}`
+        : `${MESES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -198,12 +235,12 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         <div>
           <h1 className="text-3xl font-bold mb-1">📅 Grabaciones y Reuniones</h1>
           <p className="text-sm text-muted-foreground capitalize">
-            {mesLabel} · {nGrab} grabaciones · {nReu} reuniones
+            {rangoLabel} · {nGrab} grabaciones · {nReu} reuniones
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <GoogleCalendarConnect connected={gcalStatus.connected} email={gcalStatus.email} />
-          <MesSelector />
+          <RangoNav vista={vista} desde={desde} />
         </div>
       </header>
 
@@ -234,10 +271,10 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         </div>
       )}
 
-      {/* CALENDARIO UNIFICADO — key={desde} remonta el componente al cambiar
-          de mes: si no, el filtro de marca y el día seleccionado del mes
-          anterior quedan pegados y pueden dejar la grilla vacía en silencio. */}
-      <AgendaCalendar key={desde} mes={desde} eventos={eventos} marcas={marcasMes} hoy={hoyLima} />
+      {/* CALENDARIO UNIFICADO — key remonta el componente al cambiar de rango
+          o vista: si no, el filtro de marca y el día seleccionado anteriores
+          quedan pegados y pueden dejar la grilla vacía en silencio. */}
+      <AgendaCalendar key={`${vista}-${desde}`} vista={vista} desde={desde} eventos={eventos} marcas={marcasMes} hoy={hoyLima} />
 
       <p className="text-xs text-muted-foreground text-center">
         💡 Toca un día para ver su detalle. Las grabaciones se editan en la vista{' '}
