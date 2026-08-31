@@ -216,22 +216,38 @@ export default async function ClientePortalPage() {
   let tareasMarca: any[] = []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let equipoTareas: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tareasPlan: any[] = []
   try {
-    const SEL = `id, texto, color, categoria, marca_slug, created_at, completada,
+    /* estado/fecha_inicio/fecha_entrega son columnas self-healing de la vista
+       Plan — retry SIN ellas si aún no existen (no perder las tareas). */
+    const SEL_FULL = `id, texto, color, categoria, marca_slug, created_at, completada, estado, fecha_inicio, fecha_entrega,
       miembro:team_members!tareas_team_member_id_fkey(nombre)`
-    const [porSlug, porCategoria, eq] = await Promise.all([
-      service.from('tareas').select(SEL).eq('completada', false).eq('marca_slug', cliente.marcaSlug)
-        .order('created_at', { ascending: false }).limit(100).then((r: unknown) => r, () => ({ data: [] })),
+    const SEL_BASE = `id, texto, color, categoria, marca_slug, created_at, completada,
+      miembro:team_members!tareas_team_member_id_fkey(nombre)`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buscar = async (filtro: (q: any) => any) => {
+      let r = await filtro(service.from('tareas').select(SEL_FULL).eq('completada', false)
+        .order('created_at', { ascending: false }).limit(100))
+      if (r.error && /estado|fecha_inicio|fecha_entrega|schema cache|42703/i.test(r.error.message ?? '')) {
+        r = await filtro(service.from('tareas').select(SEL_BASE).eq('completada', false)
+          .order('created_at', { ascending: false }).limit(100))
+      }
+      return r.error ? [] : (r.data ?? [])
+    }
+    const [dataSlug, dataCategoria, eq] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      buscar((q: any) => q.eq('marca_slug', cliente.marcaSlug)),
       /* ilike sin comodines = igualdad case-insensitive: la columna del
          tablero dice "Typhouse" y la marca "TypHouse" — deben coincidir. */
-      service.from('tareas').select(SEL).eq('completada', false).ilike('categoria', cliente.marcaNombre)
-        .order('created_at', { ascending: false }).limit(100).then((r: unknown) => r, () => ({ data: [] })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      buscar((q: any) => q.ilike('categoria', cliente.marcaNombre)),
       service.from('team_members').select('id, nombre').eq('activo', true).order('nombre')
         .then((r: unknown) => r, () => ({ data: [] })),
     ])
     const porId = new Map<string, unknown>()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of ([...(((porSlug as any).data) ?? []), ...(((porCategoria as any).data) ?? [])] as any[])) {
+    for (const r of ([...dataSlug, ...dataCategoria] as any[])) {
       if (!porId.has(r.id)) porId.set(r.id, r)
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -249,6 +265,25 @@ export default async function ClientePortalPage() {
       })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     equipoTareas = ((((eq as any).data) ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+
+    /* Vista PLAN (estados + fechas + Gantt/calendario) — mismas tareas. */
+    const ESTADOS = ['sin_empezar', 'en_proceso', 'archivado']
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tareasPlan = ([...porId.values()] as any[]).map((r) => {
+      const m = Array.isArray(r.miembro) ? r.miembro[0] : r.miembro
+      return {
+        id: r.id as string,
+        texto: (r.texto ?? '') as string,
+        categoria: (r.categoria ?? cliente.marcaNombre) as string,
+        color: (r.color ?? '#db2777') as string,
+        marcaSlug: (r.marca_slug ?? null) as string | null,
+        responsableNombre: (m?.nombre ?? null) as string | null,
+        estado: ESTADOS.includes(r.estado) ? r.estado : 'sin_empezar',
+        fechaInicio: (r.fecha_inicio ?? null) as string | null,
+        fechaEntrega: (r.fecha_entrega ?? null) as string | null,
+        createdAt: (r.created_at ?? '') as string,
+      }
+    })
   } catch { /* sin tareas */ }
 
   return (
@@ -274,6 +309,7 @@ export default async function ClientePortalPage() {
       influencersDriveUrl={DRIVE_INFLUENCERS[cliente.marcaSlug] ?? cliente.driveUrl ?? null}
       tareasMarca={tareasMarca}
       equipoTareas={equipoTareas}
+      tareasPlan={tareasPlan}
       reporteNombre={reporte?.nombre ?? null}
       reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
     />

@@ -20,6 +20,7 @@ import { AgendaClienteView } from './agenda-cliente'
 import { InfluencersView, type InfluencerItem } from '@/app/influencers/_components/influencers-view'
 import { normalizeSubEstado, type SubEstadoDiseno } from '@/lib/diseno/types'
 import { TareasClienteView, type TareaClienteItem } from './tareas-cliente-view'
+import { TareasPlanView, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
@@ -313,7 +314,7 @@ export function ClientePortalView({
   marcasDisponibles = [],
   reportesSoporte = [],
   influencersActivo = false, influencers = [], influencersDriveUrl = null,
-  tareasMarca = [], equipoTareas = [],
+  tareasMarca = [], equipoTareas = [], tareasPlan = [],
   reporteNombre = null, reporteMeses = null,
 }: {
   marcaId: string
@@ -341,6 +342,8 @@ export function ClientePortalView({
   /* Tareas del MÓDULO de tareas del sistema (solo su marca) + equipo asignable. */
   tareasMarca?: TareaClienteItem[]
   equipoTareas?: Array<{ id: string; nombre: string }>
+  /* Vista Plan: estados + fechas + Gantt (solo lectura para el cliente). */
+  tareasPlan?: TareaPlan[]
   /* Reporte mensual de la marca: nombre para mostrar + data. meses=null con
      nombre presente = candado (aún sin código). nombre=null = sin reporte. */
   reporteNombre?: string | null
@@ -355,7 +358,7 @@ export function ClientePortalView({
   const [aprobados, setAprobados] = useState<Record<string, string>>({})
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
-  const [vista, setVista] = useState<VistaId | 'drive' | 'tareas'>('cal')
+  const [vista, setVista] = useState<VistaId | 'drive' | 'tareas' | 'plan'>('cal')
   /* ¿Esta marca tiene reporte mensual cargado? (si no, el ítem no aparece) */
   const tieneReporte = !!reporteNombre
   const navVisible = NAV.filter(({ id }) =>
@@ -659,6 +662,15 @@ export function ClientePortalView({
                     <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{tareasMarca.length}</span>
                   )}
                 </button>
+                {/* PLAN DE TRABAJO — responsables, estados, Gantt y calendario
+                    de las tareas (el cliente VE el avance del equipo). */}
+                <button
+                  onClick={() => setVista('plan')}
+                  className="w-full flex items-center gap-2.5 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors hover:bg-muted"
+                  style={vista === 'plan' ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
+                >
+                  <LayoutGrid className="w-4 h-4 shrink-0" /> Plan de trabajo
+                </button>
                 {driveUrl && (
                   /* Pedro 5-ago-2026: el botón lleva DIRECTO a la carpeta de Drive
                      de la marca (abre Google Drive en otra pestaña), sin abrir una
@@ -763,6 +775,15 @@ export function ClientePortalView({
             {tareasMarca.length > 0 && (
               <span className="min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{tareasMarca.length}</span>
             )}
+          </button>
+          <button
+            onClick={() => setVista('plan')}
+            className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-2xl text-[13.5px] font-bold border-2"
+            style={vista === 'plan'
+              ? { background: `${marcaColor}14`, color: marcaColor, borderColor: `${marcaColor}55` }
+              : { color: 'var(--muted-foreground, #64748b)', borderColor: 'var(--border, #e5e7eb)' }}
+          >
+            <LayoutGrid className="w-4 h-4" /> Plan de trabajo
           </button>
           {driveUrl && (
             /* Directo a la carpeta de Drive de la marca (Pedro 5-ago-2026). */
@@ -1126,6 +1147,21 @@ export function ClientePortalView({
           tareas de verdad y el cliente también crea y asigna). */}
       {vista === 'tareas' && (
         <TareasClienteView tareas={tareasMarca} equipo={equipoTareas} marcaNombre={marcaNombre} color={marcaColor} />
+      )}
+
+      {/* PLAN DE TRABAJO — misma vista que usa el equipo (tablero por
+          responsable + Gantt + calendario), en modo lectura de avance. */}
+      {vista === 'plan' && (
+        <section className="rounded-2xl bg-card p-4 sm:p-5 border">
+          <h2 className="text-[16px] font-bold mb-3">🗂️ Plan de trabajo · {marcaNombre}</h2>
+          <TareasPlanView
+            tareas={tareasPlan}
+            marcas={[]}
+            modo="cliente"
+            marcaFija={{ slug: 'marca', nombre: marcaNombre }}
+            hoy={new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())}
+          />
+        </section>
       )}
 
       {vista === 'drive' && driveUrl && (
