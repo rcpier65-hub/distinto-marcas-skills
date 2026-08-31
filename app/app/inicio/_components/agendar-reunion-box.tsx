@@ -35,7 +35,7 @@ export function AgendarReunionBox() {
   const [correoManual, setCorreoManual] = useState('')
   const [guardarCorreo, setGuardarCorreo] = useState(true)
 
-  const { soportado: vozOk, grabando, alternar } = useDictado({
+  const { soportado: vozOk, grabando, parcial, alternar } = useDictado({
     onFinal: (frag) => setTexto((cur) => (cur ? cur + ' ' : '') + frag),
     onError: (m) => toast.error(m),
   })
@@ -116,6 +116,11 @@ export function AgendarReunionBox() {
               {interpretando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
+          {/* Estado del dictado: "Grabando…" / "Transcribiendo…" (modo Whisper)
+              o el texto que va escuchando en vivo (Web Speech). */}
+          {(grabando || parcial) && (
+            <p className="mt-1.5 text-[12px] text-muted-foreground italic">{parcial || '🎙 Escuchando…'}</p>
+          )}
         </>
       ) : (
         /* ===== Tarjeta de confirmación ===== */
