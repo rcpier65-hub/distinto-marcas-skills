@@ -197,6 +197,9 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {/* Creación de Ideas: estudio de contenido para creadores (guiones
               virales, banco de ideas, teleprompter…). Visible para todo el equipo. */}
           <NavItem href="/creacion-de-ideas" icon={<SparklesIcon />} label="Creación de Ideas" active={isActive('/creacion-de-ideas')} />
+          {/* Oficina virtual (tipo Gather): el equipo entra con su avatar y
+              habla por proximidad. Visible para todos. Pedro 31-ago-2026. */}
+          <NavItem href="/oficina" icon={<OficinaIcon />} label="Oficina" active={isActive('/oficina')} shortcut="O" />
           {/* Fechas importantes — función de Lorena/Erick. Fechas clave del año
               por marca. Solo Lorena y directores (Erick/Pedro). */}
           {(esCEO || permisos?.nombre === 'LORENA') && (
@@ -531,6 +534,7 @@ function PaintIcon() { return <svg width="12" height="12" viewBox="0 0 12 12" fi
 function CheckIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 7L6.2 8.7L9.5 5.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg> }
 function NoteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2.5H9L11 4.5V11.5C11 11.78 10.78 12 10.5 12H3.5C3.22 12 3 11.78 3 11.5V3C3 2.72 3.22 2.5 3.5 2.5Z" stroke="currentColor" strokeWidth="1.2" /><path d="M9 2.5V4.5H11M5 7H9M5 9H8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function TareasIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5L3 4.5L4.7 2.8M2 8L3 9L4.7 7.3M2 12L3 13L4.7 11.3M6.5 3.5H12M6.5 8H12M6.5 12H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+function OficinaIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="4" width="5" height="8.5" rx="0.8" stroke="currentColor" strokeWidth="1.2" /><rect x="7.5" y="1.5" width="5" height="11" rx="0.8" stroke="currentColor" strokeWidth="1.2" /><path d="M9.2 4h1.6M9.2 6.4h1.6M9.2 8.8h1.6M3.4 7h1.2M3.4 9.4h1.2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" /></svg> }
 function SparklesIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5L8 5L11.5 6L8 7L7 10.5L6 7L2.5 6L6 5L7 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M11 9.5L11.4 10.6L12.5 11L11.4 11.4L11 12.5L10.6 11.4L9.5 11L10.6 10.6L11 9.5Z" fill="currentColor" /></svg> }
 function SoporteIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.2" stroke="currentColor" strokeWidth="1.2" /><circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M3.4 3.4L5.5 5.5M8.5 8.5L10.6 10.6M10.6 3.4L8.5 5.5M5.5 8.5L3.4 10.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 function ChartIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 12H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /><rect x="3" y="7" width="2" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.2" /><rect x="6.5" y="4" width="2" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.2" /><rect x="10" y="2" width="2" height="9" rx="0.5" stroke="currentColor" strokeWidth="1.2" /></svg> }
