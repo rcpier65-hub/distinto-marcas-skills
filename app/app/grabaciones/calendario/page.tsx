@@ -240,6 +240,43 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     })
   }
 
+  /* FECHAS IMPORTANTES — chip ⭐ APAGADO por defecto (salen como sugerencia
+     solo si se prende). Pedro 31-ago-2026: el módulo dejó el menú y vive
+     aquí; se gestionan en /fechas-importantes. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fechasRows: any[] = []
+  try {
+    const r = await service
+      .from('fechas_importantes')
+      .select('id, marca_id, titulo, fecha, nota, categoria')
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('fecha', { ascending: true })
+      .limit(200)
+    if (!r.error) fechasRows = r.data ?? []
+  } catch { /* sin fechas importantes */ }
+  fechasRows = fechasRows.filter((f) => !marcasPermitidas || !f.marca_id || marcasPermitidas.has(f.marca_id))
+
+  for (const f of fechasRows) {
+    const marca = f.marca_id ? marcasById.get(f.marca_id) : null
+    eventos.push({
+      id: f.id,
+      tipo: 'fecha',
+      fecha: f.fecha,
+      hora: null,
+      titulo: f.titulo ?? 'Fecha importante',
+      marcaSlug: marca?.slug ?? null,
+      marcaNombre: marca?.nombre ?? null,
+      marcaEmoji: marca?.emoji_marca ?? null,
+      color: marca?.color_calendario ?? '#f59e0b',
+      estado: null,
+      meetLink: null,
+      notas: [f.categoria, f.nota].filter(Boolean).join(' · ') || null,
+      videosGrabados: null,
+      href: '/fechas-importantes',
+    })
+  }
+
   /* GCal externo: saltar lo que la app misma creó (grabaciones por event_id;
      reuniones por el prefijo 📌 con el que la app titula sus eventos). */
   for (const ev of gcalEvents) {
@@ -289,7 +326,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       {/* HEADER */}
       <header className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold mb-1">📅 Grabaciones y Reuniones</h1>
+          <h1 className="text-3xl font-bold mb-1">📅 Calendario</h1>
           <p className="text-sm text-muted-foreground capitalize">
             {rangoLabel} · {nGrab} grabaciones · {nReu} reuniones
           </p>

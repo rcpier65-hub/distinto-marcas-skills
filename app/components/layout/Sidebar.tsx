@@ -189,10 +189,11 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {puede('diseno') && (
             <NavItem href="/diseno"        icon={<PaintIcon />}    label="Diseño"          active={isActive('/diseno')}        indent={puede('publicaciones')} />
           )}
-          {/* Grabaciones y Reuniones: parte de publicaciones — mismo permiso.
+          {/* Calendario (grabaciones + reuniones + publicaciones + fechas):
+              parte de publicaciones — mismo permiso.
               Aterriza en la vista calendario (Pedro 31-ago-2026). */}
           {puede('publicaciones') && (
-            <NavItem href="/grabaciones/calendario" icon={<VideoIcon />} label="Grabaciones y Reuniones" active={isActive('/grabaciones')} shortcut="4" />
+            <NavItem href="/grabaciones/calendario" icon={<VideoIcon />} label="Calendario" active={isActive('/grabaciones')} shortcut="4" />
           )}
           {/* Creación de Ideas: estudio de contenido para creadores (guiones
               virales, banco de ideas, teleprompter…). Visible para todo el equipo. */}
@@ -200,11 +201,10 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {/* Oficina virtual (tipo Gather): el equipo entra con su avatar y
               habla por proximidad. Visible para todos. Pedro 31-ago-2026. */}
           <NavItem href="/oficina" icon={<OficinaIcon />} label="Oficina" active={isActive('/oficina')} shortcut="O" />
-          {/* Fechas importantes — función de Lorena/Erick. Fechas clave del año
-              por marca. Solo Lorena y directores (Erick/Pedro). */}
-          {(esCEO || permisos?.nombre === 'LORENA') && (
-            <NavItem href="/fechas-importantes" icon={<CalendarIcon />} label="Fechas importantes" active={isActive('/fechas-importantes')} />
-          )}
+          {/* Fechas importantes: ya NO es módulo del menú — viven como chip ⭐
+              dentro del Calendario (Pedro 31-ago-2026). La página
+              /fechas-importantes sigue existiendo para gestionarlas (link
+              desde el propio calendario). */}
           {/* Soporte — cualquiera reporta fallas/pedidos/consultas; Erick los
               resuelve. Visible para TODO el equipo. Pedro 06-ago-2026. */}
           <NavItem href="/soporte" icon={<SoporteIcon />} label="Soporte" active={isActive('/soporte')} />
