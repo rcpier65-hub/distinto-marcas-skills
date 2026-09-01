@@ -798,10 +798,13 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
         </button>
       ) : (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+          {/* Blanco sobre la card de color (Pedro 31-ago-2026: "no se distingue
+              la fecha"). colorScheme dark pinta también el iconito 📅 nativo
+              y el dd/mm/aaaa en claro. */}
           <input type="date" value={fi} onChange={(e) => setFi(e.target.value)} title="Inicio (opcional)"
-            style={{ fontSize: 8.5, borderRadius: 5, border: 'none', padding: '1px 3px', color: '#111827' }} />
+            style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 6, border: '1px solid rgba(255,255,255,0.4)', padding: '2px 5px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
           <input type="date" value={fe} onChange={(e) => setFe(e.target.value)} title="Entrega"
-            style={{ fontSize: 8.5, borderRadius: 5, border: 'none', padding: '1px 3px', color: '#111827' }} />
+            style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 6, border: '1px solid rgba(255,255,255,0.4)', padding: '2px 5px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
           <button type="button" onClick={guardarFechas} disabled={cargando}
             style={{ fontSize: 8.5, fontWeight: 700, border: 'none', borderRadius: 5, padding: '1px 6px', background: '#10b981', color: '#fff', cursor: 'pointer' }}>✓</button>
           <button type="button" onClick={() => setEditFechas(false)}
