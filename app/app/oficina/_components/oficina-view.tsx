@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Mic, MicOff, Video, VideoOff, Users, X, Ghost, Palette, Phone, MapPin,
-  MonitorUp, MonitorOff, Megaphone, Lock, MessageSquare, Send, Maximize2, Minimize2, VolumeX,
+  MonitorUp, MonitorOff, Megaphone, Lock, MessageSquare, Send, Maximize2, Minimize2, VolumeX, Armchair, AlertTriangle,
 } from 'lucide-react'
 import {
   TILE, MAPA_W, MAPA_H, SPAWN, ZONAS,
@@ -28,27 +28,44 @@ import {
   PIELES, PELOS, ROPAS, PEINADOS, ACCESORIOS,
   type AvatarConfig, type Direccion, type EstadoUsuario,
 } from '../_avatar'
-import { usarOficina, type MensajeChat } from '../_usar-oficina'
+import { usarOficina, HAY_TURN, type MensajeChat } from '../_usar-oficina'
+import { guardarAvatarOficina, reclamarEscritorio } from '../_actions'
+import { MUEBLES } from '../_mapa'
 
 const VEL = 6.2
 const LS_AVATAR = 'oficina-avatar'
 const LS_POS = 'oficina-pos'
 const EMOTES = ['👋', '👍', '🎉', '❤️', '😂', '✋', '❓']
 
-export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) {
+type PerfilLite = { userId: string; nombre: string | null; escritorio: string | null }
+
+export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = [] }: {
+  yoId: string
+  nombre: string
+  /* Avatar guardado en la base: así se ve igual desde cualquier computadora. */
+  avatarGuardado?: AvatarConfig | null
+  /* Quién reclamó cada escritorio. */
+  perfiles?: PerfilLite[]
+}) {
   const router = useRouter()
 
-  const [avatar, setAvatar] = useState<AvatarConfig>(() => avatarPorNombre(nombre))
+  const [avatar, setAvatar] = useState<AvatarConfig>(() => avatarGuardado ?? avatarPorNombre(nombre))
+  const [duenos, setDuenos] = useState<PerfilLite[]>(perfiles)
+  const miEscritorio = duenos.find((d) => d.userId === yoId)?.escritorio ?? null
   const [editorAbierto, setEditorAbierto] = useState(false)
   useEffect(() => {
+    /* Si ya hay uno en la base, ese manda. El de localStorage queda solo
+       como respaldo para quien nunca lo guardó. */
+    if (avatarGuardado) return
     try {
       const raw = localStorage.getItem(LS_AVATAR)
       if (raw) { const p = JSON.parse(raw); if (avatarValido(p)) setAvatar(p) }
     } catch { /* primera vez */ }
-  }, [])
+  }, [avatarGuardado])
   const guardarAvatar = useCallback((a: AvatarConfig) => {
     setAvatar(a)
     try { localStorage.setItem(LS_AVATAR, JSON.stringify(a)) } catch { /* modo privado */ }
+    void guardarAvatarOficina(a as unknown as Record<string, string>)
   }, [])
 
   const of = usarOficina(yoId, nombre, avatar)
@@ -58,7 +75,7 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
     alternarMic, alternarCam, alternarPantalla,
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
-    chat, mandarChat, noLeidos, setNoLeidos,
+    chat, mandarChat, noLeidos, setNoLeidos, entro, setEntro,
     publicarPos, avanzar, mandarEmote, llamarA, llamada, setLlamada,
   } = of
 
@@ -81,6 +98,8 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
   const [zonaActual, setZonaActual] = useState<string | null>(null)
   const [fantasmaUI, setFantasmaUI] = useState(false)
   const [pantallaGrande, setPantallaGrande] = useState<string | null>(null)
+  const duenosRef = useRef<PerfilLite[]>(perfiles)
+  useEffect(() => { duenosRef.current = duenos }, [duenos])
 
   useEffect(() => {
     try {
@@ -252,6 +271,19 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
         }
       }
 
+      /* Nombre de quien reclamó cada escritorio. */
+      for (const m of MUEBLES) {
+        if (m.tipo !== 'escritorio') continue
+        const dueno = duenosRef.current.find((d) => d.escritorio === m.label)
+        if (!dueno?.nombre) continue
+        ctx.save()
+        ctx.font = 'bold 9px ui-sans-serif, system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillStyle = dueno.userId === yoId ? '#7170ff' : 'rgba(10,10,10,0.45)'
+        ctx.fillText(dueno.nombre.split(' ')[0], (m.x + m.w / 2) * TILE, (m.y + m.h) * TILE - 8)
+        ctx.restore()
+      }
+
       if (obj) {
         ctx.save()
         ctx.strokeStyle = '#FDFF00'
@@ -280,7 +312,9 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
               ctx.restore()
             }
             dibujarAvatar(ctx, px, py, j.avatar, j.dir, j.mov, j.paso, {
-              fantasma: j.ghost, hablando: j.gain > 0.05,
+              /* El aro verde sale por NIVEL DE VOZ real, no por estar
+                 conectado: si está callado, no parpadea. */
+              fantasma: j.ghost, hablando: j.nivel > 0.12,
             })
             dibujarEtiqueta(ctx, px, py, j.nombre, j.estado, j.emote)
             if (j.spot) {
@@ -336,7 +370,7 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
 
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [avatar, nombre, estado, privada, minimapa, libre, publicarPos, avanzar, jugadores, emoteRef, zonaActual])
+  }, [avatar, nombre, estado, privada, minimapa, libre, publicarPos, avanzar, jugadores, emoteRef, zonaActual, yoId])
 
   const alDobleClic = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const cv = canvasRef.current
@@ -362,6 +396,25 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
     guia.current = { id, hasta: Date.now() + 20000 }
     destino.current = { x: j.x, y: j.y + 1 }
   }, [jugadores])
+
+  /* Escritorio propio: caminar hasta él. */
+  const irAMiEscritorio = useCallback(() => {
+    if (!miEscritorio) { toast.error('Todavía no reclamaste un escritorio'); return }
+    const m = MUEBLES.find((x) => x.tipo === 'escritorio' && x.label === miEscritorio)
+    if (!m) { toast.error('Ese escritorio ya no existe'); return }
+    destino.current = { x: m.x + m.w / 2, y: m.y + m.h + 0.5 }
+    guia.current = null
+  }, [miEscritorio])
+
+  const tomarEscritorio = useCallback(async (label: string) => {
+    const r = await reclamarEscritorio(label)
+    if (!r.ok) { toast.error(r.error); return }
+    setDuenos((cur) => [
+      ...cur.filter((d) => d.userId !== yoId && d.escritorio !== label),
+      { userId: yoId, nombre, escritorio: label },
+    ])
+    toast.success(`El escritorio de ${label} ahora es tuyo`)
+  }, [yoId, nombre])
 
   const cercanos = listaUI.filter((j) => j.gain > 0.05)
   const zonaInfo = ZONAS.find((z) => z.id === zonaActual) ?? null
@@ -508,6 +561,9 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
             <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold inline-flex items-center justify-center">{noLeidos}</span>
           )}
         </button>
+        <button onClick={irAMiEscritorio} title={miEscritorio ? `Ir a mi escritorio (${miEscritorio})` : 'Reclama un escritorio desde el panel'}
+          className="w-10 h-10 rounded-xl hover:bg-black/5 inline-flex items-center justify-center shrink-0 disabled:opacity-40"
+          disabled={!miEscritorio}><Armchair className="w-5 h-5" /></button>
         <button onClick={() => setEditorAbierto(true)} title="Personalizar mi avatar"
           className="w-10 h-10 rounded-xl hover:bg-black/5 inline-flex items-center justify-center shrink-0"><Palette className="w-5 h-5" /></button>
         <button onClick={() => setPanelAbierto((v) => !v)} title="Quién está en la oficina"
@@ -558,6 +614,27 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
             </div>
           ))}
 
+          {/* Escritorios: cada uno reclama el suyo y puede volver a él. */}
+          <div className="mt-3 pt-2.5 border-t">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-black/45 mb-1.5">Escritorios</div>
+            <div className="flex flex-wrap gap-1">
+              {MUEBLES.filter((m) => m.tipo === 'escritorio' && m.label).map((m) => {
+                const dueno = duenos.find((d) => d.escritorio === m.label)
+                const mio = dueno?.userId === yoId
+                return (
+                  <button key={m.label} onClick={() => tomarEscritorio(m.label!)}
+                    title={dueno?.nombre ? `De ${dueno.nombre} — tócalo para quedártelo` : 'Libre — tócalo para reclamarlo'}
+                    className="h-7 px-2 rounded-lg text-[11px] font-semibold border"
+                    style={mio ? { background: '#7170ff', color: '#fff', borderColor: '#7170ff' }
+                      : dueno ? { borderColor: 'rgba(0,0,0,0.12)', color: '#6b7280' }
+                      : { borderColor: '#43d69f66', color: '#15803d' }}>
+                    {m.label}{dueno && !mio ? ` · ${dueno.nombre?.split(' ')[0]}` : ''}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="mt-3 pt-2.5 border-t text-[11px] text-black/45 leading-relaxed">
             <b>WASD</b> moverte · <b>doble clic</b> caminar · <b>G</b> fantasma<br />
             <b>1-7</b> emotes · <b>X</b> usar objeto · <b>M</b> minimapa
@@ -595,6 +672,17 @@ export function OficinaView({ yoId, nombre }: { yoId: string; nombre: string }) 
 
       {error && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[12.5px] font-semibold">{error}</div>
+      )}
+
+      {/* Aviso de que alguien llegó a la oficina */}
+      {entro && <AvisoLlegada nombre={entro} onFin={() => setEntro(null)} />}
+
+      {/* Sin TURN, un porcentaje del equipo no va a conectar y hoy fallaba
+          en silencio. Solo se lo mostramos a quien puede arreglarlo. */}
+      {!HAY_TURN && (
+        <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
+          <AlertTriangle className="w-3.5 h-3.5" /> Sin servidor TURN: en algunas redes no conecta
+        </div>
       )}
 
       {editorAbierto && (
@@ -716,6 +804,19 @@ function ChatPanel({ mensajes, onEnviar, onCerrar, hayPrivada }: {
         </button>
       </div>
     </aside>
+  )
+}
+
+/* Avisito "X llegó a la oficina" — se va solo a los 4 segundos. */
+function AvisoLlegada({ nombre, onFin }: { nombre: string; onFin: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onFin, 4000)
+    return () => clearTimeout(t)
+  }, [nombre, onFin])
+  return (
+    <div className="absolute top-16 left-3 px-3.5 py-2 rounded-xl bg-white/95 shadow-lg backdrop-blur border border-black/5 text-[12.5px] font-semibold">
+      👋 <b>{nombre}</b> llegó a la oficina
+    </div>
   )
 }
 

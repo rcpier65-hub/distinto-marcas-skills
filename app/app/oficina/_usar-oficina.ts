@@ -32,9 +32,29 @@ import {
 } from './_audio-grafo'
 import { MezcladorOficina } from './_audio-mixer'
 
-const ICE: RTCConfiguration = {
-  iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }],
+/* Servidores para atravesar routers. Los STUN gratuitos de Google resuelven
+   la mayoría de los casos, pero en redes móviles y algunas oficinas hace
+   falta un TURN (que retransmite). Se configura con variables de entorno:
+   NEXT_PUBLIC_TURN_URL / NEXT_PUBLIC_TURN_USER / NEXT_PUBLIC_TURN_PASS.
+   Sin TURN la oficina funciona igual, pero un porcentaje no conecta. */
+function armarIce(): RTCConfiguration {
+  const servers: RTCIceServer[] = [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  ]
+  const url = process.env.NEXT_PUBLIC_TURN_URL
+  if (url) {
+    servers.push({
+      urls: url.split(',').map((u) => u.trim()).filter(Boolean),
+      username: process.env.NEXT_PUBLIC_TURN_USER,
+      credential: process.env.NEXT_PUBLIC_TURN_PASS,
+    })
+  }
+  return { iceServers: servers }
 }
+const ICE: RTCConfiguration = armarIce()
+
+/** ¿Hay TURN configurado? La UI avisa si no, para no diagnosticar a ciegas. */
+export const HAY_TURN = !!process.env.NEXT_PUBLIC_TURN_URL
 
 const ENVIO_MS = 80        // 12.5 Hz de posición
 const KEEPALIVE_MS = 2000
@@ -65,6 +85,7 @@ export type Jugador = {
   gain: number
   videoAlpha: number
   fijado: boolean
+  nivel: number       // 0..1 — qué tan fuerte está hablando ahora
 }
 
 export type Remoto = {
@@ -121,6 +142,8 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   const [entrado, setEntrado] = useState(false)
   const [chat, setChat] = useState<MensajeChat[]>([])
   const [noLeidos, setNoLeidos] = useState(0)
+  /* Quién acaba de entrar (para el avisito "X llegó a la oficina"). */
+  const [entro, setEntro] = useState<string | null>(null)
 
   const jugadores = useRef<Map<string, Jugador>>(new Map())
   const yo = useRef<EstadoAudio & { dir: Direccion; mov: boolean; pantalla: boolean }>({
@@ -140,6 +163,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   const ultimoEnvio = useRef(0)
   const emoteRef = useRef<{ emoji: string; hasta: number } | null>(null)
   const spotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const entradoRef = useRef(false)
 
   const enviar = useCallback((s: Senal) => {
     canalRef.current?.send({ type: 'broadcast', event: 'senal', payload: s })
@@ -252,6 +276,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     const s = await pedirMedia(false)
     setMicOn(!!s)
     setEntrado(true)
+    entradoRef.current = true
   }, [pedirMedia])
 
   const alternarMic = useCallback(async () => {
@@ -341,13 +366,15 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
         const j = jugadores.current.get(id)
         if (j) { j.nombre = m.nombre; j.avatar = m.avatar; j.estado = m.estado; j.visto = Date.now() }
         else {
+          /* Recién llegado: avisamos (solo si yo ya estaba adentro). */
+          if (entradoRef.current) setEntro(m.nombre)
           jugadores.current.set(id, {
             id, nombre: m.nombre, avatar: m.avatar, estado: m.estado,
             emote: null, emoteHasta: 0,
             x: 0, y: 0, tx: 0, ty: 0, dir: 's', mov: false,
             ghost: false, quiet: false, spot: false, privada: null, pantalla: false,
             zona: null, paso: 0, visto: Date.now(),
-            gain: 0, videoAlpha: 1, fijado: false,
+            gain: 0, videoAlpha: 1, fijado: false, nivel: 0,
           })
         }
       }
@@ -479,6 +506,9 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
         j.gain = dec.gain
         j.videoAlpha = dec.videoAlpha
         j.fijado = dec.fijado
+        /* Nivel de voz real: el aro verde sale solo si de verdad está
+           hablando, no por estar conectado. */
+        j.nivel = dec.gain > 0 ? (mezcla.current?.nivel(j.id) ?? 0) : 0
 
         if (debeConectar(mio, suyo, yaEstaba)) {
           if (!yaEstaba) crearPeer(j.id)
@@ -564,7 +594,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     alternarMic, alternarCam, alternarPantalla, entrar,
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
-    chat, mandarChat, noLeidos, setNoLeidos,
+    chat, mandarChat, noLeidos, setNoLeidos, entro, setEntro,
     publicarPos, avanzar, mandarEmote, llamarA, llamada, setLlamada,
   }
 }

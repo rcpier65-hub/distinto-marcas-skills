@@ -19,6 +19,10 @@ type Nodo = {
   fuente: MediaStreamAudioSourceNode
   gain: GainNode
   pan: StereoPannerNode | null
+  /* Mide el nivel de voz: así el aro verde de "está hablando" sale solo
+     cuando de verdad habla, no por el simple hecho de estar conectado. */
+  analizador: AnalyserNode
+  datos: Uint8Array
   /* El <audio> silenciado mantiene viva la pista en algunos navegadores:
      sin un elemento que "consuma" el stream, Safari no alimenta el nodo. */
   ancla: HTMLAudioElement
@@ -75,8 +79,13 @@ export class MezcladorOficina {
       } catch {
         fuente.connect(gain)        // navegadores viejos sin paneo
       }
+      const analizador = this.ctx.createAnalyser()
+      analizador.fftSize = 256
+      analizador.smoothingTimeConstant = 0.6
+      gain.connect(analizador)
       gain.connect(this.destino)
-      this.nodos.set(id, { fuente, gain, pan, ancla })
+      const datos = new Uint8Array(analizador.frequencyBinCount)
+      this.nodos.set(id, { fuente, gain, pan, ancla, analizador, datos })
     } catch { /* si falla, esa persona simplemente no suena */ }
   }
 
@@ -92,9 +101,22 @@ export class MezcladorOficina {
     } catch { /* noop */ }
   }
 
+  /** Nivel de voz de alguien, 0..1. Sirve para el aro de "está hablando". */
+  nivel(id: string): number {
+    const n = this.nodos.get(id)
+    if (!n) return 0
+    try {
+      n.analizador.getByteFrequencyData(n.datos as unknown as Uint8Array<ArrayBuffer>)
+      let suma = 0
+      for (let i = 0; i < n.datos.length; i++) suma += n.datos[i]
+      return Math.min(1, (suma / n.datos.length) / 45)
+    } catch { return 0 }
+  }
+
   quitar(id: string): void {
     const n = this.nodos.get(id)
     if (!n) return
+    try { n.analizador.disconnect() } catch { /* noop */ }
     try { n.fuente.disconnect() } catch { /* noop */ }
     try { n.pan?.disconnect() } catch { /* noop */ }
     try { n.gain.disconnect() } catch { /* noop */ }
