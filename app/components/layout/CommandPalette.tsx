@@ -36,6 +36,8 @@ type Action = {
   /* Módulo de permiso requerido. Si está vacío → visible para todos
      los miembros (siempre). null = action de owner-only (Pedro). */
   requiereModulo?: ModuloPermiso | null
+  /* Solo pedro@agenciadistinto.com (no Erick ni otros directors). */
+  requierePedro?: boolean
 }
 
 type Props = {
@@ -45,9 +47,11 @@ type Props = {
   marcas?: MarcaNav[]
   /* Permisos del usuario logueado. null = admin/owner, ve todo. */
   permisos?: PermisosSimple
+  /* Email Auth — para acciones exclusivas de Pedro (no otros directors). */
+  emailActivo?: string | null
 }
 
-export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }: Props) {
+export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos, emailActivo }: Props) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [selectedIdx, setSelectedIdx] = useState(0)
@@ -56,6 +60,7 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }:
     // Navegación
     /* Inicio: dashboard unificado (Cockpit + Home en uno). */
     { id: 'nav-inicio',        title: 'Ir a Inicio',           subtitle: 'Tu dashboard ejecutivo',          category: 'navegacion', icon: <IconHome />,     shortcut: ['G', 'I'], keywords: 'home dashboard cockpit ejecutivo bienvenida', href: '/inicio',         requiereModulo: undefined },
+    { id: 'nav-planes',        title: 'Planes Distinto',       subtitle: 'Catálogo comercial interno',      category: 'navegacion', icon: <IconGrid />,     shortcut: ['G', 'L'], keywords: 'planes precios cotizacion social web retainer', href: '/planes', requiereModulo: undefined, requierePedro: true },
     { id: 'nav-inbox',         title: 'Inbox global de comentarios',                                        category: 'navegacion', icon: <IconInbox />,    shortcut: ['G', 'I'], keywords: 'comentarios respuestas', href: '/comentarios',  requiereModulo: 'comentarios' },
     { id: 'nav-pubs',          title: 'Publicaciones',                                                      category: 'navegacion', icon: <IconCalendar />, shortcut: ['G', 'P'], keywords: 'posts contenido',      href: '/publicaciones',  requiereModulo: 'publicaciones' },
     { id: 'nav-editor',        title: 'Editor de video',                                                    category: 'navegacion', icon: <IconVideo />,    shortcut: ['G', 'E'], keywords: 'editar videos',        href: '/editor',         requiereModulo: 'editor' },
@@ -90,16 +95,24 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos }:
        requiereModulo === undefined  → siempre visible (ej. Inicio, Hábitos)
        requiereModulo === null       → owner-only, OCULTAR
        requiereModulo === 'xxx'      → visible solo si tieneAcceso(xxx) */
+  const esPedro =
+    (emailActivo ?? permisos?.email ?? '').trim().toLowerCase() === 'pedro@agenciadistinto.com'
+
   const visibles = useMemo(() => {
-    if (!permisos) return actions  /* admin/owner ve todo */
-    /* CEO (director) también ve todo — caso Pedro como team_member */
-    if (permisos.rolBase === 'director') return actions
-    return actions.filter((a) => {
-      if (a.requiereModulo === undefined) return true
-      if (a.requiereModulo === null) return false
-      return tieneAcceso(permisos.modulos, a.requiereModulo)
-    })
-  }, [actions, permisos])
+    let list: Action[]
+    if (!permisos || permisos.rolBase === 'director') {
+      /* Admin/owner o director (Pedro/Erick): ven todo por módulo.
+         Planes se filtra aparte con requierePedro. */
+      list = actions
+    } else {
+      list = actions.filter((a) => {
+        if (a.requiereModulo === undefined) return true
+        if (a.requiereModulo === null) return false
+        return tieneAcceso(permisos.modulos, a.requiereModulo)
+      })
+    }
+    return list.filter((a) => !a.requierePedro || esPedro)
+  }, [actions, permisos, emailActivo, esPedro])
 
   // Filtro fuzzy aplicado sobre las visibles
   const filtered = useMemo(() => {

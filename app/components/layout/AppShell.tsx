@@ -54,6 +54,7 @@ function getPageTitle(pathname: string | null): string {
   const titles: Record<string, string> = {
     cockpit: 'Cockpit',
     inicio: 'Inicio',
+    planes: 'Planes',
     publicaciones: 'Publicaciones',
     editor: 'Editor',
     diseno: 'Diseño',
@@ -173,7 +174,7 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
     </>
   )
 }

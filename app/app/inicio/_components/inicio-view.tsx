@@ -530,9 +530,10 @@ export function InicioView({ data }: { data: InicioData }) {
           </div>
         </div>
 
-        {/* Asistente "Agendar reunión" — solo directores (Pedro y Erick). Dices
-            "agenda para Manrique mañana 10am" y agenda + manda la invitación. */}
-        {(data.nombre === 'Erick' || data.rolBase === 'director' || data.rolBase === 'admin') && (
+        {/* Asistente "Agendar reunión" — solo Erick en Inicio.
+           Pedro 3-sep-2026: quitarlo de su Inicio (pedro@agenciadistinto.com).
+           La ruta /reunion sigue viva. */}
+        {data.nombre === 'Erick' && (
           <div style={{ marginBottom: 20 }}>
             <AgendarReunionBox />
           </div>

@@ -53,6 +53,10 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
   const puedeGestionarMarcas =
     !permisos || permisos.rolBase === 'director' || permisos.rolBase === 'admin'
 
+  /* Planes comerciales: SOLO pedro@agenciadistinto.com (no Erick ni otros directors). */
+  const esPedro =
+    (emailActivo ?? permisos?.email ?? '').trim().toLowerCase() === 'pedro@agenciadistinto.com'
+
   /* Helper para mostrar/ocultar items según permisos. Si no hay
      permisos (= admin/owner), retorna true para todo. */
   const puede = (modulo: ModuloPermiso): boolean => {
@@ -173,6 +177,9 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
               contenido ejecutivo del Cockpit; para los demás muestra
               versión simple. */}
           <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio') || isActive('/cockpit')} shortcut="1" />
+          {esPedro && (
+            <NavItem href="/planes" icon={<PlanesIcon />} label="Planes" active={isActive('/planes')} shortcut="P" />
+          )}
           {/* Tareas: tablero personal de cada uno (estilo Notas). Todos lo ven. */}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
           {/* "Inbox global" eliminado del menú — ya no se usa. Pedro 06-ago-2026. */}
@@ -521,6 +528,17 @@ const avatarStyle: React.CSSProperties = {
   background: 'linear-gradient(135deg, #ff8a4c 0%, #ff5252 100%)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   color: 'white', fontWeight: 600, fontSize: 11,
+}
+
+function PlanesIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
 }
 
 function HomeIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 6L7 2.5L11.5 6V11.5H8.5V8H5.5V11.5H2.5V6Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
