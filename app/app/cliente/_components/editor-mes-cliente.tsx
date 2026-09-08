@@ -115,8 +115,8 @@ export function EditorMesCliente({ marcaNombre, meses }: {
             <F k="leads" label={MES_FORM_LABELS.leads} ph="1015" />
             <F k="ventasShopify" label={MES_FORM_LABELS.ventasShopify} ph="125" readOnly={shopifyBloqueado} />
             <F k="ingresoShopify" label={MES_FORM_LABELS.ingresoShopify} pre="S/" ph="10395.71" readOnly={shopifyBloqueado} />
-            <F k="pedidosWhatsApp" label={MES_FORM_LABELS.pedidosWhatsApp} ph="214" />
-            <F k="ingresoWhatsAppSoles" label={MES_FORM_LABELS.ingresoWhatsAppSoles} pre="S/" ph="18352.29" />
+            <F k="ventasTotales" label={MES_FORM_LABELS.ventasTotales} ph="339" />
+            <F k="ingresoDirecto" label={MES_FORM_LABELS.ingresoDirecto} pre="S/" ph="28748" />
             <F k="retailIndirectoSoles" label={MES_FORM_LABELS.retailIndirectoSoles} pre="S/" ph="36252" />
             <F k="gastoAdsUsd" label={MES_FORM_LABELS.gastoAdsUsd} pre="US$" ph="1500.78" />
             <F k="tipoCambio" label={MES_FORM_LABELS.tipoCambio} ph="3.41" />
@@ -125,16 +125,16 @@ export function EditorMesCliente({ marcaNombre, meses }: {
 
           <div className="rounded-xl border bg-muted/30 px-3 py-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-muted-foreground">
             <div>
-              <span className="font-bold uppercase tracking-wider text-[10px] block">Ventas totales (calc.)</span>
-              <span className="tabular-nums text-foreground font-semibold">{preview.ventasTotales || '—'}</span>
-              <span className="ml-1">= Shopify + pedidos WA</span>
+              <span className="font-bold uppercase tracking-wider text-[10px] block">Pedidos WhatsApp (calc.)</span>
+              <span className="tabular-nums text-foreground font-semibold">{preview.pedidosWhatsApp || '—'}</span>
+              <span className="ml-1">= totales − Shopify</span>
             </div>
             <div>
-              <span className="font-bold uppercase tracking-wider text-[10px] block">Ingreso directo (calc.)</span>
+              <span className="font-bold uppercase tracking-wider text-[10px] block">Ingreso WhatsApp (calc.)</span>
               <span className="tabular-nums text-foreground font-semibold">
-                S/ {preview.ingresoDirecto ? preview.ingresoDirecto.toLocaleString('es-PE', { maximumFractionDigits: 2 }) : '—'}
+                S/ {preview.ingresoWhatsApp ? preview.ingresoWhatsApp.toLocaleString('es-PE', { maximumFractionDigits: 2 }) : '—'}
               </span>
-              <span className="ml-1">= Shopify + ingreso WA</span>
+              <span className="ml-1">= directo − Shopify</span>
             </div>
             <div>
               <span className="font-bold uppercase tracking-wider text-[10px] block">Omnicanal (calc.)</span>

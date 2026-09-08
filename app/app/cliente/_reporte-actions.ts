@@ -4,7 +4,7 @@
 /* Persistencia del reporte mensual desde el PORTAL del cliente.
    Misma tabla (guardarMesDb) que el editor staff. SEGURIDAD: marca_slug
    FORZADO desde getClienteActual(). Requiere PIN de reportes desbloqueado.
-   El editor cliente mapea UI (venta WA S/, retail S/, pedidos WA) → MesRaw
+   El editor cliente mapea UI (ventas totales, ingreso directo, retail) → MesRaw
    antes de llamar; este action guarda MesRaw tal cual (sin tocar typhouse). */
 
 import { revalidatePath } from 'next/cache'
