@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { guardarMesReporteCliente } from '../_actions'
+import { guardarMesReporteCliente } from '../_reporte-actions'
 import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
 
 type Campos = {
@@ -80,7 +80,7 @@ export function EditorMesCliente({ marcaNombre, meses }: {
     })
     setPending(false)
     if (r.ok) {
-      toast.success(`✅ ${labelMes(c.mes)} guardado — el reporte se actualiza al instante`)
+      toast.success(`Mes ${labelMes(c.mes)} guardado — el reporte se actualiza al instante`)
       setAbierto(false)
       router.refresh()
     } else toast.error(r.error)
@@ -105,8 +105,6 @@ export function EditorMesCliente({ marcaNombre, meses }: {
     </label>
   )
 
-  /* Shopify: si el mes ya tiene dato, se muestra read-only para no pisarlo
-     por error; en mes nuevo (o sin Shopify) se puede editar. */
   const shopifyBloqueado = editando !== 'nuevo' && (Number(c.ventasShopify) > 0 || Number(c.ingresoShopify) > 0)
 
   return (
@@ -117,20 +115,20 @@ export function EditorMesCliente({ marcaNombre, meses }: {
           onClick={() => setAbierto(true)}
           className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-colors"
         >
-          ＋ Cargar / editar datos del mes · {marcaNombre}
+          + Cargar / editar datos del mes · {marcaNombre}
         </button>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-extrabold">📝 Data del mes · {marcaNombre}</span>
+            <span className="text-sm font-extrabold">Data del mes · {marcaNombre}</span>
             <select
               value={editando}
               onChange={(e) => elegir(e.target.value)}
               className="h-8 px-2 rounded-lg border bg-background text-xs font-semibold"
             >
-              <option value="nuevo">➕ Mes nuevo</option>
+              <option value="nuevo">Mes nuevo</option>
               {meses.map((m) => (
-                <option key={m.mes} value={m.mes}>✏️ {labelMes(m.mes)}</option>
+                <option key={m.mes} value={m.mes}>{labelMes(m.mes)}</option>
               ))}
             </select>
             <button
@@ -138,7 +136,7 @@ export function EditorMesCliente({ marcaNombre, meses }: {
               onClick={() => setAbierto(false)}
               className="ml-auto h-8 px-2.5 rounded-lg text-xs text-muted-foreground hover:bg-muted"
             >
-              ✕ Cerrar
+              Cerrar
             </button>
           </div>
 
@@ -149,15 +147,15 @@ export function EditorMesCliente({ marcaNombre, meses }: {
             <F k="ingresoShopify" label="Ingreso Shopify" pre="S/" ph="10395.71" readOnly={shopifyBloqueado} />
             <F k="ventasTotales" label="Ventas totales (pedidos)" ph="339" />
             <F k="ingresoDirecto" label="Ingreso directo total" pre="S/" ph="28748" />
-            <F k="ventasOmnicanal" label="Venta omnicanal total" pre="S/" ph="65000" />
             <F k="gastoAdsUsd" label="Gasto Ads" pre="US$" ph="1500.78" />
+            <F k="ventasOmnicanal" label="Venta omnicanal total" pre="S/" ph="65000" />
             <F k="tipoCambio" label="Tipo de cambio" ph="3.41" />
             <F k="igv" label="IGV" ph="0.18" />
           </div>
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             Completa la data cruda que falte (ventas totales, ingreso directo, omnicanal/retail).
-            Conversión, costo por venta, ticket, ROAS, CAC y retail se calculan solos.
+            Conversion, costo por venta, ticket, ROAS, CAC y retail se calculan solos.
             {shopifyBloqueado ? ' Los campos Shopify ya cargados se muestran solo lectura.' : ''}
             {' '}Solo se guarda en tu marca.
           </p>
