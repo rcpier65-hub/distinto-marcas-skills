@@ -4,8 +4,8 @@
 // Keep editors thin; do NOT invent MesRaw columns; do NOT change typhouse.computeMes.
 //
 // On save (Campos UI → MesRaw):
-//   ventasTotales   = ventasShopify + pedidosWhatsApp
-//   ingresoDirecto  = ingresoShopify + ingresoWhatsAppSoles
+//   ventasTotales   = as entered (TODOS los pedidos confirmados, incluye Shopify)
+//   ingresoDirecto  = as entered (Ingreso directo total S/: Shopify + WA)
 //   ventasOmnicanal = ingresoDirecto + retailIndirectoSoles
 //
 // Dashboard then derives (typhouse.computeMes):
@@ -14,9 +14,10 @@
 //   Ingreso WhatsApp KPI          = ingresoDirecto − ingresoShopify ← soles
 //
 // Pedidos ≠ soles ≠ retail:
-//   - Pedidos WhatsApp = cantidad de pedidos (integer), NOT "ventas" in soles
-//   - Ingreso WhatsApp = S/ de venta por WhatsApp
-//   - Retail Indirecto = S/ ventas fuera de Shopify / retail física
+//   - Ventas totales = cantidad de pedidos confirmados (incluye Shopify)
+//   - Pedidos WhatsApp (calc.) = ventasTotales − ventasShopify
+//   - Ingreso directo = S/ total directo (Shopify + WA); Ingreso WA = directo − Shopify
+//   - Retail Indirecto = S/ ventas fuera de Shopify / retail física (≠ WhatsApp)
 
 import type { MesRaw, MesReporte } from '@/lib/reportes/typhouse'
 
@@ -26,10 +27,10 @@ export type MesFormCampos = {
   leads: string
   ventasShopify: string
   ingresoShopify: string
-  /** Cantidad de pedidos por WhatsApp (integer). */
-  pedidosWhatsApp: string
-  /** Soles de venta por WhatsApp (aparte de Shopify). */
-  ingresoWhatsAppSoles: string
+  /** Todos los pedidos confirmados del embudo (incluye Shopify). */
+  ventasTotales: string
+  /** Ingreso directo total en soles (Shopify + WhatsApp). */
+  ingresoDirecto: string
   /** Soles ventas fuera de Shopify / retail física. */
   retailIndirectoSoles: string
   gastoAdsUsd: string
@@ -42,17 +43,17 @@ export const MES_FORM_LABELS = {
   leads: 'Leads WhatsApp',
   ventasShopify: 'Ventas Shopify (pedidos)',
   ingresoShopify: 'Ingreso Shopify',
-  pedidosWhatsApp: 'Pedidos WhatsApp',
-  ingresoWhatsAppSoles: 'Ingreso WhatsApp',
+  ventasTotales: 'Ventas totales (todos los pedidos)',
+  ingresoDirecto: 'Ingreso directo total',
   retailIndirectoSoles: 'Retail Indirecto (fuera Shopify)',
   gastoAdsUsd: 'Gasto Ads',
   tipoCambio: 'Tipo de cambio',
   igv: 'IGV',
 } as const
 
-/** Short helper under the form: pedidos ≠ soles ≠ retail. */
+/** Short helper under the form: totales → WA calc.; retail ≠ WhatsApp. */
 export const MES_FORM_HELP =
-  'Pedidos WhatsApp = cantidad de pedidos (no soles). Ingreso WhatsApp = soles de venta por WhatsApp. Retail Indirecto = ventas fuera de Shopify / retail física. Son tres cosas distintas; ingreso directo, omnicanal y ventas totales se calculan solos.'
+  'Carga TODOS los pedidos confirmados (incluye Shopify). WhatsApp se calcula: totales − Shopify. Ingreso directo = total S/ directo (Shopify + WA); Ingreso WhatsApp = directo − Shopify. Retail Indirecto = ventas fuera de Shopify / retail física (≠ WhatsApp).'
 
 export function parseMesNum(v: string): number {
   return Number(String(v).replace(',', '.'))
@@ -75,8 +76,8 @@ export function vacioMesForm(mes: string): MesFormCampos {
     leads: '',
     ventasShopify: '',
     ingresoShopify: '',
-    pedidosWhatsApp: '',
-    ingresoWhatsAppSoles: '',
+    ventasTotales: '',
+    ingresoDirecto: '',
     retailIndirectoSoles: '',
     gastoAdsUsd: '',
     tipoCambio: '3.41',
@@ -91,8 +92,8 @@ export function camposDesdeMes(m: MesReporte | MesRaw): MesFormCampos {
     leads: String(m.leads),
     ventasShopify: String(m.ventasShopify),
     ingresoShopify: String(m.ingresoShopify),
-    pedidosWhatsApp: String(Math.max(0, m.ventasTotales - m.ventasShopify)),
-    ingresoWhatsAppSoles: String(Math.max(0, m.ingresoDirecto - m.ingresoShopify)),
+    ventasTotales: String(m.ventasTotales),
+    ingresoDirecto: String(m.ingresoDirecto),
     retailIndirectoSoles: String(Math.max(0, m.ventasOmnicanal - m.ingresoDirecto)),
     gastoAdsUsd: String(m.gastoAdsUsd),
     tipoCambio: String(m.tipoCambio),
@@ -105,16 +106,14 @@ export function camposAMesRaw(c: MesFormCampos): MesRaw {
   const leads = parseMesNum(c.leads)
   const ventasShopify = parseMesNum(c.ventasShopify)
   const ingresoShopify = parseMesNum(c.ingresoShopify)
-  const pedidosWhatsApp = parseMesNum(c.pedidosWhatsApp)
-  const ingresoWhatsAppSoles = parseMesNum(c.ingresoWhatsAppSoles)
+  const ventasTotales = parseMesNum(c.ventasTotales)
+  const ingresoDirecto = parseMesNum(c.ingresoDirecto)
   const retailIndirectoSoles = parseMesNum(c.retailIndirectoSoles)
   const gastoAdsUsd = parseMesNum(c.gastoAdsUsd)
   const tipoCambio = parseMesNum(c.tipoCambio)
   const igv = parseMesNum(c.igv)
 
-  const ingresoDirecto = ingresoShopify + ingresoWhatsAppSoles
   const ventasOmnicanal = ingresoDirecto + retailIndirectoSoles
-  const ventasTotales = ventasShopify + pedidosWhatsApp
 
   return {
     mes: c.mes.trim(),
@@ -130,21 +129,20 @@ export function camposAMesRaw(c: MesFormCampos): MesRaw {
   }
 }
 
-/** Live preview of derived MesRaw totals while typing. */
+/** Live preview of derived KPIs while typing (WA and omnicanal). */
 export function previewDesdeCampos(c: MesFormCampos): {
-  ventasTotales: number
-  ingresoDirecto: number
+  pedidosWhatsApp: number
+  ingresoWhatsApp: number
   ventasOmnicanal: number
 } {
+  const ventasTotales = parseMesNum(c.ventasTotales) || 0
+  const ventasShopify = parseMesNum(c.ventasShopify) || 0
+  const ingresoDirecto = parseMesNum(c.ingresoDirecto) || 0
   const ingresoShopify = parseMesNum(c.ingresoShopify) || 0
-  const ingresoWA = parseMesNum(c.ingresoWhatsAppSoles) || 0
   const retail = parseMesNum(c.retailIndirectoSoles) || 0
-  const vShopify = parseMesNum(c.ventasShopify) || 0
-  const pedidosWA = parseMesNum(c.pedidosWhatsApp) || 0
-  const ingresoDirecto = ingresoShopify + ingresoWA
   return {
-    ingresoDirecto,
+    pedidosWhatsApp: Math.max(0, ventasTotales - ventasShopify),
+    ingresoWhatsApp: Math.max(0, ingresoDirecto - ingresoShopify),
     ventasOmnicanal: ingresoDirecto + retail,
-    ventasTotales: vShopify + pedidosWA,
   }
 }
