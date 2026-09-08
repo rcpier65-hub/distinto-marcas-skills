@@ -1,0 +1,177 @@
+'use client'
+
+/* Formulario del PORTAL cliente para cargar/editar data cruda del reporte
+   mensual (retail / WA / omnicanal). Misma persistencia que el editor staff
+   (guardarMesDb), pero la marca se FUERZA a la del cliente autenticado.
+   Requiere el PIN de reportes ya desbloqueado (misma cookie). */
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { guardarMesReporteCliente } from '../_reporte-actions'
+import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
+
+type Campos = {
+  mes: string; leads: string; ventasShopify: string; ingresoShopify: string
+  ventasTotales: string; ingresoDirecto: string; ventasOmnicanal: string
+  gastoAdsUsd: string; tipoCambio: string; igv: string
+}
+
+function sigMes(ultimo?: string): string {
+  if (!ultimo) {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const [y, m] = ultimo.split('-').map(Number)
+  const ny = m === 12 ? y + 1 : y
+  const nm = m === 12 ? 1 : m + 1
+  return `${ny}-${String(nm).padStart(2, '0')}`
+}
+
+const VACIO = (mes: string): Campos => ({
+  mes, leads: '', ventasShopify: '', ingresoShopify: '', ventasTotales: '',
+  ingresoDirecto: '', ventasOmnicanal: '', gastoAdsUsd: '', tipoCambio: '3.41', igv: '0.18',
+})
+
+const DE_MES = (m: MesReporte): Campos => ({
+  mes: m.mes, leads: String(m.leads), ventasShopify: String(m.ventasShopify),
+  ingresoShopify: String(m.ingresoShopify), ventasTotales: String(m.ventasTotales),
+  ingresoDirecto: String(m.ingresoDirecto), ventasOmnicanal: String(m.ventasOmnicanal),
+  gastoAdsUsd: String(m.gastoAdsUsd), tipoCambio: String(m.tipoCambio), igv: String(m.igv),
+})
+
+export function EditorMesCliente({ marcaNombre, meses }: {
+  marcaNombre: string
+  meses: MesReporte[]
+}) {
+  const router = useRouter()
+  const [abierto, setAbierto] = useState(false)
+  const [editando, setEditando] = useState<string>('nuevo')
+  const [c, setC] = useState<Campos>(() => VACIO(sigMes(meses[meses.length - 1]?.mes)))
+  const [pending, setPending] = useState(false)
+
+  function elegir(v: string) {
+    setEditando(v)
+    if (v === 'nuevo') setC(VACIO(sigMes(meses[meses.length - 1]?.mes)))
+    else {
+      const m = meses.find((x) => x.mes === v)
+      if (m) setC(DE_MES(m))
+    }
+  }
+
+  const set = (k: keyof Campos) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setC((s) => ({ ...s, [k]: e.target.value }))
+
+  async function guardar() {
+    if (pending) return
+    setPending(true)
+    const n = (v: string) => Number(String(v).replace(',', '.'))
+    const r = await guardarMesReporteCliente({
+      mes: c.mes.trim(),
+      leads: n(c.leads),
+      ventasShopify: n(c.ventasShopify),
+      ingresoShopify: n(c.ingresoShopify),
+      ventasTotales: n(c.ventasTotales),
+      ingresoDirecto: n(c.ingresoDirecto),
+      ventasOmnicanal: n(c.ventasOmnicanal),
+      gastoAdsUsd: n(c.gastoAdsUsd),
+      tipoCambio: n(c.tipoCambio),
+      igv: n(c.igv),
+    })
+    setPending(false)
+    if (r.ok) {
+      toast.success(`Mes ${labelMes(c.mes)} guardado — el reporte se actualiza al instante`)
+      setAbierto(false)
+      router.refresh()
+    } else toast.error(r.error)
+  }
+
+  const F = ({ k, label, ph, pre, readOnly }: {
+    k: keyof Campos; label: string; ph?: string; pre?: string; readOnly?: boolean
+  }) => (
+    <label className="flex flex-col gap-1 min-w-0">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1.5">
+        {pre && <span className="text-xs text-muted-foreground shrink-0">{pre}</span>}
+        <input
+          value={c[k]}
+          onChange={set(k)}
+          placeholder={ph}
+          inputMode="decimal"
+          readOnly={readOnly}
+          className={`w-full h-9 px-2.5 rounded-lg border text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 ${readOnly ? 'bg-muted/50 text-muted-foreground' : 'bg-background'}`}
+        />
+      </div>
+    </label>
+  )
+
+  const shopifyBloqueado = editando !== 'nuevo' && (Number(c.ventasShopify) > 0 || Number(c.ingresoShopify) > 0)
+
+  return (
+    <div className="rounded-2xl border border-dashed bg-card/60 p-4 mb-4">
+      {!abierto ? (
+        <button
+          type="button"
+          onClick={() => setAbierto(true)}
+          className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-bold text-primary hover:bg-primary/5 transition-colors"
+        >
+          + Cargar / editar datos del mes · {marcaNombre}
+        </button>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-extrabold">Data del mes · {marcaNombre}</span>
+            <select
+              value={editando}
+              onChange={(e) => elegir(e.target.value)}
+              className="h-8 px-2 rounded-lg border bg-background text-xs font-semibold"
+            >
+              <option value="nuevo">Mes nuevo</option>
+              {meses.map((m) => (
+                <option key={m.mes} value={m.mes}>{labelMes(m.mes)}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setAbierto(false)}
+              className="ml-auto h-8 px-2.5 rounded-lg text-xs text-muted-foreground hover:bg-muted"
+            >
+              Cerrar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <F k="mes" label="Mes (AAAA-MM)" ph="2026-08" readOnly={editando !== 'nuevo'} />
+            <F k="leads" label="Leads WhatsApp" ph="1015" />
+            <F k="ventasShopify" label="Ventas Shopify (pedidos)" ph="125" readOnly={shopifyBloqueado} />
+            <F k="ingresoShopify" label="Ingreso Shopify" pre="S/" ph="10395.71" readOnly={shopifyBloqueado} />
+            <F k="ventasTotales" label="Ventas totales (pedidos)" ph="339" />
+            <F k="ingresoDirecto" label="Ingreso directo total" pre="S/" ph="28748" />
+            <F k="gastoAdsUsd" label="Gasto Ads" pre="US$" ph="1500.78" />
+            <F k="ventasOmnicanal" label="Venta omnicanal total" pre="S/" ph="65000" />
+            <F k="tipoCambio" label="Tipo de cambio" ph="3.41" />
+            <F k="igv" label="IGV" ph="0.18" />
+          </div>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Completa la data cruda que falte (ventas totales, ingreso directo, omnicanal/retail).
+            Conversion, costo por venta, ticket, ROAS, CAC y retail se calculan solos.
+            {shopifyBloqueado ? ' Los campos Shopify ya cargados se muestran solo lectura.' : ''}
+            {' '}Solo se guarda en tu marca.
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={guardar}
+              disabled={pending}
+              className="h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-bold disabled:opacity-50"
+            >
+              {pending ? 'Guardando…' : 'Guardar mes'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

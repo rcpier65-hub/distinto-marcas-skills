@@ -7,6 +7,9 @@
 
 import { useState } from 'react'
 import { labelMes, COSTO_GESTION, type MesReporte } from '@/lib/reportes/typhouse'
+import { Kpi, KPI_TIPS } from './kpi'
+import { usePathname } from 'next/navigation'
+import { EditorMesCliente } from '@/app/cliente/_components/editor-mes-cliente'
 
 const AZUL = '#1E5EDA'
 const CELESTE = '#3BA5E8'
@@ -35,24 +38,9 @@ function Delta({ actual, previo, invertir = false, formato = 'pct' }: {
   )
 }
 
-function Kpi({ label, value, sub, delta, accent }: {
-  label: string; value: string; sub?: string; delta?: React.ReactNode; accent?: string
-}) {
-  return (
-    <div className="rounded-2xl border bg-card p-4 flex flex-col gap-1 min-w-0"
-      style={accent ? { borderColor: accent, borderWidth: 1.5 } : undefined}>
-      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className="text-xl font-extrabold tracking-tight" style={accent ? { color: accent } : undefined}>{value}</span>
-      <div className="flex items-center gap-2 flex-wrap">
-        {sub && <span className="text-[11px] text-muted-foreground">{sub}</span>}
-        {delta}
-      </div>
-    </div>
-  )
-}
-
 export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: MesReporte[] }) {
-  
+  const pathname = usePathname()
+  const enPortalCliente = (pathname ?? '').startsWith('/cliente')
   const [idx, setIdx] = useState(meses.length - 1)
   const m = meses[idx]
   const prev: MesReporte | null = idx > 0 ? meses[idx - 1] : null
@@ -73,6 +61,9 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
 
   return (
     <div className="space-y-6">
+      {enPortalCliente && (
+        <EditorMesCliente marcaNombre={nombre} meses={meses} />
+      )}
       {/* ── Selector de mes ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
@@ -98,13 +89,11 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
           <div className="text-xs text-muted-foreground mt-1">Meta Ads (WhatsApp) + Shopify — Embudo de ventas</div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-[110px_1fr_130px] items-center gap-4">
-          {/* Números laterales */}
           <div className="hidden md:flex flex-col justify-between h-[240px] py-4 text-right">
             <div className="text-2xl font-extrabold">{num(m.leads)} <span className="text-muted-foreground">→</span></div>
             <div className="text-2xl font-extrabold">{num(m.ventasShopify)} <span className="text-muted-foreground">→</span></div>
             <div className="text-2xl font-extrabold">{num(m.ventasWhatsApp)} <span className="text-muted-foreground">→</span></div>
           </div>
-          {/* Trapecios */}
           <div className="flex flex-col items-center gap-1.5">
             {[
               { v: m.leads, t: 'Leads entrantes (WhatsApp)', c: AZUL, w1: 92, w2: 72, d: prev ? <Delta actual={m.leads} previo={prev.leads} /> : null },
@@ -122,7 +111,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
               </div>
             ))}
           </div>
-          {/* Total */}
           <div className="text-center md:text-left">
             <div className="text-4xl font-extrabold tracking-tight">{num(m.ventasTotales)}</div>
             <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ventas totales</div>
@@ -131,36 +119,43 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </div>
       </div>
 
-      {/* ── KPIs principales ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="Inversión Meta Ads" value={soles(m.gastoAdsSoles, 2)}
+          tip={KPI_TIPS.inversionMetaAds}
           sub={`US$ ${m.gastoAdsUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} · TC ${m.tipoCambio} · IGV ${pct(m.igv, 0)}`}
           delta={prev ? <Delta actual={m.gastoAdsSoles} previo={prev.gastoAdsSoles} invertir /> : undefined} accent={AZUL} />
         <Kpi label="Costo por mensaje" value={soles(m.costoMensaje, 2)}
+          tip={KPI_TIPS.costoMensaje}
           delta={prev ? <Delta actual={m.costoMensaje} previo={prev.costoMensaje} invertir /> : undefined} />
         <Kpi label="Ticket promedio" value={soles(m.ticketPromedio, 2)}
+          tip={KPI_TIPS.ticketPromedio}
           delta={prev ? <Delta actual={m.ticketPromedio} previo={prev.ticketPromedio} /> : undefined} accent={CELESTE} />
         <Kpi label="Costo por venta" value={soles(m.costoVenta, 2)}
+          tip={KPI_TIPS.costoVenta}
           delta={prev ? <Delta actual={m.costoVenta} previo={prev.costoVenta} invertir /> : undefined} />
         <Kpi label="Conversión" value={pct(m.conversion)} sub="ventas totales / leads"
+          tip={KPI_TIPS.conversion}
           delta={prev ? <Delta actual={m.conversion} previo={prev.conversion} formato="pp" /> : undefined} accent="#059669" />
       </div>
 
-      {/* ── KPIs de rentabilidad ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="ROAS directo" value={m.roasDirecto.toFixed(2) + 'x'} sub="ingreso directo / gasto ads"
+          tip={KPI_TIPS.roasDirecto}
           delta={prev ? <Delta actual={m.roasDirecto} previo={prev.roasDirecto} /> : undefined} accent={NARANJA} />
         <Kpi label="Ingreso directo" value={soles(m.ingresoDirecto)}
+          tip={KPI_TIPS.ingresoDirecto}
           delta={prev ? <Delta actual={m.ingresoDirecto} previo={prev.ingresoDirecto} /> : undefined} />
         <Kpi label="Gasto mkt total" value={soles(m.gastoMktTotal, 0)} sub={`ads + gestión ${soles(COSTO_GESTION)} (+IGV)`}
+          tip={KPI_TIPS.gastoMktTotal}
           delta={prev ? <Delta actual={m.gastoMktTotal} previo={prev.gastoMktTotal} invertir /> : undefined} />
         <Kpi label="CAC directo" value={soles(m.cacDirecto, 2)} sub="por venta confirmada"
+          tip={KPI_TIPS.cacDirecto}
           delta={prev ? <Delta actual={m.cacDirecto} previo={prev.cacDirecto} invertir /> : undefined} />
         <Kpi label="CAC omnicanal (est.)" value={soles(m.cacOmnicanal, 2)} sub={`${Math.round(m.clientesOmni)} clientes est.`}
+          tip={KPI_TIPS.cacOmnicanal}
           delta={prev ? <Delta actual={m.cacOmnicanal} previo={prev.cacOmnicanal} invertir /> : undefined} />
       </div>
 
-      {/* ── Omnicanal ── */}
       <div className="rounded-2xl border bg-card p-6">
         <h3 className="text-lg font-extrabold tracking-tight text-center">Vista omnicanal — {labelMes(m.mes)}</h3>
         <p className="text-xs text-muted-foreground text-center mt-1 mb-4">
@@ -177,15 +172,17 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
           <Kpi label="Total omnicanal" value={soles(m.ventasOmnicanal)}
+            tip={KPI_TIPS.totalOmnicanal}
             delta={prev ? <Delta actual={m.ventasOmnicanal} previo={prev.ventasOmnicanal} /> : undefined} />
           <Kpi label="Directo confirmado" value={soles(m.ingresoDirecto)} accent={AZUL}
+            tip={KPI_TIPS.directoConfirmado}
             delta={prev ? <Delta actual={m.ingresoDirecto} previo={prev.ingresoDirecto} /> : undefined} />
           <Kpi label="Retail indirecto" value={soles(m.ventasRetail)}
+            tip={KPI_TIPS.retailIndirecto}
             delta={prev ? <Delta actual={m.ventasRetail} previo={prev.ventasRetail} /> : undefined} />
         </div>
       </div>
 
-      {/* ── Tendencia mensual ── */}
       <div className="rounded-2xl border bg-card p-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <h3 className="text-lg font-extrabold tracking-tight">Tendencia mensual</h3>
@@ -217,7 +214,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </div>
       </div>
 
-      {/* ── Tabla comparativa ── */}
       <div className="rounded-2xl border bg-card p-6 overflow-x-auto">
         <h3 className="text-lg font-extrabold tracking-tight mb-4">Comparativa por mes</h3>
         <table className="w-full text-xs min-w-[880px]">
@@ -254,7 +250,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </table>
       </div>
 
-      {/* ── Metodología ── */}
       <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-xs leading-relaxed text-amber-900">
         <b>Ventas Totales</b> confirmadas directamente por el equipo (registro propio del embudo WhatsApp).{' '}
         <b>Ventas WhatsApp</b> = Ventas Totales − Ventas Shopify. El resto de cifras proviene de Shopify Admin API y Meta Ads API (Graph API).
