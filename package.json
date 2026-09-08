@@ -1,0 +1,8 @@
+{
+  "name": "distinto-marcas-skills",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix app",
+    "vercel-build": "npm run build --prefix app"
+  }
+}
