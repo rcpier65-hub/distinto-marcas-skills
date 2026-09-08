@@ -1,110 +1,24 @@
 'use client'
 
 /* Formulario del PORTAL cliente para cargar/editar data cruda del reporte
-   mensual (retail / WA / omnicanal). Misma persistencia que el editor staff
-   (guardarMesDb), pero la marca se FUERZA a la del cliente autenticado.
-   Requiere el PIN de reportes ya desbloqueado (misma cookie).
-
-   El cliente ingresa valores de negocio claros:
-   - Venta Directa (Ventas por WhatsApp) en S/
-   - Retail Indirecto (Ventas fuera de Shopify) en S/
-   - Ventas WhatsApp (pedidos)
-   Al guardar se mapean a MesRaw (ingresoDirecto / ventasOmnicanal / ventasTotales)
-   sin tocar las fórmulas de typhouse.computeMes. */
+   mensual. Misma UX/mapping que staff vía mes-form.ts (Campos UI → MesRaw).
+   Marca forzada a la del cliente autenticado; requiere PIN de reportes. */
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarMesReporteCliente } from '../_reporte-actions'
 import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
-
-type Campos = {
-  mes: string
-  leads: string
-  ventasShopify: string
-  ingresoShopify: string
-  /** Pedidos confirmados por WhatsApp (no Shopify). */
-  ventasWhatsAppPedidos: string
-  /** S/ venta directa por WhatsApp (aparte de Shopify). */
-  ventaDirectaWhatsAppSoles: string
-  /** S/ retail / ventas fuera de Shopify (omnicanal − directo). */
-  retailIndirectoSoles: string
-  gastoAdsUsd: string
-  tipoCambio: string
-  igv: string
-}
-
-function sigMes(ultimo?: string): string {
-  if (!ultimo) {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  }
-  const [y, m] = ultimo.split('-').map(Number)
-  const ny = m === 12 ? y + 1 : y
-  const nm = m === 12 ? 1 : m + 1
-  return `${ny}-${String(nm).padStart(2, '0')}`
-}
-
-const VACIO = (mes: string): Campos => ({
-  mes,
-  leads: '',
-  ventasShopify: '',
-  ingresoShopify: '',
-  ventasWhatsAppPedidos: '',
-  ventaDirectaWhatsAppSoles: '',
-  retailIndirectoSoles: '',
-  gastoAdsUsd: '',
-  tipoCambio: '3.41',
-  igv: '0.18',
-})
-
-/** Reverse-map MesRaw → campos de UI del cliente. */
-const DE_MES = (m: MesReporte): Campos => ({
-  mes: m.mes,
-  leads: String(m.leads),
-  ventasShopify: String(m.ventasShopify),
-  ingresoShopify: String(m.ingresoShopify),
-  ventasWhatsAppPedidos: String(Math.max(0, m.ventasTotales - m.ventasShopify)),
-  ventaDirectaWhatsAppSoles: String(Math.max(0, m.ingresoDirecto - m.ingresoShopify)),
-  retailIndirectoSoles: String(Math.max(0, m.ventasOmnicanal - m.ingresoDirecto)),
-  gastoAdsUsd: String(m.gastoAdsUsd),
-  tipoCambio: String(m.tipoCambio),
-  igv: String(m.igv),
-})
-
-function n(v: string): number {
-  return Number(String(v).replace(',', '.'))
-}
-
-/** Client UI → MesRaw (no cambia shape ni fórmulas de typhouse). */
-function aMesRaw(c: Campos) {
-  const leads = n(c.leads)
-  const ventasShopify = n(c.ventasShopify)
-  const ingresoShopify = n(c.ingresoShopify)
-  const ventasWhatsAppPedidos = n(c.ventasWhatsAppPedidos)
-  const ventaDirectaWhatsAppSoles = n(c.ventaDirectaWhatsAppSoles)
-  const retailIndirectoSoles = n(c.retailIndirectoSoles)
-  const gastoAdsUsd = n(c.gastoAdsUsd)
-  const tipoCambio = n(c.tipoCambio)
-  const igv = n(c.igv)
-
-  const ingresoDirecto = ingresoShopify + ventaDirectaWhatsAppSoles
-  const ventasOmnicanal = ingresoDirecto + retailIndirectoSoles
-  const ventasTotales = ventasShopify + ventasWhatsAppPedidos
-
-  return {
-    mes: c.mes.trim(),
-    leads,
-    ventasShopify,
-    ingresoShopify,
-    ventasTotales,
-    ingresoDirecto,
-    ventasOmnicanal,
-    gastoAdsUsd,
-    tipoCambio,
-    igv,
-  }
-}
+import {
+  type MesFormCampos,
+  MES_FORM_HELP,
+  MES_FORM_LABELS,
+  camposAMesRaw,
+  camposDesdeMes,
+  previewDesdeCampos,
+  sigMes,
+  vacioMesForm,
+} from '@/lib/reportes/mes-form'
 
 export function EditorMesCliente({ marcaNombre, meses }: {
   marcaNombre: string
@@ -113,25 +27,25 @@ export function EditorMesCliente({ marcaNombre, meses }: {
   const router = useRouter()
   const [abierto, setAbierto] = useState(false)
   const [editando, setEditando] = useState<string>('nuevo')
-  const [c, setC] = useState<Campos>(() => VACIO(sigMes(meses[meses.length - 1]?.mes)))
+  const [c, setC] = useState<MesFormCampos>(() => vacioMesForm(sigMes(meses[meses.length - 1]?.mes)))
   const [pending, setPending] = useState(false)
 
   function elegir(v: string) {
     setEditando(v)
-    if (v === 'nuevo') setC(VACIO(sigMes(meses[meses.length - 1]?.mes)))
+    if (v === 'nuevo') setC(vacioMesForm(sigMes(meses[meses.length - 1]?.mes)))
     else {
       const m = meses.find((x) => x.mes === v)
-      if (m) setC(DE_MES(m))
+      if (m) setC(camposDesdeMes(m))
     }
   }
 
-  const set = (k: keyof Campos) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (k: keyof MesFormCampos) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setC((s) => ({ ...s, [k]: e.target.value }))
 
   async function guardar() {
     if (pending) return
     setPending(true)
-    const raw = aMesRaw(c)
+    const raw = camposAMesRaw(c)
     const r = await guardarMesReporteCliente(raw)
     setPending(false)
     if (r.ok) {
@@ -142,7 +56,7 @@ export function EditorMesCliente({ marcaNombre, meses }: {
   }
 
   const F = ({ k, label, ph, pre, readOnly }: {
-    k: keyof Campos; label: string; ph?: string; pre?: string; readOnly?: boolean
+    k: keyof MesFormCampos; label: string; ph?: string; pre?: string; readOnly?: boolean
   }) => (
     <label className="flex flex-col gap-1 min-w-0">
       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
@@ -161,21 +75,7 @@ export function EditorMesCliente({ marcaNombre, meses }: {
   )
 
   const shopifyBloqueado = editando !== 'nuevo' && (Number(c.ventasShopify) > 0 || Number(c.ingresoShopify) > 0)
-
-  // Totales derivados (solo lectura / de-énfasis) para que el cliente vea el resultado
-  const preview = (() => {
-    const ingresoShopify = n(c.ingresoShopify) || 0
-    const ventaWA = n(c.ventaDirectaWhatsAppSoles) || 0
-    const retail = n(c.retailIndirectoSoles) || 0
-    const vShopify = n(c.ventasShopify) || 0
-    const vWA = n(c.ventasWhatsAppPedidos) || 0
-    const ingresoDirecto = ingresoShopify + ventaWA
-    return {
-      ingresoDirecto,
-      ventasOmnicanal: ingresoDirecto + retail,
-      ventasTotales: vShopify + vWA,
-    }
-  })()
+  const preview = previewDesdeCampos(c)
 
   return (
     <div className="rounded-2xl border border-dashed bg-card/60 p-4 mb-4">
@@ -211,30 +111,30 @@ export function EditorMesCliente({ marcaNombre, meses }: {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <F k="mes" label="Mes (AAAA-MM)" ph="2026-08" readOnly={editando !== 'nuevo'} />
-            <F k="leads" label="Leads WhatsApp" ph="1015" />
-            <F k="ventasShopify" label="Ventas Shopify (pedidos)" ph="125" readOnly={shopifyBloqueado} />
-            <F k="ingresoShopify" label="Ingreso Shopify" pre="S/" ph="10395.71" readOnly={shopifyBloqueado} />
-            <F k="ventasWhatsAppPedidos" label="Ventas WhatsApp (pedidos)" ph="214" />
-            <F k="ventaDirectaWhatsAppSoles" label="Venta Directa (Ventas por WhatsApp)" pre="S/" ph="18352.29" />
-            <F k="retailIndirectoSoles" label="Retail Indirecto (Ventas fuera de Shopify)" pre="S/" ph="36252" />
-            <F k="gastoAdsUsd" label="Gasto Ads" pre="US$" ph="1500.78" />
-            <F k="tipoCambio" label="Tipo de cambio" ph="3.41" />
-            <F k="igv" label="IGV" ph="0.18" />
+            <F k="mes" label={MES_FORM_LABELS.mes} ph="2026-08" readOnly={editando !== 'nuevo'} />
+            <F k="leads" label={MES_FORM_LABELS.leads} ph="1015" />
+            <F k="ventasShopify" label={MES_FORM_LABELS.ventasShopify} ph="125" readOnly={shopifyBloqueado} />
+            <F k="ingresoShopify" label={MES_FORM_LABELS.ingresoShopify} pre="S/" ph="10395.71" readOnly={shopifyBloqueado} />
+            <F k="pedidosWhatsApp" label={MES_FORM_LABELS.pedidosWhatsApp} ph="214" />
+            <F k="ingresoWhatsAppSoles" label={MES_FORM_LABELS.ingresoWhatsAppSoles} pre="S/" ph="18352.29" />
+            <F k="retailIndirectoSoles" label={MES_FORM_LABELS.retailIndirectoSoles} pre="S/" ph="36252" />
+            <F k="gastoAdsUsd" label={MES_FORM_LABELS.gastoAdsUsd} pre="US$" ph="1500.78" />
+            <F k="tipoCambio" label={MES_FORM_LABELS.tipoCambio} ph="3.41" />
+            <F k="igv" label={MES_FORM_LABELS.igv} ph="0.18" />
           </div>
 
           <div className="rounded-xl border bg-muted/30 px-3 py-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-muted-foreground">
             <div>
               <span className="font-bold uppercase tracking-wider text-[10px] block">Ventas totales (calc.)</span>
               <span className="tabular-nums text-foreground font-semibold">{preview.ventasTotales || '—'}</span>
-              <span className="ml-1">= Shopify + WA pedidos</span>
+              <span className="ml-1">= Shopify + pedidos WA</span>
             </div>
             <div>
               <span className="font-bold uppercase tracking-wider text-[10px] block">Ingreso directo (calc.)</span>
               <span className="tabular-nums text-foreground font-semibold">
                 S/ {preview.ingresoDirecto ? preview.ingresoDirecto.toLocaleString('es-PE', { maximumFractionDigits: 2 }) : '—'}
               </span>
-              <span className="ml-1">= Shopify + venta WA</span>
+              <span className="ml-1">= Shopify + ingreso WA</span>
             </div>
             <div>
               <span className="font-bold uppercase tracking-wider text-[10px] block">Omnicanal (calc.)</span>
@@ -246,8 +146,7 @@ export function EditorMesCliente({ marcaNombre, meses }: {
           </div>
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Ingresa venta directa por WhatsApp (S/), retail indirecto fuera de Shopify (S/) y pedidos WhatsApp.
-            Ingreso directo, omnicanal y ventas totales se calculan solos; conversion, costo por venta, ticket, ROAS, CAC y retail del dashboard también.
+            {MES_FORM_HELP}
             {shopifyBloqueado ? ' Los campos Shopify ya cargados se muestran solo lectura.' : ''}
             {' '}Solo se guarda en tu marca.
           </p>
