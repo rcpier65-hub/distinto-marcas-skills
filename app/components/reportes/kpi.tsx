@@ -15,8 +15,8 @@ export const KPI_TIPS = {
   cacOmnicanal: 'Costo estimado por cliente omnicanal (directo + retail estimado). Fórmula: gastoMktTotal / clientesOmni.',
   totalOmnicanal: 'Venta total del mes incluyendo retail física (Falabella / Tottus / Sodimac). Dato crudo omnicanal.',
   directoConfirmado: 'Parte del omnicanal atribuida al canal directo (Shopify + WhatsApp). Mismo ingreso directo del embudo.',
-  retailIndirecto: 'Venta retail física estimada. Fórmula: ventasOmnicanal − ingresoDirecto.',
-  ventaDirectaWhatsApp: 'Parte del ingreso directo que viene por WhatsApp (no Shopify). Fórmula: ingresoDirecto − ingresoShopify.',
+  retailIndirecto: 'Ventas fuera de Shopify / retail física (Falabella / Tottus / Sodimac). Fórmula: ventasOmnicanal − ingresoDirecto.',
+  ventaDirectaWhatsApp: 'Ingreso WhatsApp (S/): soles de venta por WhatsApp, aparte de Shopify. No confundir con Pedidos WhatsApp (cantidad). Fórmula: ingresoDirecto − ingresoShopify.',
 } as const
 
 /** KPI card with optional info tooltip (hover/focus + title nativo). */

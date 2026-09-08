@@ -98,7 +98,7 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
             {[
               { v: m.leads, t: 'Leads entrantes (WhatsApp)', c: AZUL, w1: 92, w2: 72, d: prev ? <Delta actual={m.leads} previo={prev.leads} /> : null },
               { v: m.ventasShopify, t: 'Ventas Shopify', c: CELESTE, w1: 72, w2: 56, d: prev ? <Delta actual={m.ventasShopify} previo={prev.ventasShopify} /> : null },
-              { v: m.ventasWhatsApp, t: 'Ventas WhatsApp', c: NARANJA, w1: 56, w2: 40, d: prev ? <Delta actual={m.ventasWhatsApp} previo={prev.ventasWhatsApp} /> : null },
+              { v: m.ventasWhatsApp, t: 'Ventas WhatsApp · pedidos', c: NARANJA, w1: 56, w2: 40, d: prev ? <Delta actual={m.ventasWhatsApp} previo={prev.ventasWhatsApp} /> : null },
             ].map((s) => (
               <div key={s.t} className="text-white text-center flex flex-col items-center justify-center"
                 style={{
@@ -177,10 +177,10 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
           <Kpi label="Directo confirmado" value={soles(m.ingresoDirecto)} accent={AZUL}
             tip={KPI_TIPS.directoConfirmado}
             delta={prev ? <Delta actual={m.ingresoDirecto} previo={prev.ingresoDirecto} /> : undefined} />
-          <Kpi label="Venta directa (WhatsApp)" value={soles(Math.max(0, m.ingresoDirecto - m.ingresoShopify))}
+          <Kpi label="Ingreso WhatsApp" value={soles(Math.max(0, m.ingresoDirecto - m.ingresoShopify))}
             tip={KPI_TIPS.ventaDirectaWhatsApp}
             delta={prev ? <Delta actual={Math.max(0, m.ingresoDirecto - m.ingresoShopify)} previo={Math.max(0, prev.ingresoDirecto - prev.ingresoShopify)} /> : undefined} />
-          <Kpi label="Retail indirecto" value={soles(m.ventasRetail)}
+          <Kpi label="Retail Indirecto" value={soles(m.ventasRetail)}
             tip={KPI_TIPS.retailIndirecto}
             delta={prev ? <Delta actual={m.ventasRetail} previo={prev.ventasRetail} /> : undefined} />
         </div>
@@ -255,7 +255,7 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
 
       <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-xs leading-relaxed text-amber-900">
         <b>Ventas Totales</b> confirmadas directamente por el equipo (registro propio del embudo WhatsApp).{' '}
-        <b>Ventas WhatsApp</b> = Ventas Totales − Ventas Shopify. El resto de cifras proviene de Shopify Admin API y Meta Ads API (Graph API).
+        <b>Ventas WhatsApp</b> (pedidos) = Ventas Totales − Ventas Shopify. <b>Ingreso WhatsApp</b> (S/) = Ingreso directo − Ingreso Shopify. El resto de cifras proviene de Shopify Admin API y Meta Ads API (Graph API).
         Tipo de cambio SUNAT del mes. La venta retail física (Falabella/Tottus/Sodimac) vive en sus propios sistemas de punto de venta:
         no hay dato que conecte «vio el anuncio» con «compró en tienda» — por eso NO se asigna un % de atribución inventado.
         Clientes retail y CAC omnicanal son <b>estimados</b> (retail ÷ ticket promedio).
