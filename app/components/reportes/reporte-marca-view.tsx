@@ -89,13 +89,11 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
           <div className="text-xs text-muted-foreground mt-1">Meta Ads (WhatsApp) + Shopify — Embudo de ventas</div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-[110px_1fr_130px] items-center gap-4">
-          {/* Números laterales */}
           <div className="hidden md:flex flex-col justify-between h-[240px] py-4 text-right">
             <div className="text-2xl font-extrabold">{num(m.leads)} <span className="text-muted-foreground">→</span></div>
             <div className="text-2xl font-extrabold">{num(m.ventasShopify)} <span className="text-muted-foreground">→</span></div>
             <div className="text-2xl font-extrabold">{num(m.ventasWhatsApp)} <span className="text-muted-foreground">→</span></div>
           </div>
-          {/* Trapecios */}
           <div className="flex flex-col items-center gap-1.5">
             {[
               { v: m.leads, t: 'Leads entrantes (WhatsApp)', c: AZUL, w1: 92, w2: 72, d: prev ? <Delta actual={m.leads} previo={prev.leads} /> : null },
@@ -113,7 +111,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
               </div>
             ))}
           </div>
-          {/* Total */}
           <div className="text-center md:text-left">
             <div className="text-4xl font-extrabold tracking-tight">{num(m.ventasTotales)}</div>
             <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ventas totales</div>
@@ -122,7 +119,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </div>
       </div>
 
-      {/* ── KPIs principales ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="Inversión Meta Ads" value={soles(m.gastoAdsSoles, 2)}
           tip={KPI_TIPS.inversionMetaAds}
@@ -142,7 +138,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
           delta={prev ? <Delta actual={m.conversion} previo={prev.conversion} formato="pp" /> : undefined} accent="#059669" />
       </div>
 
-      {/* ── KPIs de rentabilidad ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="ROAS directo" value={m.roasDirecto.toFixed(2) + 'x'} sub="ingreso directo / gasto ads"
           tip={KPI_TIPS.roasDirecto}
@@ -161,7 +156,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
           delta={prev ? <Delta actual={m.cacOmnicanal} previo={prev.cacOmnicanal} invertir /> : undefined} />
       </div>
 
-      {/* ── Omnicanal ── */}
       <div className="rounded-2xl border bg-card p-6">
         <h3 className="text-lg font-extrabold tracking-tight text-center">Vista omnicanal — {labelMes(m.mes)}</h3>
         <p className="text-xs text-muted-foreground text-center mt-1 mb-4">
@@ -189,7 +183,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </div>
       </div>
 
-      {/* ── Tendencia mensual ── */}
       <div className="rounded-2xl border bg-card p-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <h3 className="text-lg font-extrabold tracking-tight">Tendencia mensual</h3>
@@ -221,7 +214,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </div>
       </div>
 
-      {/* ── Tabla comparativa ── */}
       <div className="rounded-2xl border bg-card p-6 overflow-x-auto">
         <h3 className="text-lg font-extrabold tracking-tight mb-4">Comparativa por mes</h3>
         <table className="w-full text-xs min-w-[880px]">
@@ -239,7 +231,7 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
             {meses.map((x, i) => (
               <tr key={x.mes} onClick={() => setIdx(i)}
                 className={`border-t cursor-pointer hover:bg-muted/50 ${i === idx ? 'font-bold' : ''}`}
-                style={i === idx ? { background: `${AZUL}0d` : undefined}>
+                style={i === idx ? { background: `${AZUL}0d` } : undefined}>
                 <td className="py-2 pr-3">{labelMes(x.mes)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{num(x.leads)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{num(x.ventasShopify)}</td>
@@ -258,7 +250,6 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
         </table>
       </div>
 
-      {/* ── Metodología ── */}
       <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-xs leading-relaxed text-amber-900">
         <b>Ventas Totales</b> confirmadas directamente por el equipo (registro propio del embudo WhatsApp).{' '}
         <b>Ventas WhatsApp</b> = Ventas Totales − Ventas Shopify. El resto de cifras proviene de Shopify Admin API y Meta Ads API (Graph API).
