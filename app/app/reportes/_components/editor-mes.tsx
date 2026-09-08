@@ -1,70 +1,51 @@
 'use client'
 
-/* Formulario para CARGAR la data mensual del reporte desde la interfaz
-   (reemplaza el Excel). Solo campos CRUDOS — todo lo derivado (CAC, ROAS,
-   costo por venta, retail, etc.) se calcula solo con las fórmulas de siempre.
-   Editar un mes existente lo pre-llena; guardar pisa ese mes (la base gana
-   sobre el seed del código). */
+/* Formulario staff para CARGAR la data mensual del reporte.
+   Misma UX/mapping que el portal cliente (Campos UI → MesRaw vía mes-form.ts).
+   Extras staff: eliminar mes + marcaSlug en guardarMesReporte. */
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { guardarMesReporte, eliminarMesReporte } from '../_actions'
 import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
-
-type Campos = {
-  mes: string; leads: string; ventasShopify: string; ingresoShopify: string
-  ventasTotales: string; ingresoDirecto: string; ventasOmnicanal: string
-  gastoAdsUsd: string; tipoCambio: string; igv: string
-}
-
-function sigMes(ultimo?: string): string {
-  if (!ultimo) { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
-  const [y, m] = ultimo.split('-').map(Number)
-  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1
-  return `${ny}-${String(nm).padStart(2, '0')}`
-}
-
-const VACIO = (mes: string): Campos => ({
-  mes, leads: '', ventasShopify: '', ingresoShopify: '', ventasTotales: '',
-  ingresoDirecto: '', ventasOmnicanal: '', gastoAdsUsd: '', tipoCambio: '3.41', igv: '0.18',
-})
-
-const DE_MES = (m: MesReporte): Campos => ({
-  mes: m.mes, leads: String(m.leads), ventasShopify: String(m.ventasShopify),
-  ingresoShopify: String(m.ingresoShopify), ventasTotales: String(m.ventasTotales),
-  ingresoDirecto: String(m.ingresoDirecto), ventasOmnicanal: String(m.ventasOmnicanal),
-  gastoAdsUsd: String(m.gastoAdsUsd), tipoCambio: String(m.tipoCambio), igv: String(m.igv),
-})
+import {
+  type MesFormCampos,
+  MES_FORM_HELP,
+  MES_FORM_LABELS,
+  camposAMesRaw,
+  camposDesdeMes,
+  previewDesdeCampos,
+  sigMes,
+  vacioMesForm,
+} from '@/lib/reportes/mes-form'
 
 export function EditorMes({ marcaSlug, marcaNombre, meses }: {
   marcaSlug: string; marcaNombre: string; meses: MesReporte[]
 }) {
   const router = useRouter()
   const [abierto, setAbierto] = useState(false)
-  const [editando, setEditando] = useState<string>('nuevo') // 'nuevo' | 'YYYY-MM'
-  const [c, setC] = useState<Campos>(() => VACIO(sigMes(meses[meses.length - 1]?.mes)))
+  const [editando, setEditando] = useState<string>('nuevo')
+  const [c, setC] = useState<MesFormCampos>(() => vacioMesForm(sigMes(meses[meses.length - 1]?.mes)))
   const [pending, setPending] = useState(false)
 
   function elegir(v: string) {
     setEditando(v)
-    if (v === 'nuevo') setC(VACIO(sigMes(meses[meses.length - 1]?.mes)))
-    else { const m = meses.find((x) => x.mes === v); if (m) setC(DE_MES(m)) }
+    if (v === 'nuevo') setC(vacioMesForm(sigMes(meses[meses.length - 1]?.mes)))
+    else {
+      const m = meses.find((x) => x.mes === v)
+      if (m) setC(camposDesdeMes(m))
+    }
   }
 
-  const set = (k: keyof Campos) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (k: keyof MesFormCampos) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setC((s) => ({ ...s, [k]: e.target.value }))
 
   async function guardar() {
     if (pending) return
     setPending(true)
-    const n = (v: string) => Number(String(v).replace(',', '.'))
-    const r = await guardarMesReporte({
-      marcaSlug, mes: c.mes.trim(),
-      leads: n(c.leads), ventasShopify: n(c.ventasShopify), ingresoShopify: n(c.ingresoShopify),
-      ventasTotales: n(c.ventasTotales), ingresoDirecto: n(c.ingresoDirecto), ventasOmnicanal: n(c.ventasOmnicanal),
-      gastoAdsUsd: n(c.gastoAdsUsd), tipoCambio: n(c.tipoCambio), igv: n(c.igv),
-    })
+    const raw = camposAMesRaw(c)
+    const r = await guardarMesReporte({ marcaSlug, ...raw })
     setPending(false)
     if (r.ok) {
       toast.success(`✅ ${labelMes(c.mes)} guardado — el reporte ya lo muestra (interno y portal del cliente)`)
@@ -83,7 +64,7 @@ export function EditorMes({ marcaSlug, marcaNombre, meses }: {
     else toast.error(r.error)
   }
 
-  const F = ({ k, label, ph, pre }: { k: keyof Campos; label: string; ph?: string; pre?: string }) => (
+  const F = ({ k, label, ph, pre }: { k: keyof MesFormCampos; label: string; ph?: string; pre?: string }) => (
     <label className="flex flex-col gap-1 min-w-0">
       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
       <div className="flex items-center gap-1.5">
@@ -93,6 +74,8 @@ export function EditorMes({ marcaSlug, marcaNombre, meses }: {
       </div>
     </label>
   )
+
+  const preview = previewDesdeCampos(c)
 
   return (
     <div className="rounded-2xl border border-dashed bg-card/60 p-4">
@@ -114,21 +97,42 @@ export function EditorMes({ marcaSlug, marcaNombre, meses }: {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <F k="mes" label="Mes (AAAA-MM)" ph="2026-08" />
-            <F k="leads" label="Leads WhatsApp" ph="1015" />
-            <F k="ventasShopify" label="Ventas Shopify (pedidos)" ph="125" />
-            <F k="ingresoShopify" label="Ingreso Shopify" pre="S/" ph="10395.71" />
-            <F k="ventasTotales" label="Ventas totales (pedidos)" ph="339" />
-            <F k="ingresoDirecto" label="Ingreso directo total" pre="S/" ph="28748" />
-            <F k="ventasOmnicanal" label="Venta omnicanal total" pre="S/" ph="65000" />
-            <F k="gastoAdsUsd" label="Gasto Ads" pre="US$" ph="1500.78" />
-            <F k="tipoCambio" label="Tipo de cambio" ph="3.41" />
-            <F k="igv" label="IGV" ph="0.18" />
+            <F k="mes" label={MES_FORM_LABELS.mes} ph="2026-08" />
+            <F k="leads" label={MES_FORM_LABELS.leads} ph="1015" />
+            <F k="ventasShopify" label={MES_FORM_LABELS.ventasShopify} ph="125" />
+            <F k="ingresoShopify" label={MES_FORM_LABELS.ingresoShopify} pre="S/" ph="10395.71" />
+            <F k="pedidosWhatsApp" label={MES_FORM_LABELS.pedidosWhatsApp} ph="214" />
+            <F k="ingresoWhatsAppSoles" label={MES_FORM_LABELS.ingresoWhatsAppSoles} pre="S/" ph="18352.29" />
+            <F k="retailIndirectoSoles" label={MES_FORM_LABELS.retailIndirectoSoles} pre="S/" ph="36252" />
+            <F k="gastoAdsUsd" label={MES_FORM_LABELS.gastoAdsUsd} pre="US$" ph="1500.78" />
+            <F k="tipoCambio" label={MES_FORM_LABELS.tipoCambio} ph="3.41" />
+            <F k="igv" label={MES_FORM_LABELS.igv} ph="0.18" />
+          </div>
+
+          <div className="rounded-xl border bg-muted/30 px-3 py-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+            <div>
+              <span className="font-bold uppercase tracking-wider text-[10px] block">Ventas totales (calc.)</span>
+              <span className="tabular-nums text-foreground font-semibold">{preview.ventasTotales || '—'}</span>
+              <span className="ml-1">= Shopify + pedidos WA</span>
+            </div>
+            <div>
+              <span className="font-bold uppercase tracking-wider text-[10px] block">Ingreso directo (calc.)</span>
+              <span className="tabular-nums text-foreground font-semibold">
+                S/ {preview.ingresoDirecto ? preview.ingresoDirecto.toLocaleString('es-PE', { maximumFractionDigits: 2 }) : '—'}
+              </span>
+              <span className="ml-1">= Shopify + ingreso WA</span>
+            </div>
+            <div>
+              <span className="font-bold uppercase tracking-wider text-[10px] block">Omnicanal (calc.)</span>
+              <span className="tabular-nums text-foreground font-semibold">
+                S/ {preview.ventasOmnicanal ? preview.ventasOmnicanal.toLocaleString('es-PE', { maximumFractionDigits: 2 }) : '—'}
+              </span>
+              <span className="ml-1">= directo + retail</span>
+            </div>
           </div>
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Solo llenas la data cruda (la misma que las columnas azules del Excel). Conversión, costo por venta,
-            ticket, ROAS, CAC y retail se calculan solos. Ventas WhatsApp = totales − Shopify.
+            {MES_FORM_HELP}
           </p>
 
           <div className="flex gap-2">
