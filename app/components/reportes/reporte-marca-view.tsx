@@ -170,13 +170,16 @@ export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: Mes
             {pct(m.pctRetail)} retail
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
           <Kpi label="Total omnicanal" value={soles(m.ventasOmnicanal)}
             tip={KPI_TIPS.totalOmnicanal}
             delta={prev ? <Delta actual={m.ventasOmnicanal} previo={prev.ventasOmnicanal} /> : undefined} />
           <Kpi label="Directo confirmado" value={soles(m.ingresoDirecto)} accent={AZUL}
             tip={KPI_TIPS.directoConfirmado}
             delta={prev ? <Delta actual={m.ingresoDirecto} previo={prev.ingresoDirecto} /> : undefined} />
+          <Kpi label="Venta directa (WhatsApp)" value={soles(Math.max(0, m.ingresoDirecto - m.ingresoShopify))}
+            tip={KPI_TIPS.ventaDirectaWhatsApp}
+            delta={prev ? <Delta actual={Math.max(0, m.ingresoDirecto - m.ingresoShopify)} previo={Math.max(0, prev.ingresoDirecto - prev.ingresoShopify)} /> : undefined} />
           <Kpi label="Retail indirecto" value={soles(m.ventasRetail)}
             tip={KPI_TIPS.retailIndirecto}
             delta={prev ? <Delta actual={m.ventasRetail} previo={prev.ventasRetail} /> : undefined} />
