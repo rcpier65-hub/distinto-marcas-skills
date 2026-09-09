@@ -2,7 +2,8 @@
 //
 // Calendario de FECHAS IMPORTANTES por marca (idea de Lorena 23-jul-2026).
 // Ve todas las fechas clave del año por marca, con recordatorio del mes.
-// Acceso: Lorena + directores (Erick / Pedro).
+// Acceso lectura: Lorena + directores + diseño (Ailyn) + publicaciones.
+// Acceso gestión: Lorena + directores (Erick / Pedro).
 
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
@@ -19,7 +20,19 @@ export default async function FechasImportantesPage() {
 
   const { data: me } = await service
     .from('team_members').select('nombre, rol_base').eq('auth_user_id', user.id).maybeSingle()
-  if (!me || (me.nombre !== 'LORENA' && me.rol_base !== 'director')) redirect('/inicio')
+
+  /* Gestión (crear/borrar): Lorena + directores.
+     Lectura: también quien tiene diseño (Ailyn — Pedro 132c5a66) o
+     publicaciones (ya ven las fechas en su calendario). */
+  const { getCurrentMemberPermisos } = await import('@/lib/team/permisos-helper')
+  const { tieneAcceso } = await import('@/lib/team/types')
+  const p = await getCurrentMemberPermisos()
+  const esGestor = !!me && (me.nombre === 'LORENA' || me.rol_base === 'director')
+  const puedeVer =
+    !p || // admin/owner
+    esGestor ||
+    (p && (tieneAcceso(p.permisos, 'diseno') || tieneAcceso(p.permisos, 'publicaciones')))
+  if (!puedeVer) redirect('/inicio')
 
   const [marcasRes, fechasRes] = await Promise.all([
     service.from('marcas').select('id, slug, nombre, emoji_marca, color_primario_hex').eq('activa', true).order('nombre'),
@@ -39,5 +52,5 @@ export default async function FechasImportantesPage() {
     nota: f.nota ?? null, categoria: f.categoria ?? 'otro', contenido: f.contenido ?? null,
   }))
 
-  return <FechasView marcas={marcas} fechas={fechas} />
+  return <FechasView marcas={marcas} fechas={fechas} readOnly={!esGestor && !!p} />
 }
