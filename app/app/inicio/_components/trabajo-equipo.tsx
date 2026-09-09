@@ -12,6 +12,7 @@
 
 import { Users, Palette, Video, MessageCircle, Calendar, CheckSquare, type LucideIcon } from 'lucide-react'
 import type { MiembroTrabajo, TareaMiembro, TotalesEquipo } from '@/lib/inicio/get-trabajo-equipo'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 const ROL_ICON: Record<string, LucideIcon> = {
   disenador: Palette,
@@ -60,6 +61,8 @@ export function TrabajoEquipo({
 
   return (
     <section style={{ minWidth: 0 }}>
+      {/* Sync permanente en /inicio (CEO): mismo patrón 15s que /tareas. Pedro b2f993db. */}
+      <AutoRefresh intervalMs={15000} />
       {/* Header de la sección */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span style={{
