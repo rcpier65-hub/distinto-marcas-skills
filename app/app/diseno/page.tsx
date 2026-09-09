@@ -14,7 +14,7 @@ import { DisenoView } from '@/components/views/DisenoView'
 import type { DisenoEntry, EstadoPub } from '@/lib/diseno/types'
 import { normalizeSubEstado } from '@/lib/diseno/types'
 import { colorDeMarca } from '@/lib/marcas/branding'
-import type { FechaTablero } from '@/components/fechas/fechas-calendario-tablero'
+import { DisenoFechasShell, type FechaTablero } from '@/components/views/DisenoFechasShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -243,19 +243,20 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
   })
 
   return (
-    <DisenoView
-      entries={entries}
-      marcas={marcas.map((m) => ({
-        slug: m.slug,
-        nombre: m.nombre,
-        color: m.color_primario_hex ?? '#737373',
-        emoji: m.emoji_marca ?? null,
-      }))}
-      fechasImportantes={fechasImportantes}
-      migrationPendiente={migrationPendiente}
-      rangoDesde={DESDE}
-      rangoHasta={HASTA}
-      initialNuevo={initialNuevo}
-    />
+    <DisenoFechasShell fechas={fechasImportantes}>
+      <DisenoView
+        entries={entries}
+        marcas={marcas.map((m) => ({
+          slug: m.slug,
+          nombre: m.nombre,
+          color: m.color_primario_hex ?? '#737373',
+          emoji: m.emoji_marca ?? null,
+        }))}
+        migrationPendiente={migrationPendiente}
+        rangoDesde={DESDE}
+        rangoHasta={HASTA}
+        initialNuevo={initialNuevo}
+      />
+    </DisenoFechasShell>
   )
 }
