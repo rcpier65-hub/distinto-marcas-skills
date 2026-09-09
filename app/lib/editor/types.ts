@@ -30,6 +30,11 @@ export type EditorEntry = {
      por primera vez. La diferencia entre ambos es el tiempo total. */
   iniciadoEdicionAt: string | null  // ISO timestamp con TZ
   editadoAt: string | null          // ISO timestamp con TZ
+  /* Flag booleano `editado` (tijereta / checklist / estado_tarea=listo).
+     El filtro "Editar" oculta filas con editado=true aunque el estado
+     pipeline siga en editar/editando (Lorena: videos ya editados no deben
+     aparecer). Se limpia al volver el estado a editar (revisión). */
+  editado: boolean
 }
 
 export type EditorOption = {
