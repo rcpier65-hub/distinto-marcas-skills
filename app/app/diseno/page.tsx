@@ -13,6 +13,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { DisenoView } from '@/components/views/DisenoView'
 import type { DisenoEntry, EstadoPub } from '@/lib/diseno/types'
 import { normalizeSubEstado } from '@/lib/diseno/types'
+import { colorDeMarca } from '@/lib/marcas/branding'
+import { DisenoFechasShell, type FechaTablero } from '@/components/views/DisenoFechasShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -143,6 +145,14 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     .neq('slug', 'interno')
     .order('nombre')
 
+  /* Fechas importantes de marcas — Ailyn las necesita en su tablero para
+     planificar contenido (Pedro 132c5a66). Misma fuente que /fechas-importantes
+     y el calendario de publicaciones; solo lectura aquí. */
+  const fechasResult = await service
+    .from('fechas_importantes')
+    .select('id, marca_id, titulo, fecha, nota, categoria, contenido')
+    .order('fecha')
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rowsA = (resA.data ?? []) as any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,19 +225,38 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const marcas = (marcasResult.data ?? []) as any[]
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fechasImportantes: FechaTablero[] = ((fechasResult?.data ?? []) as any[]).map((f) => {
+    const mi = marcaById.get(f.marca_id)
+    const slug = mi?.slug ?? 'unknown'
+    return {
+      id: f.id as string,
+      titulo: f.titulo as string,
+      fecha: (typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : f.fecha) as string,
+      nota: (f.nota ?? null) as string | null,
+      categoria: (f.categoria ?? 'otro') as string,
+      contenido: (f.contenido ?? null) as string | null,
+      marcaNombre: mi?.nombre ?? 'Marca',
+      marcaSlug: slug,
+      color: mi ? colorDeMarca(slug, mi.color) : '#7170ff',
+    }
+  })
+
   return (
-    <DisenoView
-      entries={entries}
-      marcas={marcas.map((m) => ({
-        slug: m.slug,
-        nombre: m.nombre,
-        color: m.color_primario_hex ?? '#737373',
-        emoji: m.emoji_marca ?? null,
-      }))}
-      migrationPendiente={migrationPendiente}
-      rangoDesde={DESDE}
-      rangoHasta={HASTA}
-      initialNuevo={initialNuevo}
-    />
+    <DisenoFechasShell fechas={fechasImportantes}>
+      <DisenoView
+        entries={entries}
+        marcas={marcas.map((m) => ({
+          slug: m.slug,
+          nombre: m.nombre,
+          color: m.color_primario_hex ?? '#737373',
+          emoji: m.emoji_marca ?? null,
+        }))}
+        migrationPendiente={migrationPendiente}
+        rangoDesde={DESDE}
+        rangoHasta={HASTA}
+        initialNuevo={initialNuevo}
+      />
+    </DisenoFechasShell>
   )
 }
