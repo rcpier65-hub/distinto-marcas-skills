@@ -8,6 +8,7 @@
 // Server component: intenta fetch Supabase, fallback mock.
 
 import { PublicacionesView } from '@/components/views/PublicacionesView'
+import { HistoriasEnPublicaciones } from '@/components/views/HistoriasEnPublicaciones'
 import { SyncNotionButton } from './_components/SyncNotionButton'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import {
@@ -196,13 +197,13 @@ export default async function PublicacionesPage() {
         </a>
         <SyncNotionButton />
       </div>
+      <HistoriasEnPublicaciones historias={historiasCal} />
       <PublicacionesView
         publicaciones={pubs}
         marcas={marcas}
         fechasImportantes={fechasImportantes}
         marcasFechas={marcasFechas}
         canManageFechas={canManageFechas}
-        historias={historiasCal}
       />
     </>
   )
