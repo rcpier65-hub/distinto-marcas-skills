@@ -70,7 +70,7 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
   const SELECT = `
     id, nombre, descripcion,
     fecha_publicacion, fecha_diseno, fecha_entrega,
-    estado, estado_tarea,
+    estado, estado_tarea, diseno_terminado_at,
     plataformas, tipo_contenido,
     fecha_marcada_para_disenar, marcas_extra,
     started_at, archived_at,
@@ -79,7 +79,7 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
   const FALLBACK_SELECT = `
     id, nombre,
     fecha_publicacion, fecha_diseno,
-    estado, estado_tarea,
+    estado, estado_tarea, diseno_terminado_at,
     plataformas, tipo_contenido,
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
   `
@@ -164,14 +164,17 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     seen.add(r.id)
     return true
   }).filter((r) => {
-    /* Ailyn 493525fb: posts de grilla (tienen fecha_publicacion) que ya
-       terminaron diseño (listo/enviado/archivado) NO deben figurar en su
-       tablero. Lorena los asigna con "Mandar a diseño"; cuando el diseño
-       termina, el post sigue en Publicaciones/grilla, no como tarjeta de
-       Ailyn. Las standalone (sin fecha_publicacion) SÍ se quedan en Listo
-       hasta archivar — flujo normal del módulo. */
+    /* Ailyn 493525fb + 5549e47c: posts de grilla terminados solo salen del
+       tablero si diseño selló (diseno_terminado_at). Si están listo/enviado
+       sin sello (Lorena avanzó pipeline o Mandar a diseño sobre un listo),
+       DEBEN seguir visibles — si no, "se hacen solitas" y no salen en el
+       reporte. Standalone sin fecha_publicacion siguen en Listo hasta archivar. */
     const sub = (r.estado_tarea ?? '') as string
-    if (r.fecha_publicacion && (sub === 'listo' || sub === 'enviado' || sub === 'archivado')) {
+    if (
+      r.fecha_publicacion &&
+      (sub === 'listo' || sub === 'enviado' || sub === 'archivado') &&
+      r.diseno_terminado_at
+    ) {
       return false
     }
     return true
