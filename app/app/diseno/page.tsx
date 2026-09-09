@@ -153,6 +153,18 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     if (seen.has(r.id)) return false
     seen.add(r.id)
     return true
+  }).filter((r) => {
+    /* Ailyn 493525fb: posts de grilla (tienen fecha_publicacion) que ya
+       terminaron diseño (listo/enviado/archivado) NO deben figurar en su
+       tablero. Lorena los asigna con "Mandar a diseño"; cuando el diseño
+       termina, el post sigue en Publicaciones/grilla, no como tarjeta de
+       Ailyn. Las standalone (sin fecha_publicacion) SÍ se quedan en Listo
+       hasta archivar — flujo normal del módulo. */
+    const sub = (r.estado_tarea ?? '') as string
+    if (r.fecha_publicacion && (sub === 'listo' || sub === 'enviado' || sub === 'archivado')) {
+      return false
+    }
+    return true
   })
 
   /* Lookup de marca por id, para resolver las etiquetas extra (marcas_extra). */
