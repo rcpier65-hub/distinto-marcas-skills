@@ -46,13 +46,15 @@ export function TrabajoEquipo({
   /** Totales unificados del equipo (misma query que el carrusel). */
   totales?: TotalesEquipo | null
 }) {
-  const totalPend = totales?.totales ?? miembros.reduce((s, m) => s + m.pendientes, 0)
-  const chips: { key: string; label: string; value: number; color: string }[] = totales
+  /* Also accept totales attached on the array (compat TrabajoEquipoResult). */
+  const t = totales ?? (miembros as MiembroTrabajo[] & { totales?: TotalesEquipo }).totales ?? null
+  const totalPend = t?.totales ?? miembros.reduce((s, m) => s + m.pendientes, 0)
+  const chips: { key: string; label: string; value: number; color: string }[] = t
     ? [
-        { key: 'totales', label: 'Tareas totales', value: totales.totales, color: '#7170ff' },
-        { key: 'editor', label: 'Editor', value: totales.editor, color: '#8b5cf6' },
-        { key: 'diseno', label: 'Diseño', value: totales.diseno, color: '#ec4899' },
-        { key: 'generales', label: 'Generales', value: totales.generales, color: '#0ea5e9' },
+        { key: 'totales', label: 'Tareas totales', value: t.totales, color: '#7170ff' },
+        { key: 'editor', label: 'Editor', value: t.editor, color: '#8b5cf6' },
+        { key: 'diseno', label: 'Diseño', value: t.diseno, color: '#ec4899' },
+        { key: 'generales', label: 'Generales', value: t.generales, color: '#0ea5e9' },
       ]
     : []
 
