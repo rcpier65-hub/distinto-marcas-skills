@@ -2,7 +2,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, CircleDashed, Plus, Trash2, X, Instagram } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleDashed, Plus, Trash2, X, Camera } from 'lucide-react'
 import { crearHistoria, actualizarHistoria, eliminarHistoria, type HistoriaEstado } from '../_actions'
 
 export type MarcaLite = { id: string; nombre: string; emoji: string | null; color: string; slug: string }
@@ -139,7 +139,7 @@ function FormHistoria({ marcas, fechaInicial, edit, onClose, onDone }: { marcas:
   }
   return <Overlay onClose={onClose}>
     <div className="flex items-center justify-between mb-4">
-      <div className="font-extrabold text-[16px] flex items-center gap-2"><Instagram className="w-4 h-4" style={{ color: '#ec4899' }} />{edit ? 'Editar historia' : 'Nueva historia'}</div>
+      <div className="font-extrabold text-[16px] flex items-center gap-2"><Camera className="w-4 h-4" style={{ color: '#ec4899' }} />{edit ? 'Editar historia' : 'Nueva historia'}</div>
       <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted"><X className="w-4 h-4 mx-auto" /></button>
     </div>
     <div className="space-y-3">
