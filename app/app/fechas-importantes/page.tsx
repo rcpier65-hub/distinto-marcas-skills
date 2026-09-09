@@ -52,5 +52,6 @@ export default async function FechasImportantesPage() {
     nota: f.nota ?? null, categoria: f.categoria ?? 'otro', contenido: f.contenido ?? null,
   }))
 
-  return <FechasView marcas={marcas} fechas={fechas} readOnly={!esGestor && !!p} />
+  /* readOnly UI deferred (FechasView); writes still gated in _actions for non-gestores. */
+  return <FechasView marcas={marcas} fechas={fechas} />
 }
