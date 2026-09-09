@@ -79,7 +79,28 @@ export async function updatePublicacion(
      diseño" (es_tarea_diseno) lo hace. El auto-flag (27-jun) inundaba /diseno
      con TODOS los posts de grilla que Lorena pasaba a la etapa Diseñar. */
   let activoParaDiseno = false
-  if (input.es_tarea_diseno === true) activoParaDiseno = true
+  if (input.es_tarea_diseno === true) {
+    activoParaDiseno = true
+    /* Ailyn 5549e47c: si Lorena manda a diseño un post de grilla que ya
+       estaba listo/enviado/archivado SIN sello diseno_terminado_at, el
+       filtro del tablero lo esconde al instante ("se hicieron solitas") y
+       el reporte no lo cuenta. Reabrimos a sin_empezar para que Ailyn lo
+       trabaje de verdad. */
+    const { data: ctxMandar } = await service
+      .from('publicaciones')
+      .select('estado_tarea, diseno_terminado_at')
+      .eq('id', id)
+      .maybeSingle()
+    const sub = (ctxMandar?.estado_tarea ?? '') as string
+    if (
+      !ctxMandar?.diseno_terminado_at &&
+      (sub === 'listo' || sub === 'enviado' || sub === 'archivado')
+    ) {
+      update.estado_tarea = 'sin_empezar'
+      update.estado = 'disenar'
+      update.archived_at = null
+    }
+  }
 
   if (input.estado_tarea === 'listo') {
     const { data: ctx } = await service
@@ -130,7 +151,7 @@ export async function updatePublicacion(
   if (typeof input.estado === 'string' && ESTADOS_AVANZADOS.includes(input.estado)) {
     const { data: ctxRev } = await service
       .from('publicaciones')
-      .select('estado, nombre, es_tarea_diseno, editado_at, fecha_publicacion, marca:marcas(id, nombre, emoji_marca)')
+      .select('estado, nombre, es_tarea_diseno, editado_at, fecha_publicacion, diseno_terminado_at, marca:marcas(id, nombre, emoji_marca)')
       .eq('id', id)
       .maybeSingle()
     if (ctxRev) {
@@ -139,7 +160,14 @@ export async function updatePublicacion(
         if (input.editado === undefined) update.editado = true
         if (!ctxRev.editado_at && update.editado_at === undefined) update.editado_at = new Date().toISOString()
       }
-      if (esDiseno && ctxRev.fecha_publicacion && update.es_tarea_diseno === undefined) {
+      /* Solo sacar de /diseno al avanzar pipeline si diseño YA selló.
+         Si no, Lorena avanzando deja el post "listo" mágico sin reporte (5549e47c). */
+      if (
+        esDiseno &&
+        ctxRev.fecha_publicacion &&
+        update.es_tarea_diseno === undefined &&
+        ctxRev.diseno_terminado_at
+      ) {
         update.es_tarea_diseno = false
       }
       if (input.estado === 'aprobar' && ctxRev.estado !== 'aprobar') {

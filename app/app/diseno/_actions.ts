@@ -134,7 +134,7 @@ export async function updateDisenoEntry(
     if (patch.subEstado === 'listo' || patch.subEstado === 'enviado') {
       const { data: prev } = await service
         .from('publicaciones')
-        .select('diseno_terminado_at, disenador_nombre')
+        .select('diseno_terminado_at, disenador_nombre, fecha_publicacion')
         .eq('id', id)
         .maybeSingle()
       if (!prev?.diseno_terminado_at) update.diseno_terminado_at = new Date().toISOString()
@@ -153,6 +153,8 @@ export async function updateDisenoEntry(
           if (d && d[0]?.id) update.disenador_id = d[0].id
         }
       }
+      /* Grilla: al sellar, salir del tablero (mismo criterio que updatePublicacion). */
+      if (prev?.fecha_publicacion) update.es_tarea_diseno = false
     } else if (patch.subEstado === 'sin_empezar' || patch.subEstado === 'en_progreso' || patch.subEstado === 'pausada') {
       update.diseno_terminado_at = null
     }
