@@ -10,10 +10,22 @@ import { promptSeedPorSlug } from '@/lib/copys/seeds'
 import { registrarActividad } from '@/lib/actividad/registrar'
 import { enviarPushAClientesDeMarca, enviarPushAMiembros, marcaAvisaAlEquipo } from '@/lib/push/send'
 
-export type { UpdatePublicacionInput } from './update-publicacion'
-export { updatePublicacion } from './update-publicacion'
+import {
+  updatePublicacion as updatePublicacionImpl,
+  type UpdatePublicacionInput,
+} from './update-publicacion'
+
+export type { UpdatePublicacionInput }
 
 type ActionResult = { ok: true } | { ok: false; error: string }
+
+/** Local async re-export — Next forbids `export { fn } from` in "use server" files. */
+export async function updatePublicacion(
+  id: string,
+  input: UpdatePublicacionInput,
+): Promise<ActionResult> {
+  return updatePublicacionImpl(id, input)
+}
 
 export async function togglePublicacionField(
   id: string,

@@ -81,7 +81,7 @@ export async function updatePublicacion(
   let activoParaDiseno = false
   if (input.es_tarea_diseno === true) activoParaDiseno = true
 
-  if (input.estado_tarea === 'listo' || input.estado_tarea === 'enviado') {
+  if (input.estado_tarea === 'listo') {
     const { data: ctx } = await service
       .from('publicaciones')
       .select('es_tarea_diseno, estado, fecha_publicacion, diseno_terminado_at, disenador_nombre')
