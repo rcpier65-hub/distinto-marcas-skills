@@ -1,6 +1,22 @@
 // app/lib/inicio/get-trabajo-equipo.ts
-// Pedro tickets b2f993db + e5d97753: team sync + totales editor/diseño/generales
+//
+// "El trabajo de tu equipo" para el inicio del CEO. Pedro lo quiere como
+// un CARRUSEL de cards (una por persona, estilo "Tareas en diseño"): cada
+// card lista LAS TAREAS de esa persona con nombre + marca + estado + la
+// fecha programada de la tarea.
+//
+// Fuentes (Pedro 24-ago-2026 — tickets b2f993db + e5d97753):
+//   - diseno     → publicaciones es_tarea_diseno=true, estado_tarea no listo/archivado
+//   - editor     → publicaciones estado='editar' por editor_nombre
+//   - generales  → tabla `tareas` incompletas (tablero /tareas) por team_member_id
+//   - community  → comentarios_inbox status='pending' (además de generales)
+//
+// Los totales del equipo (totales / editor / diseño / generales) se
+// calculan UNA sola vez sobre esas mismas queries — así no se desfasán
+// del carrusel. Realtime (tabla tareas + publicaciones) + AutoRefresh
+// en /inicio mantienen la sync permanente sin un sistema nuevo.
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 
 export type TareaMiembroTipo = 'diseno' | 'editor' | 'general' | 'comentario'
@@ -11,7 +27,7 @@ export type TareaMiembro = {
   marcaNombre: string
   marcaColor: string
   estadoLabel: string
-  fechaLabel: string | null
+  fechaLabel: string | null   // 'Mié 17 jun' o null si no tiene fecha
   href: string
   tipo: TareaMiembroTipo
 }
@@ -31,11 +47,14 @@ export type MiembroTrabajo = {
   color: string
   pendientes: number
   tareas: TareaMiembro[]
-  moduloHref: string
+  moduloHref: string          // dónde ver todo el trabajo de esta persona
+  /** Conteos por bucket de ESTA persona (para chips en la card). */
   conteos?: { editor: number; diseno: number; generales: number; comentario: number }
 }
 
-export type TrabajoEquipoResult = {
+/** Array of members + attached `totales` / `miembros` alias.
+ *  Keeps CockpitView `trabajoEquipo.length` working while chips get totales. */
+export type TrabajoEquipoResult = MiembroTrabajo[] & {
   miembros: MiembroTrabajo[]
   totales: TotalesEquipo
 }
@@ -73,6 +92,7 @@ const SUBESTADO_LABEL: Record<string, string> = {
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
+/* 'YYYY-MM-DD' (o timestamp) → 'Mié 17 jun'. Null si no parsea. */
 function fechaCorta(raw: string | null | undefined): string | null {
   if (!raw) return null
   const s = String(raw).slice(0, 10)
@@ -83,6 +103,7 @@ function fechaCorta(raw: string | null | undefined): string | null {
   return `${DIAS[dt.getDay()]} ${d} ${MESES[mo - 1]}`
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function marcaDe(row: any): { nombre: string; color: string } {
   const m = Array.isArray(row?.marca) ? row.marca[0]
     : Array.isArray(row?.marcas) ? row.marcas[0]
@@ -93,6 +114,8 @@ function marcaDe(row: any): { nombre: string; color: string } {
   }
 }
 
+/* Prioridad de orden pedida por Pedro: Ailyn 1°, Pieer 2°, Lorena 3°,
+   el resto después (por cantidad de pendientes desc). */
 function prioridad(nombre: string): number {
   const n = nombre.toLowerCase()
   if (n.includes('ailyn')) return 0
@@ -109,6 +132,12 @@ function emptyConteos() {
   return { editor: 0, diseno: 0, generales: 0, comentario: 0 }
 }
 
+/**
+ * Carga el trabajo del equipo + totales unificados.
+ * Batch: 4 queries en paralelo (diseño, editor, generales, comentarios)
+ * y se reparte por persona — evita N+1 y garantiza que los chips
+ * "totales / editor / diseño / generales" sumen lo mismo que el carrusel.
+ */
 export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoResult> {
   let miembros: { id: string; nombre: string; rol_base: string }[] = []
   try {
@@ -117,14 +146,22 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
       .select('id, nombre, rol_base, activo')
       .eq('activo', true)
       .order('nombre')
+    /* Operativos: excluye director/CEO del carrusel (Pedro no es "equipo").
+       Erick (director) tampoco aparece como card — ve el carrusel, no está en él. */
     miembros = (data ?? []).filter(
       (m: { rol_base: string }) => m.rol_base && m.rol_base !== 'director',
     )
   } catch {
-    return { miembros: [], totales: { totales: 0, editor: 0, diseno: 0, generales: 0 } }
+    const empty = [] as unknown as TrabajoEquipoResult
+    empty.miembros = []
+    empty.totales = { totales: 0, editor: 0, diseno: 0, generales: 0 }
+    return empty
   }
   if (miembros.length === 0) {
-    return { miembros: [], totales: { totales: 0, editor: 0, diseno: 0, generales: 0 } }
+    const empty = [] as unknown as TrabajoEquipoResult
+    empty.miembros = []
+    empty.totales = { totales: 0, editor: 0, diseno: 0, generales: 0 }
+    return empty
   }
 
   const byId = new Map<string, { m: typeof miembros[0]; tareas: TareaMiembro[]; conteos: ReturnType<typeof emptyConteos> }>()
@@ -132,6 +169,7 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
     byId.set(m.id, { m, tareas: [], conteos: emptyConteos() })
   }
 
+  /* Alias primer-nombre → member id (para matchear editor_nombre "PIEER"). */
   const porPrimerNombre = new Map<string, string>()
   for (const m of miembros) {
     const k = primerNombre(m.nombre).toLowerCase()
@@ -195,7 +233,10 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
       .then((r: unknown) => r, () => ({ data: [] })),
   ])
 
+  /* ---- Diseño: hoy hay una sola diseñadora (Ailyn) → todas van a ella.
+     Si hay varias, matchearíamos por disenador_nombre (igual que editor). */
   const disenadores = miembros.filter((m) => m.rol_base === 'disenador')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const disenoRows = (disenoRes?.data ?? []) as any[]
   for (const r of disenoRows) {
     const mk = marcaDe(r)
@@ -209,6 +250,8 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
       href: `/publicaciones/${r.id}`,
       tipo: 'diseno',
     }
+    /* Con 1 diseñadora: todas. Con 0: no atribuimos. Con N: a la primera
+       por ahora (mismo comportamiento histórico del carrusel). */
     const dest = disenadores[0]
     if (!dest) continue
     const bucket = byId.get(dest.id)
@@ -217,6 +260,8 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
     bucket.conteos.diseno++
   }
 
+  /* ---- Editor: match por primer nombre (Notion guarda "PIEER"). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const r of ((editorRes?.data ?? []) as any[])) {
     const alias = primerNombre(String(r.editor_nombre ?? '')).toLowerCase()
     const mid = porPrimerNombre.get(alias)
@@ -237,6 +282,9 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
     bucket.conteos.editor++
   }
 
+  /* ---- Generales: tablero /tareas (antes NO entraban → totales del
+     equipo no reflejaban las 29+ tareas generales abiertas). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const t of ((generalesRes?.data ?? []) as any[])) {
     const mid = t.team_member_id as string | null
     if (!mid) continue
@@ -255,9 +303,11 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
     bucket.conteos.generales++
   }
 
+  /* ---- Comentarios: a CMs / SMMs (compartidos: misma cola, como antes). */
   const cms = miembros.filter(
     (m) => m.rol_base === 'community_manager' || m.rol_base === 'social_media_manager',
   )
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const comRows = ((comentariosRes?.data ?? []) as any[]).map((r) => {
     const mk = marcaDe(r)
     const txt = (r.comment_text ?? '').trim()
@@ -272,6 +322,9 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
       tipo: 'comentario' as const,
     }
   })
+  /* Misma cola para cada CM (histórico): cada card CM ve los pendientes.
+     Para totales de equipo NO sumamos comentarios N veces — van fuera de
+     editor/diseño/generales (Pedro pidió esos 3 + total). */
   for (const cm of cms) {
     const bucket = byId.get(cm.id)
     if (!bucket) continue
@@ -303,12 +356,18 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
     return b.pendientes - a.pendientes
   })
 
+  /* Totales del EQUIPO = editor + diseño + TODAS las generales de miembros
+     activos (incluye directores como Pedro: sus /tareas también cuentan en
+     el chip "generales" / "totales"). Comentarios NO entran a esos chips. */
   let editor = 0
   let diseno = 0
   for (const m of out) {
-    editor += m.conteos.editor
-    diseno += m.conteos.diseno
+    editor += m.conteos?.editor ?? 0
+    diseno += m.conteos?.diseno ?? 0
   }
+  /* Generales: contar filas de la query, no solo las del carrusel — así el
+     chip refleja el tablero completo que Pedro ve en /tareas (dueño). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const generalesAll = ((generalesRes?.data ?? []) as any[]).filter((t) => !!t.team_member_id).length
   const totales: TotalesEquipo = {
     editor,
@@ -317,5 +376,8 @@ export async function getTrabajoEquipo(service: Service): Promise<TrabajoEquipoR
     totales: editor + diseno + generalesAll,
   }
 
-  return { miembros: out, totales }
+  const result = out as TrabajoEquipoResult
+  result.miembros = out
+  result.totales = totales
+  return result
 }
