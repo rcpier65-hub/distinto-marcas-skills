@@ -71,7 +71,7 @@ export default async function EditorPage() {
       .select(`
         id, nombre, fecha_publicacion, fecha_edicion, estado, plataformas,
         editor_id, editor_nombre, enlace_tomas, guion, fecha_marcada_para_editar,
-        iniciado_edicion_at, editado_at, es_tarea_diseno,
+        iniciado_edicion_at, editado_at, editado, es_tarea_diseno,
         marca:marcas(slug)
       `)
       /* DESC + límite alto: el Editor DEBE incluir los videos recientes/futuros
@@ -176,6 +176,8 @@ export default async function EditorPage() {
       fechaMarcadaParaEditar: r.fecha_marcada_para_editar ?? null,
       iniciadoEdicionAt: r.iniciado_edicion_at ?? null,
       editadoAt: r.editado_at ?? null,
+      /* editado puede faltar si el retry cayó al SELECT sin columnas nuevas. */
+      editado: !!r.editado || !!r.editado_at,
     }
   })
 

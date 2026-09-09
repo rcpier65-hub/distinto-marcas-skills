@@ -45,15 +45,33 @@ export default async function DisenoDetailPage({ params }: PageProps) {
 
   const marca = Array.isArray(pub.marca) ? pub.marca[0] : pub.marca
 
-  /* Marcas activas para el selector "cambiar marca" + etiquetas extra. */
+  /* Marcas para el selector "cambiar marca" + etiquetas extra.
+     Misma fuente que /diseno (crear tarea): activas, sin 'interno'.
+     Antes el detalle filtraba solo activa y el modal de alta NO — o al
+     revés según el momento — y RETOZ podía faltar al editar una tarea
+     ya creada (Ailyn a312df2d). Excluimos 'interno' porque MarcaSelect
+     ya lo ofrece como default vacío. */
   const { data: marcasData } = await service
     .from('marcas')
     .select('id, slug, nombre, emoji_marca')
     .eq('activa', true)
+    .neq('slug', 'interno')
     .order('nombre')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const marcasRaw = (marcasData ?? []) as any[]
-  const marcas = marcasRaw.map((m) => ({
+  let marcasRaw = (marcasData ?? []) as any[]
+  /* Si la marca actual de la tarea no está en activas (p.ej. desactivada
+     o slug recién creado), la incluimos para que el selector no la pierda
+     y se pueda cambiar hacia/desde ella. */
+  const currentSlug = (marca?.slug ?? null) as string | null
+  if (currentSlug && currentSlug !== 'interno' && !marcasRaw.some((m: any) => m.slug === currentSlug)) {
+    const { data: cur } = await service
+      .from('marcas')
+      .select('id, slug, nombre, emoji_marca')
+      .eq('slug', currentSlug)
+      .maybeSingle()
+    if (cur) marcasRaw = [...marcasRaw, cur]
+  }
+  const marcas = marcasRaw.map((m: any) => ({
     slug: m.slug as string,
     nombre: m.nombre as string,
     emoji: (m.emoji_marca ?? null) as string | null,

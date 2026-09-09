@@ -240,11 +240,11 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
        tienen fecha de edición programada en este mes. */
     const objetivoMes = enMes.length
 
-    const porEditar = entries.filter((e) => e.estado === 'editar').length
-    const conGuion = entries.filter((e) => e.estado === 'editar' && (e.guion?.trim().length ?? 0) > 0).length
-    const sinGuion = entries.filter((e) => e.estado === 'editar' && (e.guion?.trim().length ?? 0) === 0).length
+    const porEditar = entries.filter((e) => e.estado === 'editar' && !e.editado).length
+    const conGuion = entries.filter((e) => e.estado === 'editar' && !e.editado && (e.guion?.trim().length ?? 0) > 0).length
+    const sinGuion = entries.filter((e) => e.estado === 'editar' && !e.editado && (e.guion?.trim().length ?? 0) === 0).length
     const urgentes = entries.filter((e) =>
-      e.estado === 'editar' && calcularAlertaFecha(e.fechaEdicion, e.grillaFit) === 'rojo'
+      e.estado === 'editar' && !e.editado && calcularAlertaFecha(e.fechaEdicion, e.grillaFit) === 'rojo'
     ).length
 
     /* ===== Métrica: editados POR DÍA (basado en editado_at) =====
@@ -295,6 +295,10 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
     const finMesDate = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0)
     const finMes = `${finMesDate.getFullYear()}-${String(finMesDate.getMonth() + 1).padStart(2, '0')}-${String(finMesDate.getDate()).padStart(2, '0')}`
     const ESTADOS_EDITADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
+    /* Pendiente de editar = estado pipeline Editar/Editando Y aún no marcado
+       como editado (tijereta / checklist / mandar a aprobar). Lorena
+       aded34d1: con filtro "Editar" seguían saliendo videos ya editados. */
+    const pendienteEditar = (e: EditorEntry) => e.estado === 'editar' && !e.editado
 
     let list = entries.filter((e) => {
       /* "Mi trabajo para hoy" tiene prioridad sobre el filtro de
@@ -306,22 +310,26 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
            IGNORA filters.estado porque la vista ya implica un estado.
            Pero respeta editor/marca/search para drill-down combinable. */
         if (filters.vistaRapida === 'porEditar') {
-          if (e.estado !== 'editar') return false
+          if (!pendienteEditar(e)) return false
         } else if (filters.vistaRapida === 'conGuion') {
-          if (e.estado !== 'editar') return false
+          if (!pendienteEditar(e)) return false
           if ((e.guion?.trim().length ?? 0) === 0) return false
         } else if (filters.vistaRapida === 'sinGuion') {
-          if (e.estado !== 'editar') return false
+          if (!pendienteEditar(e)) return false
           if ((e.guion?.trim().length ?? 0) > 0) return false
         } else if (filters.vistaRapida === 'urgentes') {
-          if (e.estado !== 'editar') return false
+          if (!pendienteEditar(e)) return false
           if (calcularAlertaFecha(e.fechaEdicion, e.grillaFit) !== 'rojo') return false
         } else if (filters.vistaRapida === 'editadosMes') {
           if (!ESTADOS_EDITADOS.includes(e.estado)) return false
           if (e.fechaEdicion < inicioMes || e.fechaEdicion > finMes) return false
         }
       } else {
-        if (filters.estado !== 'todos' && e.estado !== filters.estado) return false
+        if (filters.estado === 'editar') {
+          if (!pendienteEditar(e)) return false
+        } else if (filters.estado !== 'todos' && e.estado !== filters.estado) {
+          return false
+        }
       }
       if (filters.editorId !== 'todos') {
         if (filters.editorId === '_sin') {
@@ -409,16 +417,19 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
 
   function setEstado(id: string, estado: EstadoPub) {
     /* Optimistic: si pasa a un estado avanzado y editado_at está null,
-       lo seteamos local ya. El backend hace la misma lógica y persiste. */
+       lo seteamos local ya. El backend hace la misma lógica y persiste.
+       Volver a 'editar' limpia `editado` para que reaparezca en el filtro
+       (revisión / Brandy). */
     const ESTADOS_AVANZADOS: EstadoPub[] = ['aprobar', 'programar', 'publicar', 'publicado']
     const prevEntry = entries.find((e) => e.id === id)
     const patch: Partial<EditorEntry> = { estado }
-    if (
-      ESTADOS_AVANZADOS.includes(estado) &&
-      prevEntry &&
-      !prevEntry.editadoAt
-    ) {
-      patch.editadoAt = new Date().toISOString()
+    if (ESTADOS_AVANZADOS.includes(estado)) {
+      patch.editado = true
+      if (prevEntry && !prevEntry.editadoAt) {
+        patch.editadoAt = new Date().toISOString()
+      }
+    } else if (estado === 'editar') {
+      patch.editado = false
     }
     persist(id, patch, () => updateEditorEntry(id, { estado }), `Estado → ${ESTADO_CONFIG[estado].label}`)
   }

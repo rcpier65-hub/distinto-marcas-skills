@@ -132,6 +132,13 @@ export async function updateEditorEntry(
 
      Sólo aplicamos si patch.estado viene definido y es estado avanzado. */
   const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
+  const ESTADOS_EDICION = ['editar', 'editando']
+  /* Volver a editar/editando (revisión) → limpiar flag `editado` para que
+     el video reaparezca bajo el filtro Editar. No tocamos editado_at
+     (histórico del reporte). */
+  if (patch.estado !== undefined && ESTADOS_EDICION.includes(patch.estado)) {
+    update.editado = false
+  }
   let avisarListo = false  // avisar al cliente "video listo para aprobar"
   if (patch.estado !== undefined && ESTADOS_AVANZADOS.includes(patch.estado)) {
     /* Terminó de editar (pasó a un estado avanzado) → encender el flag

@@ -137,6 +137,12 @@ export async function updatePublicacion(
      (B) AVISO AL CLIENTE — "tienes un video listo para aprobar" en la TRANSICIÓN
          a 'aprobar' (estado previo != 'aprobar'), para no re-notificar en cada
          guardado. Pedro 27-jul-2026. */
+  /* Volver a editar/editando (revisión) limpia `editado` para el filtro Editar
+     del módulo Editor (Lorena aded34d1 / revisión Brandy). */
+  if (typeof input.estado === 'string' && (input.estado === 'editar' || input.estado === 'editando')) {
+    if (input.editado === undefined) update.editado = false
+  }
+
   const ESTADOS_AVANZADOS = ['aprobar', 'programar', 'programar_anuncios', 'publicar', 'publicado', 'enviado']
   let avisarListoCliente: { marcaId: string; nombre: string; titulo: string; emoji: string } | null = null
   if (typeof input.estado === 'string' && ESTADOS_AVANZADOS.includes(input.estado)) {
