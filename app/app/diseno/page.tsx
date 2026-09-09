@@ -133,12 +133,15 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
   const resA = res
   const resB = { data: [] as unknown[], error: null as null }
 
-  /* Marcas para el modal de nueva tarea — excluye la "interno" del
-     dropdown porque ese es el bucket default cuando NO eligen marca. */
+  /* Marcas para el modal de nueva tarea — activas, sin "interno"
+     (bucket default cuando NO eligen marca). Alineado con /diseno/[id]
+     para que RETOZ y el resto aparezcan igual al crear y al editar. */
   const marcasResult = await service
     .from('marcas')
     .select('id, slug, nombre, color_primario_hex, emoji_marca')
+    .eq('activa', true)
     .neq('slug', 'interno')
+    .order('nombre')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rowsA = (resA.data ?? []) as any[]
