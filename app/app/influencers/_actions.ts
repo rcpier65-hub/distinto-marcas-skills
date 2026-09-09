@@ -19,8 +19,27 @@ function limpiarIg(u: string): string {
   return (u ?? '').trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/+$/, '')
 }
 
+function normalizarProductos(lista?: string[] | string | null): string[] {
+  if (lista == null) return []
+  const arr = Array.isArray(lista)
+    ? lista
+    : String(lista).split(/[\n,;]+/)
+  return arr.map((x) => String(x ?? '').trim()).filter(Boolean)
+}
+
+function limpiarTelefono(t?: string | null): string | null {
+  const v = (t ?? '').trim()
+  return v || null
+}
+
 export async function crearInfluencer(input: {
-  marcaSlug: string; usuarioIg: string; nombre?: string; estado?: EstadoInfluencer; notas?: string
+  marcaSlug: string
+  usuarioIg: string
+  nombre?: string
+  estado?: EstadoInfluencer
+  notas?: string
+  telefono?: string
+  productosEnviados?: string[] | string
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   await requireUser()
   const usuario = limpiarIg(input.usuarioIg)
@@ -33,6 +52,8 @@ export async function crearInfluencer(input: {
       nombre: (input.nombre ?? '').trim() || null,
       estado,
       notas: (input.notas ?? '').trim() || null,
+      telefono: limpiarTelefono(input.telefono),
+      productosEnviados: normalizarProductos(input.productosEnviados),
     })
     revalidatePath('/influencers')
     revalidatePath('/cliente')
@@ -56,7 +77,12 @@ export async function moverInfluencer(id: string, estado: EstadoInfluencer): Pro
 }
 
 export async function editarInfluencer(id: string, patch: {
-  usuarioIg?: string; nombre?: string; videoUrl?: string; notas?: string
+  usuarioIg?: string
+  nombre?: string
+  videoUrl?: string
+  notas?: string
+  telefono?: string
+  productosEnviados?: string[] | string
 }): Promise<Result> {
   await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,6 +99,8 @@ export async function editarInfluencer(id: string, patch: {
     p.video_url = v || null
   }
   if (patch.notas !== undefined) p.notas = patch.notas.trim() || null
+  if (patch.telefono !== undefined) p.telefono = limpiarTelefono(patch.telefono)
+  if (patch.productosEnviados !== undefined) p.productos_enviados = normalizarProductos(patch.productosEnviados)
   try {
     await actualizarInfluencerDb(id, p)
     revalidatePath('/influencers')

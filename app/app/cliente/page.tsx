@@ -202,6 +202,8 @@ export default async function ClientePortalPage() {
         estado: f.estado,
         videoUrl: f.video_url,
         notas: f.notas,
+        telefono: f.telefono,
+        productosEnviados: f.productos_enviados ?? [],
         creadoEl: f.created_at,
       }))
     }
