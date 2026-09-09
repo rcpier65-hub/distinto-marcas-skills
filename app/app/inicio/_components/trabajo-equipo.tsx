@@ -4,10 +4,15 @@
    Pedro lo quiere como un CARRUSEL horizontal de cards (una por persona,
    estilo "Tareas en diseño"): cada card = "Trabajo de [Nombre]" y lista
    SUS tareas con nombre + marca + estado + fecha programada.
-   Orden: Ailyn 1°, Pieer 2°, Lorena 3°, el resto a la derecha. */
+   Orden: Ailyn 1°, Pieer 2°, Lorena 3°, el resto a la derecha.
 
-import { Users, Palette, Video, MessageCircle, Calendar, type LucideIcon } from 'lucide-react'
-import type { MiembroTrabajo, TareaMiembro } from '@/lib/inicio/get-trabajo-equipo'
+   Tickets Pedro b2f993db + e5d97753: chips permanentes de totales del
+   equipo (totales / editor / diseño / generales) alimentados por la
+   misma agregación que el carrusel — no se desfasán. */
+
+import { Users, Palette, Video, MessageCircle, Calendar, CheckSquare, type LucideIcon } from 'lucide-react'
+import type { MiembroTrabajo, TareaMiembro, TotalesEquipo } from '@/lib/inicio/get-trabajo-equipo'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 const ROL_ICON: Record<string, LucideIcon> = {
   disenador: Palette,
@@ -23,15 +28,41 @@ const ROL_ACTION: Record<string, string> = {
   social_media_manager: 'Ver comentarios',
 }
 
+const TIPO_DOT: Record<string, string> = {
+  diseno: '#ec4899',
+  editor: '#8b5cf6',
+  general: '#7170ff',
+  comentario: '#22c55e',
+}
+
 function primerNombre(nombre: string): string {
   return nombre.split(/\s+/)[0] ?? nombre
 }
 
-export function TrabajoEquipo({ miembros }: { miembros: MiembroTrabajo[] }) {
-  const totalPend = miembros.reduce((s, m) => s + m.pendientes, 0)
+export function TrabajoEquipo({
+  miembros,
+  totales,
+}: {
+  miembros: MiembroTrabajo[]
+  /** Totales unificados del equipo (misma query que el carrusel). */
+  totales?: TotalesEquipo | null
+}) {
+  /* Also accept totales attached on the array (compat TrabajoEquipoResult). */
+  const t = totales ?? (miembros as MiembroTrabajo[] & { totales?: TotalesEquipo }).totales ?? null
+  const totalPend = t?.totales ?? miembros.reduce((s, m) => s + m.pendientes, 0)
+  const chips: { key: string; label: string; value: number; color: string }[] = t
+    ? [
+        { key: 'totales', label: 'Tareas totales', value: t.totales, color: '#7170ff' },
+        { key: 'editor', label: 'Editor', value: t.editor, color: '#8b5cf6' },
+        { key: 'diseno', label: 'Diseño', value: t.diseno, color: '#ec4899' },
+        { key: 'generales', label: 'Generales', value: t.generales, color: '#0ea5e9' },
+      ]
+    : []
 
   return (
     <section style={{ minWidth: 0 }}>
+      {/* Sync permanente en /inicio (CEO): mismo patrón 15s que /tareas. Pedro b2f993db. */}
+      <AutoRefresh intervalMs={15000} />
       {/* Header de la sección */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span style={{
@@ -50,6 +81,44 @@ export function TrabajoEquipo({ miembros }: { miembros: MiembroTrabajo[] }) {
           </p>
         </div>
       </div>
+
+      {/* Chips: totales / editor / diseño / generales — siempre alineados
+          con el carrusel (misma agregación server-side). */}
+      {chips.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: 8,
+          marginBottom: 14,
+        }}>
+          {chips.map((c) => (
+            <div
+              key={c.key}
+              style={{
+                background: '#fff',
+                border: '1px solid #f1f1f3',
+                borderRadius: 12,
+                padding: '10px 12px',
+                minWidth: 0,
+              }}
+            >
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: 0.4,
+                textTransform: 'uppercase', color: c.color, marginBottom: 4,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {c.label}
+              </div>
+              <div style={{
+                fontSize: 22, fontWeight: 800, color: '#111827',
+                fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+              }}>
+                {c.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {miembros.length === 0 ? (
         <div style={{
@@ -80,6 +149,7 @@ function PersonaCard({ miembro }: { miembro: MiembroTrabajo }) {
   const Icon = ROL_ICON[miembro.rolBase] ?? Users
   const color = miembro.color
   const accion = ROL_ACTION[miembro.rolBase] ?? 'Ver más'
+  const c = miembro.conteos ?? { editor: 0, diseno: 0, generales: 0, comentario: 0 }
 
   return (
     <section style={{
@@ -130,6 +200,19 @@ function PersonaCard({ miembro }: { miembro: MiembroTrabajo }) {
         </span>
       </div>
 
+      {/* Mini breakdown por tipo (editor / diseño / generales) */}
+      {(c.editor + c.diseno + c.generales) > 0 && (
+        <div style={{
+          display: 'flex', gap: 6, flexWrap: 'wrap',
+          padding: '8px 14px', borderBottom: '1px solid #f6f6f7',
+          background: 'rgba(0,0,0,0.015)',
+        }}>
+          {c.editor > 0 && <MiniChip color="#8b5cf6" label={`${c.editor} edit.`} />}
+          {c.diseno > 0 && <MiniChip color="#ec4899" label={`${c.diseno} diseño`} />}
+          {c.generales > 0 && <MiniChip color="#0ea5e9" label={`${c.generales} gen.`} />}
+        </div>
+      )}
+
       {/* Tareas */}
       <div style={{ flex: 1, maxHeight: 264, overflowY: 'auto' }}>
         {miembro.tareas.length === 0 ? (
@@ -140,7 +223,7 @@ function PersonaCard({ miembro }: { miembro: MiembroTrabajo }) {
             Sin pendientes 🎉
           </div>
         ) : (
-          miembro.tareas.map((t) => <TareaRow key={t.id} tarea={t} />)
+          miembro.tareas.map((t) => <TareaRow key={`${t.tipo}-${t.id}`} tarea={t} />)
         )}
       </div>
 
@@ -162,7 +245,20 @@ function PersonaCard({ miembro }: { miembro: MiembroTrabajo }) {
   )
 }
 
+function MiniChip({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, color,
+      background: `${color}14`, padding: '2px 7px', borderRadius: 999,
+      fontVariantNumeric: 'tabular-nums',
+    }}>
+      {label}
+    </span>
+  )
+}
+
 function TareaRow({ tarea }: { tarea: TareaMiembro }) {
+  const tipColor = TIPO_DOT[tarea.tipo] ?? '#94a3b8'
   return (
     <a
       href={tarea.href}
@@ -179,8 +275,14 @@ function TareaRow({ tarea }: { tarea: TareaMiembro }) {
         color: '#111827', fontWeight: 500, fontSize: 12.5,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         marginBottom: 3,
+        display: 'flex', alignItems: 'center', gap: 6,
       }}>
-        {tarea.titulo}
+        {tarea.tipo === 'general' ? (
+          <CheckSquare size={12} strokeWidth={2} color={tipColor} style={{ flexShrink: 0 }} />
+        ) : (
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: tipColor, flexShrink: 0 }} />
+        )}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tarea.titulo}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' }}>
         <span style={{ width: 5, height: 5, borderRadius: '50%', background: tarea.marcaColor, flexShrink: 0 }} />
