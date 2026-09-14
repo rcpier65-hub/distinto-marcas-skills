@@ -72,27 +72,29 @@ export async function busyTimes(from: string, to: string, config: Settings, excl
     const updated = await db().from('web_bookings').update(patch).eq('id', row.id)
     if (updated.error) throw new BookingError('La agenda requiere revisar un cambio de horario. Intenta más tarde.')
   }
-  // Include every selected calendar, plus primary and the destination. Fail closed.
-  const ids = new Set(['primary', config.calendar_id])
-  let pageToken: string | undefined
-  do {
-    const res = await google('/users/me/calendarList?maxResults=250' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''))
-    if (!res.ok) throw new BookingError('No pudimos sincronizar tu disponibilidad. Intenta de nuevo.')
-    const data = await res.json()
-    for (const cal of data.items ?? []) if (cal.selected && !cal.deleted) ids.add(cal.id)
-    pageToken = data.nextPageToken
-  } while (pageToken)
+  // The existing calendar.events grant permits events.list. Do not require
+  // calendarList/freeBusy scopes merely to read the calendars used by the app.
+  const linked = await db().from('google_oauth_tokens').select('calendar_id').eq('id', 1).maybeSingle()
+  if (linked.error) throw new BookingError('No pudimos identificar el calendario conectado.')
+  const ids = new Set(['primary', config.calendar_id, linked.data?.calendar_id].filter(Boolean) as string[])
   const busy: Busy[] = []
-  const all = [...ids]
-  for (let i = 0; i < all.length; i += 50) {
-    const res = await google('/freeBusy', { method: 'POST', body: JSON.stringify({ timeMin: from, timeMax: to, timeZone: 'America/Lima', items: all.slice(i, i + 50).map(id => ({ id })) }) })
-    if (!res.ok) throw new BookingError('No pudimos sincronizar tu disponibilidad. Intenta de nuevo.')
-    const data = await res.json()
-    for (const id of all.slice(i, i + 50)) {
-      const cal = data.calendars?.[id]
-      if (!cal || cal.errors?.length) throw new BookingError('No pudimos comprobar todos los calendarios. Intenta más tarde.')
-      busy.push(...cal.busy)
-    }
+  for (const id of ids) {
+    let pageToken: string | undefined
+    do {
+      const params = new URLSearchParams({ timeMin: from, timeMax: to, singleEvents: 'true', maxResults: '2500', timeZone: 'America/Lima', fields: 'nextPageToken,items(status,transparency,start,end)' })
+      if (pageToken) params.set('pageToken', pageToken)
+      const res = await google('/calendars/' + encodeURIComponent(id) + '/events?' + params)
+      if (!res.ok) throw new BookingError('No pudimos sincronizar tu disponibilidad. Intenta de nuevo.')
+      const data = await res.json()
+      for (const event of data.items ?? []) {
+        if (event.status === 'cancelled' || event.transparency === 'transparent') continue
+        const start = event.start?.dateTime || (event.start?.date ? event.start.date + 'T00:00:00-05:00' : null)
+        const end = event.end?.dateTime || (event.end?.date ? event.end.date + 'T00:00:00-05:00' : null)
+        if (!start || !end || !Number.isFinite(Date.parse(start)) || !Number.isFinite(Date.parse(end))) throw new BookingError('No pudimos verificar un evento de la agenda.')
+        busy.push({ start, end })
+      }
+      pageToken = data.nextPageToken
+    } while (pageToken)
   }
   const service = db()
   let query = service.from('web_bookings').select('starts_at,ends_at').in('status', ['pending','confirmed','review']).lt('starts_at', to).gt('ends_at', from)
@@ -117,7 +119,7 @@ export async function daySlots(date: string, config: Settings, excludeId?: strin
   return generateSlots(date, config, busy)
 }
 export type Booking = { id: string; request_hash: string; nombre: string; email: string; empresa: string; motivo: string; starts_at: string; ends_at: string; status: string; google_event_id: string; calendar_id: string; meet_link: string | null }
-export async function syncBooking(row: Booking) {
+export async function syncBooking(row: Booking, options: { sendInvitations?: boolean } = {}) {
   const path = `/calendars/${encodeURIComponent(row.calendar_id)}/events`
   // Deterministic event ID prevents duplicates even after server/network failures.
   let res = await google(path + '/' + row.google_event_id)
@@ -129,13 +131,14 @@ export async function syncBooking(row: Booking) {
       await db().from('web_bookings').update({ status: 'cancelled' }).eq('id', row.id)
       throw new BookingError('El horario dejó de estar disponible. Selecciona otro.', 409)
     }
-    res = await google(path + '?conferenceDataVersion=1&sendUpdates=all', { method: 'POST', body: JSON.stringify({
+    const sendInvitations = options.sendInvitations !== false
+    res = await google(path + '?conferenceDataVersion=1&sendUpdates=' + (sendInvitations ? 'all' : 'none'), { method: 'POST', body: JSON.stringify({
       id: row.google_event_id,
       summary: `Diagnóstico Distinto · ${row.empresa || row.nombre}`,
       description: `Reserva desde distintostudio.com\nNombre: ${row.nombre}\nEmpresa: ${row.empresa}\nMotivo: ${row.motivo}`,
       start: { dateTime: row.starts_at, timeZone: 'America/Lima' },
       end: { dateTime: row.ends_at, timeZone: 'America/Lima' },
-      attendees: [{ email: row.email, displayName: row.nombre }],
+      attendees: sendInvitations ? [{ email: row.email, displayName: row.nombre }] : [],
       conferenceData: { createRequest: { requestId: row.id, conferenceSolutionKey: { type: 'hangoutsMeet' } } },
       extendedProperties: { private: { distintoBooking: row.id } },
     }) })

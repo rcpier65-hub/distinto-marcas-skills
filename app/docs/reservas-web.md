@@ -7,15 +7,15 @@
 - GET disponibilidad: `/api/reservas/disponibilidad?desde=YYYY-MM-DD` (31 días, sin datos privados).
 - POST reserva: `/api/reservas` (utilizado por el formulario del mismo origen).
 
-## Activación pendiente
+## Conexión verificada
 
-La conexión de Google verificada el 14 de septiembre de 2026 tenía `calendar.events`, pero no `calendar.readonly`. Pulsar **Reconectar** en el calendario interno y aceptar los permisos de lectura que ya solicita la app. La API pública falla de forma cerrada mientras no pueda consultar todos los calendarios. No sustituir el calendario de la web hasta que GET disponibilidad devuelva 200 con horarios reales y se verifique una reserva controlada.
+La conexión existente con `calendar.events` permite consultar eventos mediante `events.list`. Se verificó disponibilidad real y una reserva temporal con Google Meet, reintento sin duplicados y limpieza completa, sin invitados ni correos. No es necesario reconectar Google.
 
 La nueva API usa la sesión OAuth existente de la app, no el conector de Google del asistente. No es necesario iniciar sesión en la app para reservar.
 
 ## Ajustes iniciales
 
-Citas de 60 minutos, lunes a viernes 09:00–18:00, 24 horas de anticipación, hasta 45 días adelante. Horario de Perú. Ajustables en el panel interno por director/admin. El calendario destino es `primary`. Se consulta el estado ocupado de los calendarios seleccionados en Google, primary y destino, además de reuniones y grabaciones internas. Las reuniones internas sin duración se bloquean durante 60 minutos; grabaciones con hora durante 120 minutos y sin hora por el día completo, porque el esquema existente no tiene hora final. Son bloqueos conservadores.
+Citas de 60 minutos, lunes a viernes 09:00–18:00, 24 horas de anticipación, hasta 45 días adelante. Horario de Perú. Ajustables en el panel interno por director/admin. El calendario destino es `primary`. Se consulta el estado ocupado de primary, el calendario conectado en la app y el calendario destino, además de reuniones y grabaciones internas. Las reuniones internas sin duración se bloquean durante 60 minutos; grabaciones con hora durante 120 minutos y sin hora por el día completo, porque el esquema existente no tiene hora final. Son bloqueos conservadores.
 
 ## Código para insertar en la web
 
@@ -57,6 +57,6 @@ Google Calendar no ofrece una transacción conjunta con Postgres: se verifica ju
 - Demo local `node scripts/preview-reservas.mjs`: selección y confirmación ficticia en navegador; móvil 390px sin desbordamiento horizontal.
 - Supabase advisors: sin hallazgos que mencionen las tres tablas nuevas.
 
-Pendiente: prueba completa con Google después de otorgar permisos de lectura. La demo local NO demuestra sincronización ni envío real de invitaciones.
+- `scripts/test-live-reservas.ts`: persistencia real en Supabase, creación de evento y Google Meet, reintento idempotente y eliminación del evento y registro temporales. No se enviaron invitaciones durante la prueba.
 
 La migración `20260913194318_public_booking.sql` ya se aplicó mediante Management API a `exhmimlehdisonjvedvx`. No volver a ejecutarla a ciegas ni correr todas las migraciones históricas sobre producción.
