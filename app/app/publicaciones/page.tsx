@@ -186,15 +186,6 @@ export default async function PublicacionesPage() {
   return (
     <>
       <div className="flex items-center justify-end gap-3 px-6 pt-4">
-        <a
-          href="/historias"
-          className="inline-flex items-center h-9 px-3 rounded-lg text-[13px] font-bold"
-          style={{ color: '#ec4899', border: '1px solid rgba(236,72,153,0.35)', background: 'rgba(236,72,153,0.08)' }}
-          data-historias-count={historiasCal.length}
-          title={historiasCal.length ? `${historiasCal.length} historias planificadas` : 'Abrir planificador de historias'}
-        >
-          ◐ Planificador de historias{historiasCal.length ? ` · ${historiasCal.length}` : ''}
-        </a>
         <SyncNotionButton />
       </div>
       <HistoriasEnPublicaciones historias={historiasCal} />
