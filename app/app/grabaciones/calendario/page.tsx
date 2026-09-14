@@ -332,6 +332,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {esDirector && <Link href="/grabaciones/calendario/reservas" className="text-sm font-medium text-purple-700">Reservas de la web ↗</Link>}
           <GoogleCalendarConnect connected={gcalStatus.connected} email={gcalStatus.email} />
           <RangoNav vista={vista} desde={desde} />
         </div>

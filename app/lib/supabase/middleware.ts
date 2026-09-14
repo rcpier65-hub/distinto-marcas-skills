@@ -13,6 +13,7 @@ export async function updateSession(request: NextRequest) {
   // tienen sesión de usuario → los dejamos pasar directo.
   const p = request.nextUrl.pathname
   const sinAuthUsuario =
+    p === '/reservar/diagnostico' || p === '/api/reservas' || p === '/api/reservas/disponibilidad' ||
     p === '/api/version' ||
     p.startsWith('/api/cron') ||
     p.startsWith('/api/v1') ||
