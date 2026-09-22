@@ -10,6 +10,7 @@
 // para que la UI le pida al usuario completarlos. Pedro 25-ago-2026.
 
 import { ymdLima } from '@/lib/fechas/hoy'
+import { fechaExplicita, fechaValida } from './fecha-explicita'
 
 export type AgendaParsed = {
   marcaSlug: string | null
@@ -23,18 +24,18 @@ type MarcaLite = { slug: string; nombre: string }
 
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
-function hoyLimaDate(): { ymd: string; dow: number } {
-  const ymd = ymdLima(new Date())
+function hoyLimaDate(now: Date): { ymd: string; dow: number } {
+  const ymd = ymdLima(now)
   const [y, m, d] = ymd.split('-').map(Number)
   const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()
   return { ymd, dow }
 }
 
 /* ============== OPENAI (preferido) ============== */
-async function parseConOpenAI(texto: string, marcas: MarcaLite[]): Promise<AgendaParsed | null> {
+async function parseConOpenAI(texto: string, marcas: MarcaLite[], now: Date): Promise<AgendaParsed | null> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
-  const { ymd, dow } = hoyLimaDate()
+  const { ymd, dow } = hoyLimaDate(now)
   const listaMarcas = marcas.map((m) => `${m.slug} — ${m.nombre}`).join('\n')
   const sistema = `Interpretas órdenes para AGENDAR REUNIONES de una agencia de marketing en Lima (zona America/Lima).
 HOY es ${ymd} (${DIAS[dow]}).
@@ -49,7 +50,7 @@ Devuelve SOLO JSON válido con esta estructura exacta:
   "durationMin": número en minutos (default 45),
   "titulo": "asunto PROFESIONAL de la reunión. Si el usuario menciona el MOTIVO/TEMA, inclúyelo SIEMPRE, ej. 'agenda reunión vid natur para revisión de la web' → 'Revisión de la web · Vid Natur'. Sin motivo → 'Reunión con {nombre de la marca}'"
 }
-Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el martes' = el PRÓXIMO martes. NUNCA descartes el motivo de la reunión si el usuario lo dijo. Responde SOLO el JSON.`
+Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). Una fecha explícita con día y mes SIEMPRE tiene prioridad sobre el día de la semana: 'jueves 01 de octubre' significa 1 de octubre, nunca el jueves más cercano. Sin año, usa la próxima ocurrencia de ese día y mes; respeta el año si está escrito. Solo 'el martes' SIN fecha explícita = el PRÓXIMO martes. NUNCA descartes el motivo de la reunión si el usuario lo dijo. Responde SOLO el JSON.`
 
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -72,7 +73,7 @@ Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el mar
     const slug = typeof p.marcaSlug === 'string' && marcas.some((m) => m.slug === p.marcaSlug) ? p.marcaSlug : null
     return {
       marcaSlug: slug,
-      fecha: /^\d{4}-\d{2}-\d{2}$/.test(String(p.fecha)) ? String(p.fecha) : null,
+      fecha: fechaValida(String(p.fecha)) ? String(p.fecha) : null,
       hora: /^\d{1,2}:\d{2}$/.test(String(p.hora)) ? String(p.hora).padStart(5, '0') : null,
       durationMin: Number.isFinite(p.durationMin as number) && (p.durationMin as number) > 0 ? Math.round(p.durationMin as number) : 45,
       titulo: (p.titulo ? String(p.titulo) : 'Reunión').trim().slice(0, 90),
@@ -84,7 +85,7 @@ Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el mar
 }
 
 /* ============== FALLBACK HEURÍSTICO ============== */
-function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
+function parseFallback(texto: string, marcas: MarcaLite[], now: Date): AgendaParsed {
   const t = texto.toLowerCase()
   // Marca: match por primera palabra significativa del nombre o el slug.
   const marca = marcas.find((m) => {
@@ -93,7 +94,7 @@ function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
     return t.includes(m.slug.toLowerCase()) || primeras.some((w) => t.includes(w))
   })
   // Fecha: hoy / mañana / pasado mañana / día de la semana.
-  const { ymd, dow } = hoyLimaDate()
+  const { ymd, dow } = hoyLimaDate(now)
   const [y, mo, d] = ymd.split('-').map(Number)
   const addDays = (n: number) => {
     const dt = new Date(Date.UTC(y, mo - 1, d + n, 12))
@@ -132,14 +133,15 @@ function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
   }
 }
 
-export async function parseAgenda(texto: string, marcas: MarcaLite[]): Promise<AgendaParsed> {
-  const ia = await parseConOpenAI(texto, marcas)
-  if (ia && ia.marcaSlug && ia.fecha && ia.hora) return ia
+export async function parseAgenda(texto: string, marcas: MarcaLite[], now = new Date()): Promise<AgendaParsed> {
+  const explicita = fechaExplicita(texto, ymdLima(now))
+  const ia = await parseConOpenAI(texto, marcas, now)
   // Si la IA no resolvió todo (o no hay key), completamos con el fallback.
-  const fb = parseFallback(texto, marcas)
+  const fb = parseFallback(texto, marcas, now)
   return {
     marcaSlug: ia?.marcaSlug ?? fb.marcaSlug,
-    fecha: ia?.fecha ?? fb.fecha,
+    // An invalid explicit date must ask for clarification, never become "Thursday".
+    fecha: explicita.encontrada ? explicita.fecha : ia?.fecha ?? fb.fecha,
     hora: ia?.hora ?? fb.hora,
     durationMin: ia?.durationMin ?? fb.durationMin,
     titulo: ia?.titulo ?? fb.titulo,
