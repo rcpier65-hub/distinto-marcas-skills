@@ -24,6 +24,7 @@ import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 import { NotificationBell } from './NotificationBell'
 import { ChatFlotante } from './ChatFlotante'
 import { SonidosBridge } from './SonidosBridge'
+import { AvisoReunion } from './AvisoReunion'
 import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
@@ -183,6 +184,8 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
       {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
       <ChatFlotante />
       <SonidosBridge />
+      {/* "¿Transcribimos?" cuando empieza una reunión (estilo Granola). */}
+      <AvisoReunion />
     </>
   )
 }

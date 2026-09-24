@@ -34,5 +34,18 @@ export default async function NotaDetallePage({ params }: Props) {
   if (!esCEO && meId && data.team_member_id && data.team_member_id !== meId) notFound()
 
   const nota = rowToNota(data, meNombre)
-  return <NotaEditor nota={nota} meNombre={meNombre} />
+  /* Equipo (para asignar tareas) y marcas (para ligar la reunión). */
+  const [{ data: equipo }, { data: marcas }] = await Promise.all([
+    service.from('team_members').select('id, nombre').eq('activo', true).order('nombre'),
+    service.from('marcas').select('id, nombre, emoji_marca').order('nombre'),
+  ])
+  return (
+    <NotaEditor
+      nota={nota}
+      meNombre={meNombre}
+      equipo={((equipo ?? []) as { id: string; nombre: string }[])}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      marcas={((marcas ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))}
+    />
+  )
 }

@@ -51,5 +51,9 @@ export default async function NotasReunionesPage() {
     )
   }
 
-  return <NotasHome proximas={proximas} notas={notas} meNombre={meNombre} />
+  const { data: marcasRows } = await service.from('marcas').select('id, nombre, emoji_marca').order('nombre')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marcas = ((marcasRows ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))
+
+  return <NotasHome proximas={proximas} notas={notas} meNombre={meNombre} marcas={marcas} />
 }
