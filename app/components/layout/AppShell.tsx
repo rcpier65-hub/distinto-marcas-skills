@@ -22,6 +22,7 @@ import { CommandPalette } from './CommandPalette'
 import { RealtimeBridge } from '@/lib/realtime/realtime-bridge'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 import { NotificationBell } from './NotificationBell'
+import { ChatFlotante } from './ChatFlotante'
 import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
@@ -177,6 +178,9 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
+
+      {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
+      <ChatFlotante />
     </>
   )
 }
