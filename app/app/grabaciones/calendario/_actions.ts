@@ -9,6 +9,8 @@
      reunión desde el calendario — y reflejarlo en Google Calendar. */
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
+import { sincronizarCalendario } from '@/lib/calendario/gcal-sync'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
@@ -240,5 +242,41 @@ export async function eliminarEventoGoogle(eventId: string): Promise<Result> {
   const g = await deleteCalendarEvent(eventId)
   if (!g.ok) return { ok: false, error: `Google Calendar: ${g.error}` }
   refrescar()
+  return { ok: true }
+}
+
+/* ====== Arrastrar en el calendario: publicaciones y fechas importantes ======
+   Cambian solo la FECHA (la publicación mantiene su ventana 6–8 pm; la fecha
+   importante es de día completo). Google Calendar se actualiza al instante con
+   el sincronizador (lib/calendario/gcal-sync). Solo directores. */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function syncGoogleYa() {
+  after(() => sincronizarCalendario({ forzar: true }).catch((e) => console.error('[gcal-sync]', e)))
+}
+
+export async function moverPublicacion(id: string, fecha: string): Promise<Result> {
+  await requireUser()
+  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden mover publicaciones.' }
+  if (!UUID_RE.test(id) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Datos inválidos.' }
+  const service = createServiceClient() as Service
+  const { error } = await service.from('publicaciones').update({ fecha_publicacion: fecha }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  syncGoogleYa()
+  refrescar()
+  return { ok: true }
+}
+
+export async function moverFechaImportante(id: string, fecha: string): Promise<Result> {
+  await requireUser()
+  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden mover fechas importantes.' }
+  if (!UUID_RE.test(id) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Datos inválidos.' }
+  const service = createServiceClient() as Service
+  const { error } = await service.from('fechas_importantes').update({ fecha }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  syncGoogleYa()
+  refrescar()
+  revalidatePath('/fechas-importantes')
   return { ok: true }
 }

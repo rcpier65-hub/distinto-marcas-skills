@@ -13,6 +13,9 @@ import { ymdLima } from '@/lib/fechas/hoy'
 import { fechaExplicita, fechaValida } from './fecha-explicita'
 
 export type AgendaParsed = {
+  /* 'grabacion' si la frase habla de grabar ("grabación el 10 de octubre").
+     Pedro 24-sep-2026. */
+  tipo: 'reunion' | 'grabacion'
   marcaSlug: string | null
   fecha: string | null   // YYYY-MM-DD (Lima)
   hora: string | null    // HH:MM (24h)
@@ -72,6 +75,7 @@ Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). Una fec
     const p = JSON.parse(content) as Partial<AgendaParsed>
     const slug = typeof p.marcaSlug === 'string' && marcas.some((m) => m.slug === p.marcaSlug) ? p.marcaSlug : null
     return {
+      tipo: 'reunion',
       marcaSlug: slug,
       fecha: fechaValida(String(p.fecha)) ? String(p.fecha) : null,
       hora: /^\d{1,2}:\d{2}$/.test(String(p.hora)) ? String(p.hora).padStart(5, '0') : null,
@@ -125,6 +129,7 @@ function parseFallback(texto: string, marcas: MarcaLite[], now: Date): AgendaPar
     hora = `${String(h).padStart(2, '0')}:00`
   }
   return {
+    tipo: 'reunion',
     marcaSlug: marca?.slug ?? null,
     fecha,
     hora,
@@ -133,17 +138,28 @@ function parseFallback(texto: string, marcas: MarcaLite[], now: Date): AgendaPar
   }
 }
 
+/* ¿Pide una GRABACIÓN (no una reunión)? "grabación", "grabar", "rodaje",
+   "sesión de fotos/video". Si también dice "reunión", manda reunión. */
+export function esGrabacion(texto: string): boolean {
+  const t = texto.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  if (/\breuni(on|ones)\b/.test(t)) return false
+  return /grabaci|\bgrabar|\bgrabamos|\brodaje|sesion de (fotos|video)/.test(t)
+}
+
 export async function parseAgenda(texto: string, marcas: MarcaLite[], now = new Date()): Promise<AgendaParsed> {
   const explicita = fechaExplicita(texto, ymdLima(now))
   const ia = await parseConOpenAI(texto, marcas, now)
   // Si la IA no resolvió todo (o no hay key), completamos con el fallback.
   const fb = parseFallback(texto, marcas, now)
+  const tipo = esGrabacion(texto) ? 'grabacion' : 'reunion'
   return {
+    tipo,
     marcaSlug: ia?.marcaSlug ?? fb.marcaSlug,
     // An invalid explicit date must ask for clarification, never become "Thursday".
     fecha: explicita.encontrada ? explicita.fecha : ia?.fecha ?? fb.fecha,
     hora: ia?.hora ?? fb.hora,
-    durationMin: ia?.durationMin ?? fb.durationMin,
+    // Grabación: 2 h por defecto (una reunión, 45 min) salvo que la frase diga otra cosa.
+    durationMin: tipo === 'grabacion' && !(ia && /\b(\d+)\s*(h|hora|min)/i.test(texto)) ? 120 : ia?.durationMin ?? fb.durationMin,
     titulo: ia?.titulo ?? fb.titulo,
   }
 }
