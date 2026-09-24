@@ -284,8 +284,13 @@ export async function chatearConNota(
 /* Latido mientras se transcribe: "en vivo" durante 60 s más. Con
    `activo=false` (pausa/detener) deja de figurar al instante. */
 export async function latidoTranscripcion(id: string, activo: boolean): Promise<void> {
-  await requireUser()
+  const user = await requireUser()
   const service = createServiceClient() as Service
+  /* Solo miembros del equipo que pueden ver la nota (no clientes ni ajenos). */
+  const me = await currentMember(service, user.id)
+  if (!me.id) return
+  const { data: row } = await service.from('notas_reuniones').select('team_member_id, privada').eq('id', id).maybeSingle()
+  if (!row || !puedeVerNota(row, me.id)) return
   await service.from('notas_reuniones')
     .update({ grabando_hasta: activo ? new Date(Date.now() + 60_000).toISOString() : null })
     .eq('id', id)
