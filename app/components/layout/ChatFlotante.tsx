@@ -18,7 +18,8 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Check, CheckCheck, ImagePlus, ListChecks, Loader2, MessageCircle, Palette, Paperclip, Scissors, Send, Smile, Users, X } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { ArrowLeft, Check, CheckCheck, Compass, ImagePlus, ListChecks, Loader2, MessageCircle, Palette, Paperclip, Scissors, Send, Smile, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -136,15 +137,56 @@ function Checks({ estado, sobreMorado = false, titulo }: { estado: EstadoEnvio; 
   )
 }
 
-/* "Editando · 6. CRISTAL K9 · Kintu" bajo el nombre. */
+/* Reloj que avanza cada 30 s (para "hace 18m" sin re-render constante). */
+function useAhora(ms = 30000): number {
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), ms)
+    return () => clearInterval(t)
+  }, [ms])
+  return ahora
+}
+function duracionCorta(ms: number): string {
+  const min = Math.max(1, Math.floor(ms / 60000))
+  return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`
+}
+
+/* "Editando · 18m · 6. CRISTAL K9 · Kintu" bajo el nombre. */
 function LineaActividad({ a, size = 11 }: { a: ActividadChat; size?: number }) {
+  const ahora = useAhora()
   const Icono = a.tipo === 'editando' ? Scissors : a.tipo === 'disenando' ? Palette : ListChecks
   const verbo = a.tipo === 'editando' ? 'Editando' : a.tipo === 'disenando' ? 'Diseñando' : 'Trabajando en'
+  const tiempo = a.desde ? duracionCorta(ahora - new Date(a.desde).getTime()) : null
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: size, color: '#059669', minWidth: 0 }}>
       <Icono size={size + 1} style={{ flexShrink: 0 }} />
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {verbo}: {a.texto}{a.marca ? ` · ${a.marca}` : ''}
+        {verbo}{tiempo ? ` · ${tiempo}` : ''}: {a.texto}{a.marca ? ` · ${a.marca}` : ''}
+      </span>
+    </span>
+  )
+}
+
+/* Módulo de la app en el que está la persona (por presencia): "En Tareas". */
+const MODULOS: [string, string][] = [
+  ['/tareas', 'Tareas'], ['/grabaciones/calendario', 'Calendario'], ['/grabaciones', 'Grabaciones'],
+  ['/notas-reuniones', 'Notas y reuniones'], ['/oficina', 'la Oficina'], ['/editor', 'Edición'],
+  ['/diseno', 'Diseño'], ['/grilla', 'la Grilla'], ['/publicaciones', 'Publicaciones'], ['/marca', 'Marcas'],
+  ['/historias', 'Historias'], ['/creacion-de-ideas', 'Ideas'], ['/reportes', 'Reportes'], ['/equipo', 'Equipo'],
+  ['/cockpit', 'el Cockpit'], ['/dashboard', 'el Dashboard'], ['/inicio', 'Inicio'], ['/influencers', 'Influencers'],
+  ['/habitos', 'Hábitos'], ['/perfil', 'su perfil'], ['/settings', 'Ajustes'],
+]
+function moduloDe(ruta: string | null | undefined): string | null {
+  if (!ruta) return null
+  return MODULOS.find(([pre]) => ruta === pre || ruta.startsWith(pre + '/'))?.[1] ?? null
+}
+function LineaModulo({ ruta, size = 11 }: { ruta: string | null | undefined; size?: number }) {
+  const m = moduloDe(ruta)
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: size, color: '#059669', minWidth: 0 }}>
+      <Compass size={size + 1} style={{ flexShrink: 0 }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {m ? `En línea · en ${m}` : 'En línea'}
       </span>
     </span>
   )
@@ -187,6 +229,15 @@ export function ChatFlotante() {
   const [lecturasGrupo, setLecturasGrupo] = useState<LecturaGrupo[]>([])
   /* Quién tiene la app abierta ahora (presencia en vivo). */
   const [enLinea, setEnLinea] = useState<Set<string>>(new Set())
+  /* Dónde está cada uno dentro de la app (por presencia). */
+  const [rutas, setRutas] = useState<Map<string, string>>(new Map())
+  const pathname = usePathname()
+  const rutaRef = useRef(pathname)
+  const presenciaRef = useRef<{ track: (p: Record<string, unknown>) => Promise<unknown> } | null>(null)
+  useEffect(() => {
+    rutaRef.current = pathname
+    void presenciaRef.current?.track({ en: Date.now(), ruta: pathname })
+  }, [pathname])
   const isMobile = useSyncExternalStore(suscribirMobile, () => window.matchMedia(MQ_MOBILE).matches, () => false)
 
   const listaRef = useRef<HTMLDivElement>(null)
@@ -367,8 +418,19 @@ export function ChatFlotante() {
     /* Presencia: quién tiene la app abierta ("en línea"). */
     const presencia = supabase.channel('presencia-equipo', { config: { presence: { key: yoId } } })
     presencia
-      .on('presence', { event: 'sync' }, () => setEnLinea(new Set(Object.keys(presencia.presenceState()))))
-      .subscribe((estado) => { if (estado === 'SUBSCRIBED') void presencia.track({ en: Date.now() }) })
+      .on('presence', { event: 'sync' }, () => {
+        const st = presencia.presenceState() as Record<string, { ruta?: string }[]>
+        setEnLinea(new Set(Object.keys(st)))
+        const r = new Map<string, string>()
+        for (const [k, metas] of Object.entries(st)) {
+          const ruta = metas[metas.length - 1]?.ruta
+          if (ruta) r.set(k, ruta)
+        }
+        setRutas(r)
+      })
+      .subscribe((estado) => {
+        if (estado === 'SUBSCRIBED') { presenciaRef.current = presencia; void presencia.track({ en: Date.now(), ruta: rutaRef.current }) }
+      })
 
     /* La conexión en vivo se puede caer (Mac en reposo, cambio de wifi, app
        en segundo plano). Si el canal falla o se cierra, lo rearmamos y
@@ -428,6 +490,7 @@ export function ChatFlotante() {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', onOnline)
       if (canal) void supabase.removeChannel(canal)
+      presenciaRef.current = null
       void supabase.removeChannel(presencia)
     }
   }, [yoId, tocarContacto, tocarGrupo, resincronizar, agregarMensaje])
@@ -700,7 +763,9 @@ export function ChatFlotante() {
                   ) : chat.contactos.find((c) => c.id === activo.id)?.actividad ? (
                     <LineaActividad a={chat.contactos.find((c) => c.id === activo.id)!.actividad!} />
                   ) : (
-                    <div style={{ fontSize: 11, color: enLinea.has(activo.id) ? '#059669' : '#94a3b8' }}>{enLinea.has(activo.id) ? 'en línea' : 'desconectado'}</div>
+                    enLinea.has(activo.id)
+                      ? <LineaModulo ruta={rutas.get(activo.id)} />
+                      : <div style={{ fontSize: 11, color: '#94a3b8' }}>desconectado</div>
                   )}
                 </div>
               </>
@@ -763,7 +828,11 @@ export function ChatFlotante() {
                         </span>
                       )}
                     </span>
-                    {c.actividad && <span style={{ display: 'block', marginTop: 1 }}><LineaActividad a={c.actividad} size={10.5} /></span>}
+                    {c.actividad
+                      ? <span style={{ display: 'block', marginTop: 1 }}><LineaActividad a={c.actividad} size={10.5} /></span>
+                      : c.id !== GRUPO_ID && enLinea.has(c.id) && rutas.get(c.id)
+                        ? <span style={{ display: 'block', marginTop: 1 }}><LineaModulo ruta={rutas.get(c.id)} size={10.5} /></span>
+                        : null}
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                       <span style={{
                         flex: 1, minWidth: 0, fontSize: 12, color: c.noLeidos ? '#334155' : '#64748b',

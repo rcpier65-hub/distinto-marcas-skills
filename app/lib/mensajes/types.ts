@@ -33,7 +33,7 @@ export function estadoEnvio(m: Pick<MensajeDirecto, 'leidoAt' | 'entregadoAt'>):
 }
 
 /* Lo que está haciendo la persona (se muestra bajo su nombre). */
-export type ActividadChat = { tipo: 'editando' | 'disenando' | 'tarea'; texto: string; marca: string | null }
+export type ActividadChat = { tipo: 'editando' | 'disenando' | 'tarea'; texto: string; marca: string | null; desde?: string | null }
 
 /* Hasta cuándo leyó cada miembro el grupo (para el visto del grupo). */
 export type LecturaGrupo = { id: string; nombre: string; leidoHasta: string | null }

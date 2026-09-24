@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { ensureTareasProCols, ESTADOS_TAREA, type EstadoTarea } from '@/lib/tareas/pro-db'
+import { abrirSesion, cerrarSesion } from '@/lib/tareas/tiempo'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -59,6 +60,25 @@ export async function setEstadoTarea(id: string, estado: EstadoTarea): Promise<R
     r = await service.from('tareas').update({ estado }).eq('id', id)
   }
   if (r.error) return { ok: false, error: r.error.message }
+  /* Cronómetro: "en proceso" lo arranca; cualquier otro estado lo cierra. */
+  if (estado === 'en_proceso') await abrirSesion(service, id)
+  else await cerrarSesion(service, id, 'estado')
+  refrescar()
+  return { ok: true }
+}
+
+/* ▶ Iniciar / reanudar: pasa a "en proceso" y arranca el cronómetro. */
+export async function iniciarTarea(id: string): Promise<Result> {
+  return setEstadoTarea(id, 'en_proceso')
+}
+
+/* ⏸ Pausar: sigue "en proceso" pero el cronómetro se detiene y la sesión
+   queda guardada. */
+export async function pausarTarea(id: string): Promise<Result> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  if (!(await esMiembroEquipo(service, user.id))) return { ok: false, error: 'Solo el equipo puede pausar tareas.' }
+  await cerrarSesion(service, id, 'pausa')
   refrescar()
   return { ok: true }
 }

@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { cerrarSesion } from '@/lib/tareas/tiempo'
 import { categorizarTarea, limpiarTexto, colorParaCategoria } from '@/lib/tareas/categorizar'
 import { TAREA_SELECT as SELECT, rowToTarea } from '@/lib/tareas/serialize'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
@@ -217,6 +218,8 @@ export async function completarTarea(id: string, completada = true, fechaHecha?:
   const completadaAt = completada
     ? (fechaHecha && /^\d{4}-\d{2}-\d{2}$/.test(fechaHecha) ? `${fechaHecha}T12:00:00-05:00` : new Date().toISOString())
     : null
+  /* Terminada: si el cronómetro corría, la sesión se guarda como "terminada". */
+  if (completada) await cerrarSesion(service, id, 'terminada')
   const { error } = await service
     .from('tareas')
     .update({ completada, completada_at: completadaAt, focus_lane: completada ? null : undefined })

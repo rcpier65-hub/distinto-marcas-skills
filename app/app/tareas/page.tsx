@@ -80,7 +80,7 @@ export default async function TareasPage() {
     if (ids.length > 0) {
       const { data: planRows, error: planErr } = await service
         .from('tareas')
-        .select('id, estado, fecha_inicio, fecha_entrega')
+        .select('id, estado, fecha_inicio, fecha_entrega, en_proceso_desde, tiempo_seg')
         .in('id', ids)
       if (!planErr) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,6 +89,8 @@ export default async function TareasPage() {
             estado: ESTADOS_TAREA.includes(r.estado) ? r.estado : 'sin_empezar',
             fechaInicio: r.fecha_inicio ?? null,
             fechaEntrega: r.fecha_entrega ?? null,
+            enProcesoDesde: r.en_proceso_desde ?? null,
+            tiempoSeg: r.tiempo_seg ?? 0,
           }
         }
       }
