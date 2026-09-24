@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -71,6 +71,10 @@ export type PubCliente = {
   redes: string[]
   portada: string | null
   video: string | null
+  /* Link del sonido de TikTok (lo carga el equipo) y el video sin música,
+     para que el cliente publique con el audio en tendencia. */
+  enlaceMusica?: string | null
+  videoSinMusica?: string | null
   driveResultado: string | null
   linkTiktok: string | null
   linkInstagram: string | null
@@ -2334,6 +2338,29 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
         )}
         {p.copy && <span className="-mt-2"><CopiarTextoBtn texto={p.copy} color={color} /></span>}
       </div>
+      {urlOk(p.enlaceMusica ?? null) && (
+        <div className="rounded-lg border bg-card p-2.5 space-y-2">
+          <div className="flex items-center gap-2">
+            <Music2 className="w-4 h-4 shrink-0" style={{ color }} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12.5px] font-bold">Música para TikTok</div>
+              <div className="text-[11px] text-muted-foreground">Abre el sonido en TikTok, toca <b>“Usar este sonido”</b> y sube el video{videoAppUrl(p.videoSinMusica ?? null) ? ' sin música' : ''}.</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a href={urlOk(p.enlaceMusica ?? null)!} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: '#111' }}>
+              <Music2 className="w-3.5 h-3.5" /> Abrir música en TikTok <ExternalLink className="w-3 h-3" />
+            </a>
+            {videoAppUrl(p.videoSinMusica ?? null) && (
+              <a href={`${videoAppUrl(p.videoSinMusica ?? null)}?dl=1&name=${encodeURIComponent(p.titulo + ' (sin música)')}`} download
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border" style={{ borderColor: '#11111133', color: '#111' }}>
+                <Download className="w-3.5 h-3.5" /> Video sin música
+              </a>
+            )}
+          </div>
+        </div>
+      )}
       {!abierto ? (
         <button type="button" onClick={() => setAbierto(true)}
           className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-bold text-[14px]"
