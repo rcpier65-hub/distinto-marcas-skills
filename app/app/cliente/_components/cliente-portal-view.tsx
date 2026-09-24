@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -2357,6 +2357,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
   const [ig, setIg] = useState('')
   const [tt, setTt] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const videoSinMusica = videoAppUrl(p.videoSinMusica ?? null)
   const portada = urlOk(p.portada)
   const portadaDescarga = portada ? (driveId(portada) ? `https://drive.google.com/uc?export=download&id=${driveId(portada)}` : portada) : null
   async function marcar() {
@@ -2378,12 +2379,25 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Descargar CON o SIN música: sin música para ponerle el audio de
+            TikTok (Pedro 24-sep-2026). */}
         {videoDirecto && (
           <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: color }}>
-            <Download className="w-3.5 h-3.5" /> Video
+            <Download className="w-3.5 h-3.5" /> Con música
           </a>
         )}
+        {videoSinMusica ? (
+          <a href={`${videoSinMusica}?dl=1&name=${encodeURIComponent(p.titulo + ' sin musica')}`} download target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
+            <VolumeX className="w-3.5 h-3.5" /> Sin música
+          </a>
+        ) : videoDirecto ? (
+          <span title="El equipo todavía no subió la versión sin música"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12px] font-semibold border border-dashed text-muted-foreground">
+            <VolumeX className="w-3.5 h-3.5" /> Sin música: pronto
+          </span>
+        ) : null}
         {portadaDescarga && (
           <a href={portadaDescarga} target="_blank" rel="noopener noreferrer" download
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
@@ -2398,7 +2412,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
             <Music2 className="w-4 h-4 shrink-0" style={{ color }} />
             <div className="flex-1 min-w-0">
               <div className="text-[12.5px] font-bold">Música para TikTok</div>
-              <div className="text-[11px] text-muted-foreground">Abre el sonido en TikTok, toca <b>“Usar este sonido”</b> y sube el video{videoAppUrl(p.videoSinMusica ?? null) ? ' sin música' : ''}.</div>
+              <div className="text-[11px] text-muted-foreground">Abre el sonido en TikTok, toca <b>“Usar este sonido”</b> y sube el video <b>sin música</b>.</div>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -2406,12 +2420,6 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: '#111' }}>
               <Music2 className="w-3.5 h-3.5" /> Abrir música en TikTok <ExternalLink className="w-3 h-3" />
             </a>
-            {videoAppUrl(p.videoSinMusica ?? null) && (
-              <a href={`${videoAppUrl(p.videoSinMusica ?? null)}?dl=1&name=${encodeURIComponent(p.titulo + ' (sin música)')}`} download target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border" style={{ borderColor: '#11111133', color: '#111' }}>
-                <Download className="w-3.5 h-3.5" /> Video sin música
-              </a>
-            )}
           </div>
         </div>
       )}
