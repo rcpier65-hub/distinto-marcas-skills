@@ -17,6 +17,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { VistaAgenda } from './rango-nav'
 import { vincularEventoGcal, editarReunionCal, eliminarReunionCal } from '../_actions'
+import { EventoModal } from './evento-modal'
+import { guardarFiltrosCalendario, type FiltrosCalendario } from './filtros'
 
 export type AgendaEvento = {
   id: string
@@ -50,6 +52,7 @@ type Props = {
   hoy: string              // YYYY-MM-DD en Lima (calculado server-side)
   esDirector: boolean      // habilita vincular/editar/eliminar
   marcasTodas: MarcaOpcion[]  // todas las marcas (para el selector de vincular)
+  filtrosIniciales: FiltrosCalendario  // chips + marca guardados (cookie)
 }
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -120,14 +123,19 @@ function sugerirMarca(titulo: string, marcas: MarcaOpcion[]): string {
   return mejor
 }
 
-export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas }: Props) {
-  /* ⭐ Fechas importantes arranca APAGADO — solo si se prende salen (Pedro:
-     "como sugerencia"). El resto, prendido. */
-  const [tipos, setTipos] = useState<Record<AgendaEvento['tipo'], boolean>>({
-    grabacion: true, reunion: true, publicacion: true, fecha: false, diseno: true, gcal: true,
-  })
-  const [marcaFiltro, setMarcaFiltro] = useState<string>('todas')
+export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas, filtrosIniciales }: Props) {
+  /* Por defecto solo 🎥 Grabaciones y 🤝 Reuniones (Pedro 24-sep-2026). Lo
+     que el usuario elija se guarda (cookie) y se mantiene al cambiar de
+     semana/mes o volver a entrar. */
+  const [tipos, setTipos] = useState<Record<AgendaEvento['tipo'], boolean>>(filtrosIniciales.tipos)
+  const [marcaFiltro, setMarcaFiltroState] = useState<string>(filtrosIniciales.marca)
   const [diaSel, setDiaSel] = useState<string | null>(null)
+  const [eventoSel, setEventoSel] = useState<AgendaEvento | null>(null)
+
+  function setMarcaFiltro(m: string) {
+    setMarcaFiltroState(m)
+    guardarFiltrosCalendario({ tipos, marca: m })
+  }
 
   const counts = useMemo(() => ({
     grabacion:   eventos.filter((e) => e.tipo === 'grabacion').length,
@@ -162,7 +170,9 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
   }, [filtrados])
 
   function toggleTipo(t: AgendaEvento['tipo']) {
-    setTipos((cur) => ({ ...cur, [t]: !cur[t] }))
+    const nuevos = { ...tipos, [t]: !tipos[t] }
+    setTipos(nuevos)
+    guardarFiltrosCalendario({ tipos: nuevos, marca: marcaFiltro })
   }
 
   const diasSemana = useMemo(
@@ -172,11 +182,13 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
 
   return (
     <div className="space-y-3">
+      {eventoSel && <EventoModal e={eventoSel} esDirector={esDirector} onCerrar={() => setEventoSel(null)} />}
+
       {/* ===== Filtros ===== */}
       <div className="flex items-center gap-2 flex-wrap">
         {(Object.keys(TIPO_META) as AgendaEvento['tipo'][]).map((t) => {
           // GCal, Publicaciones, Fechas y Diseño solo aparecen si hay eventos de ese tipo
-          if ((t === 'gcal' || t === 'diseno' || t === 'publicacion' || t === 'fecha') && counts[t] === 0) return null
+          if ((t === 'gcal' || t === 'diseno' || t === 'publicacion' || t === 'fecha') && counts[t] === 0 && !tipos[t]) return null
           const on = tipos[t]
           return (
             <button
@@ -257,7 +269,18 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
                     </span>
 
                     <div className="flex flex-col gap-0.5 w-full">
-                      {events.slice(0, 4).map((e) => <EventoChip key={`${e.tipo}-${e.id}`} e={e} />)}
+                      {events.slice(0, 4).map((e) => (
+                        <div
+                          key={`${e.tipo}-${e.id}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={(ev) => { ev.stopPropagation(); setEventoSel(e) }}
+                          onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setEventoSel(e) } }}
+                          title="Ver / editar"
+                        >
+                          <EventoChip e={e} />
+                        </div>
+                      ))}
                       {events.length > 4 && (
                         <div className="text-[9px] text-muted-foreground pl-1">+{events.length - 4} más</div>
                       )}
@@ -302,7 +325,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
                     {events.length === 0 && (
                       <div className="text-[10px] text-muted-foreground/60 text-center pt-4">—</div>
                     )}
-                    {events.map((e) => <EventoCardSemana key={`${e.tipo}-${e.id}`} e={e} />)}
+                    {events.map((e) => <EventoCardSemana key={`${e.tipo}-${e.id}`} e={e} onAbrir={() => setEventoSel(e)} />)}
                   </div>
                 </div>
               )
@@ -313,7 +336,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
 
       {/* ===== VISTA DÍA ===== */}
       {vista === 'dia' && (
-        <DetalleDia dia={desde} eventos={porDia.get(desde) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} />
+        <DetalleDia dia={desde} eventos={porDia.get(desde) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} onAbrir={setEventoSel} />
       )}
 
       {/* ===== Leyenda de marcas ===== */}
@@ -331,16 +354,17 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
 
       {/* ===== Panel del día seleccionado (vistas mes y semana) ===== */}
       {vista !== 'dia' && diaSel && (
-        <DetalleDia dia={diaSel} eventos={porDia.get(diaSel) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} onCerrar={() => setDiaSel(null)} />
+        <DetalleDia dia={diaSel} eventos={porDia.get(diaSel) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} onCerrar={() => setDiaSel(null)} onAbrir={setEventoSel} />
       )}
     </div>
   )
 }
 
 /* ===== Panel de detalle de UN día (vista día + panel de mes/semana) ===== */
-function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
+function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar, onAbrir }: {
   dia: string; eventos: AgendaEvento[]; hoy: string
   esDirector: boolean; marcasTodas: MarcaOpcion[]; onCerrar?: () => void
+  onAbrir: (e: AgendaEvento) => void
 }) {
   return (
     <section className="rounded-xl border border-border bg-card p-4">
@@ -379,9 +403,10 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
                   {e.hora ? hora12(e.hora) : 'Todo el día'}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className={`text-[14px] font-semibold ${cancelado ? 'line-through' : ''}`}>
+                  <button type="button" onClick={() => onAbrir(e)} title="Ver / editar"
+                    className={`text-left text-[14px] font-semibold hover:underline ${cancelado ? 'line-through' : ''}`}>
                     {TIPO_META[e.tipo].icon} {e.titulo}
-                  </div>
+                  </button>
                   <div className="mt-0.5 flex items-center gap-2 flex-wrap text-[12px] text-muted-foreground">
                     {e.marcaNombre && (
                       <span className="inline-flex items-center gap-1">
@@ -603,7 +628,7 @@ function ReunionAcciones({ e }: { e: AgendaEvento }) {
 
 /* Card de evento en la VISTA SEMANA — más grande que el chip del mes:
    hora arriba, título completo, borde izquierdo con el color de la marca. */
-function EventoCardSemana({ e }: { e: AgendaEvento }) {
+function EventoCardSemana({ e, onAbrir }: { e: AgendaEvento; onAbrir: () => void }) {
   const cancelado = CANCELADO.has((e.estado ?? '').toLowerCase())
   const cumplido = e.estado === 'cumplida' || e.estado === 'realizada'
   const bg = e.tipo === 'grabacion' ? e.color : e.tipo === 'reunion' ? '#ede9fe' : e.tipo === 'publicacion' ? '#ffe4e6' : e.tipo === 'fecha' ? '#fef9c3' : e.tipo === 'diseno' ? '#fef3c7' : '#eff6ff'
@@ -624,14 +649,12 @@ function EventoCardSemana({ e }: { e: AgendaEvento }) {
     </div>
   )
 
-  // Con Meet: la card entera abre la llamada. Con href interno: abre la tarea.
-  if (e.meetLink && !cancelado) {
-    return <a href={e.meetLink} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>{card}</a>
-  }
-  if (e.href) {
-    return <Link href={e.href} style={{ textDecoration: 'none' }}>{card}</Link>
-  }
-  return card
+  /* Tocar la card abre el detalle (editar, Meet, enlaces) como en Google Calendar. */
+  return (
+    <button type="button" onClick={onAbrir} className="w-full text-left" style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+      {card}
+    </button>
+  )
 }
 
 /* Chip compacto dentro de la celda del día (vista MES). Grabación = sólido con

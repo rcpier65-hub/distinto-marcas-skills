@@ -14,6 +14,7 @@
 // La escritura hacia Google la hace lib/calendario/gcal-sync.ts (automática).
 
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { requireUser } from '@/lib/auth/get-user'
 import { ensureAccesoModulo, getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -22,6 +23,7 @@ import { listGrabaciones } from '../_actions'
 import { GoogleCalendarConnect } from '../_components/gcal-connect'
 import { AgendarReunionBox } from '@/app/inicio/_components/agendar-reunion-box'
 import { AgendaCalendar, type AgendaEvento } from './_components/agenda-calendar'
+import { COOKIE_FILTROS_CAL, leerFiltrosCalendario } from './_components/filtros'
 import { RangoNav, type VistaAgenda } from './_components/rango-nav'
 
 export const dynamic = 'force-dynamic'
@@ -65,6 +67,10 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   await requireUser()
   await ensureAccesoModulo('publicaciones')
   const sp = await searchParams
+
+  /* Filtros del calendario guardados (chips + marca): se mantienen al cambiar
+     de semana/mes y al volver a entrar. Pedro 24-sep-2026. */
+  const filtrosGuardados = leerFiltrosCalendario((await cookies()).get(COOKIE_FILTROS_CAL)?.value)
 
   /* Vista: Día / Semana / Mes — SEMANA por defecto al abrir (Pedro
      31-ago-2026: "siempre semanalmente debe mostrar el calendario"). */
@@ -216,6 +222,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: null,
       notas: g.notas,
       videosGrabados: g.videos_grabados,
+      duracionMin: g.duracion_min ?? null,
     })
   }
 
@@ -407,6 +414,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         marcas={marcasMes}
         hoy={hoyLima}
         esDirector={esDirector}
+        filtrosIniciales={filtrosGuardados}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         marcasTodas={((marcasRes.data ?? []) as any[]).map((m) => ({ id: m.id as string, slug: m.slug as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))}
       />

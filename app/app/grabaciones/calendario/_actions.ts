@@ -13,7 +13,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { ensureReunionCols } from '@/lib/reuniones/db'
-import { updateTimedCalendarEvent, deleteCalendarEvent, getCalendarEvent } from '@/lib/integrations/google-calendar'
+import { updateTimedCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarEvent } from '@/lib/integrations/google-calendar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -201,4 +201,44 @@ export async function eliminarReunionCal(id: string): Promise<Result> {
 
   refrescar()
   return { ok: true, gcalError }
+}
+
+/* ====== Eventos que viven SOLO en Google Calendar ======
+   Pedro 24-sep-2026: "debo poder entrar al detalle y cambiar tal cual se hace
+   en Google Calendar". Editan/borran el evento directo en Google (no hay fila
+   en la app). Solo directores. */
+
+const EVENT_ID = /^[a-zA-Z0-9_-]{5,1024}$/
+
+export async function editarEventoGoogle(eventId: string, input: {
+  titulo: string; fecha: string; hora: string | null; duracionMin?: number | null
+}): Promise<Result> {
+  await requireUser()
+  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden editar eventos de Google.' }
+  if (!EVENT_ID.test(eventId)) return { ok: false, error: 'Evento inválido.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) return { ok: false, error: 'Fecha inválida.' }
+  const titulo = input.titulo.trim().slice(0, 300)
+  if (!titulo) return { ok: false, error: 'Ponle un título.' }
+
+  if (input.hora) {
+    if (!/^\d{1,2}:\d{2}$/.test(input.hora)) return { ok: false, error: 'Hora inválida.' }
+    const dur = Math.max(5, Math.min(24 * 60, Math.round(input.duracionMin ?? 60)))
+    const g = await updateTimedCalendarEvent(eventId, { summary: titulo, fecha: input.fecha, hora: input.hora.padStart(5, '0'), durationMin: dur })
+    if (!g.ok) return { ok: false, error: `Google Calendar: ${g.error}` }
+  } else {
+    const g = await updateCalendarEvent(eventId, { summary: titulo, date: input.fecha })
+    if (!g.ok) return { ok: false, error: `Google Calendar: ${g.error}` }
+  }
+  refrescar()
+  return { ok: true }
+}
+
+export async function eliminarEventoGoogle(eventId: string): Promise<Result> {
+  await requireUser()
+  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden eliminar eventos de Google.' }
+  if (!EVENT_ID.test(eventId)) return { ok: false, error: 'Evento inválido.' }
+  const g = await deleteCalendarEvent(eventId)
+  if (!g.ok) return { ok: false, error: `Google Calendar: ${g.error}` }
+  refrescar()
+  return { ok: true }
 }
