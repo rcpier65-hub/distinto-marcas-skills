@@ -28,6 +28,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import { sonarAviso } from '@/lib/sonido/sonidos'
 import type { AvatarConfig, Direccion, EstadoUsuario } from './_avatar'
 import {
   decidir, debeConectar, paneo,
@@ -104,6 +106,7 @@ type Senal =
   | { tipo: 'respuesta'; de: string; para: string; sdp: RTCSessionDescriptionInit }
   | { tipo: 'ice'; de: string; para: string; candidato: RTCIceCandidateInit }
   | { tipo: 'llamada'; de: string; deNombre: string; para: string }
+  | { tipo: 'toque'; de: string; deNombre: string; para: string }
   | { tipo: 'privada-invita'; de: string; deNombre: string; para: string; sala: string }
 
 type Pos = {
@@ -419,8 +422,36 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     canal.on('broadcast', { event: 'senal' }, async ({ payload }) => {
       const s = payload as Senal
       if (s.para !== yoId) return
-      if (s.tipo === 'llamada') { setLlamada({ de: s.de, nombre: s.deNombre }); return }
-      if (s.tipo === 'privada-invita') { setLlamada({ de: s.de, nombre: s.deNombre, sala: s.sala }); return }
+      if (s.tipo === 'llamada') { sonarAviso(); setLlamada({ de: s.de, nombre: s.deNombre }); return }
+      if (s.tipo === 'privada-invita') {
+        sonarAviso(); setLlamada({ de: s.de, nombre: s.deNombre, sala: s.sala })
+        /* Si está en otro módulo, el cartel de aceptar vive en /oficina. */
+        if (!window.location.pathname.startsWith('/oficina')) {
+          toast(`🔒 ${s.deNombre.split(' ')[0]} quiere hablar en privado`, {
+            duration: 15000, action: { label: 'Ir a la oficina', onClick: () => { window.location.href = '/oficina' } },
+          })
+        }
+        return
+      }
+      /* Aviso (toquecito): suena y sale un aviso aunque esté en otro módulo. */
+      if (s.tipo === 'toque') {
+        sonarAviso()
+        const quien = s.deNombre.split(' ')[0]
+        toast(`🔔 ${quien} te está avisando`, {
+          description: 'Te busca en la oficina.',
+          duration: 12000,
+          action: window.location.pathname.startsWith('/oficina') ? undefined : { label: 'Ir a la oficina', onClick: () => { window.location.href = '/oficina' } },
+        })
+        try {
+          if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+            const reg = await navigator.serviceWorker?.getRegistration()
+            const op = { body: 'Te busca en la oficina.', icon: '/icons/icon-192.png', tag: `toque-${s.de}`, data: { url: '/oficina' } } as NotificationOptions
+            if (reg) await reg.showNotification(`🔔 ${quien} te está avisando`, op)
+            else new Notification(`🔔 ${quien} te está avisando`, op)
+          }
+        } catch { /* sin notificación: queda el sonido y el aviso */ }
+        return
+      }
       try {
         if (s.tipo === 'oferta' || s.tipo === 'respuesta') {
           const peer = crearPeer(s.de)
@@ -562,6 +593,11 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     canalRef.current?.send({ type: 'broadcast', event: 'emote', payload: { id: yoId, emoji } })
   }, [yoId])
 
+  /** Aviso con sonido a una persona (sin abrir conversación). */
+  const avisarA = useCallback((id: string) => {
+    enviar({ tipo: 'toque', de: yoId, deNombre: nombreRef.current, para: id })
+  }, [enviar, yoId])
+
   const llamarA = useCallback((id: string) => {
     enviar({ tipo: 'llamada', de: yoId, deNombre: nombreRef.current, para: id })
   }, [enviar, yoId])
@@ -586,6 +622,6 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
     entro, setEntro,
-    publicarPos, avanzar, mandarEmote, llamarA, llamada, setLlamada,
+    publicarPos, avanzar, mandarEmote, llamarA, avisarA, llamada, setLlamada,
   }
 }

@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import {
   Mic, MicOff, Video, VideoOff, Users, X, Ghost, Palette, Phone, MapPin,
   MonitorUp, MonitorOff, Megaphone, Lock, Maximize2, Minimize2, VolumeX, Armchair, AlertTriangle, LogOut, Loader2,
+  Bell, Scissors, ListChecks, Unlock,
 } from 'lucide-react'
 import {
   TILE, MAPA_W, MAPA_H, ZONAS,
@@ -33,13 +34,66 @@ import {
 import { HAY_TURN } from '../_usar-oficina'
 import { reclamarEscritorio } from '../_actions'
 import { MUEBLES } from '../_mapa'
-import { useOficina, motor } from '../_contexto'
+import { useOficina, motor, type ActividadOficina } from '../_contexto'
 import { buscarCamino, sillaDeEscritorio, sillaEn } from '../_camino'
 
 const VEL = 6.2
 const CORRER = 1.6
 const EMOTES = ['👋', '👍', '🎉', '❤️', '😂', '✋', '❓']
 const SENTARSE_MS = 350
+/* A cuántas casillas aparece el menú flotante sobre la otra persona. */
+const DIST_MENU = 3
+
+function duracionCorta(ms: number): string {
+  const min = Math.max(1, Math.floor(ms / 60000))
+  return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`
+}
+/* "18m" que avanza solo cada 30 s. */
+function Transcurrido({ desde }: { desde: string }) {
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 30000)
+    return () => clearInterval(t)
+  }, [])
+  return <>{duracionCorta(ahora - new Date(desde).getTime())}</>
+}
+function verboActividad(a: ActividadOficina): string {
+  return a.tipo === 'editando' ? 'Editando' : a.tipo === 'disenando' ? 'Diseñando' : 'En tarea'
+}
+
+/* Cartelito sobre el nombre: "✂ Editando · 18m" + la tarea recortada. */
+function dibujarActividad(ctx: CanvasRenderingContext2D, cx: number, cy: number, a: ActividadOficina, ahora: number) {
+  const icono = a.tipo === 'editando' ? '✂️' : a.tipo === 'disenando' ? '🎨' : '⏱'
+  const cabeza = `${icono} ${verboActividad(a)}${a.desde ? ` · ${duracionCorta(ahora - new Date(a.desde).getTime())}` : ''}`
+  ctx.save()
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.font = 'bold 10px ui-sans-serif, system-ui, -apple-system, sans-serif'
+  const wCabeza = ctx.measureText(cabeza).width
+  ctx.font = '10px ui-sans-serif, system-ui, -apple-system, sans-serif'
+  let tarea = ` ${a.texto}`
+  const maxTarea = 150
+  if (ctx.measureText(tarea).width > maxTarea) {
+    while (tarea.length > 4 && ctx.measureText(tarea + '…').width > maxTarea) tarea = tarea.slice(0, -1)
+    tarea += '…'
+  }
+  const wTarea = ctx.measureText(tarea).width
+  const w = wCabeza + wTarea + 16, h = 19
+  const x = cx - w / 2, y = cy - 66 - h / 2
+  ctx.shadowColor = 'rgba(15,23,42,0.18)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1
+  ctx.fillStyle = 'rgba(255,255,255,0.97)'
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill()
+  ctx.shadowColor = 'transparent'
+  ctx.strokeStyle = a.tipo === 'tarea' ? 'rgba(245,158,11,0.55)' : 'rgba(113,112,255,0.45)'
+  ctx.lineWidth = 1; ctx.stroke()
+  ctx.font = 'bold 10px ui-sans-serif, system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = a.tipo === 'tarea' ? '#b45309' : '#5b5bd6'
+  ctx.fillText(cabeza, x + 8, y + h / 2 + 0.5)
+  ctx.font = '10px ui-sans-serif, system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = '#334155'
+  ctx.fillText(tarea, x + 8 + wCabeza, y + h / 2 + 0.5)
+  ctx.restore()
+}
 
 export function OficinaView() {
   const of = useOficina()
@@ -64,7 +118,7 @@ function OficinaMapa() {
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
     entro, setEntro,
-    avanzar, mandarEmote, llamarA, llamada, setLlamada,
+    avanzar, mandarEmote, llamarA, avisarA, llamada, setLlamada, actividad,
   } = of
   const yoId = datos.yoId
   const nombre = datos.nombre
@@ -84,6 +138,13 @@ function OficinaMapa() {
   const [fantasmaUI, setFantasmaUI] = useState(motor.ghost)
   const [sentadoUI, setSentadoUI] = useState(motor.sentado)
   const [pantallaGrande, setPantallaGrande] = useState<string | null>(null)
+  const actividadRef = useRef(actividad)
+  useEffect(() => { actividadRef.current = actividad }, [actividad])
+  /* Persona más cercana (menú flotante encima de ella). */
+  const [vecino, setVecino] = useState<string | null>(null)
+  const vecinoRef = useRef<string | null>(null)
+  const flotanteRef = useRef<HTMLDivElement>(null)
+  const ultimoAviso = useRef<Map<string, number>>(new Map())
   const duenosRef = useRef(duenos)
   useEffect(() => { duenosRef.current = duenos }, [duenos])
 
@@ -296,6 +357,25 @@ function OficinaMapa() {
         ctx.restore()
       }
 
+      const ahoraMs = Date.now()
+
+      /* Menú flotante sobre la persona más cercana (a ≤ DIST_MENU casillas). */
+      let cerca: { id: string; d: number; x: number; y: number } | null = null
+      for (const j of jugadores.current.values()) {
+        if (j.ghost) continue
+        const d = Math.hypot(j.x - m.pos.x, j.y - m.pos.y)
+        if (d <= DIST_MENU && (!cerca || d < cerca.d)) cerca = { id: j.id, d, x: j.x, y: j.y }
+      }
+      if ((cerca?.id ?? null) !== vecinoRef.current) {
+        vecinoRef.current = cerca?.id ?? null
+        setVecino(cerca?.id ?? null)
+      }
+      const fl = flotanteRef.current
+      if (fl && cerca) {
+        const conAct = !!actividadRef.current[cerca.id]
+        fl.style.transform = `translate(${Math.round(cerca.x * TILE - camX)}px, ${Math.round(cerca.y * TILE - camY - (conAct ? 80 : 60))}px) translate(-50%, -100%)`
+      }
+
       type Dibujable = { y: number; fn: () => void }
       const lista: Dibujable[] = []
 
@@ -319,9 +399,11 @@ function OficinaMapa() {
               fantasma: j.ghost, hablando: j.nivel > 0.12, sentado: j.sentado,
             })
             dibujarEtiqueta(ctx, px, py, j.nombre, j.estado, j.emote)
+            const act = actividadRef.current[j.id]
+            if (act) dibujarActividad(ctx, px, py, act, ahoraMs)
             if (j.spot) {
               ctx.font = '16px sans-serif'; ctx.textAlign = 'center'
-              ctx.fillText('📢', px, py - 62)
+              ctx.fillText('📢', px, py - (act ? 88 : 62))
             }
             if (j.pantalla) {
               ctx.font = '14px sans-serif'; ctx.textAlign = 'center'
@@ -337,6 +419,8 @@ function OficinaMapa() {
           if (!m.sentado) dibujarMarcaPropia(ctx, px, py, '#7170ff')
           dibujarAvatar(ctx, px, py, avatar, m.dir, moviendo, m.paso, { fantasma: m.ghost, sentado: m.sentado })
           dibujarEtiqueta(ctx, px, py, nombre, estado, emoteRef.current?.emoji ?? null)
+          const act = actividadRef.current[yoId]
+          if (act) dibujarActividad(ctx, px, py, act, ahoraMs)
         },
       })
       lista.sort((a, b) => a.y - b.y)
@@ -653,6 +737,61 @@ function OficinaMapa() {
           </div>
         </aside>
       )}
+
+      {/* ===== Opciones flotantes sobre la persona cercana ===== */}
+      {vecino && (() => {
+        const j = listaUI.find((x) => x.id === vecino)
+        if (!j) return null
+        const act = actividad[vecino]
+        const enPrivadoCon = !!privada && privada === [yoId, vecino].sort().join(':')
+        const primer = j.nombre.split(' ')[0]
+        return (
+          <div ref={flotanteRef} className="absolute left-0 top-0 z-20" style={{ pointerEvents: 'none', willChange: 'transform' }}>
+            <div style={{ pointerEvents: 'auto' }}
+              className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/97 shadow-xl border border-black/5 backdrop-blur px-2 py-2">
+              {act && (
+                <div className="flex items-center gap-1.5 px-1.5 text-[11px] max-w-[240px]">
+                  {act.tipo === 'editando' ? <Scissors className="w-3.5 h-3.5 text-[#7170ff] shrink-0" />
+                    : act.tipo === 'disenando' ? <Palette className="w-3.5 h-3.5 text-[#7170ff] shrink-0" />
+                    : <ListChecks className="w-3.5 h-3.5 text-[#d97706] shrink-0" />}
+                  <span className="font-bold whitespace-nowrap">{verboActividad(act)}{act.desde ? <> · <Transcurrido desde={act.desde} /></> : null}</span>
+                  <span className="text-black/55 truncate">{act.texto}{act.marca ? ` · ${act.marca}` : ''}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <button type="button"
+                  onClick={() => {
+                    const t = ultimoAviso.current.get(vecino) ?? 0
+                    if (Date.now() - t < 5000) { toast('Ya le avisaste, espera unos segundos'); return }
+                    ultimoAviso.current.set(vecino, Date.now())
+                    avisarA(vecino)
+                    toast.success(`Le sonó el aviso a ${primer}`)
+                  }}
+                  title={`Avisar a ${primer} con un sonido`}
+                  className="h-8 px-3 rounded-xl inline-flex items-center gap-1.5 text-[12px] font-bold text-white hover:opacity-90 transition"
+                  style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
+                  <Bell className="w-3.5 h-3.5" /> Avisar
+                </button>
+                {enPrivadoCon ? (
+                  <button type="button" onClick={() => { salirPrivada(); toast('Saliste de la sala privada') }}
+                    title="Salir de la sala privada"
+                    className="h-8 px-3 rounded-xl inline-flex items-center gap-1.5 text-[12px] font-bold text-white hover:opacity-90 transition"
+                    style={{ background: '#f59e0b' }}>
+                    <Unlock className="w-3.5 h-3.5" /> Salir de privado
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => { invitarPrivada(vecino); toast.success(`Sala privada con ${primer}: nadie más los escucha`) }}
+                    title={`Sala privada con ${primer} (nadie más los escucha)`}
+                    className="h-8 px-3 rounded-xl inline-flex items-center gap-1.5 text-[12px] font-bold border border-black/10 bg-white hover:bg-amber-50 text-[#0f172a] transition">
+                    <Lock className="w-3.5 h-3.5 text-[#f59e0b]" /> Sala privada
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="mx-auto w-3 h-3 bg-white rotate-45 -mt-1.5 border-r border-b border-black/5" />
+          </div>
+        )
+      })()}
 
       {llamada && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white shadow-2xl border">

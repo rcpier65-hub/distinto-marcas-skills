@@ -81,3 +81,26 @@ export async function datosOficina(): Promise<{
     perfiles: filas.map((p) => ({ userId: p.user_id, nombre: p.nombre, escritorio: p.escritorio })),
   }
 }
+
+/* ¿En qué está cada uno? Para mostrarlo sobre su avatar ("Editando · 18m").
+   Misma regla que el chat (lib/mensajes/actividad), pero por usuario de la
+   oficina (auth_user_id). Pedro 24-sep-2026. */
+export async function actividadOficina(): Promise<Record<string, { tipo: 'editando' | 'disenando' | 'tarea'; texto: string; marca: string | null; desde: string | null }>> {
+  const user = await requireUser()
+  const { createServiceClient } = await import('@/lib/supabase/service')
+  const { actividadEquipo } = await import('@/lib/mensajes/actividad')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: yo } = await service.from('team_members').select('id').eq('auth_user_id', user.id).eq('activo', true).maybeSingle()
+  if (!yo) return {}
+  const [act, { data: miembros }] = await Promise.all([
+    actividadEquipo(service),
+    service.from('team_members').select('id, auth_user_id').eq('activo', true),
+  ])
+  const out: Record<string, { tipo: 'editando' | 'disenando' | 'tarea'; texto: string; marca: string | null; desde: string | null }> = {}
+  for (const m of (miembros ?? []) as { id: string; auth_user_id: string | null }[]) {
+    const a = act.get(m.id)
+    if (a && m.auth_user_id) out[m.auth_user_id] = { tipo: a.tipo, texto: a.texto, marca: a.marca, desde: a.desde ?? null }
+  }
+  return out
+}

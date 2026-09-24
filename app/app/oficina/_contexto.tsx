@@ -21,7 +21,7 @@ import { Building2, Mic, MicOff, LogOut } from 'lucide-react'
 import { usarOficina } from './_usar-oficina'
 import { avatarPorNombre, avatarValido, type AvatarConfig, type Direccion } from './_avatar'
 import { SPAWN, zonaDe } from './_mapa'
-import { datosOficina, guardarAvatarOficina } from './_actions'
+import { actividadOficina, datosOficina, guardarAvatarOficina } from './_actions'
 import type { Punto } from './_camino'
 
 export type PerfilLite = { userId: string; nombre: string | null; escritorio: string | null }
@@ -82,7 +82,10 @@ type Valor = ReturnType<typeof usarOficina> & {
   setDuenos: React.Dispatch<React.SetStateAction<PerfilLite[]>>
   entrarManual: () => Promise<void>
   salirManual: () => void
+  /* Tarea/edición en curso de cada uno (por userId), para dibujarla encima. */
+  actividad: Record<string, ActividadOficina>
 }
+export type ActividadOficina = Awaited<ReturnType<typeof actividadOficina>>[string]
 
 const Ctx = createContext<Valor | null>(null)
 
@@ -190,9 +193,20 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
     return () => { clearInterval(t); clearInterval(guardar) }
   }, [entrado, publicarPos, avanzar])
 
+  /* En qué está cada uno (cada minuto, mientras esté en la oficina). */
+  const [actividad, setActividad] = useState<Record<string, ActividadOficina>>({})
+  useEffect(() => {
+    if (!entrado) return
+    let vivo = true
+    const leer = () => actividadOficina().then((a) => { if (vivo) setActividad(a) }).catch(() => {})
+    void leer()
+    const t = setInterval(leer, 60000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [entrado])
+
   const valor = useMemo<Valor | null>(() => (datos ? {
-    ...of, datos, avatar, guardarAvatar, duenos, setDuenos, entrarManual, salirManual,
-  } : null), [of, datos, avatar, guardarAvatar, duenos, entrarManual, salirManual])
+    ...of, datos, avatar, guardarAvatar, duenos, setDuenos, entrarManual, salirManual, actividad,
+  } : null), [of, datos, avatar, guardarAvatar, duenos, entrarManual, salirManual, actividad])
 
   const enOficina = pathname?.startsWith('/oficina')
 
