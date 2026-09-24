@@ -332,6 +332,12 @@ export function NotaEditor({ nota, meNombre, equipo, marcas }: Props) {
                         <option value="">Responsable…</option>
                         {equipo.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                       </select>
+                      <select value={a.marcaId ?? ''} disabled={creada} title="Marca a la que va la tarea"
+                        onChange={(e) => cambiarAcciones(acciones.map((x) => (x.id === a.id ? { ...x, marcaId: e.target.value || null } : x)))}
+                        style={miniCampo}>
+                        <option value="">Sin marca (General)</option>
+                        {marcas.map((m) => <option key={m.id} value={m.id}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>)}
+                      </select>
                       <input type="date" value={a.fecha ?? ''} disabled={creada}
                         onChange={(e) => cambiarAcciones(acciones.map((x) => (x.id === a.id ? { ...x, fecha: e.target.value || null } : x)))}
                         style={miniCampo} />

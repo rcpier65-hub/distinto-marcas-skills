@@ -19,6 +19,8 @@ export type AccionNota = {
   responsableId: string | null
   responsableNombre: string | null
   fecha: string | null      // YYYY-MM-DD
+  /* Marca a la que va la tarea (sale en el trabajo de esa marca). */
+  marcaId: string | null
   tareaId: string | null
 }
 
@@ -84,6 +86,7 @@ export function parseAcciones(raw: unknown): AccionNota[] {
       responsableId: typeof o.responsableId === 'string' ? o.responsableId : null,
       responsableNombre: typeof o.responsableNombre === 'string' ? o.responsableNombre : null,
       fecha: typeof o.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.fecha) ? o.fecha : null,
+      marcaId: typeof o.marcaId === 'string' ? o.marcaId : null,
       tareaId: typeof o.tareaId === 'string' ? o.tareaId : null,
     }]
   })

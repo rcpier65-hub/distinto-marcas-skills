@@ -7,8 +7,7 @@
      notas ordenadas (resumen, decisiones, próximos pasos) y propone tareas con
      responsable y fecha.
    - crearTareasDesdeNota: las tareas aprobadas pasan a Tareas, asignadas a su
-     responsable y agrupadas con el nombre de la marca (sin salir en el portal
-     del cliente: son acuerdos internos).
+     responsable y a SU marca (cada tarea puede ser de una marca distinta).
    - preguntarAReuniones: preguntas sobre TODAS las reuniones (o las de una marca).
    - reunionesParaAviso: reuniones de las próximas horas para el aviso
      "¿Transcribimos?". */
@@ -161,13 +160,15 @@ export async function mejorarNotas(id: string, plantilla?: Plantilla): Promise<{
   const transcript = String(row.transcript ?? '').trim()
   if (!cuerpo && transcript.length < 40) return { ok: false, error: 'Todavía no hay suficiente contenido (notas o transcripción) para mejorar.' }
 
-  const [{ data: equipo }, marcaRes, autorRes] = await Promise.all([
+  const [{ data: equipo }, { data: marcasRows }, autorRes] = await Promise.all([
     service.from('team_members').select('id, nombre').eq('activo', true),
-    row.marca_id ? service.from('marcas').select('nombre').eq('id', row.marca_id).maybeSingle() : Promise.resolve({ data: null }),
+    service.from('marcas').select('id, nombre, slug'),
     row.team_member_id ? service.from('team_members').select('id, nombre').eq('id', row.team_member_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
   const miembros = (equipo ?? []) as { id: string; nombre: string }[]
-  const marcaNombre: string | null = marcaRes.data?.nombre ?? null
+  const marcasTodas = (marcasRows ?? []) as { id: string; nombre: string; slug: string }[]
+  const marcaNota = marcasTodas.find((m) => m.id === row.marca_id) ?? null
+  const marcaNombre: string | null = marcaNota?.nombre ?? null
   const autor = autorRes.data as { id: string; nombre: string } | null
 
   // Transcripción larga: principio + final (lo del medio se resume menos).
@@ -177,13 +178,14 @@ export async function mejorarNotas(id: string, plantilla?: Plantilla): Promise<{
 Tu trabajo es "mejorar" las notas de una reunión como Granola: combina las NOTAS ESCRITAS por el usuario (son lo más importante: respeta su énfasis y cubre cada punto que anotó) con la TRANSCRIPCIÓN para completar el contexto.
 HOY es ${hoyLima()} (zona America/Lima). Calendario para resolver fechas (usa SIEMPRE esta tabla, no calcules): ${tablaDias()}. "El viernes" = el PRÓXIMO viernes de la tabla.
 Equipo de Distinto (posibles responsables): ${miembros.map((m) => m.nombre).join(', ')}.
+Marcas / clientes de la agencia: ${marcasTodas.map((m) => m.nombre).join(', ')}.
 Reglas:
 - Usa SOLO lo que aparece en las notas o la transcripción. No inventes datos, cifras, nombres ni fechas.
 - La transcripción puede tener errores de reconocimiento de voz: corrige el sentido obvio sin cambiar el significado. "Yo:" es quien tomó la nota${autor ? ` (${autor.nombre}): si "Yo" se compromete a algo ("yo les mando…"), el responsable es ${autor.nombre}` : ''}; "Ellos:" son los demás participantes.
 - Estructura el resumen en markdown simple (títulos "## " y viñetas "- "), con estas secciones (omite las que queden vacías):
 ${GUIA_PLANTILLA[tpl]}
-- "acciones": tareas concretas que alguien del equipo de Distinto se comprometió a hacer o que quedaron pendientes. Redáctalas como tarea accionable, cortas. "responsable": el nombre EXACTO de la lista del equipo si se menciona o se deduce con claridad; si no, null. "plazo": las PALABRAS EXACTAS del plazo tal como se dijeron ("para el viernes", "mañana", "el 10 de octubre", "fin de mes"); si no se dijo, null. "fecha": tu mejor cálculo YYYY-MM-DD con la tabla, o null. No incluyas tareas que le tocan al cliente (van en la sección de pendientes del cliente del resumen).
-Devuelve SOLO JSON: {"titulo": "título corto y claro de la reunión", "resumen": "markdown", "acciones": [{"texto": "...", "responsable": "Nombre o null", "plazo": "palabras exactas o null", "fecha": "YYYY-MM-DD o null"}]}`
+- "acciones": tareas concretas que alguien del equipo de Distinto se comprometió a hacer o que quedaron pendientes. Redáctalas como tarea accionable, cortas. "responsable": el nombre EXACTO de la lista del equipo si se menciona o se deduce con claridad; si no, null. "marca": el nombre EXACTO de la marca/cliente de la lista a la que corresponde esa tarea (puede ser distinta a la de la reunión, ej. "revisar la app de Manrique" → la marca de Manrique); si es la marca de la reunión o no se sabe, null. "plazo": las PALABRAS EXACTAS del plazo tal como se dijeron ("para el viernes", "mañana", "el 10 de octubre", "fin de mes"); si no se dijo, null. "fecha": tu mejor cálculo YYYY-MM-DD con la tabla, o null. No incluyas tareas que le tocan al cliente (van en la sección de pendientes del cliente del resumen).
+Devuelve SOLO JSON: {"titulo": "título corto y claro de la reunión", "resumen": "markdown", "acciones": [{"texto": "...", "responsable": "Nombre o null", "marca": "Marca o null", "plazo": "palabras exactas o null", "fecha": "YYYY-MM-DD o null"}]}`
 
   const usuario = [
     `Título actual: ${row.titulo || 'Reunión'}`,
@@ -195,7 +197,7 @@ Devuelve SOLO JSON: {"titulo": "título corto y claro de la reunión", "resumen"
 
   const r = await completarIA({ sistema, usuario, json: true, maxTokens: 2200 })
   if (!r.ok) return r
-  const out = leerJSON<{ titulo?: string; resumen?: string; acciones?: { texto?: string; responsable?: string | null; plazo?: string | null; fecha?: string | null }[] }>(r.texto)
+  const out = leerJSON<{ titulo?: string; resumen?: string; acciones?: { texto?: string; responsable?: string | null; marca?: string | null; plazo?: string | null; fecha?: string | null }[] }>(r.texto)
   if (!out?.resumen) return { ok: false, error: 'La IA no devolvió un resumen válido. Intenta de nuevo.' }
 
   const porNombre = (n?: string | null) => {
@@ -205,7 +207,16 @@ Devuelve SOLO JSON: {"titulo": "título corto y claro de la reunión", "resumen"
       ?? miembros.find((m) => m.nombre.toLowerCase().split(/\s+/)[0] === k.split(/\s+/)[0])
       ?? null
   }
-  /* Responsable por defecto: quien llevó la reunión (dueño de la nota). */
+  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
+  const marcaPorNombre = (n?: string | null) => {
+    if (!n) return null
+    const k = norm(n)
+    return marcasTodas.find((m) => norm(m.nombre) === k)
+      ?? marcasTodas.find((m) => norm(m.nombre).includes(k) || k.includes(norm(m.nombre)))
+      ?? null
+  }
+  /* Responsable por defecto: quien llevó la reunión (dueño de la nota).
+     Marca por defecto: la de la reunión. */
   const acciones: AccionNota[] = (out.acciones ?? [])
     .filter((a) => a?.texto && String(a.texto).trim())
     .slice(0, 25)
@@ -216,6 +227,7 @@ Devuelve SOLO JSON: {"titulo": "título corto y claro de la reunión", "resumen"
         texto: String(a.texto).trim().slice(0, 300),
         responsableId: m?.id ?? null,
         responsableNombre: m?.nombre ?? null,
+        marcaId: marcaPorNombre(a.marca)?.id ?? marcaNota?.id ?? null,
         // La fecha la calcula el código a partir de las palabras del plazo; la de la IA es respaldo.
         fecha: resolverPlazo(a.plazo, hoyLima()) ?? (a.fecha && /^\d{4}-\d{2}-\d{2}$/.test(a.fecha) ? a.fecha : null),
         tareaId: null,
@@ -261,12 +273,19 @@ export async function crearTareasDesdeNota(id: string, accionIds: string[]): Pro
   const elegidas = acciones.filter((a) => accionIds.includes(a.id) && !a.tareaId)
   if (elegidas.length === 0) return { ok: false, error: 'No hay tareas nuevas para crear.' }
 
-  const { data: marca } = row.marca_id
-    ? await service.from('marcas').select('nombre').eq('id', row.marca_id).maybeSingle()
-    : { data: null }
-  const categoria = (marca?.nombre as string | undefined) ?? 'Reuniones'
-  const { data: conColor } = await service.from('tareas').select('color').eq('categoria', categoria).limit(1)
-  const color = (conColor?.[0]?.color as string | undefined) ?? '#7170ff'
+  /* Cada tarea va a SU marca (categoría = nombre de la marca + marca_slug),
+     igual que las tareas normales: así sale en el trabajo de esa marca.
+     Pedro 24-sep-2026: "no lo pongas en un apartado de Reuniones". */
+  const { data: marcasRows } = await service.from('marcas').select('id, nombre, slug')
+  const marcas = (marcasRows ?? []) as { id: string; nombre: string; slug: string }[]
+  const colorCache = new Map<string, string>()
+  async function colorDe(categoria: string): Promise<string> {
+    if (colorCache.has(categoria)) return colorCache.get(categoria)!
+    const { data } = await service.from('tareas').select('color').eq('categoria', categoria).limit(1)
+    const c = (data?.[0]?.color as string | undefined) ?? '#7170ff'
+    colorCache.set(categoria, c)
+    return c
+  }
 
   const { data: activos } = await service.from('team_members').select('id').eq('activo', true)
   const validos = new Set(((activos ?? []) as { id: string }[]).map((m) => m.id))
@@ -277,6 +296,9 @@ export async function crearTareasDesdeNota(id: string, accionIds: string[]): Pro
   for (const a of elegidas) {
     const owner = a.responsableId && validos.has(a.responsableId) ? a.responsableId : (row.team_member_id ?? me.id)
     const texto = `${a.texto}${a.fecha ? ` · para el ${fechaCorta(a.fecha)}` : ''}`.slice(0, 600)
+    const marca = marcas.find((m) => m.id === (a.marcaId ?? row.marca_id)) ?? null
+    const categoria = marca?.nombre ?? 'General'
+    const color = await colorDe(categoria)
     const { data: t, error } = await service.from('tareas').insert({
       team_member_id: owner,
       created_by: me.id,
@@ -285,9 +307,7 @@ export async function crearTareasDesdeNota(id: string, accionIds: string[]): Pro
       color,
       completada: false,
       focus_lane: null,
-      /* Sin marca_slug a propósito: las tareas de reuniones son internas y no
-         deben aparecer en el portal del cliente. */
-      marca_slug: null,
+      marca_slug: marca?.slug ?? null,
     }).select('id').single()
     if (error) continue
     a.tareaId = t.id as string

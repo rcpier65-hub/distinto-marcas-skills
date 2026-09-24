@@ -63,6 +63,21 @@ export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
     return proximas.filter((p) => { const y = limaParts(p.startsAt).ymd; return y >= base && y < end })
   }, [proximas, weekOffset, hoy])
 
+  /* Próximas agrupadas por día; compacto: 3 días salvo "Ver más días". */
+  const [verTodasProximas, setVerTodasProximas] = useState(false)
+  const [ahoraMs] = useState(() => Date.now())
+  const diasProximas = useMemo(() => {
+    const map = new Map<string, ProximaItem[]>()
+    for (const p of proximasFiltradas) {
+      const y = limaParts(p.startsAt).ymd
+      if (!map.has(y)) map.set(y, [])
+      map.get(y)!.push(p)
+    }
+    return [...map.entries()]
+  }, [proximasFiltradas])
+  const porDiaProximas = verTodasProximas ? diasProximas : diasProximas.slice(0, 3)
+  const hayMasProximas = diasProximas.length > 3
+
   const notasFiltradas = useMemo(() => (marcaFiltro ? notas.filter((n) => n.marcaId === marcaFiltro) : notas), [notas, marcaFiltro])
   const grouped = useMemo(() => {
     const map = new Map<string, NotaReunion[]>()
@@ -119,40 +134,71 @@ export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
         </button>
       </div>
 
-      {/* Próximas reuniones */}
-      <section style={{ background: 'var(--mk-bg-elevated)', border: '1px solid var(--mk-border-subtle)', borderRadius: 18, padding: '18px 18px 10px', marginBottom: 28 }}>
+      {/* Próximas — compacto, estilo Granola: el día a la izquierda y sus
+          reuniones a la derecha; "Ahora" en verde si ya empezó. */}
+      <section style={{ marginBottom: 30 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)' }}>Próximas</h2>
-          <div style={{ display: 'flex', gap: 4 }}>
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 500, letterSpacing: '-0.01em', color: 'var(--mk-text-primary)', fontFamily: 'Georgia, "Times New Roman", serif' }}>Próximas</h2>
+          <div style={{ display: 'flex', gap: 2 }}>
             <button type="button" aria-label="Anterior" onClick={() => setWeekOffset((w) => w - 1)} style={btnIcon}><ChevronLeft size={16} /></button>
             <button type="button" aria-label="Siguiente" onClick={() => setWeekOffset((w) => w + 1)} style={btnIcon}><ChevronRight size={16} /></button>
           </div>
         </div>
-        {proximasFiltradas.length === 0 ? (
-          <p style={{ color: 'var(--mk-text-tertiary)', fontSize: 13, padding: '12px 4px 18px' }}>No hay eventos en esta ventana.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {proximasFiltradas.map((p) => {
-              const parts = limaParts(p.startsAt)
-              const end = p.endsAt ? limaParts(p.endsAt).time : null
-              const k = `${p.fuente}-${p.id}`
-              return (
-                <li key={k} style={{ display: 'grid', gridTemplateColumns: '72px 1px 1fr auto', gap: 14, alignItems: 'center', padding: '12px 4px', borderTop: '1px solid var(--mk-border-subtle)' }}>
-                  <div><div style={{ fontSize: 22, fontWeight: 650, color: 'var(--mk-text-primary)' }}>{parts.day}</div><div style={{ fontSize: 11, color: 'var(--mk-text-tertiary)', textTransform: 'capitalize' }}>{parts.month} {parts.weekday}</div></div>
-                  <div style={{ background: 'var(--mk-border-subtle)', alignSelf: 'stretch' }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Pin size={13} style={{ color: 'var(--mk-text-quaternary)', flexShrink: 0 }} /><span style={{ fontSize: 14, fontWeight: 560, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titulo}</span></div>
-                    <div style={{ fontSize: 12, color: 'var(--mk-text-tertiary)', marginTop: 4, paddingLeft: 21 }}>{parts.time}{end ? ` – ${end}` : ''} · {p.fuente === 'marca_reuniones' ? 'Reunión' : p.fuente === 'google_calendar' ? 'Calendar' : 'Nota'}{p.meetLink ? ' · Meet' : ''}</div>
-                  </div>
-                  <button type="button" onClick={() => void tomarNotas(p)} disabled={abriendo === k}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-base, #fff)', color: 'var(--mk-text-primary)', fontSize: 12.5, fontWeight: 560, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    {abriendo === k ? <Loader2 size={13} className="animate-spin" /> : <NotebookPen size={13} />} Tomar notas
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+        <div style={{ background: 'var(--mk-bg-elevated)', border: '1px solid var(--mk-border-subtle)', borderRadius: 18, padding: '6px 18px' }}>
+          {porDiaProximas.length === 0 ? (
+            <p style={{ color: 'var(--mk-text-tertiary)', fontSize: 13, padding: '14px 0', margin: 0 }}>No hay reuniones en estos días.</p>
+          ) : porDiaProximas.map(([ymd, items], di) => {
+            const p0 = limaParts(items[0].startsAt)
+            const esHoy = ymd === hoy
+            return (
+              <div key={ymd} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, padding: '12px 0', borderTop: di ? '1px solid var(--mk-border-subtle)' : 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingTop: 2 }}>
+                  <span style={{ fontSize: 36, lineHeight: 1, fontWeight: 400, color: 'var(--mk-text-primary)', fontFamily: 'Georgia, "Times New Roman", serif' }}>{p0.day}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', paddingTop: 3 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: 'var(--mk-text-primary)', textTransform: 'capitalize' }}>
+                      {p0.month}{esHoy && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />}
+                    </span>
+                    <span style={{ fontSize: 12.5, color: 'var(--mk-text-tertiary)', textTransform: 'capitalize' }}>{p0.weekday.replace('.', '')}</span>
+                  </span>
+                </div>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {items.map((p) => {
+                    const k = `${p.fuente}-${p.id}`
+                    const ini = new Date(p.startsAt).getTime()
+                    const fin = p.endsAt ? new Date(p.endsAt).getTime() : ini + 60 * 60_000
+                    const ahora = ahoraMs >= ini && ahoraMs < fin
+                    const rango = `${limaParts(p.startsAt).time}${p.endsAt ? ` – ${limaParts(p.endsAt).time}` : ''}`
+                    return (
+                      <li key={k}>
+                        <button type="button" onClick={() => void tomarNotas(p)} disabled={abriendo === k} title="Tomar notas de esta reunión"
+                          className="mk-proxima"
+                          style={{ width: '100%', display: 'grid', gridTemplateColumns: '3px 1fr auto', gap: 12, alignItems: 'center', padding: '7px 10px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                          <span style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: ahora ? '#84cc16' : '#7dd3fc' }} />
+                          <span style={{ minWidth: 0 }}>
+                            <span style={{ display: 'block', fontSize: 14.5, fontWeight: 520, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titulo}</span>
+                            <span style={{ display: 'block', fontSize: 12.5, marginTop: 1, color: ahora ? '#65a30d' : 'var(--mk-text-tertiary)', fontWeight: ahora ? 560 : 400 }}>
+                              {ahora ? 'Ahora · ' : ''}{rango}{p.meetLink ? ' · Meet' : ''}
+                            </span>
+                          </span>
+                          <span className="mk-proxima-accion" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--mk-text-tertiary)', whiteSpace: 'nowrap' }}>
+                            {abriendo === k ? <Loader2 size={13} className="animate-spin" /> : <NotebookPen size={13} />} Tomar notas
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+          })}
+          {hayMasProximas && (
+            <button type="button" onClick={() => setVerTodasProximas((v) => !v)}
+              style={{ width: '100%', padding: '10px 0 12px', border: 'none', borderTop: '1px solid var(--mk-border-subtle)', background: 'transparent', color: 'var(--mk-text-tertiary)', fontSize: 12.5, cursor: 'pointer' }}>
+              {verTodasProximas ? 'Ver menos' : 'Ver más días'}
+            </button>
+          )}
+        </div>
+        <style>{'.mk-proxima:hover{background:var(--mk-bg-hover)!important}.mk-proxima .mk-proxima-accion{opacity:0;transition:opacity .15s}.mk-proxima:hover .mk-proxima-accion{opacity:1}@media (hover:none){.mk-proxima .mk-proxima-accion{opacity:1}}'}</style>
       </section>
 
       {/* Historial */}
