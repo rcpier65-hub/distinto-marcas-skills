@@ -18,6 +18,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { listCalendarEvents } from '@/lib/integrations/google-calendar'
 import { completarIA, leerJSON } from '@/lib/notas-reuniones/ia'
 import { resolverPlazo } from '@/lib/notas-reuniones/plazo'
+import { esSuperAdmin, puedeVerNota } from '@/lib/notas-reuniones/acceso'
 import { NOTA_SELECT, PLANTILLAS, parseAcciones, rowToNota, type AccionNota, type NotaReunion, type Plantilla } from '@/lib/notas-reuniones/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,17 +31,35 @@ const TZ = 'America/Lima'
 async function yo(service: Service) {
   const user = await requireUser()
   const { data } = await service.from('team_members').select('id, nombre, rol_base').eq('auth_user_id', user.id).maybeSingle()
-  return { id: (data?.id ?? null) as string | null, nombre: (data?.nombre ?? '') as string, esCEO: !data || data.rol_base === 'director' || data.rol_base === 'admin' }
+  return {
+    id: (data?.id ?? null) as string | null,
+    nombre: (data?.nombre ?? '') as string,
+    esCEO: !data || data.rol_base === 'director' || data.rol_base === 'admin',
+    superAdmin: esSuperAdmin(user.email),
+  }
 }
 
-/* Lee la nota si el usuario puede verla (dueño o director). */
+/* Lee la nota si el usuario puede verla (del equipo, o privada y suya). */
 async function notaVisible(service: Service, id: string) {
   if (!UUID.test(id)) return null
   const me = await yo(service)
   const { data } = await service.from('notas_reuniones').select(NOTA_SELECT).eq('id', id).maybeSingle()
-  if (!data) return null
-  if (!me.esCEO && data.team_member_id !== me.id) return null
+  if (!data || !puedeVerNota(data, me.id)) return null
   return { me, row: data }
+}
+
+/* Marca una nota como privada (solo la ve su autor) o del equipo. Solo el
+   super admin, y solo en sus propias notas. */
+export async function cambiarPrivacidadNota(id: string, privada: boolean): Promise<{ ok: true } | Err> {
+  const service = createServiceClient() as Service
+  const v = await notaVisible(service, id)
+  if (!v) return { ok: false, error: 'Nota no encontrada.' }
+  if (!v.me.superAdmin || v.row.team_member_id !== v.me.id) return { ok: false, error: 'Solo el super admin puede hacer privadas sus notas.' }
+  const { error } = await service.from('notas_reuniones').update({ privada }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/notas-reuniones')
+  revalidatePath(`/notas-reuniones/${id}`)
+  return { ok: true }
 }
 
 function hoyLima(): string {
@@ -73,6 +92,7 @@ export async function abrirNotaDeReunion(input: {
 
   // ¿Ya hay nota para esta reunión? → abrir esa.
   let q = service.from('notas_reuniones').select('id').limit(1)
+    .or(me.id ? `privada.eq.false,team_member_id.eq.${me.id}` : 'privada.eq.false')
   if (input.marcaReunionId && UUID.test(input.marcaReunionId)) q = q.eq('marca_reunion_id', input.marcaReunionId)
   else if (input.googleEventId) q = q.eq('google_event_id', input.googleEventId)
   else q = null
@@ -339,7 +359,7 @@ export async function preguntarAReuniones(pregunta: string, marcaId?: string | n
     .select('id, titulo, cuerpo, transcript, resumen, created_at, reunion_inicio, marca_id, team_member_id')
     .order('created_at', { ascending: false })
     .limit(40)
-  if (!me.esCEO && me.id) sel = sel.eq('team_member_id', me.id)
+  sel = sel.or(me.id ? `privada.eq.false,team_member_id.eq.${me.id}` : 'privada.eq.false')
   if (marcaId && UUID.test(marcaId)) sel = sel.eq('marca_id', marcaId)
   const { data } = await sel
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -385,11 +405,12 @@ export type ReunionAviso = {
 }
 
 /* Reuniones de las próximas 12 h (app + Google) para avisar "¿Transcribimos?".
-   Solo directores (son quienes llevan las reuniones con clientes). */
+   Para TODO el equipo (Pedro 24-sep-2026: "las reuniones de la agencia deben
+   salirle a todos"). */
 export async function reunionesParaAviso(): Promise<ReunionAviso[]> {
   const service = createServiceClient() as Service
   const me = await yo(service)
-  if (!me.esCEO) return []
+  if (!me.id) return []
 
   const ahora = Date.now()
   const hasta = ahora + 12 * 3600_000
@@ -435,6 +456,7 @@ export async function reunionesParaAviso(): Promise<ReunionAviso[]> {
   const gIds = out.map((o) => o.googleEventId).filter(Boolean)
   if (mrIds.length || gIds.length) {
     const { data } = await service.from('notas_reuniones').select('id, marca_reunion_id, google_event_id')
+      .or(`privada.eq.false,team_member_id.eq.${me.id}`)
       .or([mrIds.length ? `marca_reunion_id.in.(${mrIds.join(',')})` : '', gIds.length ? `google_event_id.in.(${gIds.map((g) => `"${g}"`).join(',')})` : ''].filter(Boolean).join(','))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const n of (data ?? []) as any[]) {

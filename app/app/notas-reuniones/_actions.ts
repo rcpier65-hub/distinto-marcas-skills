@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getOpenAIApiKey } from '@/lib/integrations/openai'
 import { getAnthropicApiKey } from '@/lib/integrations/anthropic'
+import { puedeBorrarNota, puedeVerNota } from '@/lib/notas-reuniones/acceso'
 import {
   NOTA_SELECT,
   parseChat,
@@ -59,10 +60,10 @@ export async function crearNota(titulo?: string): Promise<
   return { ok: true, nota: rowToNota(data, me.nombre || 'Yo') }
 }
 
-export async function crearNotaYRedirigir() {
-  const res = await crearNota()
+export async function crearNotaYRedirigir(transcribir = false) {
+  const res = await crearNota(transcribir ? 'Reunión' : undefined)
   if (!res.ok) throw new Error(res.error)
-  redirect(`/notas-reuniones/${res.nota.id}`)
+  redirect(`/notas-reuniones/${res.nota.id}${transcribir ? '?transcribir=1' : ''}`)
 }
 
 export async function actualizarNota(
@@ -87,7 +88,8 @@ export async function actualizarNota(
     .maybeSingle()
   if (selErr) return { ok: false, error: selErr.message }
   if (!existing) return { ok: false, error: 'Nota no encontrada' }
-  if (!me.esCEO && me.id && existing.team_member_id && existing.team_member_id !== me.id) {
+  /* Notas del equipo: cualquiera las completa. Privadas: solo su autor. */
+  if (!puedeVerNota(existing, me.id)) {
     return { ok: false, error: 'No puedes editar esta nota' }
   }
 
@@ -116,11 +118,11 @@ export async function eliminarNota(id: string): Promise<{ ok: true } | { ok: fal
   const me = await currentMember(service, user.id)
   const { data: existing } = await service
     .from('notas_reuniones')
-    .select('id, team_member_id')
+    .select('id, team_member_id, privada')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { ok: false, error: 'Nota no encontrada' }
-  if (!me.esCEO && me.id && existing.team_member_id && existing.team_member_id !== me.id) {
+  if (!puedeBorrarNota(existing, me.id, me.esCEO)) {
     return { ok: false, error: 'No puedes borrar esta nota' }
   }
   const { error } = await service.from('notas_reuniones').delete().eq('id', id)
@@ -147,7 +149,7 @@ export async function chatearConNota(
     .maybeSingle()
   if (selErr) return { ok: false, error: selErr.message }
   if (!nota) return { ok: false, error: 'Nota no encontrada' }
-  if (!me.esCEO && me.id && nota.team_member_id && nota.team_member_id !== me.id) {
+  if (!puedeVerNota(nota, me.id)) {
     return { ok: false, error: 'No puedes chatear con esta nota' }
   }
 

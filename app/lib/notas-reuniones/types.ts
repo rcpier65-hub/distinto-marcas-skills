@@ -56,6 +56,8 @@ export type NotaReunion = {
   resumen: string | null
   acciones: AccionNota[]
   enhancedAt: string | null
+  /* Solo la ve su autor (notas privadas del super admin). */
+  privada: boolean
 }
 
 export type ProximaItem = {
@@ -71,7 +73,7 @@ export type ProximaItem = {
 }
 
 export const NOTA_SELECT =
-  'id, team_member_id, titulo, cuerpo, transcript, chat, estado, started_at, ended_at, created_at, updated_at, marca_id, marca_reunion_id, google_event_id, reunion_inicio, meet_link, modalidad, plantilla, resumen, acciones, enhanced_at'
+  'id, team_member_id, titulo, cuerpo, transcript, chat, estado, started_at, ended_at, created_at, updated_at, marca_id, marca_reunion_id, google_event_id, reunion_inicio, meet_link, modalidad, plantilla, resumen, acciones, enhanced_at, privada'
 
 export function parseAcciones(raw: unknown): AccionNota[] {
   if (!Array.isArray(raw)) return []
@@ -136,5 +138,6 @@ export function rowToNota(row: any, autorNombre?: string): NotaReunion {
     resumen: (row.resumen ?? null) as string | null,
     acciones: parseAcciones(row.acciones),
     enhancedAt: (row.enhanced_at ?? null) as string | null,
+    privada: row.privada === true,
   }
 }

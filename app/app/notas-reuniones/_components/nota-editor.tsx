@@ -10,22 +10,24 @@
       Tareas, agrupadas por la marca.
    4. "Pregunta lo que sea" sobre esta reunión. */
 
-import { useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft, Calendar, User, Mic, Pause, Play, Square, Sparkles, Loader2, Users, MonitorSpeaker,
-  Video, CheckCircle2, ListChecks, FileText, AudioLines, Tag as TagIcon,
+  Video, CheckCircle2, ListChecks, FileText, AudioLines, Tag as TagIcon, Lock,
 } from 'lucide-react'
 import { PLANTILLAS, type AccionNota, type ChatMessage, type NotaReunion, type Plantilla } from '@/lib/notas-reuniones/types'
 import { actualizarNota, chatearConNota } from '../_actions'
-import { actualizarContextoNota, crearTareasDesdeNota, guardarAcciones, mejorarNotas } from '../_granola-actions'
+import { actualizarContextoNota, cambiarPrivacidadNota, crearTareasDesdeNota, guardarAcciones, mejorarNotas } from '../_granola-actions'
 import { useGrabadora, type Modo } from './use-grabadora'
 
 type Props = {
   nota: NotaReunion
   meNombre: string
+  /* Solo el super admin, en sus propias notas. */
+  puedePrivatizar: boolean
   equipo: { id: string; nombre: string }[]
   marcas: { id: string; nombre: string; emoji: string | null }[]
 }
@@ -73,7 +75,7 @@ function NotasMejoradas({ md, cuerpo }: { md: string; cuerpo: string }) {
   )
 }
 
-export function NotaEditor({ nota, meNombre, equipo, marcas }: Props) {
+export function NotaEditor({ nota, meNombre, puedePrivatizar, equipo, marcas }: Props) {
   const router = useRouter()
   const [titulo, setTitulo] = useState(nota.titulo)
   const [cuerpo, setCuerpo] = useState(nota.cuerpo)
@@ -90,10 +92,38 @@ export function NotaEditor({ nota, meNombre, equipo, marcas }: Props) {
   const [creandoTareas, setCreandoTareas] = useState(false)
   const [vista, setVista] = useState<Vista>(nota.resumen ? 'mejoradas' : 'mias')
   const [finalizada, setFinalizada] = useState(nota.estado === 'finalizada')
-  const ultimoModo = useRef<Modo>(nota.modalidad === 'presencial' ? 'presencial' : 'virtual')
+  const [privada, setPrivada] = useState(nota.privada)
+  /* Por defecto se transcribe con el micrófono (sirve en persona y en Meet sin
+     audífonos). El modo "audio de la llamada" es opcional. */
+  const ultimoModo = useRef<Modo>(nota.modalidad === 'virtual' ? 'virtual' : 'presencial')
   const guardarAccTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const g = useGrabadora(nota.id, nota.startedAt, nota.transcript)
+
+  /* "Transcribir reunión" (inicio, atajo del ícono de la app): llega con
+     ?transcribir=1 y arranca el micrófono solo. Si el navegador pide un toque
+     primero, queda el botón grande. */
+  const autoArranque = useRef(false)
+  useEffect(() => {
+    if (autoArranque.current) return
+    autoArranque.current = true
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('transcribir') !== '1') return
+    params.delete('transcribir')
+    const qs = params.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+    void g.iniciar('presencial')
+    // Solo al abrir la nota.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function alternarPrivada() {
+    const nuevo = !privada
+    setPrivada(nuevo)
+    const r = await cambiarPrivacidadNota(nota.id, nuevo)
+    if (!r.ok) { setPrivada(!nuevo); toast.error(r.error); return }
+    toast.success(nuevo ? '🔒 Nota privada: solo tú la ves' : '👥 Nota del equipo: todos la ven')
+  }
 
   const fechaLabel = useMemo(() => {
     const base = nota.reunionInicio ?? nota.createdAt
@@ -204,6 +234,14 @@ export function NotaEditor({ nota, meNombre, equipo, marcas }: Props) {
             {marcas.map((m) => <option key={m.id} value={m.id}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>)}
           </select>
         </label>
+        {puedePrivatizar ? (
+          <button type="button" onClick={() => void alternarPrivada()} title={privada ? 'Solo tú la ves — toca para compartirla con el equipo' : 'Todo el equipo la ve — toca para hacerla privada'}
+            style={{ ...tagStyle, cursor: 'pointer', ...(privada ? { background: '#1f2937', color: '#fff', borderColor: '#1f2937' } : {}) }}>
+            {privada ? <Lock size={12} /> : <Users size={12} />} {privada ? 'Privada' : 'Equipo'}
+          </button>
+        ) : privada ? (
+          <Tag icon={<Lock size={12} />}>Privada</Tag>
+        ) : null}
         {nota.meetLink && (
           <a href={nota.meetLink} target="_blank" rel="noreferrer" style={{ ...tagStyle, textDecoration: 'none', color: '#059669', borderColor: '#a7f3d0' }}>
             <Video size={12} /> Abrir Meet
@@ -211,22 +249,20 @@ export function NotaEditor({ nota, meNombre, equipo, marcas }: Props) {
         )}
       </div>
 
-      {/* Inicio: ¿en persona o llamada? */}
+      {/* Inicio: un solo botón grande. El modo "audio de la llamada" es opcional. */}
       {sinEmpezar && (
-        <div style={{ marginBottom: 18, padding: 16, borderRadius: 16, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-elevated)' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mk-text-primary)', marginBottom: 4 }}>¿Transcribimos esta reunión?</div>
-          <div style={{ fontSize: 12.5, color: 'var(--mk-text-tertiary)', marginBottom: 12 }}>Escribe tus apuntes abajo mientras tanto. Al terminar, las notas se ordenan solas y salen las tareas.</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => void empezar('presencial')} style={btnGrande}>
-              <Users size={16} /> En persona
-            </button>
-            <button type="button" onClick={() => void empezar('virtual')} style={btnGrande}>
-              <MonitorSpeaker size={16} /> Llamada (Meet)
-            </button>
+        <div style={{ marginBottom: 18, padding: 18, borderRadius: 16, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-elevated)' }}>
+          <button type="button" onClick={() => void empezar('presencial')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, height: 48, padding: '0 22px', borderRadius: 14, border: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, fontWeight: 650, background: `linear-gradient(135deg, ${ACENTO}, #ba41f7)`, boxShadow: '0 8px 20px -8px rgba(113,112,255,0.7)' }}>
+            <Mic size={18} /> Empezar a transcribir
+          </button>
+          <div style={{ fontSize: 12.5, color: 'var(--mk-text-tertiary)', marginTop: 10, lineHeight: 1.55 }}>
+            Usa el micrófono: sirve para reuniones <b>en persona</b> y para <b>Meet sin audífonos</b> (capta tu voz y la de la llamada por los parlantes). Escribe tus apuntes abajo mientras tanto; al terminar se ordenan solas y salen las tareas.
           </div>
-          <div style={{ fontSize: 11.5, color: 'var(--mk-text-quaternary)', marginTop: 10, lineHeight: 1.5 }}>
-            <b>Llamada:</b> en Chrome de la compu, elige la pestaña de Meet y marca «Compartir audio de la pestaña». Usa audífonos para que tu voz no se duplique.
-          </div>
+          <button type="button" onClick={() => void empezar('virtual')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', color: ACENTO, fontSize: 12.5, fontWeight: 560 }}>
+            <MonitorSpeaker size={14} /> ¿En Meet con audífonos? Capturar el audio de la llamada
+          </button>
         </div>
       )}
 
@@ -403,5 +439,4 @@ function Tag({ icon, children }: { icon: React.ReactNode; children: React.ReactN
 
 const tagStyle: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 999, border: '1px solid var(--mk-border-default)', color: 'var(--mk-text-secondary)', fontSize: 12, fontWeight: 520, background: 'var(--mk-bg-elevated)' }
 const ctrlBtn: CSSProperties = { width: 32, height: 32, borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--mk-text-primary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
-const btnGrande: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 12, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-base, #fff)', color: 'var(--mk-text-primary)', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }
 const miniCampo: CSSProperties = { height: 30, borderRadius: 8, border: '1px solid var(--mk-border-subtle)', background: 'var(--mk-bg-base, #fff)', padding: '0 8px', fontSize: 12, color: 'var(--mk-text-secondary)' }

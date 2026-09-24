@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, FileText, Plus, Pin, Sparkles, ListChecks, Loader2, X, NotebookPen } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, Plus, Sparkles, ListChecks, Loader2, X, NotebookPen, Mic, Lock } from 'lucide-react'
 import type { NotaReunion, ProximaItem } from '@/lib/notas-reuniones/types'
 import { crearNotaYRedirigir } from '../_actions'
 import { abrirNotaDeReunion, preguntarAReuniones } from '../_granola-actions'
@@ -20,6 +20,7 @@ type Props = {
   notas: NotaReunion[]
   meNombre: string
   marcas: { id: string; nombre: string; emoji: string | null }[]
+  superAdmin: boolean
 }
 
 function limaParts(iso: string) {
@@ -43,12 +44,13 @@ function extracto(md: string | null): string {
   return (l ?? '').replace(/^[-*•]\s+/, '').slice(0, 140)
 }
 
-export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
+export function NotasHome({ proximas, notas, meNombre, marcas, superAdmin }: Props) {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
   const [abriendo, setAbriendo] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
   const [marcaFiltro, setMarcaFiltro] = useState('')
+  const [soloPrivadas, setSoloPrivadas] = useState(false)
   const [pregunta, setPregunta] = useState('')
   const [preguntando, setPreguntando] = useState(false)
   const [respuesta, setRespuesta] = useState<{ texto: string; fuentes: { id: string; titulo: string }[] } | null>(null)
@@ -78,7 +80,9 @@ export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
   const porDiaProximas = verTodasProximas ? diasProximas : diasProximas.slice(0, 3)
   const hayMasProximas = diasProximas.length > 3
 
-  const notasFiltradas = useMemo(() => (marcaFiltro ? notas.filter((n) => n.marcaId === marcaFiltro) : notas), [notas, marcaFiltro])
+  const notasFiltradas = useMemo(() => notas
+    .filter((n) => !marcaFiltro || n.marcaId === marcaFiltro)
+    .filter((n) => !soloPrivadas || n.privada), [notas, marcaFiltro, soloPrivadas])
   const grouped = useMemo(() => {
     const map = new Map<string, NotaReunion[]>()
     for (const n of notasFiltradas) {
@@ -129,9 +133,16 @@ export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--mk-text-primary)' }}>Notas y reuniones</h1>
           <p style={{ margin: '6px 0 0', color: 'var(--mk-text-tertiary)', fontSize: 13 }}>Transcribe en persona o en Meet, ordena las notas con IA y reparte las tareas · {meNombre}</p>
         </div>
-        <button type="button" onClick={onNueva} disabled={creating} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 999, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-elevated)', color: 'var(--mk-text-primary)', fontSize: 13, fontWeight: 560, cursor: creating ? 'wait' : 'pointer' }}>
-          <Plus size={15} strokeWidth={2.25} />{creating ? 'Creando…' : 'Nueva nota'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Reunión al azar sin calendario: crea la nota y empieza a transcribir. */}
+          <button type="button" onClick={() => { setCreating(true); router.push('/notas-reuniones/nueva?transcribir=1') }} disabled={creating}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 999, border: 'none', background: 'linear-gradient(135deg, #7170ff, #ba41f7)', color: '#fff', fontSize: 13, fontWeight: 650, cursor: creating ? 'wait' : 'pointer', boxShadow: '0 6px 16px -6px rgba(113,112,255,0.7)' }}>
+            {creating ? <Loader2 size={15} className="animate-spin" /> : <Mic size={15} />} Transcribir reunión
+          </button>
+          <button type="button" onClick={onNueva} disabled={creating} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 999, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-elevated)', color: 'var(--mk-text-primary)', fontSize: 13, fontWeight: 560, cursor: creating ? 'wait' : 'pointer' }}>
+            <Plus size={15} strokeWidth={2.25} /> Nueva nota
+          </button>
+        </div>
       </div>
 
       {/* Próximas — compacto, estilo Granola: el día a la izquierda y sus
@@ -204,11 +215,21 @@ export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
       {/* Historial */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--mk-text-primary)' }}>Historial de reuniones</h2>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {superAdmin && (
+          <button type="button" onClick={() => setSoloPrivadas((v) => !v)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 10, fontSize: 12.5, fontWeight: 560, cursor: 'pointer',
+              border: soloPrivadas ? '1px solid #1f2937' : '1px solid var(--mk-border-default)',
+              background: soloPrivadas ? '#1f2937' : 'var(--mk-bg-elevated)', color: soloPrivadas ? '#fff' : 'var(--mk-text-secondary)' }}>
+            <Lock size={13} /> Mis privadas
+          </button>
+        )}
         <select value={marcaFiltro} onChange={(e) => setMarcaFiltro(e.target.value)}
           style={{ height: 32, borderRadius: 10, border: '1px solid var(--mk-border-default)', background: 'var(--mk-bg-elevated)', padding: '0 10px', fontSize: 12.5, color: 'var(--mk-text-secondary)' }}>
           <option value="">Todas las marcas</option>
           {marcas.map((m) => <option key={m.id} value={m.id}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>)}
         </select>
+        </div>
       </div>
       <section>
         {grouped.length === 0 ? (
@@ -233,6 +254,7 @@ export function NotasHome({ proximas, notas, meNombre, marcas }: Props) {
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.titulo || 'Sin título'}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--mk-text-tertiary)', marginTop: 2, flexWrap: 'wrap' }}>
                           {marca && <span style={{ padding: '1px 8px', borderRadius: 999, background: 'var(--mk-bg-hover)', color: 'var(--mk-text-secondary)' }}>{marca.emoji ? `${marca.emoji} ` : ''}{marca.nombre}</span>}
+                          {n.privada && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--mk-text-secondary)' }}><Lock size={11} /> Privada</span>}
                           <span>{n.autorNombre || 'Yo'}{n.estado === 'en_curso' ? ' · En curso' : ''}</span>
                           {nTareas > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ListChecks size={12} /> {nTareas} tarea{nTareas === 1 ? '' : 's'}</span>}
                         </div>

@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getProximasSemana } from '@/lib/notas-reuniones/proximas'
 import { NOTA_SELECT, rowToNota, type NotaReunion } from '@/lib/notas-reuniones/types'
 import { NotasHome } from './_components/notas-home'
+import { esSuperAdmin } from '@/lib/notas-reuniones/acceso'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,6 @@ export default async function NotasReunionesPage() {
 
   const meId: string | null = me?.id ?? null
   const meNombre: string = me?.nombre ?? (user.email?.split('@')[0] ?? 'Yo')
-  const esCEO = !me || me.rol_base === 'director'
 
   const proximas = await getProximasSemana()
 
@@ -31,7 +31,8 @@ export default async function NotasReunionesPage() {
     .select(NOTA_SELECT)
     .order('updated_at', { ascending: false })
     .limit(80)
-  if (!esCEO && meId) q = q.eq('team_member_id', meId)
+  /* Todo el equipo ve las notas del equipo; las privadas, solo su autor. */
+  q = q.or(meId ? `privada.eq.false,team_member_id.eq.${meId}` : 'privada.eq.false')
 
   const { data, error } = await q
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,5 +56,5 @@ export default async function NotasReunionesPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const marcas = ((marcasRows ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))
 
-  return <NotasHome proximas={proximas} notas={notas} meNombre={meNombre} marcas={marcas} />
+  return <NotasHome proximas={proximas} notas={notas} meNombre={meNombre} marcas={marcas} superAdmin={esSuperAdmin(user.email)} />
 }

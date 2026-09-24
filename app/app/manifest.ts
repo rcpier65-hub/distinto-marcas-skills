@@ -53,6 +53,12 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
+        name: 'Transcribir reunión',
+        short_name: 'Transcribir',
+        description: 'Crea una nota y empieza a transcribir (Notas y reuniones)',
+        url: '/notas-reuniones/nueva?transcribir=1',
+      },
+      {
         name: 'Inicio',
         short_name: 'Inicio',
         description: 'Dashboard ejecutivo',

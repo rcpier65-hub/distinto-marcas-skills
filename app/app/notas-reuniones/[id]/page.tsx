@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NOTA_SELECT, rowToNota } from '@/lib/notas-reuniones/types'
 import { NotaEditor } from '../_components/nota-editor'
+import { esSuperAdmin, puedeVerNota } from '@/lib/notas-reuniones/acceso'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,6 @@ export default async function NotaDetallePage({ params }: Props) {
 
   const meId: string | null = me?.id ?? null
   const meNombre: string = me?.nombre ?? (user.email?.split('@')[0] ?? 'Yo')
-  const esCEO = !me || me.rol_base === 'director'
 
   const { data, error } = await service
     .from('notas_reuniones')
@@ -31,7 +31,8 @@ export default async function NotaDetallePage({ params }: Props) {
     .maybeSingle()
 
   if (error || !data) notFound()
-  if (!esCEO && meId && data.team_member_id && data.team_member_id !== meId) notFound()
+  /* Privada: solo su autor. Del equipo: todos. */
+  if (!puedeVerNota(data, meId)) notFound()
 
   const nota = rowToNota(data, meNombre)
   /* Equipo (para asignar tareas) y marcas (para ligar la reunión). */
@@ -43,6 +44,8 @@ export default async function NotaDetallePage({ params }: Props) {
     <NotaEditor
       nota={nota}
       meNombre={meNombre}
+      /* El super admin puede hacer privadas SUS notas. */
+      puedePrivatizar={esSuperAdmin(user.email) && !!meId && nota.teamMemberId === meId}
       equipo={((equipo ?? []) as { id: string; nombre: string }[])}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       marcas={((marcas ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))}
