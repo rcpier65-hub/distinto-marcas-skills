@@ -4,10 +4,10 @@
    para reuniones en Meet y en persona".
 
    Dos modos:
-   - PRESENCIAL: escucha el micrófono. Transcribe gratis con el
-     reconocimiento de voz del navegador (Chrome/Safari de escritorio). Si el
-     navegador no lo tiene (iPhone con la app instalada, Firefox), graba el
-     micrófono en trozos de 20 s y los transcribe con Whisper.
+   - PRESENCIAL: escucha el micrófono y lo transcribe con gpt-4o-transcribe
+     en trozos cortados en las pausas de la voz, con el vocabulario de la
+     agencia (24-sep-2026: el reconocimiento del navegador se cortaba y
+     confundía nombres; ahora solo se usa como vista previa gris en vivo).
    - LLAMADA (Meet/Zoom en la compu): además del micrófono ("Yo"), captura el
      AUDIO DE LA PESTAÑA de la llamada ("Ellos") — el navegador pide elegir la
      pestaña de Meet y marcar "Compartir audio de la pestaña" (solo Chrome/Edge
@@ -49,7 +49,10 @@ function horaAhora(): string {
 /* Frases que Whisper "inventa" sobre silencio o ruido. */
 const ALUCINACION = /^(gracias( por ver( el video)?)?|subt[ií]tulos.*|suscr[ií]bete.*|m[uú]sica|\.+|¡?gracias!?)\.?$/i
 
-const TROZO_MS = 20_000
+const TROZO_MIN_MS = 5_000
+const TROZO_MAX_MS = 25_000
+const PAUSA_MS = 700
+const UMBRAL_VOZ = 0.01
 
 export function useGrabadora(notaId: string, startedAt: string | null, inicial: string) {
   const [transcript, setTranscript] = useState(inicial)
@@ -93,7 +96,10 @@ export function useGrabadora(notaId: string, startedAt: string | null, inicial: 
   }, [guardar])
 
   /* ---- Reconocimiento de voz del navegador (micrófono) ---- */
-  const iniciarVozNavegador = useCallback((quien: Hablante): boolean => {
+  /* Solo VISTA PREVIA en vivo (texto gris mientras hablan). Lo que se GUARDA
+     sale de gpt-4o-transcribe (mucho más preciso). El reconocimiento del
+     navegador se cortaba en los silencios y confundía palabras. */
+  const iniciarVozNavegador = useCallback((): boolean => {
     const Ctor = getSR()
     if (!Ctor) return false
     const rec = new Ctor()
@@ -108,19 +114,14 @@ export function useGrabadora(notaId: string, startedAt: string | null, inicial: 
         if (r.isFinal) final += r[0]?.transcript ?? ''
         else inter += r[0]?.transcript ?? ''
       }
-      if (final) agregar(quien, final)
-      setParcial(inter)
+      setParcial((inter || final).trim())
     }
-    rec.onerror = (ev) => {
-      const e = ev.error ?? 'error'
-      if (e === 'not-allowed' || e === 'service-not-allowed') { setError('Permiso de micrófono denegado.'); quiereEscuchar.current = false }
-      else if (e === 'network') setError('El reconocimiento de voz del navegador no está disponible aquí.')
-    }
+    rec.onerror = () => { /* la vista previa es opcional: si falla, se sigue grabando */ }
     rec.onend = () => { if (quiereEscuchar.current) { try { rec.start() } catch { /* ya iniciado */ } } }
     try { rec.start() } catch { return false }
     recRef.current = rec
     return true
-  }, [agregar])
+  }, [])
 
   /* ---- Grabación en trozos + Whisper (audio de la pestaña o micrófono) ---- */
   const grabarConWhisper = useCallback((stream: MediaStream, quien: Hablante) => {
@@ -141,37 +142,70 @@ export function useGrabadora(notaId: string, startedAt: string | null, inicial: 
         an.getFloatTimeDomainData(buf)
         let s = 0
         for (const v of buf) s += v * v
-        pico = Math.max(pico, Math.sqrt(s / buf.length))
-      }, 250)
+        nivel = Math.sqrt(s / buf.length)
+        pico = Math.max(pico, nivel)
+      }, 100)
     } catch { pico = 1 }
 
+    /* Cortes INTELIGENTES (como Granola, que transcribe en streaming): en vez
+       de cortar cada 20 s a mitad de palabra, cortamos en una PAUSA de la voz
+       (≥ 0.7 s de silencio) después de 5 s; como máximo a los 25 s. */
+    let nivel = 0
+    let silencioDesde = 0
+    /* Los trozos se transcriben en paralelo, pero se GUARDAN EN ORDEN. */
+    let siguienteN = 0
+    let proximoAGuardar = 0
+    const listos = new Map<number, string | null>()
+    const volcar = () => {
+      while (listos.has(proximoAGuardar)) {
+        const t = listos.get(proximoAGuardar)
+        listos.delete(proximoAGuardar)
+        proximoAGuardar++
+        if (t) { agregar(quien, t); setParcial('') }
+      }
+    }
     const ciclo = () => {
       if (!activo) return
       const partes: Blob[] = []
       let rec: MediaRecorder
       try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream) } catch { setError('Este navegador no puede grabar audio.'); return }
       pico = 0
+      const inicio = Date.now()
       rec.ondataavailable = (e) => { if (e.data.size) partes.push(e.data) }
       rec.onstop = () => {
         const blob = new Blob(partes, { type: rec.mimeType || mime || 'audio/webm' })
         const conVoz = pico > 0.012
         if (blob.size > 3000 && conVoz) {
-          setProcesando((n) => n + 1)
+          const n = siguienteN++
+          setProcesando((x) => x + 1)
           const fd = new FormData()
           fd.append('audio', blob, (rec.mimeType || '').includes('mp4') ? 'trozo.m4a' : 'trozo.webm')
+          /* Contexto: vocabulario de la agencia + lo último que se dijo. */
+          fd.append('glosario', '1')
+          fd.append('previo', transcriptRef.current.slice(-300).replace(/^\[\d{2}:\d{2}\] (?:(?:Yo|Ellos): )?/gm, ''))
           fetch('/api/copys/transcribir', { method: 'POST', body: fd })
             .then((r) => r.json())
             .then((j: { ok?: boolean; text?: string; error?: string }) => {
-              if (j.ok && j.text && !ALUCINACION.test(j.text.trim())) agregar(quien, j.text)
-              else if (j.error && /API key/i.test(j.error)) setError(j.error)
+              listos.set(n, j.ok && j.text && !ALUCINACION.test(j.text.trim()) ? j.text : null)
+              if (!j.ok && j.error && /API key/i.test(j.error)) setError(j.error)
             })
-            .catch(() => { /* un trozo perdido no corta la grabación */ })
-            .finally(() => setProcesando((n) => Math.max(0, n - 1)))
+            .catch(() => { listos.set(n, null) /* un trozo perdido no corta la grabación */ })
+            .finally(() => { volcar(); setProcesando((x) => Math.max(0, x - 1)) })
         }
         if (activo) ciclo()
       }
       rec.start()
-      timer = setTimeout(() => { try { rec.stop() } catch { /* ya parado */ } }, TROZO_MS)
+      silencioDesde = 0
+      const vigilar = () => {
+        if (!activo || rec.state !== 'recording') return
+        const dur = Date.now() - inicio
+        const enSilencio = nivel < UMBRAL_VOZ
+        if (enSilencio) { if (!silencioDesde) silencioDesde = Date.now() } else silencioDesde = 0
+        const pausa = silencioDesde && Date.now() - silencioDesde >= PAUSA_MS
+        if (dur >= TROZO_MAX_MS || (dur >= TROZO_MIN_MS && pausa)) { try { rec.stop() } catch { /* ya parado */ } return }
+        timer = setTimeout(vigilar, 150)
+      }
+      timer = setTimeout(vigilar, 150)
       grabadorActual = rec
     }
     let grabadorActual: MediaRecorder | null = null
@@ -233,17 +267,18 @@ export function useGrabadora(notaId: string, startedAt: string | null, inicial: 
       grabarConWhisper(new MediaStream(pistasAudio), 'Ellos')
     }
 
-    // 2) Micrófono ("Yo" en llamada; todos en presencial).
-    const conNavegador = iniciarVozNavegador(hablanteMic)
-    if (!conNavegador) {
-      try {
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
-        streamsRef.current.push(mic)
-        grabarConWhisper(mic, hablanteMic)
-      } catch {
-        setError('No se pudo usar el micrófono. Revisa el permiso.')
-        if (m !== 'virtual') { quiereEscuchar.current = false; return }
-      }
+    // 2) Micrófono ("Yo" en llamada; todos en presencial). SIEMPRE se
+    //    transcribe con gpt-4o-transcribe; el del navegador es solo vista previa.
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      })
+      streamsRef.current.push(mic)
+      grabarConWhisper(mic, hablanteMic)
+      iniciarVozNavegador()
+    } catch {
+      setError('No se pudo usar el micrófono. Revisa el permiso.')
+      if (m !== 'virtual') { quiereEscuchar.current = false; return }
     }
 
     setModo(m)
