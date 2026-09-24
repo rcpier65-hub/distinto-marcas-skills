@@ -454,6 +454,17 @@ export async function updateGrabacionEstado(args: {
   }
   if (args.notas !== undefined) payload.notas = args.notas?.trim() || null
 
+  /* Cancelada → se quita de Google Calendar (antes quedaba ahí como si
+     siguiera en pie). Si se reactiva, se recrea desde la edición de fecha. */
+  if (args.estado === 'cancelada') {
+    const { data: g } = await service.from('grabaciones').select('google_event_id').eq('id', args.id).maybeSingle()
+    if (g?.google_event_id) {
+      const d = await deleteCalendarEvent(g.google_event_id)
+      if (d.ok) payload.google_event_id = null
+      else console.error('[gcal] cancelar grabación: no se pudo borrar en Google:', d.error)
+    }
+  }
+
   const { error } = await service.from('grabaciones').update(payload).eq('id', args.id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/grabaciones')

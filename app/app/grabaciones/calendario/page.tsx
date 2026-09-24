@@ -8,8 +8,10 @@
 // Fuentes de eventos:
 //   1. Tabla `grabaciones` (con hora_planeada) — color por marca
 //   2. Tabla `marca_reuniones` (agendadas con clientes, con link de Meet)
-//   3. Google Calendar de Pedro (lectura) — lo agendado FUERA de la app
+//   3. Google Calendar de la agencia (lectura) — lo agendado FUERA de la app
 //      (dedup: se saltan los eventos que la propia app creó)
+//
+// La escritura hacia Google la hace lib/calendario/gcal-sync.ts (automática).
 
 import Link from 'next/link'
 import { requireUser } from '@/lib/auth/get-user'
@@ -95,13 +97,14 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const permisos = await getCurrentMemberPermisos()
   const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
 
-  /* Todo en paralelo — incluida la lectura del Google Calendar de Pedro
-     (solo directores; devuelve [] sola si no está conectado). */
+  /* Todo en paralelo — incluida la lectura del Google Calendar de la agencia.
+     Todo el equipo ve lo agendado directo en Google (Pedro 24-sep-2026; antes
+     solo directores). Devuelve [] sola si no está conectado. */
   const [grabRes, marcasRes, gcalStatus, gcalEvents] = await Promise.all([
     listGrabaciones(desde, hasta),
     service.from('marcas').select('id, slug, nombre, emoji_marca, color_calendario'),
     getGoogleCalendarStatus(),
-    esDirector ? listCalendarEvents(desde, hasta) : Promise.resolve([]),
+    listCalendarEvents(desde, hasta),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -284,6 +287,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
     if (ev.summary.startsWith('🎬')) continue
     if (ev.summary.startsWith('📣')) continue
+    if (ev.summary.startsWith('⭐')) continue  // fechas importantes (lib/calendario/gcal-sync)
     if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
     if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
     eventos.push({

@@ -4,8 +4,16 @@
 // Solo Lorena + directores (Erick/Pedro) gestionan esto.
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { sincronizarCalendario } from '@/lib/calendario/gcal-sync'
+
+/* Tras crear/borrar, la fecha pasa a Google Calendar al instante (en segundo
+   plano, sin frenar la respuesta). */
+function syncGoogle() {
+  after(() => sincronizarCalendario({ forzar: true }).catch((e) => console.error('[gcal-sync]', e)))
+}
 
 async function autorizado() {
   const user = await requireUser()
@@ -39,6 +47,7 @@ export async function crearFechaImportante(input: {
     created_by: me!.id,
   })
   if (error) return { ok: false, error: error.message }
+  syncGoogle()
   revalidatePath('/fechas-importantes')
   revalidatePath('/inicio')
   return { ok: true }
@@ -60,6 +69,7 @@ export async function eliminarFechaImportante(id: string): Promise<{ ok: true } 
   if (!ok) return { ok: false, error: 'No autorizado' }
   const { error } = await service.from('fechas_importantes').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
+  syncGoogle()
   revalidatePath('/fechas-importantes')
   revalidatePath('/inicio')
   return { ok: true }

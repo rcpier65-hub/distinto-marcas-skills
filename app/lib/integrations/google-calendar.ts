@@ -510,18 +510,25 @@ export async function updateCalendarEvent(eventId: string, input: EventInput): P
   endDate.setDate(endDate.getDate() + 1)
   const end = endDate.toISOString().slice(0, 10)
 
-  const calId = await getGrabacionesCalendarId(token)
-  const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      summary: input.summary,
-      description: input.description,
-      start: { date: start },
-      end: { date: end },
-      ...(input.colorId ? { colorId: input.colorId } : {}),
-    }),
-  })
+  /* Igual que el update con hora: el evento puede vivir en "Grabaciones" o en
+     primary — si el primero da 404, reintenta en el otro. */
+  const grabCal = await getGrabacionesCalendarId(token)
+  let res: Response | null = null
+  for (const calId of [...new Set([grabCal, 'primary'])]) {
+    res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${eventId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: input.summary,
+        description: input.description,
+        start: { date: start },
+        end: { date: end },
+        ...(input.colorId ? { colorId: input.colorId } : {}),
+      }),
+    })
+    if (res.status !== 404) break
+  }
+  if (!res) return { ok: false, error: 'HTTP ???' }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
