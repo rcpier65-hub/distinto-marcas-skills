@@ -55,3 +55,29 @@ export async function leerPerfilesOficina(): Promise<PerfilOficina[]> {
   await requireUser()
   return leerPerfilesDb()
 }
+
+/* Datos para abrir la oficina desde CUALQUIER pantalla (la oficina ahora vive
+   en toda la app, no solo en /oficina). Solo miembros activos del equipo;
+   los clientes del portal no tienen oficina. Pedro 24-sep-2026. */
+export async function datosOficina(): Promise<{
+  yoId: string
+  nombre: string
+  avatar: Record<string, string> | null
+  perfiles: Array<{ userId: string; nombre: string | null; escritorio: string | null }>
+} | null> {
+  const user = await requireUser()
+  const { createServiceClient } = await import('@/lib/supabase/service')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: miembro } = await service.from('team_members').select('nombre').eq('auth_user_id', user.id).eq('activo', true).maybeSingle()
+  if (!miembro) return null
+  let filas: PerfilOficina[] = []
+  try { filas = await leerPerfilesDb() } catch { /* sin tabla todavía */ }
+  const mio = filas.find((p) => p.user_id === user.id)
+  return {
+    yoId: user.id,
+    nombre: miembro.nombre ?? user.email?.split('@')[0] ?? 'Alguien',
+    avatar: mio?.avatar && typeof mio.avatar === 'object' ? (mio.avatar as unknown as Record<string, string>) : null,
+    perfiles: filas.map((p) => ({ userId: p.user_id, nombre: p.nombre, escritorio: p.escritorio })),
+  }
+}

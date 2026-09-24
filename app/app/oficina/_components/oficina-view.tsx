@@ -2,123 +2,90 @@
 
 /* OFICINA VIRTUAL de Distinto — inspirada en Gather.town.
 
-   · Te mueves con WASD o flechas. Doble clic camina hasta ese punto.
-   · Al acercarte a alguien (≤5 casillas) se abre el audio solo, y el volumen
-     sube mientras más cerca estés. Además suena por el lado que corresponde.
+   · La oficina vive en toda la app (OficinaProvider): cambiar de módulo no
+     corta el audio ni te saca. Se abre sola de lunes a sábado desde las 8 am.
+   · Clic/toque en el mapa = caminar hasta ahí rodeando muebles y paredes.
+     WASD o flechas también; Shift = correr.
+   · Quieto sobre una silla = te sientas (mirando al escritorio).
+   · Al acercarte a alguien (≤5 casillas) se abre el audio solo.
    · Dentro de una sala hablas con todos los de esa sala y nadie de afuera oye.
-   · 📢 Spotlight: le hablas a TODA la oficina, atraviesa las salas.
-   · 🔒 Conversación privada: solo entre ustedes dos.
-   · 🖥 Compartir pantalla · 💬 Chat (general / cerca / privado)
-   · G = fantasma · 1-7 = emotes · X = usar objeto · M = minimapa */
+   · 📢 Spotlight · 🔒 Conversación privada · 🖥 Compartir pantalla
+   · G = fantasma · 1-7 = emotes · X = usar objeto · M = minimapa
+   (El chat propio se quitó: se usa el chat oficial de la app.) */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Mic, MicOff, Video, VideoOff, Users, X, Ghost, Palette, Phone, MapPin,
-  MonitorUp, MonitorOff, Megaphone, Lock, MessageSquare, Send, Maximize2, Minimize2, VolumeX, Armchair, AlertTriangle,
+  MonitorUp, MonitorOff, Megaphone, Lock, Maximize2, Minimize2, VolumeX, Armchair, AlertTriangle, LogOut, Loader2,
 } from 'lucide-react'
 import {
-  TILE, MAPA_W, MAPA_H, SPAWN, ZONAS,
+  TILE, MAPA_W, MAPA_H, ZONAS,
   construirColisiones, esSolido, zonaDe, objetoCerca, dibujarMapa,
 } from '../_mapa'
 import {
   dibujarAvatar, dibujarEtiqueta, dibujarMarcaPropia,
-  avatarPorNombre, avatarValido, ESTADO_COLOR, ESTADO_LABEL,
+  ESTADO_COLOR, ESTADO_LABEL,
   PIELES, PELOS, ROPAS, PEINADOS, ACCESORIOS,
   type AvatarConfig, type Direccion, type EstadoUsuario,
 } from '../_avatar'
-import { usarOficina, HAY_TURN, type MensajeChat } from '../_usar-oficina'
-import { guardarAvatarOficina, reclamarEscritorio } from '../_actions'
+import { HAY_TURN } from '../_usar-oficina'
+import { reclamarEscritorio } from '../_actions'
 import { MUEBLES } from '../_mapa'
+import { useOficina, motor } from '../_contexto'
+import { buscarCamino, sillaDeEscritorio, sillaEn } from '../_camino'
 
 const VEL = 6.2
-const LS_AVATAR = 'oficina-avatar'
-const LS_POS = 'oficina-pos'
+const CORRER = 1.6
 const EMOTES = ['👋', '👍', '🎉', '❤️', '😂', '✋', '❓']
+const SENTARSE_MS = 350
 
-type PerfilLite = { userId: string; nombre: string | null; escritorio: string | null }
+export function OficinaView() {
+  const of = useOficina()
+  if (!of) {
+    return (
+      <div className="w-full flex items-center justify-center text-[13px] text-black/50 gap-2" style={{ height: '100dvh', background: '#eceef5' }}>
+        <Loader2 className="w-4 h-4 animate-spin" /> Cargando la oficina…
+      </div>
+    )
+  }
+  return <OficinaMapa />
+}
 
-export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = [] }: {
-  yoId: string
-  nombre: string
-  /* Avatar guardado en la base: así se ve igual desde cualquier computadora. */
-  avatarGuardado?: AvatarConfig | null
-  /* Quién reclamó cada escritorio. */
-  perfiles?: PerfilLite[]
-}) {
+function OficinaMapa() {
   const router = useRouter()
-
-  const [avatar, setAvatar] = useState<AvatarConfig>(() => avatarGuardado ?? avatarPorNombre(nombre))
-  const [duenos, setDuenos] = useState<PerfilLite[]>(perfiles)
-  const miEscritorio = duenos.find((d) => d.userId === yoId)?.escritorio ?? null
-  const [editorAbierto, setEditorAbierto] = useState(false)
-  useEffect(() => {
-    /* Si ya hay uno en la base, ese manda. El de localStorage queda solo
-       como respaldo para quien nunca lo guardó. */
-    if (avatarGuardado) return
-    try {
-      const raw = localStorage.getItem(LS_AVATAR)
-      if (raw) { const p = JSON.parse(raw); if (avatarValido(p)) setAvatar(p) }
-    } catch { /* primera vez */ }
-  }, [avatarGuardado])
-  const guardarAvatar = useCallback((a: AvatarConfig) => {
-    setAvatar(a)
-    try { localStorage.setItem(LS_AVATAR, JSON.stringify(a)) } catch { /* modo privado */ }
-    void guardarAvatarOficina(a as unknown as Record<string, string>)
-  }, [])
-
-  const of = usarOficina(yoId, nombre, avatar)
+  const of = useOficina()!
   const {
-    jugadores, listaUI, remotos, emoteRef, error, entrado, entrar,
+    datos, avatar, guardarAvatar, duenos, setDuenos,
+    jugadores, listaUI, remotos, emoteRef, error, entrado, entrarManual, salirManual,
     local, micOn, camOn, compartiendo, soportaPantalla,
     alternarMic, alternarCam, alternarPantalla,
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
-    chat, mandarChat, noLeidos, setNoLeidos, entro, setEntro,
-    publicarPos, avanzar, mandarEmote, llamarA, llamada, setLlamada,
+    entro, setEntro,
+    avanzar, mandarEmote, llamarA, llamada, setLlamada,
   } = of
+  const yoId = datos.yoId
+  const nombre = datos.nombre
+  const miEscritorio = duenos.find((d) => d.userId === yoId)?.escritorio ?? null
+  const [editorAbierto, setEditorAbierto] = useState(false)
+  const [entrando, setEntrando] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fondoRef = useRef<HTMLCanvasElement | null>(null)
   const colisiones = useMemo(() => construirColisiones(), [])
-  /* Reaparecer donde estabas (Gather hace lo mismo). */
-  const pos = useRef({ x: SPAWN.x + 0.5, y: SPAWN.y + 0.5 })
-  const dir = useRef<Direccion>('s')
-  const paso = useRef(0)
   const teclas = useRef<Set<string>>(new Set())
-  const ghost = useRef(false)
-  const destino = useRef<{ x: number; y: number } | null>(null)
-  const guia = useRef<{ id: string; hasta: number } | null>(null)
   const [panelAbierto, setPanelAbierto] = useState(true)
-  const [chatAbierto, setChatAbierto] = useState(false)
   const [minimapa, setMinimapa] = useState(true)
   const [objetoActivo, setObjetoActivo] = useState<{ titulo: string; href: string; icono: string } | null>(null)
   const objetoRef = useRef<{ titulo: string; href: string; icono: string } | null>(null)
   const [zonaActual, setZonaActual] = useState<string | null>(null)
-  const [fantasmaUI, setFantasmaUI] = useState(false)
+  const [fantasmaUI, setFantasmaUI] = useState(motor.ghost)
+  const [sentadoUI, setSentadoUI] = useState(motor.sentado)
   const [pantallaGrande, setPantallaGrande] = useState<string | null>(null)
-  const duenosRef = useRef<PerfilLite[]>(perfiles)
+  const duenosRef = useRef(duenos)
   useEffect(() => { duenosRef.current = duenos }, [duenos])
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_POS)
-      if (raw) {
-        const p = JSON.parse(raw)
-        if (typeof p?.x === 'number' && typeof p?.y === 'number' && !esSolido(colisiones, p.x, p.y)) {
-          pos.current = { x: p.x, y: p.y }
-        }
-      }
-    } catch { /* arranca en recepción */ }
-  }, [colisiones])
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      try { localStorage.setItem(LS_POS, JSON.stringify(pos.current)) } catch { /* noop */ }
-    }, 3000)
-    return () => clearInterval(t)
-  }, [])
 
   useEffect(() => {
     const off = document.createElement('canvas')
@@ -129,18 +96,28 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
     fondoRef.current = off
   }, [])
 
+  /* Caminar hasta un punto (rodeando obstáculos). */
+  const caminarA = useCallback((x: number, y: number) => {
+    const m = motor
+    const c = buscarCamino(colisiones, m.pos, { x, y })
+    if (!c || c.length === 0) return false
+    m.camino = c
+    return true
+  }, [colisiones])
+
   /* --- Teclado --- */
   useEffect(() => {
     const abajo = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
       const k = e.key.toLowerCase()
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
-        e.preventDefault(); teclas.current.add(k); destino.current = null; guia.current = null
+        e.preventDefault(); teclas.current.add(k); motor.camino = []; motor.guia = null
       }
+      if (k === 'shift') teclas.current.add('shift')
       /* Fantasma como interruptor (antes había que mantener la tecla, y si
          se soltaba fuera de la ventana quedaba pegada). */
-      if (k === 'g') { ghost.current = !ghost.current; setFantasmaUI(ghost.current) }
+      if (k === 'g') { motor.ghost = !motor.ghost; setFantasmaUI(motor.ghost) }
       if (k === 'm') setMinimapa((v) => !v)
       if (k === 'x' && objetoRef.current) router.push(objetoRef.current.href)
       const n = parseInt(k, 10)
@@ -160,7 +137,7 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
   }, [mandarEmote, router])
 
   const libre = useCallback((x: number, y: number): boolean => {
-    if (ghost.current) return x > 0.3 && y > 0.3 && x < MAPA_W - 0.3 && y < MAPA_H - 0.3
+    if (motor.ghost) return x > 0.3 && y > 0.3 && x < MAPA_W - 0.3 && y < MAPA_H - 0.3
     const r = 0.32
     for (const [dx, dy] of [[-r, -r], [r, -r], [-r, r], [r, r]] as const) {
       if (esSolido(colisiones, x + dx, y + dy)) return false
@@ -172,15 +149,19 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
     return true
   }, [colisiones, jugadores])
 
-  /* --- Bucle de render --- */
+  /* --- Bucle de render + movimiento --- */
   useEffect(() => {
     let raf = 0
     let anterior = performance.now()
     let atascado = 0
+    let quieto = 0
+    let recalcGuia = 0
 
     const frame = (ahora: number) => {
       const dt = Math.min(0.05, (ahora - anterior) / 1000)
       anterior = ahora
+      const m = motor
+      m.ultimoFrame = ahora
       const cv = canvasRef.current
       const ctx = cv?.getContext('2d')
       if (!cv || !ctx) { raf = requestAnimationFrame(frame); return }
@@ -192,48 +173,67 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
       if (k.has('w') || k.has('arrowup')) vy -= 1
       if (k.has('s') || k.has('arrowdown')) vy += 1
 
-      /* Seguir a una persona ("ir con"): camina hacia ella. */
-      if (!vx && !vy && guia.current) {
-        const j = jugadores.current.get(guia.current.id)
-        if (!j || Date.now() > guia.current.hasta) guia.current = null
-        else destino.current = { x: j.x, y: j.y + 1 }
+      /* Seguir a una persona ("ir con"): recalcula el camino cada 0.6 s. */
+      if (!vx && !vy && m.guia) {
+        const j = jugadores.current.get(m.guia.id)
+        if (!j || Date.now() > m.guia.hasta) m.guia = null
+        else if ((recalcGuia -= dt) <= 0) {
+          recalcGuia = 0.6
+          if (Math.hypot(j.x - m.pos.x, j.y - m.pos.y) > 1.3) caminarA(j.x, j.y + 1)
+          else { m.camino = []; m.guia = null }
+        }
       }
 
-      if (!vx && !vy && destino.current) {
-        const dx = destino.current.x - pos.current.x
-        const dy = destino.current.y - pos.current.y
-        if (Math.hypot(dx, dy) < 0.2) { destino.current = null; guia.current = null }
-        else { vx = Math.abs(dx) > 0.08 ? Math.sign(dx) : 0; vy = Math.abs(dy) > 0.08 ? Math.sign(dy) : 0 }
+      /* Seguir el camino (lista de puntos). */
+      if (!vx && !vy && m.camino.length) {
+        const obj = m.camino[0]
+        const dx = obj.x - m.pos.x, dy = obj.y - m.pos.y
+        const d = Math.hypot(dx, dy)
+        if (d < 0.12) { m.camino.shift() }
+        else { vx = dx / d; vy = dy / d }
       }
 
       const moviendo = vx !== 0 || vy !== 0
       if (moviendo) {
+        if (m.sentado) { m.sentado = false; setSentadoUI(false) }
         const norm = Math.hypot(vx, vy) || 1
-        const nx = pos.current.x + (vx / norm) * VEL * dt
-        const ny = pos.current.y + (vy / norm) * VEL * dt
-        const antesX = pos.current.x, antesY = pos.current.y
-        if (libre(nx, pos.current.y)) pos.current.x = nx
-        if (libre(pos.current.x, ny)) pos.current.y = ny
-        dir.current = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'e' : 'o') : (vy > 0 ? 's' : 'n')
-        paso.current += dt * 60
-        /* Si va hacia un destino y lleva medio segundo sin avanzar, hay una
-           pared en el camino: se cancela en vez de vibrar contra el muro. */
-        if (destino.current && Math.abs(pos.current.x - antesX) < 0.001 && Math.abs(pos.current.y - antesY) < 0.001) {
+        const vel = VEL * (k.has('shift') ? CORRER : 1)
+        const nx = m.pos.x + (vx / norm) * vel * dt
+        const ny = m.pos.y + (vy / norm) * vel * dt
+        const antesX = m.pos.x, antesY = m.pos.y
+        if (libre(nx, m.pos.y)) m.pos.x = nx
+        if (libre(m.pos.x, ny)) m.pos.y = ny
+        m.dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'e' : 'o') : (vy > 0 ? 's' : 'n')
+        m.paso += dt * 60
+        quieto = 0
+        /* Si lleva medio segundo sin avanzar (alguien parado en el camino),
+           se cancela en vez de vibrar. */
+        if (m.camino.length && Math.abs(m.pos.x - antesX) < 0.001 && Math.abs(m.pos.y - antesY) < 0.001) {
           atascado += dt
-          if (atascado > 0.5) { destino.current = null; guia.current = null; atascado = 0 }
+          if (atascado > 0.5) { m.camino = []; m.guia = null; atascado = 0 }
         } else atascado = 0
+      } else if (!m.sentado) {
+        /* Quieto sobre una silla → sentarse mirando al escritorio. */
+        const silla = sillaEn(m.pos.x, m.pos.y)
+        if (silla && !m.ghost) {
+          quieto += dt * 1000
+          if (quieto >= SENTARSE_MS) {
+            m.sentado = true; m.pos = { x: silla.x, y: silla.y }; m.dir = silla.dir
+            setSentadoUI(true)
+          }
+        } else quieto = 0
       }
+      m.mov = moviendo
 
-      const z = zonaDe(pos.current.x, pos.current.y)
+      const z = zonaDe(m.pos.x, m.pos.y)
       if ((z?.id ?? null) !== zonaActual) setZonaActual(z?.id ?? null)
-      const obj = objetoCerca(pos.current.x, pos.current.y)
+      const obj = objetoCerca(m.pos.x, m.pos.y)
       const accion = obj?.accion ?? null
       if (accion?.href !== objetoRef.current?.href) {
         objetoRef.current = accion
         setObjetoActivo(accion)
       }
 
-      publicarPos(pos.current.x, pos.current.y, dir.current, moviendo, ghost.current, z?.id ?? null)
       avanzar(dt)
 
       const vw = cv.clientWidth, vh = cv.clientHeight
@@ -245,8 +245,8 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
       ctx.clearRect(0, 0, vw, vh)
 
       const mundoW = MAPA_W * TILE, mundoH = MAPA_H * TILE
-      let camX = pos.current.x * TILE - vw / 2
-      let camY = pos.current.y * TILE - vh / 2
+      let camX = m.pos.x * TILE - vw / 2
+      let camY = m.pos.y * TILE - vh / 2
       camX = mundoW <= vw ? (mundoW - vw) / 2 : Math.max(0, Math.min(mundoW - vw, camX))
       camY = mundoH <= vh ? (mundoH - vh) / 2 : Math.max(0, Math.min(mundoH - vh, camY))
 
@@ -254,33 +254,35 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
       ctx.translate(-Math.round(camX), -Math.round(camY))
       if (fondoRef.current) ctx.drawImage(fondoRef.current, 0, 0)
 
-      /* Camino de baldosas hacia la persona que estoy buscando (Locate). */
-      if (guia.current) {
-        const j = jugadores.current.get(guia.current.id)
-        if (j) {
-          const pasos = 14
+      /* Camino marcado hacia el destino (puntitos). */
+      if (m.camino.length) {
+        let a = m.pos
+        for (const b of m.camino) {
+          const pasos = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) * 2))
           for (let i = 1; i <= pasos; i++) {
             const t = i / pasos
-            const px = pos.current.x + (j.x - pos.current.x) * t
-            const py = pos.current.y + (j.y - pos.current.y) * t
-            ctx.fillStyle = `rgba(113,112,255,${0.32 * (1 - t) + 0.1})`
+            ctx.fillStyle = 'rgba(113,112,255,0.28)'
             ctx.beginPath()
-            ctx.ellipse(px * TILE, py * TILE, 7, 3.5, 0, 0, Math.PI * 2)
+            ctx.ellipse((a.x + (b.x - a.x) * t) * TILE, (a.y + (b.y - a.y) * t) * TILE, 4, 2.2, 0, 0, Math.PI * 2)
             ctx.fill()
           }
+          a = b
         }
+        const fin = m.camino[m.camino.length - 1]
+        ctx.strokeStyle = 'rgba(113,112,255,0.7)'; ctx.lineWidth = 2
+        ctx.beginPath(); ctx.ellipse(fin.x * TILE, fin.y * TILE, 9, 4.5, 0, 0, Math.PI * 2); ctx.stroke()
       }
 
       /* Nombre de quien reclamó cada escritorio. */
-      for (const m of MUEBLES) {
-        if (m.tipo !== 'escritorio') continue
-        const dueno = duenosRef.current.find((d) => d.escritorio === m.label)
+      for (const mu of MUEBLES) {
+        if (mu.tipo !== 'escritorio') continue
+        const dueno = duenosRef.current.find((d) => d.escritorio === mu.label)
         if (!dueno?.nombre) continue
         ctx.save()
         ctx.font = 'bold 9px ui-sans-serif, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.fillStyle = dueno.userId === yoId ? '#7170ff' : 'rgba(10,10,10,0.45)'
-        ctx.fillText(dueno.nombre.split(' ')[0], (m.x + m.w / 2) * TILE, (m.y + m.h) * TILE - 8)
+        ctx.fillText(dueno.nombre.split(' ')[0], (mu.x + mu.w / 2) * TILE, (mu.y + mu.h) * TILE - 8)
         ctx.restore()
       }
 
@@ -314,7 +316,7 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
             dibujarAvatar(ctx, px, py, j.avatar, j.dir, j.mov, j.paso, {
               /* El aro verde sale por NIVEL DE VOZ real, no por estar
                  conectado: si está callado, no parpadea. */
-              fantasma: j.ghost, hablando: j.nivel > 0.12,
+              fantasma: j.ghost, hablando: j.nivel > 0.12, sentado: j.sentado,
             })
             dibujarEtiqueta(ctx, px, py, j.nombre, j.estado, j.emote)
             if (j.spot) {
@@ -329,11 +331,11 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
         })
       }
       lista.push({
-        y: pos.current.y,
+        y: m.pos.y,
         fn: () => {
-          const px = pos.current.x * TILE, py = pos.current.y * TILE
-          dibujarMarcaPropia(ctx, px, py, '#7170ff')
-          dibujarAvatar(ctx, px, py, avatar, dir.current, moviendo, paso.current, { fantasma: ghost.current })
+          const px = m.pos.x * TILE, py = m.pos.y * TILE
+          if (!m.sentado) dibujarMarcaPropia(ctx, px, py, '#7170ff')
+          dibujarAvatar(ctx, px, py, avatar, m.dir, moviendo, m.paso, { fantasma: m.ghost, sentado: m.sentado })
           dibujarEtiqueta(ctx, px, py, nombre, estado, emoteRef.current?.emoji ?? null)
         },
       })
@@ -361,7 +363,7 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
           ctx.beginPath(); ctx.arc(mx + j.x * esc, my + j.y * esc, 2.6, 0, Math.PI * 2); ctx.fill()
         }
         ctx.fillStyle = '#7170ff'
-        ctx.beginPath(); ctx.arc(mx + pos.current.x * esc, my + pos.current.y * esc, 3.4, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.arc(mx + m.pos.x * esc, my + m.pos.y * esc, 3.4, 0, Math.PI * 2); ctx.fill()
         ctx.restore()
       }
 
@@ -370,41 +372,48 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
 
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [avatar, nombre, estado, privada, minimapa, libre, publicarPos, avanzar, jugadores, emoteRef, zonaActual, yoId])
+  }, [avatar, nombre, estado, privada, minimapa, libre, avanzar, jugadores, emoteRef, zonaActual, yoId, caminarA])
 
-  const alDobleClic = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  /* Clic/toque en el mapa: caminar hasta ahí. Sobre una persona: ir con ella. */
+  const alClic = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const cv = canvasRef.current
     if (!cv) return
+    const m = motor
     const rect = cv.getBoundingClientRect()
     const vw = cv.clientWidth, vh = cv.clientHeight
     const mundoW = MAPA_W * TILE, mundoH = MAPA_H * TILE
-    let camX = pos.current.x * TILE - vw / 2
-    let camY = pos.current.y * TILE - vh / 2
+    let camX = m.pos.x * TILE - vw / 2
+    let camY = m.pos.y * TILE - vh / 2
     camX = mundoW <= vw ? (mundoW - vw) / 2 : Math.max(0, Math.min(mundoW - vw, camX))
     camY = mundoH <= vh ? (mundoH - vh) / 2 : Math.max(0, Math.min(mundoH - vh, camY))
     const x = (e.clientX - rect.left + camX) / TILE
     const y = (e.clientY - rect.top + camY) / TILE
-    if (esSolido(colisiones, x, y)) return
-    destino.current = { x, y }
-    guia.current = null
-  }, [colisiones])
+    for (const j of jugadores.current.values()) {
+      if (Math.abs(j.x - x) < 0.6 && y > j.y - 1.6 && y < j.y + 0.4) {
+        m.guia = { id: j.id, hasta: Date.now() + 20000 }
+        caminarA(j.x, j.y + 1)
+        return
+      }
+    }
+    m.guia = null
+    if (!caminarA(x, y)) toast('No hay camino hasta ahí')
+  }, [caminarA, jugadores])
 
   const irCon = useCallback((id: string) => {
     const j = jugadores.current.get(id)
     if (!j) { toast.error('Esa persona ya no está en la oficina'); return }
-    /* Camina hacia ella (no teletransporta) y pinta el camino. */
-    guia.current = { id, hasta: Date.now() + 20000 }
-    destino.current = { x: j.x, y: j.y + 1 }
-  }, [jugadores])
+    motor.guia = { id, hasta: Date.now() + 20000 }
+    caminarA(j.x, j.y + 1)
+  }, [jugadores, caminarA])
 
-  /* Escritorio propio: caminar hasta él. */
+  /* Escritorio propio: caminar hasta su silla (y sentarse al llegar). */
   const irAMiEscritorio = useCallback(() => {
     if (!miEscritorio) { toast.error('Todavía no reclamaste un escritorio'); return }
-    const m = MUEBLES.find((x) => x.tipo === 'escritorio' && x.label === miEscritorio)
-    if (!m) { toast.error('Ese escritorio ya no existe'); return }
-    destino.current = { x: m.x + m.w / 2, y: m.y + m.h + 0.5 }
-    guia.current = null
-  }, [miEscritorio])
+    const silla = sillaDeEscritorio(miEscritorio)
+    if (!silla) { toast.error('Ese escritorio ya no existe'); return }
+    motor.guia = null
+    if (!caminarA(silla.x, silla.y)) toast.error('No encontré camino a tu escritorio')
+  }, [miEscritorio, caminarA])
 
   const tomarEscritorio = useCallback(async (label: string) => {
     const r = await reclamarEscritorio(label)
@@ -414,7 +423,7 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
       { userId: yoId, nombre, escritorio: label },
     ])
     toast.success(`El escritorio de ${label} ahora es tuyo`)
-  }, [yoId, nombre])
+  }, [yoId, nombre, setDuenos])
 
   const cercanos = listaUI.filter((j) => j.gain > 0.05)
   const zonaInfo = ZONAS.find((z) => z.id === zonaActual) ?? null
@@ -432,13 +441,16 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
             Vas a entrar como <b>{nombre}</b>. Al acercarte a alguien se abre el audio solo,
             como en una oficina de verdad.
           </p>
-          <button onClick={entrar}
+          <button onClick={async () => { setEntrando(true); try { await entrarManual() } finally { setEntrando(false) } }} disabled={entrando}
             className="w-full h-12 rounded-xl text-white font-bold text-[15px]"
             style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
-            Entrar a la oficina
+            {entrando ? 'Entrando…' : 'Entrar a la oficina'}
           </button>
           <p className="text-[11.5px] text-black/40 mt-3">
             El navegador te va a pedir permiso del micrófono. Es necesario para que te escuchen.
+          </p>
+          <p className="text-[11.5px] text-black/40 mt-2">
+            Se abre sola de lunes a sábado desde las 8:00 am, y sigues adentro aunque cambies de módulo.
           </p>
         </div>
       </div>
@@ -447,7 +459,7 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
 
   return (
     <div className="relative w-full" style={{ height: '100dvh', background: '#eceef5' }}>
-      <canvas ref={canvasRef} onDoubleClick={alDobleClic} className="w-full h-full block" style={{ cursor: 'crosshair' }} />
+      <canvas ref={canvasRef} onClick={alClic} className="w-full h-full block" style={{ cursor: 'pointer', touchAction: 'manipulation' }} />
 
       {/* ===== Cabecera ===== */}
       <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap max-w-[62%]">
@@ -461,6 +473,11 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
           <div className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl shadow-lg backdrop-blur text-[13px] font-bold text-white"
             style={{ background: zonaInfo.color }}>
             {zonaInfo.emoji} {zonaInfo.nombre} · sala privada
+          </div>
+        )}
+        {sentadoUI && (
+          <div className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl bg-white/95 shadow-lg backdrop-blur border border-black/5 text-[12.5px] font-bold">
+            <Armchair className="w-4 h-4 text-[#7170ff]" /> Sentado
           </div>
         )}
         {fantasmaUI && (
@@ -554,13 +571,6 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
             className="w-10 h-10 rounded-xl hover:bg-black/5 text-[18px] transition-colors shrink-0">{e}</button>
         ))}
         <div className="w-px h-7 bg-black/10 mx-1" />
-        <button onClick={() => { setChatAbierto((v) => !v); setNoLeidos(0) }} title="Chat"
-          className="relative w-10 h-10 rounded-xl hover:bg-black/5 inline-flex items-center justify-center shrink-0">
-          <MessageSquare className="w-5 h-5" />
-          {noLeidos > 0 && !chatAbierto && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold inline-flex items-center justify-center">{noLeidos}</span>
-          )}
-        </button>
         <button onClick={irAMiEscritorio} title={miEscritorio ? `Ir a mi escritorio (${miEscritorio})` : 'Reclama un escritorio desde el panel'}
           className="w-10 h-10 rounded-xl hover:bg-black/5 inline-flex items-center justify-center shrink-0 disabled:opacity-40"
           disabled={!miEscritorio}><Armchair className="w-5 h-5" /></button>
@@ -570,6 +580,8 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
           className="h-10 px-3 rounded-xl hover:bg-black/5 inline-flex items-center gap-1.5 text-[13px] font-bold shrink-0">
           <Users className="w-5 h-5" /> {listaUI.length + 1}
         </button>
+        <button onClick={salirManual} title="Salir de la oficina"
+          className="w-10 h-10 rounded-xl hover:bg-red-50 text-black/50 hover:text-red-600 inline-flex items-center justify-center shrink-0"><LogOut className="w-5 h-5" /></button>
       </div>
 
       {/* ===== Panel de personas ===== */}
@@ -636,15 +648,10 @@ export function OficinaView({ yoId, nombre, avatarGuardado = null, perfiles = []
           </div>
 
           <div className="mt-3 pt-2.5 border-t text-[11px] text-black/45 leading-relaxed">
-            <b>WASD</b> moverte · <b>doble clic</b> caminar · <b>G</b> fantasma<br />
-            <b>1-7</b> emotes · <b>X</b> usar objeto · <b>M</b> minimapa
+            <b>Clic</b> caminar (rodea obstáculos) · <b>WASD</b> moverte · <b>Shift</b> correr<br />
+            Quieto en una silla = <b>sentarte</b> · <b>G</b> fantasma · <b>1-7</b> emotes · <b>X</b> usar objeto · <b>M</b> minimapa
           </div>
         </aside>
-      )}
-
-      {/* ===== Chat ===== */}
-      {chatAbierto && (
-        <ChatPanel mensajes={chat} onEnviar={mandarChat} onCerrar={() => setChatAbierto(false)} hayPrivada={!!privada} />
       )}
 
       {llamada && (
@@ -741,69 +748,6 @@ function BurbujaVideo({ remoto, alpha, gain, fijado }: {
         <span className="shrink-0">{'▮'.repeat(Math.max(1, Math.round(gain * 3)))}</span>
       </div>
     </div>
-  )
-}
-
-/* ============ Chat ============ */
-function ChatPanel({ mensajes, onEnviar, onCerrar, hayPrivada }: {
-  mensajes: MensajeChat[]
-  onEnviar: (t: string, c: MensajeChat['canal']) => void
-  onCerrar: () => void
-  hayPrivada: boolean
-}) {
-  const [canal, setCanal] = useState<MensajeChat['canal']>('cerca')
-  const [txt, setTxt] = useState('')
-  const finRef = useRef<HTMLDivElement>(null)
-  const visibles = mensajes.filter((m) => m.canal === canal)
-  useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [visibles.length])
-
-  const CANALES: Array<{ id: MensajeChat['canal']; label: string }> = [
-    { id: 'cerca', label: 'Cerca' },
-    { id: 'general', label: 'General' },
-    ...(hayPrivada ? [{ id: 'privado' as const, label: 'Privado' }] : []),
-  ]
-
-  return (
-    <aside className="absolute bottom-20 left-3 w-[300px] max-w-[90vw] h-[340px] rounded-2xl bg-white/97 shadow-xl backdrop-blur border border-black/5 flex flex-col">
-      <div className="flex items-center gap-1 p-2 border-b">
-        {CANALES.map((c) => (
-          <button key={c.id} onClick={() => setCanal(c.id)}
-            className="h-7 px-2.5 rounded-lg text-[12px] font-bold"
-            style={canal === c.id ? { background: '#7170ff', color: '#fff' } : { color: '#6b7280' }}>
-            {c.label}
-          </button>
-        ))}
-        <button onClick={onCerrar} className="ml-auto w-7 h-7 rounded-lg hover:bg-black/5 inline-flex items-center justify-center"><X className="w-3.5 h-3.5" /></button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-        {visibles.length === 0 ? (
-          <p className="text-[12px] text-black/40 pt-2">
-            {canal === 'cerca' ? 'Lo que escribas acá lo leen solo los que tienes cerca.'
-              : canal === 'general' ? 'Mensaje para toda la oficina.'
-              : 'Solo entre ustedes dos.'}
-          </p>
-        ) : visibles.map((m) => (
-          <div key={m.id} className="text-[13px]">
-            <span className="font-bold" style={{ color: '#7170ff' }}>{m.nombre.split(' ')[0]}</span>
-            <span className="text-black/35 text-[10.5px] ml-1.5">
-              {new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(new Date(m.ts))}
-            </span>
-            <div className="whitespace-pre-wrap break-words">{m.texto}</div>
-          </div>
-        ))}
-        <div ref={finRef} />
-      </div>
-      <div className="p-2 border-t flex items-center gap-1.5">
-        <input value={txt} onChange={(e) => setTxt(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && txt.trim()) { onEnviar(txt, canal); setTxt('') } }}
-          placeholder={canal === 'cerca' ? 'A los que tienes cerca…' : canal === 'general' ? 'A toda la oficina…' : 'En privado…'}
-          className="flex-1 h-9 px-3 rounded-lg border bg-white text-[13px] outline-none" />
-        <button onClick={() => { if (txt.trim()) { onEnviar(txt, canal); setTxt('') } }}
-          className="w-9 h-9 rounded-lg text-white inline-flex items-center justify-center" style={{ background: '#7170ff' }}>
-          <Send className="w-4 h-4" />
-        </button>
-      </div>
-    </aside>
   )
 }
 

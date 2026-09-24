@@ -6,8 +6,11 @@
 //   · POSICIONES por Supabase Realtime broadcast (12 Hz) + interpolación
 //   · ROSTER (nombre, avatar, estado) por Realtime presence
 //   · AUDIO/VIDEO por cercanía con WebRTC, decidido por _audio-grafo.ts
-//   · SPOTLIGHT (hablarle a toda la oficina), CONVERSACIÓN PRIVADA,
-//     COMPARTIR PANTALLA y CHAT de 3 canales
+//   · SPOTLIGHT (hablarle a toda la oficina), CONVERSACIÓN PRIVADA y
+//     COMPARTIR PANTALLA. (El chat propio se quitó: se usa el chat oficial.)
+//   · Vive en OficinaProvider (toda la app): cambiar de módulo NO corta la
+//     oficina. El canal solo se abre cuando uno ENTRA (antes se veía a la
+//     gente "en línea" apenas abría la página).
 //
 // Correcciones de fondo respecto de la primera versión:
 //   1. El micrófono se pide AL ENTRAR (antes solo al tocar el botón, así que
@@ -27,7 +30,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { AvatarConfig, Direccion, EstadoUsuario } from './_avatar'
 import {
-  decidir, debeConectar, paneo, cheb,
+  decidir, debeConectar, paneo,
   type EstadoAudio, type Decision,
 } from './_audio-grafo'
 import { MezcladorOficina } from './_audio-mixer'
@@ -73,6 +76,7 @@ export type Jugador = {
   tx: number; ty: number
   dir: Direccion
   mov: boolean
+  sentado: boolean
   ghost: boolean
   quiet: boolean
   spot: boolean
@@ -95,15 +99,6 @@ export type Remoto = {
   tipo: 'camara' | 'pantalla'
 }
 
-export type MensajeChat = {
-  id: string
-  de: string
-  nombre: string
-  canal: 'general' | 'cerca' | 'privado'
-  texto: string
-  ts: number
-}
-
 type Senal =
   | { tipo: 'oferta'; de: string; para: string; sdp: RTCSessionDescriptionInit }
   | { tipo: 'respuesta'; de: string; para: string; sdp: RTCSessionDescriptionInit }
@@ -115,6 +110,7 @@ type Pos = {
   id: string; x: number; y: number; dir: Direccion
   mov: boolean; ghost: boolean; quiet: boolean; spot: boolean
   privada: string | null; pantalla: boolean; zona: string | null
+  sentado?: boolean
 }
 
 /* Estado por peer: la conexión más lo necesario para negociar sin pisarnos. */
@@ -140,15 +136,13 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   const [llamada, setLlamada] = useState<{ de: string; nombre: string; sala?: string } | null>(null)
   const [conectado, setConectado] = useState(false)
   const [entrado, setEntrado] = useState(false)
-  const [chat, setChat] = useState<MensajeChat[]>([])
-  const [noLeidos, setNoLeidos] = useState(0)
   /* Quién acaba de entrar (para el avisito "X llegó a la oficina"). */
   const [entro, setEntro] = useState<string | null>(null)
 
   const jugadores = useRef<Map<string, Jugador>>(new Map())
-  const yo = useRef<EstadoAudio & { dir: Direccion; mov: boolean; pantalla: boolean }>({
+  const yo = useRef<EstadoAudio & { dir: Direccion; mov: boolean; pantalla: boolean; sentado: boolean }>({
     id: yoId, x: 0, y: 0, zona: null, privada: null, spot: false,
-    ghost: false, quiet: false, estado: 'disponible', dir: 's', mov: false, pantalla: false,
+    ghost: false, quiet: false, estado: 'disponible', dir: 's', mov: false, pantalla: false, sentado: false,
   })
   const canalRef = useRef<RealtimeChannel | null>(null)
   const peers = useRef<Map<string, Peer>>(new Map())
@@ -157,6 +151,8 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   const camaraTrackRef = useRef<MediaStreamTrack | null>(null)
   const mezcla = useRef<MezcladorOficina | null>(null)
   const decisiones = useRef<Map<string, Decision>>(new Map())
+  /* El id llega después (el proveedor carga los datos al montar). */
+  useEffect(() => { yo.current.id = yoId }, [yoId])
   const avatarRef = useRef(avatar); avatarRef.current = avatar
   const nombreRef = useRef(nombre); nombreRef.current = nombre
   const estadoRef = useRef(estado); estadoRef.current = estado
@@ -279,6 +275,22 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     entradoRef.current = true
   }, [pedirMedia])
 
+  /** Salir de la oficina (corta audio, micrófono y presencia). */
+  const salir = useCallback(() => {
+    entradoRef.current = false
+    setEntrado(false)
+    setMicOn(false)
+    setCamOn(false)
+    setLocal(null)
+    setRemotos([])
+    setListaUI([])
+    jugadores.current.clear()
+  }, [])
+
+  /** Si el navegador dejó el audio en pausa (entrada automática sin toque),
+      el primer clic en la app lo reactiva. */
+  const reanudarAudio = useCallback(() => { void mezcla.current?.iniciar() }, [])
+
   const alternarMic = useCallback(async () => {
     if (!localRef.current) { const s = await pedirMedia(false); setMicOn(!!s); return }
     const nuevo = !micOn
@@ -348,8 +360,9 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     })
   }, [])
 
-  /* ============ Canal Realtime ============ */
+  /* ============ Canal Realtime (solo estando ADENTRO) ============ */
   useEffect(() => {
+    if (!entrado) return
     let supabase: ReturnType<typeof createClient>
     try { supabase = createClient() } catch { return }
 
@@ -371,7 +384,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
           jugadores.current.set(id, {
             id, nombre: m.nombre, avatar: m.avatar, estado: m.estado,
             emote: null, emoteHasta: 0,
-            x: 0, y: 0, tx: 0, ty: 0, dir: 's', mov: false,
+            x: 0, y: 0, tx: 0, ty: 0, dir: 's', mov: false, sentado: false,
             ghost: false, quiet: false, spot: false, privada: null, pantalla: false,
             zona: null, paso: 0, visto: Date.now(),
             gain: 0, videoAlpha: 1, fijado: false, nivel: 0,
@@ -388,7 +401,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       if (!p?.id || p.id === yoId) return
       const j = jugadores.current.get(p.id)
       if (!j) return
-      j.tx = p.x; j.ty = p.y; j.dir = p.dir; j.mov = p.mov
+      j.tx = p.x; j.ty = p.y; j.dir = p.dir; j.mov = p.mov; j.sentado = !!p.sentado
       j.ghost = p.ghost; j.quiet = p.quiet; j.spot = p.spot
       j.privada = p.privada; j.pantalla = p.pantalla; j.zona = p.zona
       j.visto = Date.now()
@@ -401,19 +414,6 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       if (!j) return
       j.emote = emoji || null
       j.emoteHasta = emoji === '✋' ? Number.MAX_SAFE_INTEGER : Date.now() + 3000
-    })
-
-    canal.on('broadcast', { event: 'chat' }, ({ payload }) => {
-      const m = payload as MensajeChat
-      if (!m?.texto) return
-      /* El canal "cerca" solo se recibe si de verdad está cerca. */
-      if (m.canal === 'cerca') {
-        const j = jugadores.current.get(m.de)
-        if (!j || cheb(yo.current, j) > 5 || j.zona !== yo.current.zona) return
-      }
-      if (m.canal === 'privado' && !yo.current.privada) return
-      setChat((c) => [...c.slice(-99), m])
-      setNoLeidos((n) => n + 1)
     })
 
     canal.on('broadcast', { event: 'senal' }, async ({ payload }) => {
@@ -463,7 +463,9 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       peersSnapshot.forEach((p) => { try { p.pc.close() } catch { /* noop */ } })
       peersSnapshot.clear()
       localRef.current?.getTracks().forEach((t) => t.stop())
+      localRef.current = null
       pantallaRef.current?.getTracks().forEach((t) => t.stop())
+      pantallaRef.current = null
       mezcla.current?.destruir()
       mezcla.current = null
       supabase.removeChannel(canal)
@@ -471,7 +473,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       setConectado(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yoId])
+  }, [yoId, entrado])
 
   useEffect(() => {
     canalRef.current?.track({ nombre, avatar, estado })
@@ -524,18 +526,18 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   }, [crearPeer, cerrarPeer])
 
   /* ============ API para el render loop ============ */
-  const publicarPos = useCallback((x: number, y: number, dir: Direccion, mov: boolean, ghost: boolean, zona: string | null) => {
+  const publicarPos = useCallback((x: number, y: number, dir: Direccion, mov: boolean, ghost: boolean, zona: string | null, sentado = false) => {
     const antes = yo.current
     const cambio = mov || antes.mov !== mov || antes.ghost !== ghost
-      || antes.zona !== zona || antes.dir !== dir
-    yo.current = { ...antes, x, y, dir, mov, ghost, zona }
+      || antes.zona !== zona || antes.dir !== dir || antes.sentado !== sentado
+    yo.current = { ...antes, x, y, dir, mov, ghost, zona, sentado }
     const ahora = performance.now()
     if (ahora - ultimoEnvio.current < (cambio ? ENVIO_MS : KEEPALIVE_MS)) return
     ultimoEnvio.current = ahora
     canalRef.current?.send({
       type: 'broadcast', event: 'pos',
       payload: {
-        id: yoId, x, y, dir, mov, ghost, zona,
+        id: yoId, x, y, dir, mov, ghost, zona, sentado,
         quiet: yo.current.quiet, spot: yo.current.spot,
         privada: yo.current.privada, pantalla: yo.current.pantalla,
       } satisfies Pos,
@@ -577,24 +579,13 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     yo.current.privada = null
   }, [])
 
-  const mandarChat = useCallback((texto: string, canal: MensajeChat['canal']) => {
-    const t = texto.trim()
-    if (!t) return
-    const m: MensajeChat = {
-      id: `${yoId}-${Date.now()}`, de: yoId, nombre: nombreRef.current,
-      canal, texto: t.slice(0, 500), ts: Date.now(),
-    }
-    setChat((c) => [...c.slice(-99), m])
-    canalRef.current?.send({ type: 'broadcast', event: 'chat', payload: m })
-  }, [yoId])
-
   return {
     jugadores, listaUI, remotos, decisiones, emoteRef, conectado, error, entrado,
     local, micOn, camOn, compartiendo, soportaPantalla,
-    alternarMic, alternarCam, alternarPantalla, entrar,
+    alternarMic, alternarCam, alternarPantalla, entrar, salir, reanudarAudio,
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
-    chat, mandarChat, noLeidos, setNoLeidos, entro, setEntro,
+    entro, setEntro,
     publicarPos, avanzar, mandarEmote, llamarA, llamada, setLlamada,
   }
 }
