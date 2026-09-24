@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX, ImageOff,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -212,7 +212,9 @@ function driveThumbUrl(url: string | null, w = 800): string | null {
    del video/diseño en Drive. Se usa igual en las cards y en las filas de la
    lista para que ambas muestren la imagen del video. Pedro 17-jul-2026. */
 function portadaDe(p: PubCliente): string | null {
-  return urlOk(p.portada) ?? driveThumbUrl(p.video) ?? driveThumbUrl(p.driveResultado)
+  /* La portada suele ser un LINK de Drive (no una imagen): usamos su
+     miniatura. Pedro 24-sep-2026: "la portada que está en Drive". */
+  return driveThumbUrl(p.portada, 400) ?? urlOk(p.portada) ?? driveThumbUrl(p.video) ?? driveThumbUrl(p.driveResultado)
 }
 /* Video servido por NUESTRA app (/api/video/ID), que lo trae de Drive por
    detrás. Drive NO le entrega el MP4 a un <video> del navegador desde otro
@@ -2078,7 +2080,7 @@ function FilaCompacta({ p, color, badge, proceso, onClick }: {
     <button onClick={onClick}
       className="w-full text-left rounded-2xl bg-card p-3 border flex items-center gap-3 transition-shadow hover:shadow-md"
       style={{ borderLeft: `5px solid ${color}` }}>
-      <Thumb portada={portadaDe(p)} color={color} kind={dis ? 'diseno' : 'video'} size={54} />
+      <span className="order-last lg:order-first shrink-0"><Thumb portada={portadaDe(p)} color={color} kind={dis ? 'diseno' : 'video'} size={58} sinPortada /></span>
       <div className="flex-1 min-w-0">
         <div className="text-[15px] font-bold truncate">{p.titulo}</div>
         <div className="text-[12px] text-muted-foreground mt-0.5 truncate flex items-center gap-1">
@@ -2119,7 +2121,7 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
      iframe de Drive queda solo de respaldo (salía cortado y con controles
      gigantes). La portada es un fotograma REAL del video. Pedro 15-jul-2026. */
   const videoDirecto = videoAppUrl(p.video) ?? videoAppUrl(p.driveResultado)
-  const portadaReal = urlOk(p.portada) ?? driveThumbUrl(p.video) ?? driveThumbUrl(p.driveResultado)
+  const portadaReal = portadaDe(p)
 
   /* CORRECCIONES: el cliente marca el segundo del video (currentTime del <video>)
      y escribe qué corregir; puede añadir varias y enviarlas todas al equipo.
@@ -2152,7 +2154,8 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
     <div className="rounded-2xl bg-card overflow-hidden border transition-shadow hover:shadow-md" style={{ borderLeft: `5px solid ${color}` }}>
       <button onClick={onToggle} className="w-full flex items-center gap-3 p-3 text-left">
         {/* Portada = fotograma real del video (antes salía el cuadro de color). */}
-        <Thumb portada={portadaReal} color={color} kind={dis ? 'diseno' : 'video'} size={54} />
+        {/* Portada: a la DERECHA en celular (Pedro 24-sep-2026), a la izquierda en PC. */}
+        <span className="order-last lg:order-first shrink-0"><Thumb portada={portadaReal} color={color} kind={dis ? 'diseno' : 'video'} size={58} sinPortada /></span>
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-bold truncate">{p.titulo}</div>
           <div className="text-[12px] text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
@@ -2163,7 +2166,7 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
           </div>
         </div>
         {aprobado && <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full" style={{ background: 'rgba(22,163,74,0.14)', color: '#15803d' }}><ThumbsUp className="w-3 h-3" /> Aprobado</span>}
-        <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 order-last lg:order-none transition-transform ${abierto ? 'rotate-180' : ''}`} />
       </button>
 
       {abierto && (
@@ -2479,7 +2482,7 @@ function DisenoCard({ p, onClick }: { p: PubCliente; onClick: () => void }) {
   )
 }
 
-function Thumb({ portada, color, kind = 'video', size, big }: { portada: string | null; color: string; kind?: 'video' | 'diseno'; size?: number; big?: boolean }) {
+function Thumb({ portada, color, kind = 'video', size, big, sinPortada }: { portada: string | null; color: string; kind?: 'video' | 'diseno'; size?: number; big?: boolean; sinPortada?: boolean }) {
   const [failed, setFailed] = useState(false)
   const url = urlOk(portada)
   const dim = big ? undefined : size ?? 54
@@ -2489,6 +2492,15 @@ function Thumb({ portada, color, kind = 'video', size, big }: { portada: string 
       <div className="rounded-xl overflow-hidden shrink-0" style={wrap}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="" onError={() => setFailed(true)} className="w-full h-full object-cover" />
+      </div>
+    )
+  }
+  /* Sin portada: iconito gris "sin portada" (lista del cliente). */
+  if (sinPortada && !big) {
+    return (
+      <div className="rounded-xl shrink-0 flex flex-col items-center justify-center gap-0.5 border border-dashed bg-muted/40 text-muted-foreground" style={wrap} title="Sin portada">
+        <ImageOff style={{ width: Math.round((size ?? 54) * 0.36), height: Math.round((size ?? 54) * 0.36) }} strokeWidth={1.75} />
+        <span className="text-[8.5px] font-semibold leading-none">Sin portada</span>
       </div>
     )
   }
