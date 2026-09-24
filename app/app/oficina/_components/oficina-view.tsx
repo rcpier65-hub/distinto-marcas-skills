@@ -13,13 +13,13 @@
    · G = fantasma · 1-7 = emotes · X = usar objeto · M = minimapa
    (El chat propio se quitó: se usa el chat oficial de la app.) */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Mic, MicOff, Video, VideoOff, Users, X, Ghost, Palette, Phone, MapPin,
   MonitorUp, MonitorOff, Megaphone, Lock, Maximize2, Minimize2, VolumeX, Armchair, AlertTriangle, LogOut, Loader2,
-  Bell, Scissors, ListChecks, Unlock,
+  Bell, Scissors, ListChecks, Unlock, Monitor,
 } from 'lucide-react'
 import {
   TILE, MAPA_W, MAPA_H, ZONAS,
@@ -34,7 +34,7 @@ import {
 import { HAY_TURN } from '../_usar-oficina'
 import { reclamarEscritorio } from '../_actions'
 import { MUEBLES } from '../_mapa'
-import { useOficina, motor, type ActividadOficina } from '../_contexto'
+import { useOficina, motor, esDispositivoMovil, type ActividadOficina } from '../_contexto'
 import { buscarCamino, sillaDeEscritorio, sillaEn } from '../_camino'
 
 const VEL = 6.2
@@ -95,8 +95,26 @@ function dibujarActividad(ctx: CanvasRenderingContext2D, cx: number, cy: number,
   ctx.restore()
 }
 
+const nadaSuscribir = () => () => {}
+
 export function OficinaView() {
   const of = useOficina()
+  const movil = useSyncExternalStore(nadaSuscribir, esDispositivoMovil, () => false)
+  if (movil) {
+    return (
+      <div className="w-full flex items-center justify-center" style={{ height: '100dvh', background: '#eceef5' }}>
+        <div className="max-w-sm w-full mx-4 rounded-2xl bg-white shadow-xl border p-7 text-center">
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 inline-flex items-center justify-center text-white"
+            style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}><Monitor className="w-7 h-7" /></div>
+          <h1 className="text-lg font-extrabold mb-1">La oficina es solo en computadora</h1>
+          <p className="text-[13.5px] text-black/55">
+            Para no dejar el micrófono abierto desde el celular, la Oficina Distinto solo funciona en la compu.
+            Desde aquí puedes seguir usando el chat y el resto de la app.
+          </p>
+        </div>
+      </div>
+    )
+  }
   if (!of) {
     return (
       <div className="w-full flex items-center justify-center text-[13px] text-black/50 gap-2" style={{ height: '100dvh', background: '#eceef5' }}>

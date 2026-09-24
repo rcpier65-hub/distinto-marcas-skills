@@ -376,10 +376,9 @@ export function ClientePortalView({
   const [dzBuscar, setDzBuscar] = useState('')
   const [dzDesde, setDzDesde] = useState('')
   const [dzHasta, setDzHasta] = useState('')
-  /* Modo del calendario. Arranca en SEMANA (Pedro 31-ago-2026: "cuando ingreso
-     primera vez a calendario siempre debe mostrarse la vista semanal"). La
-     LISTA ahora también vive aquí como un modo más del calendario. */
-  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes' | 'lista'>('semana')
+  /* Modo del calendario. Arranca en LISTA (Pedro 24-sep-2026: "la primera
+     vista del portal siempre debe ser la lista, no la semana"). */
+  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes' | 'lista'>('lista')
   /* Presentación de la pestaña LISTA: cuadrícula (cards) o lista (filas).
      Toggle en la esquina de la vista Lista, estilo Assets. Pedro 17-jul-2026. */
   const [listaFmt, setListaFmt] = useState<'grid' | 'lista'>('grid')
@@ -572,6 +571,61 @@ export function ClientePortalView({
       else { toast.success('📅 Fecha actualizada. Ya le avisamos al equipo.'); router.refresh() }
     })
   }
+
+  /* RECORDAR dónde se quedó el cliente (Pedro 24-sep-2026: "puse descargar y
+     volvió al inicio"). Guardamos sección, modo, día/semana/mes, video abierto
+     y scroll; si vuelve dentro de 2 horas, lo dejamos donde estaba. Si pasó más
+     tiempo, arranca limpio en la Lista. */
+  const LS_PORTAL = `portal-cliente:${marcaId}`
+  const restaurado = useRef(false)
+  const modalIdRestaurar = useRef<string | null>(null)
+  useEffect(() => {
+    if (restaurado.current) return
+    restaurado.current = true
+    const qs = new URLSearchParams(window.location.search)
+    if (qs.get('reunion') || qs.get('obs') || qs.get('pub')) return
+    try {
+      const raw = localStorage.getItem(LS_PORTAL)
+      const e = raw ? JSON.parse(raw) : null
+      if (!e || Date.now() - (e.t ?? 0) > 2 * 3600_000) return
+      if (e.vista) setVista(e.vista)
+      if (e.calMode) setCalMode(e.calMode)
+      if (e.listaFmt) setListaFmt(e.listaFmt)
+      if (e.sel) setSel(e.sel)
+      if (e.weekStart) setWeekStart(e.weekStart)
+      if (e.ym) setYm(e.ym)
+      modalIdRestaurar.current = e.modalId ?? null
+      const y = Number(e.scroll) || 0
+      if (y > 0) setTimeout(() => window.scrollTo({ top: y }), 120)
+    } catch { /* sin almacenamiento: arranca en la Lista */ }
+  }, [LS_PORTAL])
+  useEffect(() => {
+    const id = modalIdRestaurar.current
+    if (!id) return
+    const p = pubs.find((x) => x.id === id)
+    if (p) { modalIdRestaurar.current = null; setModalPub(p) }
+  }, [pubs])
+  useEffect(() => {
+    const guardar = () => {
+      try {
+        localStorage.setItem(LS_PORTAL, JSON.stringify({
+          t: Date.now(), vista, calMode, listaFmt, sel, weekStart, ym, modalId: modalPub?.id ?? null, scroll: window.scrollY,
+        }))
+      } catch { /* modo privado */ }
+    }
+    guardar()
+    let t: ReturnType<typeof setTimeout> | null = null
+    const alScroll = () => { if (t) clearTimeout(t); t = setTimeout(guardar, 250) }
+    window.addEventListener('scroll', alScroll, { passive: true })
+    window.addEventListener('pagehide', guardar)
+    document.addEventListener('visibilitychange', guardar)
+    return () => {
+      if (t) clearTimeout(t)
+      window.removeEventListener('scroll', alScroll)
+      window.removeEventListener('pagehide', guardar)
+      document.removeEventListener('visibilitychange', guardar)
+    }
+  }, [LS_PORTAL, vista, calMode, listaFmt, sel, weekStart, ym, modalPub])
 
   /* Deep-link: si el cliente entra desde la notificación push (/cliente?pub=ID),
      abrimos directo esa publicación para que vea el video recién subido y sus
@@ -2219,7 +2273,7 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
                 guarde como .mp4 con el nombre de la publicación (antes bajaba
                 un archivo sin extensión que el celular tomaba por .html). */}
             {videoDirecto && (
-              <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download
+              <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-[13px] font-bold text-white" style={{ background: color }}>
                 <Download className="w-4 h-4" /> Descargar en alta calidad
               </a>
@@ -2325,7 +2379,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {videoDirecto && (
-          <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download
+          <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: color }}>
             <Download className="w-3.5 h-3.5" /> Video
           </a>
@@ -2353,7 +2407,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
               <Music2 className="w-3.5 h-3.5" /> Abrir música en TikTok <ExternalLink className="w-3 h-3" />
             </a>
             {videoAppUrl(p.videoSinMusica ?? null) && (
-              <a href={`${videoAppUrl(p.videoSinMusica ?? null)}?dl=1&name=${encodeURIComponent(p.titulo + ' (sin música)')}`} download
+              <a href={`${videoAppUrl(p.videoSinMusica ?? null)}?dl=1&name=${encodeURIComponent(p.titulo + ' (sin música)')}`} download target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border" style={{ borderColor: '#11111133', color: '#111' }}>
                 <Download className="w-3.5 h-3.5" /> Video sin música
               </a>

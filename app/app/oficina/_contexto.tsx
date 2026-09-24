@@ -52,6 +52,18 @@ const LS_SALIO = 'oficina-salio'   // YYYY-MM-DD en que salió a mano
 const HORA_ABRE = 8
 const HORA_CIERRA = 20
 
+/* La oficina NO funciona en celular/tablet (Pedro 24-sep-2026: "en mobile no
+   debe funcionar, en cuanto se entra no se puede estar apagando el micro"). */
+export function esDispositivoMovil(): boolean {
+  if (typeof window === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const uaMovil = /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(ua)
+  /* iPadOS se presenta como Mac: lo detectamos por pantalla táctil. */
+  const ipad = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1
+  const tactilChico = window.matchMedia?.('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) < 820
+  return uaMovil || ipad || !!tactilChico
+}
+
 function hoyLima(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
 }
@@ -100,8 +112,9 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
   const [avatar, setAvatar] = useState<AvatarConfig>(() => avatarPorNombre('equipo'))
   const [duenos, setDuenos] = useState<PerfilLite[]>([])
 
-  /* Datos del usuario (solo equipo). */
+  /* Datos del usuario (solo equipo y solo en computadora). */
   useEffect(() => {
+    if (esDispositivoMovil()) return
     let vivo = true
     datosOficina().then((d) => {
       if (!vivo || !d) return
