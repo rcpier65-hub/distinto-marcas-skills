@@ -105,3 +105,23 @@ export async function toggleMarcaActiva(
   revalidatePath('/', 'layout')   // refresca el sidebar (que lista solo activas)
   return { ok: true }
 }
+
+/* Cambiar el color de la marca (tarjeta del dashboard). Solo equipo.
+   Pedro 24-sep-2026: "dame opción de poder cambiar el color". */
+export async function cambiarColorMarca(
+  slug: string,
+  color: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser()
+  const hex = String(color ?? '').trim().toLowerCase()
+  if (!/^#[0-9a-f]{6}$/.test(hex)) return { ok: false, error: 'Color inválido' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: miembro } = await service.from('team_members').select('id').eq('auth_user_id', user.id).eq('activo', true).maybeSingle()
+  if (!miembro) return { ok: false, error: 'No autorizado' }
+  const { error } = await service.from('marcas').update({ color_primario_hex: hex, updated_at: new Date().toISOString() }).eq('slug', slug)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
+  return { ok: true }
+}

@@ -5,11 +5,11 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Power, Plus, ListTodo } from 'lucide-react'
+import { Power, Plus, ListTodo, Pencil, Check, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { MarcaLogo } from '@/components/marca-logo'
-import { toggleMarcaActiva } from '../_actions'
+import { toggleMarcaActiva, cambiarColorMarca } from '../_actions'
 import { crearTareaEnMarca } from '@/app/tareas/_actions'
 import { sincronizarPublicacionesGcal } from '../_gcal-actions'
 
@@ -136,15 +136,7 @@ export function MarcaCard({
           </Badge>
         </div>
 
-        {marca.color_primario_hex && (
-          <div className="flex items-center gap-2">
-            <div
-              className="w-5 h-5 rounded border border-border"
-              style={{ backgroundColor: marca.color_primario_hex }}
-            />
-            <code className="text-xs text-muted-foreground">{marca.color_primario_hex}</code>
-          </div>
-        )}
+        <ColorMarca slug={marca.slug} inicial={marca.color_primario_hex} />
 
         <div className="grid grid-cols-2 gap-2">
           <Link
@@ -250,5 +242,64 @@ export function MarcaCard({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+/* Paleta rápida + selector libre para el color de la marca. */
+const PALETA = ['#a855f7', '#6366f1', '#3b82f6', '#0ea5e9', '#14b8a6', '#22c55e', '#84cc16', '#f7f140', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#a16207', '#111827']
+
+function ColorMarca({ slug, inicial }: { slug: string; inicial: string | null }) {
+  const [color, setColor] = useState(inicial ?? '#a855f7')
+  const [editando, setEditando] = useState(false)
+  const [borrador, setBorrador] = useState(color)
+  const [guardando, setGuardando] = useState(false)
+
+  async function guardar(hex: string) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) { toast.error('Usa un color tipo #ba41f7'); return }
+    setGuardando(true)
+    const r = await cambiarColorMarca(slug, hex)
+    setGuardando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    setColor(hex.toLowerCase())
+    setEditando(false)
+    toast.success('Color de la marca actualizado')
+  }
+
+  if (!editando) {
+    return (
+      <button type="button" onClick={() => { setBorrador(color); setEditando(true) }} title="Cambiar el color de la marca"
+        className="group inline-flex items-center gap-2 h-8 pl-1.5 pr-2.5 rounded-lg border border-transparent hover:border-border hover:bg-muted transition-colors">
+        <span className="w-5 h-5 rounded-md border border-border" style={{ backgroundColor: color }} />
+        <code className="text-xs text-muted-foreground">{color}</code>
+        <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+    )
+  }
+  return (
+    <div className="rounded-xl border border-border bg-background p-2.5 space-y-2.5 shadow-sm">
+      <div className="grid grid-cols-7 gap-1.5">
+        {PALETA.map((c) => (
+          <button key={c} type="button" onClick={() => setBorrador(c)} title={c}
+            className="w-7 h-7 rounded-md border border-black/10 inline-flex items-center justify-center transition-transform hover:scale-110"
+            style={{ backgroundColor: c, boxShadow: borrador.toLowerCase() === c ? '0 0 0 2px var(--background), 0 0 0 4px #7170ff' : undefined }}>
+            {borrador.toLowerCase() === c && <Check className="w-3.5 h-3.5" style={{ color: c === '#f7f140' || c === '#84cc16' ? '#111' : '#fff' }} />}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="relative w-8 h-8 rounded-md border border-border overflow-hidden cursor-pointer shrink-0" title="Elegir cualquier color" style={{ backgroundColor: borrador }}>
+          <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(borrador) ? borrador : '#000000'} onChange={(e) => setBorrador(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer" />
+        </label>
+        <input value={borrador} onChange={(e) => setBorrador(e.target.value.trim())} maxLength={7} spellCheck={false}
+          className="flex-1 min-w-0 h-8 px-2 rounded-md border border-border bg-background text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#7170ff]/30" />
+        <button type="button" onClick={() => setEditando(false)} title="Cancelar"
+          className="w-8 h-8 rounded-md border border-border inline-flex items-center justify-center text-muted-foreground hover:bg-muted"><X className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={() => void guardar(borrador)} disabled={guardando} title="Guardar color"
+          className="h-8 px-3 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1 disabled:opacity-60" style={{ background: '#7170ff' }}>
+          <Check className="w-3.5 h-3.5" /> {guardando ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
+    </div>
   )
 }
