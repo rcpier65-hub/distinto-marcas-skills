@@ -18,11 +18,14 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ImagePlus, Loader2, MessageCircle, Paperclip, Send, Smile, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Loader2, MessageCircle, Paperclip, Send, Smile, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { enviarMensaje, getChatInicial, getConversacion, marcarLeidos, prepararImagen, urlImagen } from '@/lib/mensajes/actions'
-import { MENSAJE_MAX, rowToMensaje, vistaPrevia, type ChatInicial, type ContactoChat, type MensajeDirecto } from '@/lib/mensajes/types'
+import {
+  detalleMensajeGrupo, enviarMensaje, enviarMensajeGrupo, getChatInicial, getConversacion, getConversacionGrupo,
+  marcarLeidos, marcarLeidosGrupo, prepararImagen, urlImagen,
+} from '@/lib/mensajes/actions'
+import { GRUPO_ID, GRUPO_NOMBRE, MENSAJE_MAX, rowToMensaje, rowToMensajeGrupo, vistaPrevia, type ChatInicial, type ContactoChat, type MensajeDirecto } from '@/lib/mensajes/types'
 import { comprimirImagen } from '@/lib/mensajes/comprimir'
 import { sonarMensaje } from '@/lib/sonido/sonidos'
 import { EmojiPanel } from './chat/EmojiPanel'
@@ -76,8 +79,19 @@ function emojisGrandes(texto: string): boolean {
   return n >= 1 && n <= 3
 }
 
-function Avatar({ c, size = 34 }: { c: Pick<ContactoChat, 'nombre' | 'avatarUrl'>; size?: number }) {
+function Avatar({ c, size = 34 }: { c: Pick<ContactoChat, 'nombre' | 'avatarUrl'> & { id?: string }; size?: number }) {
   const inicial = (c.nombre.trim()[0] ?? '?').toUpperCase()
+  if (c.id === GRUPO_ID) {
+    return (
+      <span aria-hidden style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0, color: '#fff',
+        background: 'linear-gradient(135deg, #7170ff, #ba41f7)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Users size={size * 0.48} strokeWidth={2.2} />
+      </span>
+    )
+  }
   return (
     <span
       aria-hidden
@@ -94,6 +108,14 @@ function Avatar({ c, size = 34 }: { c: Pick<ContactoChat, 'nombre' | 'avatarUrl'
 }
 
 type Pendiente = { id: string; file: File; preview: string }
+
+/* Color estable por persona para su nombre en el grupo (como Telegram). */
+const COLORES_NOMBRE = ['#7c3aed', '#0891b2', '#db2777', '#059669', '#ea580c', '#2563eb', '#ca8a04', '#9333ea']
+function colorNombre(id: string): string {
+  let h = 0
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return COLORES_NOMBRE[h % COLORES_NOMBRE.length]
+}
 
 /* Notificación del sistema generada por la propia app (no push): funciona
    mientras la app esté abierta aunque esté minimizada. Mismo `tag` que el push
@@ -142,8 +164,11 @@ export function ChatFlotante() {
   useEffect(() => { chatRef.current = chat }, [chat])
 
   const yoId = chat?.yo.id ?? null
-  const activo = chat?.contactos.find((c) => c.id === activoId) ?? null
-  const totalNoLeidos = chat?.contactos.reduce((s, c) => s + c.noLeidos, 0) ?? 0
+  const esGrupo = activoId === GRUPO_ID
+  const activo: ContactoChat | null = esGrupo && chat
+    ? { id: GRUPO_ID, nombre: GRUPO_NOMBRE, avatarUrl: null, rolBase: null, ultimo: null, noLeidos: 0 }
+    : chat?.contactos.find((c) => c.id === activoId) ?? null
+  const totalNoLeidos = (chat?.contactos.reduce((s, c) => s + c.noLeidos, 0) ?? 0) + (chat?.grupo.noLeidos ?? 0)
   /* Último total conocido, para detectar mensajes nuevos al re-sincronizar. */
   const noLeidosRef = useRef<number | null>(null)
   useEffect(() => { noLeidosRef.current = chat ? totalNoLeidos : null }, [chat, totalNoLeidos])
@@ -152,7 +177,9 @@ export function ChatFlotante() {
   const resincronizar = useCallback(async () => {
     const [lista, conv] = await Promise.all([
       getChatInicial(),
-      openRef.current && activoRef.current ? getConversacion(activoRef.current) : null,
+      openRef.current && activoRef.current
+        ? (activoRef.current === GRUPO_ID ? getConversacionGrupo() : getConversacion(activoRef.current))
+        : null,
     ])
     if (conv?.ok) {
       const nuevos = conv.mensajes
@@ -161,17 +188,19 @@ export function ChatFlotante() {
         const faltan = nuevos.filter((m) => !ids.has(m.id))
         return faltan.length ? [...prev, ...faltan].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : prev
       })
-      if (activoRef.current && nuevos.some((m) => m.deId === activoRef.current && !m.leidoAt)) {
+      if (activoRef.current === GRUPO_ID) void marcarLeidosGrupo()
+      else if (activoRef.current && nuevos.some((m) => m.deId === activoRef.current && !m.leidoAt)) {
         void marcarLeidos(activoRef.current)
       }
     }
     if (lista.ok) {
       const activoActual = openRef.current ? activoRef.current : null
       const contactos = lista.data.contactos.map((c) => (c.id === activoActual ? { ...c, noLeidos: 0 } : c))
+      const grupo = activoActual === GRUPO_ID ? { ...lista.data.grupo, noLeidos: 0 } : lista.data.grupo
       /* Sonido si apareció algo sin leer que el canal en vivo no trajo. */
-      const total = contactos.reduce((s, c) => s + c.noLeidos, 0)
+      const total = contactos.reduce((s, c) => s + c.noLeidos, 0) + grupo.noLeidos
       if (noLeidosRef.current !== null && total > noLeidosRef.current) sonarMensaje()
-      setChat({ ...lista.data, contactos })
+      setChat({ ...lista.data, contactos, grupo })
     }
   }, [])
 
@@ -192,10 +221,33 @@ export function ChatFlotante() {
     })
   }, [])
 
+  /* Actualiza la fila del grupo "Equipo Distinto" con un mensaje nuevo. */
+  const tocarGrupo = useCallback((m: MensajeDirecto, yo: string, sumarNoLeido: boolean) => {
+    setChat((prev) => prev && {
+      ...prev,
+      grupo: {
+        ultimo: { texto: vistaPrevia(m.texto, !!m.adjunto), createdAt: m.createdAt, esMio: m.deId === yo, deNombre: m.deNombre ?? null },
+        noLeidos: sumarNoLeido ? prev.grupo.noLeidos + 1 : prev.grupo.noLeidos,
+      },
+    })
+  }, [])
+
   /* Agrega un mensaje a la conversación abierta; si trae imagen, pide su URL. */
   const agregarMensaje = useCallback((m: MensajeDirecto) => {
     setMensajes((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))
-    if (m.adjunto && !m.adjunto.url) {
+    if (m.paraId === GRUPO_ID) {
+      // Del grupo: completar nombre del autor e imagen si faltan.
+      if ((m.adjunto && !m.adjunto.url) || !m.deNombre) {
+        void detalleMensajeGrupo(m.id).then((r) => {
+          if (!r.ok) return
+          setMensajes((prev) => prev.map((x) => (x.id !== m.id ? x : {
+            ...x,
+            deNombre: x.deNombre ?? r.deNombre,
+            adjunto: x.adjunto ? { ...x.adjunto, url: x.adjunto.url ?? r.url } : null,
+          })))
+        })
+      }
+    } else if (m.adjunto && !m.adjunto.url) {
       void urlImagen(m.id).then((r) => {
         if (!r.ok) return
         setMensajes((prev) => prev.map((x) => (x.id === m.id && x.adjunto ? { ...x, adjunto: { ...x.adjunto, url: r.url } } : x)))
@@ -231,6 +283,27 @@ export function ChatFlotante() {
       tocarContacto(m, yoId, esParaMi && !viendoEsta)
     }
 
+    /* Mensajes del grupo "Equipo Distinto" (RLS: solo miembros activos). */
+    const onInsertGrupo = (payload: { new: unknown }) => {
+      const raw = payload.new as { de_id?: string }
+      const deNombre = raw.de_id === yoId ? chatRef.current?.yo.nombre ?? null : chatRef.current?.contactos.find((c) => c.id === raw.de_id)?.nombre ?? null
+      const m = rowToMensajeGrupo(payload.new, deNombre)
+      const abierto = openRef.current && activoRef.current === GRUPO_ID
+      const viendo = abierto && document.visibilityState === 'visible'
+      const mio = m.deId === yoId
+      if (!mio) {
+        sonarMensaje()
+        if (document.visibilityState !== 'visible') {
+          void notificarLocal(`💬 ${GRUPO_NOMBRE} · ${deNombre ?? 'Equipo'}`, vistaPrevia(m.texto, !!m.adjunto), GRUPO_ID)
+        }
+      }
+      if (abierto) {
+        agregarMensaje(m)
+        if (!mio && viendo) void marcarLeidosGrupo()
+      }
+      tocarGrupo(m, yoId, !mio && !viendo)
+    }
+
     /* La conexión en vivo se puede caer (Mac en reposo, cambio de wifi, app
        en segundo plano). Si el canal falla o se cierra, lo rearmamos y
        re-sincronizamos para no perder mensajes. */
@@ -247,6 +320,8 @@ export function ChatFlotante() {
         .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'mensajes_directos', filter: `para_id=eq.${yoId}` }, onInsert)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'mensajes_directos', filter: `de_id=eq.${yoId}` }, onInsert)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'mensajes_grupo' }, onInsertGrupo)
         .subscribe((estado) => {
           if (cerrado) return
           if (estado === 'SUBSCRIBED') {
@@ -282,7 +357,7 @@ export function ChatFlotante() {
       window.removeEventListener('online', onOnline)
       if (canal) void supabase.removeChannel(canal)
     }
-  }, [yoId, tocarContacto, resincronizar, agregarMensaje])
+  }, [yoId, tocarContacto, tocarGrupo, resincronizar, agregarMensaje])
 
   const abrirConversacion = useCallback(async (id: string) => {
     setActivoId(id)
@@ -291,12 +366,18 @@ export function ChatFlotante() {
     setPendientes(sinPendientes)
     setEmojiAbierto(false)
     setCargandoConv(true)
-    const r = await getConversacion(id)
+    const grupo = id === GRUPO_ID
+    const r = grupo ? await getConversacionGrupo() : await getConversacion(id)
     setCargandoConv(false)
     if (r.ok) setMensajes(r.mensajes)
     else toast.error(r.error)
-    setChat((prev) => prev && { ...prev, contactos: prev.contactos.map((c) => (c.id === id ? { ...c, noLeidos: 0 } : c)) })
-    void marcarLeidos(id)
+    if (grupo) {
+      setChat((prev) => prev && { ...prev, grupo: { ...prev.grupo, noLeidos: 0 } })
+      void marcarLeidosGrupo()
+    } else {
+      setChat((prev) => prev && { ...prev, contactos: prev.contactos.map((c) => (c.id === id ? { ...c, noLeidos: 0 } : c)) })
+      void marcarLeidos(id)
+    }
   }, [])
 
   /* Carga inicial. `?chat=<id>` en la URL (viene del push) abre esa conversación. */
@@ -306,7 +387,7 @@ export function ChatFlotante() {
       setChat(r.data)
       const params = new URLSearchParams(window.location.search)
       const id = params.get('chat')
-      if (!id || !r.data.contactos.some((c) => c.id === id)) return
+      if (!id || (id !== GRUPO_ID && !r.data.contactos.some((c) => c.id === id))) return
       void abrirConversacion(id)
       params.delete('chat')
       const qs = params.toString()
@@ -380,9 +461,8 @@ export function ChatFlotante() {
     const { bucket, path, token } = prep.subida
     const up = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, img.blob, { contentType: img.tipo })
     if (up.error) throw new Error('No se pudo subir la imagen.')
-    const r = await enviarMensaje(paraId, caption, {
-      ref: prep.subida.ref, tipo: img.tipo, ancho: img.ancho, alto: img.alto, bytes: img.blob.size,
-    })
+    const adj = { ref: prep.subida.ref, tipo: img.tipo, ancho: img.ancho, alto: img.alto, bytes: img.blob.size }
+    const r = paraId === GRUPO_ID ? await enviarMensajeGrupo(caption, adj) : await enviarMensaje(paraId, caption, adj)
     if (!r.ok) throw new Error(r.error)
     return r.mensaje
   }
@@ -399,17 +479,18 @@ export function ChatFlotante() {
         const lote = pendientes
         for (let i = 0; i < lote.length; i++) {
           const m = await subirYEnviar(paraId, lote[i], i === 0 ? limpio : '')
-          if (m) { agregarMensaje(m); tocarContacto(m, yoId, false) }
+          if (m) { agregarMensaje(m); if (paraId === GRUPO_ID) tocarGrupo(m, yoId, false); else tocarContacto(m, yoId, false) }
           URL.revokeObjectURL(lote[i].preview)
           setPendientes((prev) => prev.filter((x) => x.id !== lote[i].id))
         }
         setTexto('')
       } else {
-        const r = await enviarMensaje(paraId, limpio)
+        const r = paraId === GRUPO_ID ? await enviarMensajeGrupo(limpio) : await enviarMensaje(paraId, limpio)
         if (!r.ok) { toast.error(r.error); return }
         setTexto('')
         agregarMensaje(r.mensaje)
-        tocarContacto(r.mensaje, yoId, false)
+        if (paraId === GRUPO_ID) tocarGrupo(r.mensaje, yoId, false)
+        else tocarContacto(r.mensaje, yoId, false)
       }
       if (!isMobile) inputRef.current?.focus()
     } catch (e) {
@@ -542,11 +623,17 @@ export function ChatFlotante() {
           {!activo ? (
             /* ===== Lista del equipo ===== */
             <div style={{ overflowY: 'auto', flex: 1 }}>
-              {chat.contactos.length === 0 ? (
-                <div style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: '#6b7280' }}>
-                  Todavía no hay más personas en el equipo.
-                </div>
-              ) : chat.contactos.map((c) => (
+              {/* El grupo de todo el equipo va fijo arriba; luego los chats 1 a 1. */}
+              {[
+                {
+                  id: GRUPO_ID, nombre: GRUPO_NOMBRE, avatarUrl: null, rolBase: null,
+                  noLeidos: chat.grupo.noLeidos,
+                  ultimo: chat.grupo.ultimo
+                    ? { ...chat.grupo.ultimo, esMio: chat.grupo.ultimo.esMio, texto: chat.grupo.ultimo.esMio || !chat.grupo.ultimo.deNombre ? chat.grupo.ultimo.texto : `${chat.grupo.ultimo.deNombre.split(' ')[0]}: ${chat.grupo.ultimo.texto}` }
+                    : null,
+                } as ContactoChat,
+                ...chat.contactos,
+              ].map((c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -581,7 +668,7 @@ export function ChatFlotante() {
                         flex: 1, minWidth: 0, fontSize: 12, color: c.noLeidos ? '#334155' : '#64748b',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {c.ultimo ? `${c.ultimo.esMio ? 'Tú: ' : ''}${c.ultimo.texto}` : 'Escríbele un mensaje'}
+                        {c.ultimo ? `${c.ultimo.esMio ? 'Tú: ' : ''}${c.ultimo.texto}` : c.id === GRUPO_ID ? 'Mensaje para todo el equipo' : 'Escríbele un mensaje'}
                       </span>
                       {c.noLeidos > 0 && (
                         <span style={{
@@ -606,7 +693,7 @@ export function ChatFlotante() {
                 ) : mensajes.length === 0 ? (
                   <div style={{ padding: '40px 20px', textAlign: 'center' }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#374151' }}>Empieza la conversación</div>
-                    <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 3 }}>Solo tú y {activo.nombre} ven estos mensajes.</div>
+                    <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 3 }}>{esGrupo ? 'Todo el equipo ve y responde estos mensajes.' : `Solo tú y ${activo.nombre} ven estos mensajes.`}</div>
                     <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 10 }}>Puedes pegar o arrastrar capturas aquí.</div>
                   </div>
                 ) : mensajes.map((m, i) => {
@@ -622,6 +709,11 @@ export function ChatFlotante() {
                           <span style={{ fontSize: 10.5, fontWeight: 500, color: '#64748b', background: '#eef0f3', padding: '3px 9px', borderRadius: 999, textTransform: 'capitalize' }}>
                             {etiquetaDia(m.createdAt)}
                           </span>
+                        </div>
+                      )}
+                      {esGrupo && !mio && !pegado && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: colorNombre(m.deId), margin: '8px 0 -4px 6px' }}>
+                          {m.deNombre ?? 'Equipo'}
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: mio ? 'flex-end' : 'flex-start', marginTop: pegado ? 2 : 8 }}>

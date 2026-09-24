@@ -10,7 +10,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { enviarPushAMiembroId } from '@/lib/push/send'
 import { MAX_BYTES, TIPOS_IMAGEN, borrarArchivo, prepararSubida, urlsDeLectura, type SubidaPreparada } from './almacen'
 import {
-  MENSAJE_MAX, MENSAJE_SELECT, rowToMensaje, vistaPrevia,
+  GRUPO_ID, GRUPO_NOMBRE, MENSAJE_GRUPO_SELECT, MENSAJE_MAX, MENSAJE_SELECT, rowToMensaje, rowToMensajeGrupo, vistaPrevia,
   type AdjuntoEnviado, type ChatInicial, type ContactoChat, type MensajeDirecto,
 } from './types'
 
@@ -49,7 +49,7 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
     const yo = await miembroActual(service)
     if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
 
-    const [{ data: miembros }, { data: recientes }] = await Promise.all([
+    const [{ data: miembros }, { data: recientes }, grupo] = await Promise.all([
       service
         .from('team_members')
         .select('id, nombre, avatar_url, rol_base')
@@ -62,6 +62,7 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
         .or(`de_id.eq.${yo.id},para_id.eq.${yo.id}`)
         .order('created_at', { ascending: false })
         .limit(1000),
+      resumenGrupo(service, yo.id),
     ])
 
     const mensajes: MensajeDirecto[] = (recientes ?? []).map(rowToMensaje)
@@ -92,7 +93,8 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
       data: {
         yo,
         contactos,
-        totalNoLeidos: contactos.reduce((s, c) => s + c.noLeidos, 0),
+        grupo,
+        totalNoLeidos: contactos.reduce((s, c) => s + c.noLeidos, 0) + grupo.noLeidos,
       },
     }
   } catch (e) {
@@ -245,5 +247,126 @@ export async function marcarLeidos(otroId: string): Promise<Result<object>> {
   } catch (e) {
     console.error('[mensajes] marcarLeidos', e)
     return { ok: false, error: 'No se pudo actualizar.' }
+  }
+}
+
+/* ====================== Chat grupal "Equipo Distinto" ======================
+   Pedro 24-sep-2026: "me falta una opción para enviar un mensaje general para
+   todos". Todo el equipo activo lee y escribe; cada uno lleva su "leído hasta". */
+
+async function resumenGrupo(service: Service, yoId: string): Promise<ChatInicial['grupo']> {
+  const [{ data: ult }, { data: lect }] = await Promise.all([
+    service.from('mensajes_grupo').select('de_id, texto, adjunto_path, created_at, autor:team_members!mensajes_grupo_de_id_fkey(nombre)')
+      .order('created_at', { ascending: false }).limit(1),
+    service.from('mensajes_grupo_lecturas').select('leido_hasta').eq('team_member_id', yoId).maybeSingle(),
+  ])
+  const u = ult?.[0]
+  let q = service.from('mensajes_grupo').select('id', { count: 'exact', head: true }).neq('de_id', yoId)
+  if (lect?.leido_hasta) q = q.gt('created_at', lect.leido_hasta)
+  const { count } = await q
+  const autor = Array.isArray(u?.autor) ? u.autor[0] : u?.autor
+  return {
+    ultimo: u ? { texto: vistaPrevia(u.texto ?? '', !!u.adjunto_path), createdAt: u.created_at, esMio: u.de_id === yoId, deNombre: autor?.nombre ?? null } : null,
+    noLeidos: count ?? 0,
+  }
+}
+
+async function nombresDe(service: Service, ids: string[]): Promise<Map<string, string>> {
+  const unicos = [...new Set(ids)]
+  if (!unicos.length) return new Map()
+  const { data } = await service.from('team_members').select('id, nombre').in('id', unicos)
+  return new Map(((data ?? []) as { id: string; nombre: string }[]).map((m) => [m.id, m.nombre]))
+}
+
+export async function getConversacionGrupo(): Promise<Result<{ mensajes: MensajeDirecto[] }>> {
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    const { data, error } = await service.from('mensajes_grupo').select(MENSAJE_GRUPO_SELECT)
+      .order('created_at', { ascending: false }).limit(150)
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = ((data ?? []) as any[]).reverse()
+    const nombres = await nombresDe(service, rows.map((r) => r.de_id))
+    return { ok: true, mensajes: await firmar(rows.map((r) => rowToMensajeGrupo(r, nombres.get(r.de_id)))) }
+  } catch (e) {
+    console.error('[mensajes] getConversacionGrupo', e)
+    return { ok: false, error: 'No se pudo cargar el chat del equipo.' }
+  }
+}
+
+export async function enviarMensajeGrupo(texto: string, adjunto?: AdjuntoEnviado | null): Promise<Result<{ mensaje: MensajeDirecto }>> {
+  const limpio = texto.trim()
+  if (!limpio && !adjunto) return { ok: false, error: 'El mensaje está vacío.' }
+  if (limpio.length > MENSAJE_MAX) return { ok: false, error: `Máximo ${MENSAJE_MAX} caracteres.` }
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    if (adjunto) {
+      const valido = adjunto.ref.startsWith(`sb:${yo.id}/`) && !adjunto.ref.includes('..')
+        && (TIPOS_IMAGEN as readonly string[]).includes(adjunto.tipo) && adjunto.bytes > 0 && adjunto.bytes <= MAX_BYTES
+      if (!valido) return { ok: false, error: 'Imagen inválida.' }
+    }
+    const { data, error } = await service.from('mensajes_grupo').insert({
+      de_id: yo.id,
+      texto: limpio,
+      ...(adjunto ? { adjunto_path: adjunto.ref, adjunto_tipo: adjunto.tipo, adjunto_ancho: Math.round(adjunto.ancho) || null, adjunto_alto: Math.round(adjunto.alto) || null, adjunto_bytes: adjunto.bytes } : {}),
+    }).select(MENSAJE_GRUPO_SELECT).single()
+    if (error) {
+      if (adjunto) await borrarArchivo(adjunto.ref).catch(() => {})
+      throw error
+    }
+    // Quien escribe ya lo "leyó".
+    await service.from('mensajes_grupo_lecturas').upsert({ team_member_id: yo.id, leido_hasta: data.created_at }, { onConflict: 'team_member_id' })
+
+    // Push a todo el equipo (menos a quien escribe); mismo tag = un aviso por grupo.
+    const previa = vistaPrevia(limpio, !!adjunto)
+    const { data: equipo } = await service.from('team_members').select('id').eq('activo', true).neq('id', yo.id)
+    await Promise.all(((equipo ?? []) as { id: string }[]).map((m) => enviarPushAMiembroId(m.id, {
+      title: `💬 ${GRUPO_NOMBRE} · ${yo.nombre}`,
+      body: previa.length > 140 ? `${previa.slice(0, 137)}…` : previa,
+      url: `/inicio?chat=${GRUPO_ID}`,
+      tag: `chat-${GRUPO_ID}`,
+    })))
+
+    const [mensaje] = await firmar([rowToMensajeGrupo(data, yo.nombre)])
+    return { ok: true, mensaje }
+  } catch (e) {
+    console.error('[mensajes] enviarMensajeGrupo', e)
+    return { ok: false, error: 'No se pudo enviar el mensaje.' }
+  }
+}
+
+export async function marcarLeidosGrupo(): Promise<Result<object>> {
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    await service.from('mensajes_grupo_lecturas').upsert({ team_member_id: yo.id, leido_hasta: new Date().toISOString() }, { onConflict: 'team_member_id' })
+    return { ok: true }
+  } catch (e) {
+    console.error('[mensajes] marcarLeidosGrupo', e)
+    return { ok: false, error: 'No se pudo actualizar.' }
+  }
+}
+
+/* Nombre del autor + URL de imagen de un mensaje del grupo que llegó por
+   Realtime (el evento trae ids y rutas, no nombres ni URLs firmadas). */
+export async function detalleMensajeGrupo(id: string): Promise<Result<{ deNombre: string | null; url: string | null }>> {
+  if (!UUID.test(id)) return { ok: false, error: 'Mensaje inválido.' }
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    const { data } = await service.from('mensajes_grupo').select('de_id, adjunto_path, autor:team_members!mensajes_grupo_de_id_fkey(nombre)').eq('id', id).maybeSingle()
+    if (!data) return { ok: false, error: 'No encontrado.' }
+    const autor = Array.isArray(data.autor) ? data.autor[0] : data.autor
+    const url = data.adjunto_path ? (await urlsDeLectura([data.adjunto_path])).get(data.adjunto_path) ?? null : null
+    return { ok: true, deNombre: autor?.nombre ?? null, url }
+  } catch (e) {
+    console.error('[mensajes] detalleMensajeGrupo', e)
+    return { ok: false, error: 'No se pudo cargar.' }
   }
 }

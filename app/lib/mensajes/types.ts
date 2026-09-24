@@ -8,9 +8,15 @@ export type Adjunto = {
   url: string | null     // URL firmada de lectura (la pone el servidor)
 }
 
+/* Id especial de la conversación grupal "Equipo Distinto". */
+export const GRUPO_ID = 'equipo'
+export const GRUPO_NOMBRE = 'Equipo Distinto'
+
 export type MensajeDirecto = {
   id: string
   deId: string
+  /* Solo en el grupo: nombre de quien escribió. */
+  deNombre?: string | null
   paraId: string
   texto: string
   leidoAt: string | null
@@ -30,6 +36,8 @@ export type ContactoChat = {
 export type ChatInicial = {
   yo: { id: string; nombre: string }
   contactos: ContactoChat[]
+  /* Chat grupal de todo el equipo. */
+  grupo: { ultimo: { texto: string; createdAt: string; esMio: boolean; deNombre: string | null } | null; noLeidos: number }
   totalNoLeidos: number
 }
 
@@ -59,4 +67,11 @@ export function rowToMensaje(r: any): MensajeDirecto {
       ? { ref: r.adjunto_path, tipo: r.adjunto_tipo ?? 'image/webp', ancho: r.adjunto_ancho ?? null, alto: r.adjunto_alto ?? null, url: null }
       : null,
   }
+}
+
+export const MENSAJE_GRUPO_SELECT = 'id, de_id, texto, created_at, adjunto_path, adjunto_tipo, adjunto_ancho, adjunto_alto'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function rowToMensajeGrupo(r: any, deNombre?: string | null): MensajeDirecto {
+  return { ...rowToMensaje({ ...r, para_id: GRUPO_ID, leido_at: null }), deNombre: deNombre ?? null }
 }
