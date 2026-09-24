@@ -15,8 +15,9 @@ export function puedeVerNota(row: FilaNota, meId: string | null): boolean {
   return !row.privada || (!!meId && row.team_member_id === meId)
 }
 
-/* Borrar: el autor, o un director si la nota es del equipo. */
-export function puedeBorrarNota(row: FilaNota, meId: string | null, esDirector: boolean): boolean {
-  if (meId && row.team_member_id === meId) return true
-  return esDirector && !row.privada
+/* Borrar: SOLO el super admin (Pedro 24-sep-2026: "solo yo puedo borrar").
+   Sus privadas también, claro; las privadas de otros ni las ve. */
+export function puedeBorrarNota(row: FilaNota, meId: string | null, email: string | null | undefined): boolean {
+  if (!esSuperAdmin(email)) return false
+  return !row.privada || (!!meId && row.team_member_id === meId)
 }

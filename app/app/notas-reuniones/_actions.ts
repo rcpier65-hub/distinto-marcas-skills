@@ -122,7 +122,7 @@ export async function eliminarNota(id: string): Promise<{ ok: true } | { ok: fal
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { ok: false, error: 'Nota no encontrada' }
-  if (!puedeBorrarNota(existing, me.id, me.esCEO)) {
+  if (!puedeBorrarNota(existing, me.id, user.email)) {
     return { ok: false, error: 'No puedes borrar esta nota' }
   }
   const { error } = await service.from('notas_reuniones').delete().eq('id', id)
@@ -279,4 +279,32 @@ export async function chatearConNota(
   if (upErr) return { ok: false, error: upErr.message }
   revalidateNota(notaId)
   return { ok: true, messages: next }
+}
+
+/* Latido mientras se transcribe: "en vivo" durante 60 s más. Con
+   `activo=false` (pausa/detener) deja de figurar al instante. */
+export async function latidoTranscripcion(id: string, activo: boolean): Promise<void> {
+  await requireUser()
+  const service = createServiceClient() as Service
+  await service.from('notas_reuniones')
+    .update({ grabando_hasta: activo ? new Date(Date.now() + 60_000).toISOString() : null })
+    .eq('id', id)
+}
+
+/* Notas que alguien está transcribiendo AHORA (para el iconito en vivo). */
+export async function transcribiendoAhora(): Promise<{ notaId: string; autor: string; googleEventId: string | null; marcaReunionId: string | null }[]> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const me = await currentMember(service, user.id)
+  if (!me.id) return []
+  const { data } = await service.from('notas_reuniones')
+    .select('id, team_member_id, privada, google_event_id, marca_reunion_id, autor:team_members(nombre)')
+    .gt('grabando_hasta', new Date().toISOString())
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).filter((r) => puedeVerNota(r, me.id)).map((r) => ({
+    notaId: r.id as string,
+    autor: ((Array.isArray(r.autor) ? r.autor[0] : r.autor)?.nombre ?? 'Alguien') as string,
+    googleEventId: (r.google_event_id ?? null) as string | null,
+    marcaReunionId: (r.marca_reunion_id ?? null) as string | null,
+  }))
 }

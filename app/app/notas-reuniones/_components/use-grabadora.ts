@@ -18,7 +18,7 @@
    "[hh:mm] Ellos: …" (en presencial, sin etiqueta). No se guarda audio. */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { actualizarNota } from '../_actions'
+import { actualizarNota, latidoTranscripcion } from '../_actions'
 
 export type Modo = 'presencial' | 'virtual'
 export type Estado = 'idle' | 'grabando' | 'pausado'
@@ -253,6 +253,14 @@ export function useGrabadora(notaId: string, startedAt: string | null, inicial: 
 
   const pausar = useCallback(() => { liberar(); setEstado('pausado') }, [liberar])
   const detener = useCallback(() => { liberar(); setEstado('idle') }, [liberar])
+
+  /* Latido "transcribiendo en vivo" (el equipo ve el iconito animado). */
+  useEffect(() => {
+    if (estado !== 'grabando') return
+    void latidoTranscripcion(notaId, true)
+    const t = setInterval(() => { void latidoTranscripcion(notaId, true) }, 20_000)
+    return () => { clearInterval(t); void latidoTranscripcion(notaId, false) }
+  }, [estado, notaId])
 
   useEffect(() => () => {
     liberar()

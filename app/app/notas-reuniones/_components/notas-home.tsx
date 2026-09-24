@@ -7,12 +7,12 @@
    - "Pregunta a tus reuniones": preguntas sobre TODAS (o las de una marca). */
 
 import Link from 'next/link'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, FileText, Plus, Sparkles, ListChecks, Loader2, X, NotebookPen, Mic, Lock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, Plus, Sparkles, ListChecks, Loader2, X, NotebookPen, Mic, Lock, Trash2 } from 'lucide-react'
 import type { NotaReunion, ProximaItem } from '@/lib/notas-reuniones/types'
-import { crearNotaYRedirigir } from '../_actions'
+import { crearNotaYRedirigir, eliminarNota, transcribiendoAhora } from '../_actions'
 import { abrirNotaDeReunion, preguntarAReuniones } from '../_granola-actions'
 
 type Props = {
@@ -44,6 +44,22 @@ function extracto(md: string | null): string {
   return (l ?? '').replace(/^[-*•]\s+/, '').slice(0, 140)
 }
 
+type EnVivo = Awaited<ReturnType<typeof transcribiendoAhora>>[number]
+
+/* Iconito animado "transcribiendo en vivo" (barras de audio + punto rojo). */
+function IndicadorEnVivo({ autor, compacto = false }: { autor: string; compacto?: boolean }) {
+  return (
+    <span title={`${autor} está transcribiendo en vivo`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: compacto ? '1px 8px' : '2px 9px', borderRadius: 999, background: 'rgba(239,68,68,0.10)', color: '#dc2626', fontSize: 11.5, fontWeight: 650, whiteSpace: 'nowrap' }}>
+      <span className="mk-vivo-punto" style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+      <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 1.5, height: 11 }}>
+        {[0, 1, 2, 3].map((i) => <span key={i} className="mk-vivo-barra" style={{ width: 2, height: 11, borderRadius: 1, background: '#ef4444', animationDelay: `${i * 0.15}s` }} />)}
+      </span>
+      {autor.split(' ')[0]} transcribiendo
+    </span>
+  )
+}
+
 export function NotasHome({ proximas, notas, meNombre, marcas, superAdmin }: Props) {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
@@ -56,6 +72,31 @@ export function NotasHome({ proximas, notas, meNombre, marcas, superAdmin }: Pro
   const [respuesta, setRespuesta] = useState<{ texto: string; fuentes: { id: string; titulo: string }[] } | null>(null)
 
   const marcaPorId = useMemo(() => new Map(marcas.map((m) => [m.id, m])), [marcas])
+
+  /* Quién está transcribiendo ahora (cada 15 s). */
+  const [enVivo, setEnVivo] = useState<EnVivo[]>([])
+  useEffect(() => {
+    let vivo = true
+    const leer = () => transcribiendoAhora().then((r) => { if (vivo) setEnVivo(r) }).catch(() => {})
+    void leer()
+    const t = setInterval(leer, 15_000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [])
+  const vivoPorNota = useMemo(() => new Map(enVivo.map((v) => [v.notaId, v])), [enVivo])
+  const vivoDeProxima = (p: ProximaItem): EnVivo | null =>
+    (p.fuente === 'nota' ? vivoPorNota.get(p.id)
+      : enVivo.find((v) => (p.fuente === 'google_calendar' && v.googleEventId === p.id) || (p.fuente === 'marca_reuniones' && v.marcaReunionId === p.id))) ?? null
+
+  const [borrando, setBorrando] = useState<string | null>(null)
+  async function borrar(id: string, titulo: string) {
+    if (!confirm(`¿Borrar la nota "${titulo || 'Sin título'}"? No se puede deshacer.`)) return
+    setBorrando(id)
+    const r = await eliminarNota(id)
+    setBorrando(null)
+    if (!r.ok) { toast.error(r.error); return }
+    toast.success('Nota borrada')
+    router.refresh()
+  }
   const hoy = useMemo(() => limaParts(new Date().toISOString()).ymd, [])
   const ayer = useMemo(() => addDaysYmd(hoy, -1), [hoy])
   const proximasFiltradas = useMemo(() => {
@@ -190,6 +231,7 @@ export function NotasHome({ proximas, notas, meNombre, marcas, superAdmin }: Pro
                             <span style={{ display: 'block', fontSize: 12.5, marginTop: 1, color: ahora ? '#65a30d' : 'var(--mk-text-tertiary)', fontWeight: ahora ? 560 : 400 }}>
                               {ahora ? 'Ahora · ' : ''}{rango}{p.meetLink ? ' · Meet' : ''}
                             </span>
+                            {(() => { const v = vivoDeProxima(p); return v ? <span style={{ display: 'block', marginTop: 4 }}><IndicadorEnVivo autor={v.autor} compacto /></span> : null })()}
                           </span>
                           <span className="mk-proxima-accion" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--mk-text-tertiary)', whiteSpace: 'nowrap' }}>
                             {abriendo === k ? <Loader2 size={13} className="animate-spin" /> : <NotebookPen size={13} />} Tomar notas
@@ -209,6 +251,7 @@ export function NotasHome({ proximas, notas, meNombre, marcas, superAdmin }: Pro
             </button>
           )}
         </div>
+        <style>{'@keyframes mkVivoBarra{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}@keyframes mkVivoPunto{0%,100%{opacity:1}50%{opacity:.35}}.mk-vivo-barra{transform-origin:bottom;animation:mkVivoBarra .9s ease-in-out infinite}.mk-vivo-punto{animation:mkVivoPunto 1.2s ease-in-out infinite}.mk-nota-fila .mk-nota-borrar{opacity:0;transition:opacity .15s}.mk-nota-fila:hover .mk-nota-borrar{opacity:1}@media (hover:none){.mk-nota-fila .mk-nota-borrar{opacity:1}}'}</style>
         <style>{'.mk-proxima:hover{background:var(--mk-bg-hover)!important}.mk-proxima .mk-proxima-accion{opacity:0;transition:opacity .15s}.mk-proxima:hover .mk-proxima-accion{opacity:1}@media (hover:none){.mk-proxima .mk-proxima-accion{opacity:1}}'}</style>
       </section>
 
@@ -244,24 +287,33 @@ export function NotasHome({ proximas, notas, meNombre, marcas, superAdmin }: Pro
                 const marca = n.marcaId ? marcaPorId.get(n.marcaId) : null
                 const nTareas = n.acciones.filter((a) => a.tareaId).length
                 const resumen = extracto(n.resumen)
+                const vivo = vivoPorNota.get(n.id)
                 return (
-                  <li key={n.id}>
-                    <Link href={`/notas-reuniones/${n.id}`} style={{ display: 'grid', gridTemplateColumns: '28px 1fr auto', gap: 12, alignItems: 'center', padding: '12px 10px', borderRadius: 12, textDecoration: 'none', color: 'inherit' }}
+                  <li key={n.id} className="mk-nota-fila" style={{ position: 'relative' }}>
+                    <Link href={`/notas-reuniones/${n.id}`} style={{ display: 'grid', gridTemplateColumns: superAdmin ? '28px 1fr auto 28px' : '28px 1fr auto', gap: 12, alignItems: 'center', padding: '12px 10px', borderRadius: 12, textDecoration: 'none', color: 'inherit' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--mk-bg-hover)' }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-                      {n.resumen ? <Sparkles size={16} style={{ color: '#7170ff' }} /> : <FileText size={16} style={{ color: 'var(--mk-text-quaternary)' }} />}
+                      {vivo ? <Mic size={16} className="mk-vivo-punto" style={{ color: '#ef4444' }} /> : n.resumen ? <Sparkles size={16} style={{ color: '#7170ff' }} /> : <FileText size={16} style={{ color: 'var(--mk-text-quaternary)' }} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mk-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.titulo || 'Sin título'}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--mk-text-tertiary)', marginTop: 2, flexWrap: 'wrap' }}>
                           {marca && <span style={{ padding: '1px 8px', borderRadius: 999, background: 'var(--mk-bg-hover)', color: 'var(--mk-text-secondary)' }}>{marca.emoji ? `${marca.emoji} ` : ''}{marca.nombre}</span>}
                           {n.privada && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--mk-text-secondary)' }}><Lock size={11} /> Privada</span>}
-                          <span>{n.autorNombre || 'Yo'}{n.estado === 'en_curso' ? ' · En curso' : ''}</span>
+                          {vivo ? <IndicadorEnVivo autor={vivo.autor} /> : <span>{n.autorNombre || 'Yo'}</span>}
                           {nTareas > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ListChecks size={12} /> {nTareas} tarea{nTareas === 1 ? '' : 's'}</span>}
                         </div>
                         {resumen && <div style={{ fontSize: 12.5, color: 'var(--mk-text-tertiary)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{resumen}</div>}
                       </div>
                       <span style={{ fontSize: 12, color: 'var(--mk-text-quaternary)' }}>{limaParts(n.reunionInicio || n.updatedAt || n.createdAt).time}</span>
+                      {superAdmin && <span />}
                     </Link>
+                    {superAdmin && (
+                      <button type="button" className="mk-nota-borrar" title="Borrar nota (solo tú puedes)" disabled={borrando === n.id}
+                        onClick={() => void borrar(n.id, n.titulo)}
+                        style={{ ...btnIcon, position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#dc2626', background: 'var(--mk-bg-elevated)' }}>
+                        {borrando === n.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                      </button>
+                    )}
                   </li>
                 )
               })}
