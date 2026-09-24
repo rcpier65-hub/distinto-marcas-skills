@@ -600,8 +600,8 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
       getValidAccessToken(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
     ])
-  } catch { return [] }
-  if (!token) return []
+  } catch (e) { console.error('[gcal] listCalendarEvents: token falló', e); return [] }
+  if (!token) { console.error('[gcal] listCalendarEvents: sin token (refresh falló o tardó >6s)'); return [] }
 
   const grabCal = await getGrabacionesCalendarId(token)
   const calIds = [...new Set([grabCal, 'primary'])]
@@ -629,11 +629,14 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
         `${CAL_API}/calendars/${encodeURIComponent(calId)}/events?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) },
       )
-      if (!res.ok) return []
+      if (!res.ok) {
+        console.error('[gcal] listCalendarEvents', calId, 'HTTP', res.status, (await res.text().catch(() => '')).slice(0, 300))
+        return []
+      }
       const data = await res.json()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (data.items ?? []) as any[]
-    } catch { return [] }  /* best-effort */
+    } catch (e) { console.error('[gcal] listCalendarEvents', calId, e); return [] }  /* best-effort */
   }))
 
   const vistos = new Set<string>()

@@ -44,6 +44,23 @@ function tsALima(iso: string): { ymd: string; hm: string } {
   return { ymd, hm }
 }
 
+/* Marca de un evento de Google por su título: la que tenga más palabras de
+   su nombre/slug (de 4+ letras) presentes. Misma idea que sugerirMarca del
+   calendario (VincularGcal). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function marcaPorTitulo(titulo: string, marcas: any[]): any | null {
+  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  const t = norm(titulo)
+  let mejor = null
+  let mejorScore = 0
+  for (const m of marcas) {
+    const palabras = [...norm(String(m.nombre ?? '')).split(/\s+/), ...String(m.slug ?? '').split('-')].filter((w) => w.length > 3)
+    const score = new Set(palabras.filter((w) => t.includes(w))).size
+    if (score > mejorScore) { mejorScore = score; mejor = m }
+  }
+  return mejor
+}
+
 export default async function GrabacionesCalendarioPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
   await ensureAccesoModulo('publicaciones')
@@ -290,20 +307,30 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     if (ev.summary.startsWith('⭐')) continue  // fechas importantes (lib/calendario/gcal-sync)
     if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
     if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
+    /* Grabaciones y reuniones agendadas DIRECTO en Google (ej. "GRABACION
+       LOZANO") se muestran como grabación/reunión, con la marca adivinada por
+       el título — Pedro 24-sep-2026: "tiene grabación el viernes y no sale
+       como grabaciones". Siguen siendo de Google: se pueden Vincular. */
+    const tipoGoogle = /grabaci|grabar|rodaje/i.test(ev.summary) ? 'grabacion' as const
+      : /reuni|revisi/i.test(ev.summary) ? 'reunion' as const
+      : 'gcal' as const
+    const marcaG = tipoGoogle !== 'gcal' ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
+    if (marcaG && marcasPermitidas && !marcasPermitidas.has(marcaG.id)) continue
     eventos.push({
       id: ev.id,
-      tipo: 'gcal',
+      tipo: tipoGoogle,
+      origenGoogle: true,
       fecha: ev.fecha,
       hora: ev.hora,
       titulo: ev.summary,
-      marcaSlug: null,
-      marcaNombre: null,
-      marcaEmoji: null,
-      color: '#3b82f6',
+      marcaSlug: marcaG?.slug ?? null,
+      marcaNombre: marcaG?.nombre ?? null,
+      marcaEmoji: marcaG?.emoji_marca ?? null,
+      color: marcaG?.color_calendario ?? (tipoGoogle === 'grabacion' ? '#6366F1' : '#3b82f6'),
       estado: null,
       meetLink: ev.meetLink,
       videosGrabados: null,
-      notas: null,
+      notas: tipoGoogle !== 'gcal' ? 'Agendado en Google Calendar' : null,
       duracionMin: ev.durationMin,
     })
   }

@@ -34,6 +34,9 @@ export type AgendaEvento = {
   videosGrabados: number | null
   href?: string | null     // link interno (ej. tarea de diseño)
   duracionMin?: number | null  // eventos GCal: duración real (para vincular)
+  /* Evento que vive solo en Google (agendado allá) aunque se muestre como
+     grabación/reunión: se ofrece Vincular, no las acciones de la app. */
+  origenGoogle?: boolean
 }
 
 type MarcaLite = { slug: string; nombre: string; emoji: string | null; color: string }
@@ -392,10 +395,10 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
                   {e.notas && <p className="mt-1 text-[12.5px] text-muted-foreground line-clamp-2">{e.notas}</p>}
 
                   {/* Acciones por tipo (solo directores donde aplica) */}
-                  {e.tipo === 'gcal' && esDirector && (
+                  {(e.tipo === 'gcal' || e.origenGoogle) && esDirector && (
                     <VincularGcal e={e} marcasTodas={marcasTodas} />
                   )}
-                  {e.tipo === 'reunion' && esDirector && (
+                  {e.tipo === 'reunion' && !e.origenGoogle && esDirector && (
                     <ReunionAcciones e={e} />
                   )}
                 </div>
