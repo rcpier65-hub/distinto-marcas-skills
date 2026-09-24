@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -25,7 +25,7 @@ import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
-import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente, eliminarFechaImportanteCliente } from '../_actions'
+import { marcarPublicadoCliente, aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente, eliminarFechaImportanteCliente } from '../_actions'
 import type { MarcaCliente } from '@/lib/cliente/get-cliente'
 import { ClienteRealtime } from './cliente-realtime'
 import { DriveExplorer } from './drive-explorer'
@@ -2247,6 +2247,11 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
             )}
           </div>
 
+          {/* PUBLICARLO TÚ MISMO: descargar, copiar el texto y marcarlo publicado. */}
+          {!publicada && hayContenido && !modoCorr && (
+            <PublicarTuMismo p={p} color={color} videoDirecto={videoDirecto ?? null} />
+          )}
+
           {/* Panel de CORRECCIONES por segundo del video (Pedro 5-ago-2026). */}
           {modoCorr && (
             <div className="rounded-xl border p-3 space-y-3" style={{ borderColor: `${color}44`, background: `${color}08` }}>
@@ -2279,6 +2284,76 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
           {puedeAprobar && !aprobado && hayContenido && !modoCorr && !corrEnviadas && (
             <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Sparkles className="w-3 h-3" style={{ color }} /> Míralo y toca <strong>“Aprobar”</strong>, o usa <strong>“Mandar correcciones”</strong> si algo debe cambiar. El equipo recibe el aviso al instante.</p>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* Panel "Publícalo tú": el cliente baja el video y la portada, copia el texto,
+   lo sube a sus redes y marca "Ya lo publiqué" (con links opcionales).
+   Pedro 24-sep-2026: "quiero que el cliente mismo pueda publicar". */
+function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: string; videoDirecto: string | null }) {
+  const router = useRouter()
+  const [abierto, setAbierto] = useState(false)
+  const [ig, setIg] = useState('')
+  const [tt, setTt] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const portada = urlOk(p.portada)
+  const portadaDescarga = portada ? (driveId(portada) ? `https://drive.google.com/uc?export=download&id=${driveId(portada)}` : portada) : null
+  async function marcar() {
+    setEnviando(true)
+    const r = await marcarPublicadoCliente(p.id, { instagram: ig, tiktok: tt })
+    setEnviando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    toast.success('¡Listo! Quedó como publicado y el equipo ya lo sabe 🎉')
+    setAbierto(false)
+    router.refresh()
+  }
+  return (
+    <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: `${color}44`, background: `${color}08` }}>
+      <div className="flex items-center gap-2">
+        <Upload className="w-4 h-4 shrink-0" style={{ color }} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-extrabold" style={{ color }}>Publícalo tú mismo</div>
+          <div className="text-[11.5px] text-muted-foreground">Descarga el video y la portada, copia el texto y súbelo a tus redes.</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {videoDirecto && (
+          <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: color }}>
+            <Download className="w-3.5 h-3.5" /> Video
+          </a>
+        )}
+        {portadaDescarga && (
+          <a href={portadaDescarga} target="_blank" rel="noopener noreferrer" download
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
+            <ImageIcon className="w-3.5 h-3.5" /> Portada
+          </a>
+        )}
+        {p.copy && <span className="-mt-2"><CopiarTextoBtn texto={p.copy} color={color} /></span>}
+      </div>
+      {!abierto ? (
+        <button type="button" onClick={() => setAbierto(true)}
+          className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-bold text-[14px]"
+          style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', boxShadow: '0 6px 16px -6px rgba(99,102,241,0.6)' }}>
+          <CheckCircle2 className="w-4 h-4" /> Ya lo publiqué
+        </button>
+      ) : (
+        <div className="space-y-2 rounded-lg border bg-card p-2.5">
+          <div className="text-[11.5px] text-muted-foreground">Pega los links si quieres (opcional), así el equipo lo ve directo:</div>
+          <input value={ig} onChange={(e) => setIg(e.target.value)} placeholder="Link de Instagram (opcional)" inputMode="url"
+            className="w-full h-10 px-3 rounded-lg border bg-background text-[13px] focus:outline-none focus:ring-2 focus:ring-black/10" />
+          <input value={tt} onChange={(e) => setTt(e.target.value)} placeholder="Link de TikTok (opcional)" inputMode="url"
+            className="w-full h-10 px-3 rounded-lg border bg-background text-[13px] focus:outline-none focus:ring-2 focus:ring-black/10" />
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setAbierto(false)} className="flex-1 h-10 rounded-xl font-bold text-[13px] border hover:bg-muted transition-colors">Cancelar</button>
+            <button type="button" onClick={marcar} disabled={enviando}
+              className="flex-1 h-10 rounded-xl font-bold text-[13px] text-white disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }}>
+              {enviando ? 'Guardando…' : 'Marcar como publicado'}
+            </button>
+          </div>
         </div>
       )}
     </div>
