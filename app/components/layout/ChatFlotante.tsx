@@ -18,14 +18,17 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ImagePlus, Loader2, MessageCircle, Paperclip, Send, Smile, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, CheckCheck, ImagePlus, ListChecks, Loader2, MessageCircle, Palette, Paperclip, Scissors, Send, Smile, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import {
   detalleMensajeGrupo, enviarMensaje, enviarMensajeGrupo, getChatInicial, getConversacion, getConversacionGrupo,
-  marcarLeidos, marcarLeidosGrupo, prepararImagen, urlImagen,
+  marcarEntregados, marcarLeidos, marcarLeidosGrupo, prepararImagen, urlImagen,
 } from '@/lib/mensajes/actions'
-import { GRUPO_ID, GRUPO_NOMBRE, MENSAJE_MAX, rowToMensaje, rowToMensajeGrupo, vistaPrevia, type ChatInicial, type ContactoChat, type MensajeDirecto } from '@/lib/mensajes/types'
+import {
+  GRUPO_ID, GRUPO_NOMBRE, MENSAJE_MAX, estadoEnvio, rowToMensaje, rowToMensajeGrupo, vistaPrevia,
+  type ActividadChat, type ChatInicial, type ContactoChat, type EstadoEnvio, type LecturaGrupo, type MensajeDirecto,
+} from '@/lib/mensajes/types'
 import { comprimirImagen } from '@/lib/mensajes/comprimir'
 import { sonarMensaje } from '@/lib/sonido/sonidos'
 import { EmojiPanel } from './chat/EmojiPanel'
@@ -117,6 +120,36 @@ function colorNombre(id: string): string {
   return COLORES_NOMBRE[h % COLORES_NOMBRE.length]
 }
 
+function PuntoEnLinea() {
+  return <span aria-label="en línea" style={{ position: 'absolute', right: -1, bottom: -1, width: 10, height: 10, borderRadius: '50%', background: '#22c55e', border: '2px solid #fff' }} />
+}
+
+/* ✓ enviado · ✓✓ entregado · ✓✓ azul leído (como WhatsApp). */
+function Checks({ estado, sobreMorado = false, titulo }: { estado: EstadoEnvio; sobreMorado?: boolean; titulo?: string }) {
+  const leido = estado === 'leido'
+  const color = leido ? (sobreMorado ? '#a5f3fc' : '#0ea5e9') : sobreMorado ? 'rgba(255,255,255,0.75)' : '#94a3b8'
+  const Icono = estado === 'enviado' ? Check : CheckCheck
+  return (
+    <span title={titulo ?? (leido ? 'Leído' : estado === 'entregado' ? 'Entregado' : 'Enviado')} style={{ display: 'inline-flex', verticalAlign: '-2px', marginLeft: 3 }}>
+      <Icono size={14} strokeWidth={2.4} color={color} />
+    </span>
+  )
+}
+
+/* "Editando · 6. CRISTAL K9 · Kintu" bajo el nombre. */
+function LineaActividad({ a, size = 11 }: { a: ActividadChat; size?: number }) {
+  const Icono = a.tipo === 'editando' ? Scissors : a.tipo === 'disenando' ? Palette : ListChecks
+  const verbo = a.tipo === 'editando' ? 'Editando' : a.tipo === 'disenando' ? 'Diseñando' : 'Trabajando en'
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: size, color: '#059669', minWidth: 0 }}>
+      <Icono size={size + 1} style={{ flexShrink: 0 }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {verbo}: {a.texto}{a.marca ? ` · ${a.marca}` : ''}
+      </span>
+    </span>
+  )
+}
+
 /* Notificación del sistema generada por la propia app (no push): funciona
    mientras la app esté abierta aunque esté minimizada. Mismo `tag` que el push
    del servidor → si llegan los dos, el sistema muestra uno solo. */
@@ -150,6 +183,10 @@ export function ChatFlotante() {
   const [emojiAbierto, setEmojiAbierto] = useState(false)
   const [arrastrando, setArrastrando] = useState(false)
   const [visor, setVisor] = useState<string | null>(null)
+  /* Visto del grupo: hasta cuándo leyó cada miembro. */
+  const [lecturasGrupo, setLecturasGrupo] = useState<LecturaGrupo[]>([])
+  /* Quién tiene la app abierta ahora (presencia en vivo). */
+  const [enLinea, setEnLinea] = useState<Set<string>>(new Set())
   const isMobile = useSyncExternalStore(suscribirMobile, () => window.matchMedia(MQ_MOBILE).matches, () => false)
 
   const listaRef = useRef<HTMLDivElement>(null)
@@ -182,6 +219,7 @@ export function ChatFlotante() {
         : null,
     ])
     if (conv?.ok) {
+      if ('lecturas' in conv) setLecturasGrupo((conv as { lecturas: LecturaGrupo[] }).lecturas)
       const nuevos = conv.mensajes
       setMensajes((prev) => {
         const ids = new Set(prev.map((m) => m.id))
@@ -269,6 +307,7 @@ export function ChatFlotante() {
       const esParaMi = m.paraId === yoId
 
       if (esParaMi) {
+        if (!viendoEsta) void marcarEntregados()
         sonarMensaje()
         /* App en segundo plano (minimizada / otra pestaña) → aviso del sistema. */
         if (document.visibilityState !== 'visible') {
@@ -304,6 +343,33 @@ export function ChatFlotante() {
       tocarGrupo(m, yoId, !mio && !viendo)
     }
 
+    const onVisto = (payload: { new: unknown }) => {
+      const m = rowToMensaje(payload.new)
+      setMensajes((prev) => prev.map((x) => (x.id === m.id ? { ...x, leidoAt: m.leidoAt, entregadoAt: m.entregadoAt } : x)))
+      setChat((prev) => prev && {
+        ...prev,
+        contactos: prev.contactos.map((c) => (c.id === m.paraId && c.ultimo?.esMio && c.ultimo.createdAt === m.createdAt
+          ? { ...c, ultimo: { ...c.ultimo, estado: estadoEnvio(m) } } : c)),
+      })
+    }
+    const onLecturaGrupo = (payload: { new: unknown }) => {
+      const l = payload.new as { team_member_id?: string; leido_hasta?: string } | null
+      if (!l?.team_member_id) return
+      setLecturasGrupo((prev) => {
+        const existe = prev.some((x) => x.id === l.team_member_id)
+        const nombre = chatRef.current?.contactos.find((c) => c.id === l.team_member_id)?.nombre ?? ''
+        return existe
+          ? prev.map((x) => (x.id === l.team_member_id ? { ...x, leidoHasta: l.leido_hasta ?? x.leidoHasta } : x))
+          : [...prev, { id: l.team_member_id!, nombre, leidoHasta: l.leido_hasta ?? null }]
+      })
+    }
+
+    /* Presencia: quién tiene la app abierta ("en línea"). */
+    const presencia = supabase.channel('presencia-equipo', { config: { presence: { key: yoId } } })
+    presencia
+      .on('presence', { event: 'sync' }, () => setEnLinea(new Set(Object.keys(presencia.presenceState()))))
+      .subscribe((estado) => { if (estado === 'SUBSCRIBED') void presencia.track({ en: Date.now() }) })
+
     /* La conexión en vivo se puede caer (Mac en reposo, cambio de wifi, app
        en segundo plano). Si el canal falla o se cierra, lo rearmamos y
        re-sincronizamos para no perder mensajes. */
@@ -322,6 +388,12 @@ export function ChatFlotante() {
         .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'mensajes_directos', filter: `de_id=eq.${yoId}` }, onInsert)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'mensajes_grupo' }, onInsertGrupo)
+        // ✓✓ en vivo: la otra persona recibió / leyó lo que mandé.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on('postgres_changes' as any, { event: 'UPDATE', schema: 'public', table: 'mensajes_directos', filter: `de_id=eq.${yoId}` }, onVisto)
+        // Visto del grupo.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'mensajes_grupo_lecturas' }, onLecturaGrupo)
         .subscribe((estado) => {
           if (cerrado) return
           if (estado === 'SUBSCRIBED') {
@@ -356,6 +428,7 @@ export function ChatFlotante() {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', onOnline)
       if (canal) void supabase.removeChannel(canal)
+      void supabase.removeChannel(presencia)
     }
   }, [yoId, tocarContacto, tocarGrupo, resincronizar, agregarMensaje])
 
@@ -369,7 +442,7 @@ export function ChatFlotante() {
     const grupo = id === GRUPO_ID
     const r = grupo ? await getConversacionGrupo() : await getConversacion(id)
     setCargandoConv(false)
-    if (r.ok) setMensajes(r.mensajes)
+    if (r.ok) { setMensajes(r.mensajes); if ('lecturas' in r) setLecturasGrupo((r as { lecturas: LecturaGrupo[] }).lecturas) }
     else toast.error(r.error)
     if (grupo) {
       setChat((prev) => prev && { ...prev, grupo: { ...prev.grupo, noLeidos: 0 } })
@@ -500,6 +573,16 @@ export function ChatFlotante() {
     }
   }
 
+  /* Estado del ✓ de un mensaje mío. En el grupo: azul cuando lo leyeron todos. */
+  function vistoDe(m: MensajeDirecto): { estado: EstadoEnvio; titulo?: string } {
+    if (m.paraId !== GRUPO_ID) return { estado: estadoEnvio(m) }
+    const otros = lecturasGrupo.filter((l) => l.id !== yoId)
+    const leyeron = otros.filter((l) => l.leidoHasta && l.leidoHasta >= m.createdAt)
+    const estado: EstadoEnvio = otros.length > 0 && leyeron.length === otros.length ? 'leido' : leyeron.length > 0 ? 'entregado' : 'enviado'
+    const titulo = leyeron.length ? `Visto por: ${leyeron.map((l) => l.nombre.split(' ')[0]).join(', ')}` : 'Enviado'
+    return { estado, titulo }
+  }
+
   if (!chat) return null
 
   const PANEL_W = 380
@@ -602,9 +685,23 @@ export function ChatFlotante() {
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <Avatar c={activo} size={30} />
-                <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {activo.nombre}
+                <span style={{ position: 'relative', lineHeight: 0 }}>
+                  <Avatar c={activo} size={30} />
+                  {!esGrupo && enLinea.has(activo.id) && <PuntoEnLinea />}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activo.nombre}
+                  </div>
+                  {esGrupo ? (
+                    <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {chat.contactos.length + 1} miembros{enLinea.size > 1 ? ` · ${enLinea.size - (enLinea.has(yoId ?? '') ? 1 : 0)} en línea` : ''}
+                    </div>
+                  ) : chat.contactos.find((c) => c.id === activo.id)?.actividad ? (
+                    <LineaActividad a={chat.contactos.find((c) => c.id === activo.id)!.actividad!} />
+                  ) : (
+                    <div style={{ fontSize: 11, color: enLinea.has(activo.id) ? '#059669' : '#94a3b8' }}>{enLinea.has(activo.id) ? 'en línea' : 'desconectado'}</div>
+                  )}
                 </div>
               </>
             ) : (
@@ -648,7 +745,10 @@ export function ChatFlotante() {
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa' }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                 >
-                  <Avatar c={c} />
+                  <span style={{ position: 'relative', lineHeight: 0 }}>
+                    <Avatar c={c} />
+                    {c.id !== GRUPO_ID && enLinea.has(c.id) && <PuntoEnLinea />}
+                  </span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                       <span style={{
@@ -663,12 +763,14 @@ export function ChatFlotante() {
                         </span>
                       )}
                     </span>
+                    {c.actividad && <span style={{ display: 'block', marginTop: 1 }}><LineaActividad a={c.actividad} size={10.5} /></span>}
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                       <span style={{
                         flex: 1, minWidth: 0, fontSize: 12, color: c.noLeidos ? '#334155' : '#64748b',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {c.ultimo ? `${c.ultimo.esMio ? 'Tú: ' : ''}${c.ultimo.texto}` : c.id === GRUPO_ID ? 'Mensaje para todo el equipo' : 'Escríbele un mensaje'}
+                        {c.ultimo?.esMio && c.ultimo.estado && c.id !== GRUPO_ID && <Checks estado={c.ultimo.estado} />}
+                        {c.ultimo ? ` ${c.ultimo.esMio ? 'Tú: ' : ''}${c.ultimo.texto}` : c.id === GRUPO_ID ? 'Mensaje para todo el equipo' : 'Escríbele un mensaje'}
                       </span>
                       {c.noLeidos > 0 && (
                         <span style={{
@@ -720,7 +822,7 @@ export function ChatFlotante() {
                         {grande ? (
                           <div style={{ textAlign: mio ? 'right' : 'left' }}>
                             <div style={{ fontSize: 40, lineHeight: 1.15 }}>{m.texto.trim()}</div>
-                            <span style={{ fontSize: 10, color: '#94a3b8' }}>{horaLima(m.createdAt)}</span>
+                            <span style={{ fontSize: 10, color: '#94a3b8' }}>{horaLima(m.createdAt)}{mio && <Checks {...vistoDe(m)} />}</span>
                           </div>
                         ) : (
                           <div style={{
@@ -765,6 +867,7 @@ export function ChatFlotante() {
                                 color: mio ? 'rgba(255,255,255,0.75)' : '#94a3b8',
                               }}>
                                 {horaLima(m.createdAt)}
+                                {mio && <Checks sobreMorado {...vistoDe(m)} />}
                               </span>
                             </div>
                           </div>

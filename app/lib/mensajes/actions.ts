@@ -8,10 +8,12 @@
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { enviarPushAMiembroId } from '@/lib/push/send'
+import { actividadEquipo } from './actividad'
 import { MAX_BYTES, TIPOS_IMAGEN, borrarArchivo, prepararSubida, urlsDeLectura, type SubidaPreparada } from './almacen'
 import {
   GRUPO_ID, GRUPO_NOMBRE, MENSAJE_GRUPO_SELECT, MENSAJE_MAX, MENSAJE_SELECT, rowToMensaje, rowToMensajeGrupo, vistaPrevia,
-  type AdjuntoEnviado, type ChatInicial, type ContactoChat, type MensajeDirecto,
+  estadoEnvio,
+  type AdjuntoEnviado, type ChatInicial, type ContactoChat, type LecturaGrupo, type MensajeDirecto,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,7 +51,11 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
     const yo = await miembroActual(service)
     if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
 
-    const [{ data: miembros }, { data: recientes }, grupo] = await Promise.all([
+    /* Abrir la app = los mensajes que me mandaron ya me "llegaron" (✓✓). */
+    await service.from('mensajes_directos').update({ entregado_at: new Date().toISOString() })
+      .eq('para_id', yo.id).is('entregado_at', null)
+
+    const [{ data: miembros }, { data: recientes }, grupo, actividad] = await Promise.all([
       service
         .from('team_members')
         .select('id, nombre, avatar_url, rol_base')
@@ -63,6 +69,7 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
         .order('created_at', { ascending: false })
         .limit(1000),
       resumenGrupo(service, yo.id),
+      actividadEquipo(service),
     ])
 
     const mensajes: MensajeDirecto[] = (recientes ?? []).map(rowToMensaje)
@@ -75,8 +82,9 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
         nombre: m.nombre,
         avatarUrl: m.avatar_url ?? null,
         rolBase: m.rol_base ?? null,
-        ultimo: u ? { texto: vistaPrevia(u.texto, !!u.adjunto), createdAt: u.createdAt, esMio: u.deId === yo.id } : null,
+        ultimo: u ? { texto: vistaPrevia(u.texto, !!u.adjunto), createdAt: u.createdAt, esMio: u.deId === yo.id, estado: estadoEnvio(u) } : null,
         noLeidos: conEl.filter((x) => x.paraId === yo.id && !x.leidoAt).length,
+        actividad: actividad.get(m.id) ?? null,
       }
     })
 
@@ -238,7 +246,7 @@ export async function marcarLeidos(otroId: string): Promise<Result<object>> {
 
     const { error } = await service
       .from('mensajes_directos')
-      .update({ leido_at: new Date().toISOString() })
+      .update({ leido_at: new Date().toISOString(), entregado_at: new Date().toISOString() })
       .eq('de_id', otroId)
       .eq('para_id', yo.id)
       .is('leido_at', null)
@@ -278,7 +286,7 @@ async function nombresDe(service: Service, ids: string[]): Promise<Map<string, s
   return new Map(((data ?? []) as { id: string; nombre: string }[]).map((m) => [m.id, m.nombre]))
 }
 
-export async function getConversacionGrupo(): Promise<Result<{ mensajes: MensajeDirecto[] }>> {
+export async function getConversacionGrupo(): Promise<Result<{ mensajes: MensajeDirecto[]; lecturas: LecturaGrupo[] }>> {
   try {
     const service = createServiceClient() as Service
     const yo = await miembroActual(service)
@@ -289,7 +297,13 @@ export async function getConversacionGrupo(): Promise<Result<{ mensajes: Mensaje
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = ((data ?? []) as any[]).reverse()
     const nombres = await nombresDe(service, rows.map((r) => r.de_id))
-    return { ok: true, mensajes: await firmar(rows.map((r) => rowToMensajeGrupo(r, nombres.get(r.de_id)))) }
+    const [{ data: equipo }, { data: lect }] = await Promise.all([
+      service.from('team_members').select('id, nombre').eq('activo', true),
+      service.from('mensajes_grupo_lecturas').select('team_member_id, leido_hasta'),
+    ])
+    const hasta = new Map(((lect ?? []) as { team_member_id: string; leido_hasta: string }[]).map((l) => [l.team_member_id, l.leido_hasta]))
+    const lecturas: LecturaGrupo[] = ((equipo ?? []) as { id: string; nombre: string }[]).map((m) => ({ id: m.id, nombre: m.nombre, leidoHasta: hasta.get(m.id) ?? null }))
+    return { ok: true, mensajes: await firmar(rows.map((r) => rowToMensajeGrupo(r, nombres.get(r.de_id)))), lecturas }
   } catch (e) {
     console.error('[mensajes] getConversacionGrupo', e)
     return { ok: false, error: 'No se pudo cargar el chat del equipo.' }
@@ -368,5 +382,19 @@ export async function detalleMensajeGrupo(id: string): Promise<Result<{ deNombre
   } catch (e) {
     console.error('[mensajes] detalleMensajeGrupo', e)
     return { ok: false, error: 'No se pudo cargar.' }
+  }
+}
+
+/* Me llegó un mensaje por Realtime → marcarlo entregado (✓✓ gris al que lo mandó). */
+export async function marcarEntregados(): Promise<Result<object>> {
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    await service.from('mensajes_directos').update({ entregado_at: new Date().toISOString() }).eq('para_id', yo.id).is('entregado_at', null)
+    return { ok: true }
+  } catch (e) {
+    console.error('[mensajes] marcarEntregados', e)
+    return { ok: false, error: 'No se pudo actualizar.' }
   }
 }

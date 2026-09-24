@@ -20,17 +20,32 @@ export type MensajeDirecto = {
   paraId: string
   texto: string
   leidoAt: string | null
+  /* Le llegó a la app de la otra persona (✓✓ gris). */
+  entregadoAt: string | null
   createdAt: string
   adjunto: Adjunto | null
 }
+
+/* Estado de un mensaje mío: ✓ enviado · ✓✓ entregado · ✓✓ azul leído. */
+export type EstadoEnvio = 'enviado' | 'entregado' | 'leido'
+export function estadoEnvio(m: Pick<MensajeDirecto, 'leidoAt' | 'entregadoAt'>): EstadoEnvio {
+  return m.leidoAt ? 'leido' : m.entregadoAt ? 'entregado' : 'enviado'
+}
+
+/* Lo que está haciendo la persona (se muestra bajo su nombre). */
+export type ActividadChat = { tipo: 'editando' | 'disenando' | 'tarea'; texto: string; marca: string | null }
+
+/* Hasta cuándo leyó cada miembro el grupo (para el visto del grupo). */
+export type LecturaGrupo = { id: string; nombre: string; leidoHasta: string | null }
 
 export type ContactoChat = {
   id: string
   nombre: string
   avatarUrl: string | null
   rolBase: string | null
-  ultimo: { texto: string; createdAt: string; esMio: boolean } | null
+  ultimo: { texto: string; createdAt: string; esMio: boolean; estado?: EstadoEnvio } | null
   noLeidos: number
+  actividad?: ActividadChat | null
 }
 
 export type ChatInicial = {
@@ -44,7 +59,7 @@ export type ChatInicial = {
 /* Lo que el navegador manda al enviar una imagen ya subida. */
 export type AdjuntoEnviado = { ref: string; tipo: string; ancho: number; alto: number; bytes: number }
 
-export const MENSAJE_SELECT = 'id, de_id, para_id, texto, leido_at, created_at, adjunto_path, adjunto_tipo, adjunto_ancho, adjunto_alto'
+export const MENSAJE_SELECT = 'id, de_id, para_id, texto, leido_at, entregado_at, created_at, adjunto_path, adjunto_tipo, adjunto_ancho, adjunto_alto'
 export const MENSAJE_MAX = 4000
 
 /* Texto de vista previa (lista de chats, push): "📷 Foto" si es imagen. */
@@ -62,6 +77,7 @@ export function rowToMensaje(r: any): MensajeDirecto {
     paraId: r.para_id,
     texto: r.texto ?? '',
     leidoAt: r.leido_at ?? null,
+    entregadoAt: r.entregado_at ?? r.leido_at ?? null,
     createdAt: r.created_at,
     adjunto: r.adjunto_path
       ? { ref: r.adjunto_path, tipo: r.adjunto_tipo ?? 'image/webp', ancho: r.adjunto_ancho ?? null, alto: r.adjunto_alto ?? null, url: null }
