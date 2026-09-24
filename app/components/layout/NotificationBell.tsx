@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Bell, CalendarClock, Scissors, ClipboardList, LifeBuoy, X } from 'lucide-react'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
+import { sonarAviso } from '@/lib/sonido/sonidos'
 
 const ICONO: Record<Notificacion['tipo'], typeof Bell> = {
   grabacion: CalendarClock,
@@ -33,6 +34,16 @@ export function NotificationBell({ notificaciones }: { notificaciones: Notificac
 
   const total = notificaciones.length
   const altas = notificaciones.filter((n) => n.urgencia === 'alta').length
+
+  /* Suena cuando aparece un aviso URGENTE nuevo (la lista se refresca sola por
+     Realtime). No suena al abrir la app, solo ante novedades. Pedro 24-sep-2026. */
+  const idsAltasPrevios = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const ids = new Set(notificaciones.filter((n) => n.urgencia === 'alta').map((n) => n.id))
+    const previos = idsAltasPrevios.current
+    if (previos && [...ids].some((id) => !previos.has(id))) sonarAviso()
+    idsAltasPrevios.current = ids
+  }, [notificaciones])
 
   function toggle() {
     if (!open && btnRef.current) {

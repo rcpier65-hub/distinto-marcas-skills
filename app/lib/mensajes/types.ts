@@ -1,5 +1,13 @@
 /* Tipos del chat interno (mensajes directos 1 a 1 entre miembros del equipo). */
 
+export type Adjunto = {
+  ref: string            // 'sb:chat/<de_id>/<uuid>.webp'
+  tipo: string           // image/webp, image/jpeg…
+  ancho: number | null
+  alto: number | null
+  url: string | null     // URL firmada de lectura (la pone el servidor)
+}
+
 export type MensajeDirecto = {
   id: string
   deId: string
@@ -7,6 +15,7 @@ export type MensajeDirecto = {
   texto: string
   leidoAt: string | null
   createdAt: string
+  adjunto: Adjunto | null
 }
 
 export type ContactoChat = {
@@ -24,8 +33,18 @@ export type ChatInicial = {
   totalNoLeidos: number
 }
 
-export const MENSAJE_SELECT = 'id, de_id, para_id, texto, leido_at, created_at'
+/* Lo que el navegador manda al enviar una imagen ya subida. */
+export type AdjuntoEnviado = { ref: string; tipo: string; ancho: number; alto: number; bytes: number }
+
+export const MENSAJE_SELECT = 'id, de_id, para_id, texto, leido_at, created_at, adjunto_path, adjunto_tipo, adjunto_ancho, adjunto_alto'
 export const MENSAJE_MAX = 4000
+
+/* Texto de vista previa (lista de chats, push): "📷 Foto" si es imagen. */
+export function vistaPrevia(texto: string, conAdjunto: boolean): string {
+  const t = texto.trim()
+  if (!conAdjunto) return t
+  return t ? `📷 ${t}` : '📷 Foto'
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToMensaje(r: any): MensajeDirecto {
@@ -33,8 +52,11 @@ export function rowToMensaje(r: any): MensajeDirecto {
     id: r.id,
     deId: r.de_id,
     paraId: r.para_id,
-    texto: r.texto,
+    texto: r.texto ?? '',
     leidoAt: r.leido_at ?? null,
     createdAt: r.created_at,
+    adjunto: r.adjunto_path
+      ? { ref: r.adjunto_path, tipo: r.adjunto_tipo ?? 'image/webp', ancho: r.adjunto_ancho ?? null, alto: r.adjunto_alto ?? null, url: null }
+      : null,
   }
 }

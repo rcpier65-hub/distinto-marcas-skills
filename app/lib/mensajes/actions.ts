@@ -8,9 +8,10 @@
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { enviarPushAMiembroId } from '@/lib/push/send'
+import { MAX_BYTES, TIPOS_IMAGEN, borrarArchivo, prepararSubida, urlsDeLectura, type SubidaPreparada } from './almacen'
 import {
-  MENSAJE_MAX, MENSAJE_SELECT, rowToMensaje,
-  type ChatInicial, type ContactoChat, type MensajeDirecto,
+  MENSAJE_MAX, MENSAJE_SELECT, rowToMensaje, vistaPrevia,
+  type AdjuntoEnviado, type ChatInicial, type ContactoChat, type MensajeDirecto,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,6 +20,14 @@ type Result<T> = ({ ok: true } & T) | { ok: false; error: string }
 
 // Los ids viajan a filtros PostgREST (.or) → solo aceptamos UUIDs.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/* Completa la URL firmada de lectura de los mensajes con imagen. */
+async function firmar(mensajes: MensajeDirecto[]): Promise<MensajeDirecto[]> {
+  const refs = mensajes.filter((m) => m.adjunto).map((m) => m.adjunto!.ref)
+  if (refs.length === 0) return mensajes
+  const urls = await urlsDeLectura(refs)
+  return mensajes.map((m) => (m.adjunto ? { ...m, adjunto: { ...m.adjunto, url: urls.get(m.adjunto.ref) ?? null } } : m))
+}
 
 async function miembroActual(service: Service): Promise<{ id: string; nombre: string } | null> {
   const user = await requireUser()
@@ -65,7 +74,7 @@ export async function getChatInicial(): Promise<Result<{ data: ChatInicial }>> {
         nombre: m.nombre,
         avatarUrl: m.avatar_url ?? null,
         rolBase: m.rol_base ?? null,
-        ultimo: u ? { texto: u.texto, createdAt: u.createdAt, esMio: u.deId === yo.id } : null,
+        ultimo: u ? { texto: vistaPrevia(u.texto, !!u.adjunto), createdAt: u.createdAt, esMio: u.deId === yo.id } : null,
         noLeidos: conEl.filter((x) => x.paraId === yo.id && !x.leidoAt).length,
       }
     })
@@ -108,17 +117,37 @@ export async function getConversacion(otroId: string): Promise<Result<{ mensajes
       .limit(100)
     if (error) throw error
 
-    return { ok: true, mensajes: (data ?? []).map(rowToMensaje).reverse() }
+    return { ok: true, mensajes: await firmar((data ?? []).map(rowToMensaje).reverse()) }
   } catch (e) {
     console.error('[mensajes] getConversacion', e)
     return { ok: false, error: 'No se pudo cargar la conversación.' }
   }
 }
 
-export async function enviarMensaje(paraId: string, texto: string): Promise<Result<{ mensaje: MensajeDirecto }>> {
+/* Paso 1 de enviar una imagen: el servidor da una URL firmada y el navegador
+   sube el archivo (ya comprimido) directo al almacén. */
+export async function prepararImagen(tipo: string, bytes: number): Promise<Result<{ subida: SubidaPreparada }>> {
+  if (!(TIPOS_IMAGEN as readonly string[]).includes(tipo)) return { ok: false, error: 'Solo se pueden enviar imágenes.' }
+  if (!(bytes > 0 && bytes <= MAX_BYTES)) return { ok: false, error: 'La imagen pesa más de 5 MB.' }
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    return { ok: true, subida: await prepararSubida(yo.id, tipo) }
+  } catch (e) {
+    console.error('[mensajes] prepararImagen', e)
+    return { ok: false, error: 'No se pudo preparar la imagen.' }
+  }
+}
+
+export async function enviarMensaje(
+  paraId: string,
+  texto: string,
+  adjunto?: AdjuntoEnviado | null,
+): Promise<Result<{ mensaje: MensajeDirecto }>> {
   if (!UUID.test(paraId)) return { ok: false, error: 'Contacto inválido.' }
   const limpio = texto.trim()
-  if (!limpio) return { ok: false, error: 'El mensaje está vacío.' }
+  if (!limpio && !adjunto) return { ok: false, error: 'El mensaje está vacío.' }
   if (limpio.length > MENSAJE_MAX) return { ok: false, error: `Máximo ${MENSAJE_MAX} caracteres.` }
 
   try {
@@ -127,29 +156,73 @@ export async function enviarMensaje(paraId: string, texto: string): Promise<Resu
     if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
     if (paraId === yo.id) return { ok: false, error: 'No puedes escribirte a ti mismo.' }
 
+    /* La imagen tiene que estar en la carpeta del que envía (la dio
+       prepararImagen): nadie puede adjuntar archivos de otro. */
+    if (adjunto) {
+      const valido = adjunto.ref.startsWith(`sb:${yo.id}/`) && !adjunto.ref.includes('..')
+        && (TIPOS_IMAGEN as readonly string[]).includes(adjunto.tipo)
+        && adjunto.bytes > 0 && adjunto.bytes <= MAX_BYTES
+      if (!valido) return { ok: false, error: 'Imagen inválida.' }
+    }
+
     const { data: destino } = await service
       .from('team_members').select('id').eq('id', paraId).eq('activo', true).maybeSingle()
     if (!destino) return { ok: false, error: 'Esa persona ya no está en el equipo.' }
 
     const { data, error } = await service
       .from('mensajes_directos')
-      .insert({ de_id: yo.id, para_id: paraId, texto: limpio })
+      .insert({
+        de_id: yo.id,
+        para_id: paraId,
+        texto: limpio,
+        ...(adjunto ? {
+          adjunto_path: adjunto.ref,
+          adjunto_tipo: adjunto.tipo,
+          adjunto_ancho: Math.round(adjunto.ancho) || null,
+          adjunto_alto: Math.round(adjunto.alto) || null,
+          adjunto_bytes: adjunto.bytes,
+        } : {}),
+      })
       .select(MENSAJE_SELECT)
       .single()
-    if (error) throw error
+    if (error) {
+      if (adjunto) await borrarArchivo(adjunto.ref).catch(() => {})
+      throw error
+    }
 
     // Aviso push al destinatario; tocarlo abre el chat con quien escribió.
+    const previa = vistaPrevia(limpio, !!adjunto)
     await enviarPushAMiembroId(paraId, {
       title: `💬 ${yo.nombre}`,
-      body: limpio.length > 140 ? `${limpio.slice(0, 137)}…` : limpio,
+      body: previa.length > 140 ? `${previa.slice(0, 137)}…` : previa,
       url: `/inicio?chat=${yo.id}`,
       tag: `chat-${yo.id}`,
     })
 
-    return { ok: true, mensaje: rowToMensaje(data) }
+    const [mensaje] = await firmar([rowToMensaje(data)])
+    return { ok: true, mensaje }
   } catch (e) {
     console.error('[mensajes] enviarMensaje', e)
     return { ok: false, error: 'No se pudo enviar el mensaje.' }
+  }
+}
+
+/* URL de una imagen que llegó por Realtime (el evento trae la ruta, no la
+   URL firmada). Solo para participantes del mensaje. */
+export async function urlImagen(mensajeId: string): Promise<Result<{ url: string }>> {
+  if (!UUID.test(mensajeId)) return { ok: false, error: 'Mensaje inválido.' }
+  try {
+    const service = createServiceClient() as Service
+    const yo = await miembroActual(service)
+    if (!yo) return { ok: false, error: 'Tu usuario no está en el equipo.' }
+    const { data } = await service
+      .from('mensajes_directos').select('de_id, para_id, adjunto_path').eq('id', mensajeId).maybeSingle()
+    if (!data?.adjunto_path || (data.de_id !== yo.id && data.para_id !== yo.id)) return { ok: false, error: 'No encontrado.' }
+    const url = (await urlsDeLectura([data.adjunto_path])).get(data.adjunto_path)
+    return url ? { ok: true, url } : { ok: false, error: 'No se pudo cargar la imagen.' }
+  } catch (e) {
+    console.error('[mensajes] urlImagen', e)
+    return { ok: false, error: 'No se pudo cargar la imagen.' }
   }
 }
 

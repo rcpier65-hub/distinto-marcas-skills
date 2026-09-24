@@ -106,11 +106,18 @@ self.addEventListener('push', (event) => {
     icon: data.icon || '/icons/icon-192.png',
     badge: '/favicon-32.png',
     vibrate: [200, 100, 200],
+    /* Con sonido del sistema (celular y Mac). */
+    silent: false,
     tag: data.tag || undefined,
     renotify: !!data.tag,
     data: { url: data.url || '/publicaciones/publicar-hoy' },
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  /* Avisar a las ventanas abiertas de la app para que suenen (SonidosBridge).
+     Pedro 24-sep-2026: "quiero que suene cuando llega una notificación". */
+  const avisarVentanas = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+    for (const w of wins) w.postMessage({ type: 'push-recibido', tag: data.tag || null })
+  })
+  event.waitUntil(Promise.all([self.registration.showNotification(title, options), avisarVentanas]))
 })
 
 self.addEventListener('notificationclick', (event) => {
