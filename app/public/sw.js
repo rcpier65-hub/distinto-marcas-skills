@@ -9,7 +9,10 @@
  * algunos browsers (Safari macOS) muestran el icono más opaco en el
  * dock. Con SW + manifest se ve como app nativa. */
 
-const CACHE_VERSION = 'distinto-v1'
+/* v2 (24-sep-2026): se descartan las cachés viejas, que podían tener guardado
+   un CSS/JS FALLIDO (404 en pleno cambio de versión) → la app salía sin
+   estilos ("pantalla en blanco con letras") hasta borrar la caché. */
+const CACHE_VERSION = 'distinto-v2'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 
 const STATIC_ASSETS = [
@@ -63,8 +66,11 @@ self.addEventListener('fetch', (event) => {
       caches.match(req).then((cached) =>
         cached ||
         fetch(req).then((res) => {
-          const copy = res.clone()
-          caches.open(STATIC_CACHE).then((c) => c.put(req, copy))
+          /* Solo guardamos respuestas BUENAS: nunca un 404/500. */
+          if (res.ok) {
+            const copy = res.clone()
+            caches.open(STATIC_CACHE).then((c) => c.put(req, copy))
+          }
           return res
         })
       )
