@@ -7,6 +7,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export type VistaAgenda = 'dia' | 'semana' | 'mes'
 
@@ -69,36 +70,49 @@ export function RangoNav({ vista, desde }: { vista: VistaAgenda; desde: string }
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Selector de vista */}
-      <div className="inline-flex rounded-lg border border-border overflow-hidden">
-        {VISTAS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            onClick={() => go(v.id, rangoDe(v.id, desde))}
-            className={`h-8 px-3 text-xs font-medium ${
-              v.id === vista ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
+      {/* Selector de vista: control segmentado (estilo Linear / Google). */}
+      <div role="tablist" aria-label="Vista del calendario" className="inline-flex items-center p-0.5 rounded-lg bg-muted/70 border border-border">
+        {VISTAS.map((v) => {
+          const activa = v.id === vista
+          return (
+            <button
+              key={v.id}
+              type="button"
+              role="tab"
+              aria-selected={activa}
+              onClick={() => go(v.id, rangoDe(v.id, desde))}
+              className={`h-8 px-3.5 rounded-md text-[13px] font-medium transition-all ${
+                activa
+                  ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {v.label}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Navegación del rango */}
+      {/* Navegación del rango: Hoy · ‹ › */}
       <div className="inline-flex items-center gap-1">
-        <button type="button" onClick={() => mover(-1)} className="h-8 w-8 rounded border hover:bg-muted text-sm" title="Anterior">←</button>
-        <button type="button" onClick={() => mover(1)} className="h-8 w-8 rounded border hover:bg-muted text-sm" title="Siguiente">→</button>
-        {!esHoy && (
-          <button
-            type="button"
-            onClick={() => go(vista, rangoDe(vista, hoy))}
-            className="h-8 px-2.5 rounded border border-primary text-primary text-xs ml-1"
-            title="Volver a hoy"
-          >
-            Hoy
+        <button
+          type="button"
+          onClick={() => go(vista, rangoDe(vista, hoy))}
+          disabled={esHoy}
+          className="h-9 px-3 rounded-lg border border-border bg-card text-[13px] font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-default disabled:hover:bg-card"
+          title="Volver a hoy"
+        >
+          Hoy
+        </button>
+        <div className="inline-flex items-center rounded-lg border border-border bg-card overflow-hidden">
+          <button type="button" onClick={() => mover(-1)} className="h-9 w-9 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Anterior" aria-label="Anterior">
+            <ChevronLeft className="w-4 h-4" />
           </button>
-        )}
+          <span className="w-px h-5 bg-border" aria-hidden />
+          <button type="button" onClick={() => mover(1)} className="h-9 w-9 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Siguiente" aria-label="Siguiente">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   )

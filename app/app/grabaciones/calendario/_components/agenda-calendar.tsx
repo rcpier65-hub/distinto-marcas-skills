@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import type { VistaAgenda } from './rango-nav'
 import { vincularEventoGcal, editarReunionCal, eliminarReunionCal } from '../_actions'
 import { EventoModal } from './evento-modal'
+import { CalendarDays, Megaphone, Palette, Star, Users, Video, type LucideIcon } from 'lucide-react'
 import { guardarFiltrosCalendario, type FiltrosCalendario } from './filtros'
 
 export type AgendaEvento = {
@@ -98,13 +99,20 @@ function buildMonthGrid(monthStartStr: string): (string | null)[] {
   return cells
 }
 
-const TIPO_META: Record<AgendaEvento['tipo'], { label: string; icon: string }> = {
-  grabacion:   { label: 'Grabaciones',   icon: '🎥' },
-  reunion:     { label: 'Reuniones',     icon: '🤝' },
-  publicacion: { label: 'Publicaciones', icon: '📣' },
-  fecha:       { label: 'Fechas importantes', icon: '⭐' },
-  diseno:      { label: 'Diseño',        icon: '🎨' },
-  gcal:        { label: 'Google Calendar', icon: '🟦' },
+/* Íconos de línea (lucide) en vez de emojis — Pedro 24-sep-2026: "esos
+   íconos hazlos profesionales". */
+const TIPO_META: Record<AgendaEvento['tipo'], { label: string; singular: string; Icon: LucideIcon }> = {
+  grabacion:   { label: 'Grabaciones',        singular: 'Grabación',        Icon: Video },
+  reunion:     { label: 'Reuniones',          singular: 'Reunión',          Icon: Users },
+  publicacion: { label: 'Publicaciones',      singular: 'Publicación',      Icon: Megaphone },
+  fecha:       { label: 'Fechas importantes', singular: 'Fecha importante', Icon: Star },
+  diseno:      { label: 'Diseño',             singular: 'Diseño',           Icon: Palette },
+  gcal:        { label: 'Google Calendar',    singular: 'Google Calendar',  Icon: CalendarDays },
+}
+
+function TipoIcono({ t, size = 13 }: { t: AgendaEvento['tipo']; size?: number }) {
+  const { Icon } = TIPO_META[t]
+  return <Icon size={size} strokeWidth={2} aria-hidden style={{ flexShrink: 0, display: 'inline-block', verticalAlign: '-0.15em' }} />
 }
 
 /* Sugerir la marca de un evento de GCal por su título (ej. "Reunión Centro
@@ -202,7 +210,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
               }`}
               title={on ? 'Ocultar' : 'Mostrar'}
             >
-              <span>{TIPO_META[t].icon}</span>
+              <TipoIcono t={t} size={14} />
               {TIPO_META[t].label}
               <span className={`text-[11px] px-1.5 rounded-full ${on ? 'bg-[#7170ff]/15' : 'bg-muted'}`}>{counts[t]}</span>
             </button>
@@ -212,7 +220,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
         {/* Gestionar fechas importantes — solo cuando el chip ⭐ está prendido */}
         {tipos.fecha && counts.fecha > 0 && (
           <Link href="/fechas-importantes" className="text-[11.5px] text-muted-foreground underline hover:text-foreground">
-            ⭐ gestionar
+            <Star size={12} style={{ display: 'inline', verticalAlign: '-0.1em' }} /> gestionar
           </Link>
         )}
 
@@ -348,7 +356,11 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
               {m.emoji} {m.nombre}
             </span>
           ))}
-          <span className="inline-flex items-center gap-1.5">🎥 grabación · 🤝 reunión{counts.publicacion > 0 ? ' · 📣 publicación' : ''}{counts.gcal > 0 ? ' · 🟦 Google Calendar' : ''}</span>
+          <span className="inline-flex items-center gap-3">
+            {(['grabacion', 'reunion', ...(counts.publicacion > 0 ? ['publicacion'] : []), ...(counts.gcal > 0 ? ['gcal'] : [])] as AgendaEvento['tipo'][]).map((t) => (
+              <span key={t} className="inline-flex items-center gap-1"><TipoIcono t={t} size={12} /> {TIPO_META[t].singular.toLowerCase()}</span>
+            ))}
+          </span>
         </div>
       )}
 
@@ -370,7 +382,7 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar, onAb
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-[15px] font-bold capitalize">
-          📅 {fechaLarga(dia)}{dia === hoy ? ' · HOY' : ''}
+          <CalendarDays size={16} style={{ display: 'inline', verticalAlign: '-0.15em', marginRight: 6 }} />{fechaLarga(dia)}{dia === hoy ? ' · HOY' : ''}
         </h3>
         <div className="flex items-center gap-2">
           <Link
@@ -405,7 +417,7 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar, onAb
                 <div className="min-w-0 flex-1">
                   <button type="button" onClick={() => onAbrir(e)} title="Ver / editar"
                     className={`text-left text-[14px] font-semibold hover:underline ${cancelado ? 'line-through' : ''}`}>
-                    {TIPO_META[e.tipo].icon} {e.titulo}
+                    <TipoIcono t={e.tipo} size={14} /> {e.titulo}
                   </button>
                   <div className="mt-0.5 flex items-center gap-2 flex-wrap text-[12px] text-muted-foreground">
                     {e.marcaNombre && (
@@ -546,7 +558,7 @@ function VincularGcal({ e, marcasTodas }: { e: AgendaEvento; marcasTodas: MarcaO
         {(['reunion', 'grabacion'] as const).map((t) => (
           <button key={t} type="button" onClick={() => setTipo(t)}
             className={`h-8 px-2.5 text-[11.5px] font-medium ${tipo === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground'}`}>
-            {t === 'reunion' ? '🤝 Reunión' : '🎥 Grabación'}
+            <TipoIcono t={t} size={12} /> {t === 'reunion' ? 'Reunión' : 'Grabación'}
           </button>
         ))}
       </div>
@@ -638,10 +650,10 @@ function EventoCardSemana({ e, onAbrir }: { e: AgendaEvento; onAbrir: () => void
     <div
       className={`rounded-md px-1.5 py-1 text-left w-full ${cancelado ? 'opacity-50' : ''} ${cumplido ? 'ring-1 ring-emerald-300' : ''}`}
       style={{ background: bg, color: fg, borderLeft: e.tipo !== 'grabacion' ? `3px solid ${e.color}` : undefined }}
-      title={`${TIPO_META[e.tipo].icon} ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
+      title={`${TIPO_META[e.tipo].singular}: ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
     >
       <div className="text-[10px] font-bold" style={{ opacity: 0.85 }}>
-        {e.hora ? hora12(e.hora) : 'Todo el día'} {TIPO_META[e.tipo].icon}
+        {e.hora ? hora12(e.hora) : 'Todo el día'} <TipoIcono t={e.tipo} size={11} />
       </div>
       <div className={`text-[11px] font-medium leading-tight ${cancelado ? 'line-through' : ''}`} style={{ wordBreak: 'break-word' }}>
         {e.tipo === 'grabacion' ? (e.marcaNombre ?? e.titulo) : e.titulo}
@@ -667,8 +679,8 @@ function EventoChip({ e }: { e: AgendaEvento }) {
 
   if (e.tipo === 'grabacion') {
     return (
-      <div className={base + extra + ' text-white'} style={{ background: e.color }} title={`🎥 ${e.titulo}`}>
-        🎥 {hora}{e.marcaNombre ?? e.titulo}
+      <div className={base + extra + ' text-white'} style={{ background: e.color }} title={`Grabación: ${e.titulo}`}>
+        <TipoIcono t="grabacion" size={10} /> {hora}{e.marcaNombre ?? e.titulo}
       </div>
     )
   }
@@ -677,9 +689,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#ede9fe', color: '#5b21b6', borderLeft: `3px solid ${e.color}` }}
-        title={`🤝 ${e.titulo}`}
+        title={`Reunión: ${e.titulo}`}
       >
-        🤝 {hora}{e.titulo}
+        <TipoIcono t="reunion" size={10} /> {hora}{e.titulo}
       </div>
     )
   }
@@ -688,9 +700,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#ffe4e6', color: '#be123c', borderLeft: `3px solid ${e.color}` }}
-        title={`📣 ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
+        title={`Publicación: ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
       >
-        📣 {hora}{e.titulo}
+        <TipoIcono t="publicacion" size={10} /> {hora}{e.titulo}
       </div>
     )
   }
@@ -699,9 +711,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#fef9c3', color: '#a16207', borderLeft: `3px solid ${e.color}` }}
-        title={`⭐ ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
+        title={`Fecha importante: ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
       >
-        ⭐ {e.titulo}
+        <TipoIcono t="fecha" size={10} /> {e.titulo}
       </div>
     )
   }
@@ -710,9 +722,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#fef3c7', color: '#92400e', borderLeft: `3px solid ${e.color}` }}
-        title={`🎨 ${e.titulo}`}
+        title={`Diseño: ${e.titulo}`}
       >
-        🎨 {hora}{e.titulo}
+        <TipoIcono t="diseno" size={10} /> {hora}{e.titulo}
       </div>
     )
   }

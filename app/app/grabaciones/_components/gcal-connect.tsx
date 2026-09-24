@@ -11,7 +11,7 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { CalendarCheck, CalendarX } from 'lucide-react'
+import { CalendarCheck, CalendarX, RefreshCw } from 'lucide-react'
 
 export function GoogleCalendarConnect({ connected, email }: { connected: boolean; email: string | null }) {
   const router = useRouter()
@@ -44,16 +44,17 @@ export function GoogleCalendarConnect({ connected, email }: { connected: boolean
   if (connected) {
     return (
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-xs font-medium">
+        <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-xs font-medium">
           <CalendarCheck className="w-4 h-4" />
           {email ? `Sincronizado · ${email}` : 'Google Calendar conectado'}
         </span>
         <a
           href={startHref}
-          className="text-[11px] text-muted-foreground hover:text-foreground underline"
-          title="Reconectar (si cambiaste de cuenta o el permiso expiró)"
+          className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Reconectar Google Calendar (si cambiaste de cuenta o el permiso expiró)"
+          aria-label="Reconectar Google Calendar"
         >
-          Reconectar
+          <RefreshCw className="w-4 h-4" />
         </a>
       </div>
     )

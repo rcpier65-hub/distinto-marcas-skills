@@ -26,8 +26,8 @@ import { updateGrabacionEstado, updateGrabacionFecha } from '../../_actions'
 
 const ACENTO = '#7170ff'
 const TITULO_TIPO: Record<AgendaEvento['tipo'], string> = {
-  grabacion: '🎥 Grabación', reunion: '🤝 Reunión', publicacion: '📣 Publicación',
-  fecha: '⭐ Fecha importante', diseno: '🎨 Diseño', gcal: '🟦 Google Calendar',
+  grabacion: 'Grabación', reunion: 'Reunión', publicacion: 'Publicación',
+  fecha: 'Fecha importante', diseno: 'Diseño', gcal: 'Google Calendar',
 }
 const DURACIONES = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480]
 
