@@ -320,7 +320,11 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
        el título — Pedro 24-sep-2026: "tiene grabación el viernes y no sale
        como grabaciones". Siguen siendo de Google: se pueden Vincular. */
     const tipoGoogle = /grabaci|grabar|rodaje/i.test(ev.summary) ? 'grabacion' as const
-      : /reuni|revisi/i.test(ev.summary) ? 'reunion' as const
+      /* Reunión: por el título (reunión, revisión, diagnóstico, llamada,
+         sesión…) o porque tiene enlace de Meet. Pedro 24-sep-2026: el
+         "Diagnóstico Distinto" que reservaron por la web salía en Google
+         pero no en la app (caía en el filtro "Google Calendar", apagado). */
+      : (/reuni|revisi|diagn[oó]stic|llamada|sesi[oó]n|meeting|call\b|entrevista|onboarding|kick.?off/i.test(ev.summary) || !!ev.meetLink) ? 'reunion' as const
       : 'gcal' as const
     const marcaG = tipoGoogle !== 'gcal' ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
     if (marcaG && marcasPermitidas && !marcasPermitidas.has(marcaG.id)) continue
