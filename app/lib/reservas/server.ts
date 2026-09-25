@@ -141,6 +141,8 @@ export async function syncBooking(row: Booking, options: { sendInvitations?: boo
       attendees: sendInvitations ? [{ email: row.email, displayName: row.nombre }] : [],
       conferenceData: { createRequest: { requestId: row.id, conferenceSolutionKey: { type: 'hangoutsMeet' } } },
       extendedProperties: { private: { distintoBooking: row.id } },
+      /* Naranja ("Mandarina") en Google: son clientes que reservaron por la web. */
+      colorId: '6',
     }) })
     if (res.status === 409) res = await google(path + '/' + row.google_event_id)
   }

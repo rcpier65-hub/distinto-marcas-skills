@@ -27,6 +27,9 @@ import { AgendaCalendar, type AgendaEvento } from './_components/agenda-calendar
 import { COOKIE_FILTROS_CAL, leerFiltrosCalendario } from './_components/filtros'
 import { RangoNav, type VistaAgenda } from './_components/rango-nav'
 
+/* Color de las reservas de clientes desde la web (naranja). */
+const COLOR_RESERVA_WEB = '#f97316'
+
 export const dynamic = 'force-dynamic'
 
 type SP = { desde?: string; hasta?: string; vista?: string }
@@ -326,7 +329,10 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
          pero no en la app (caía en el filtro "Google Calendar", apagado). */
       : (/reuni|revisi|diagn[oó]stic|llamada|sesi[oó]n|meeting|call\b|entrevista|onboarding|kick.?off/i.test(ev.summary) || !!ev.meetLink) ? 'reunion' as const
       : 'gcal' as const
-    const marcaG = tipoGoogle !== 'gcal' ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
+    /* Reservas desde la WEB (distintostudio.com → "Diagnóstico Distinto · …"):
+       son clientes nuevos, van en NARANJA para distinguirlas (Pedro 24-sep-2026). */
+    const esReservaWeb = /^diagn[oó]stico distinto/i.test(ev.summary.trim())
+    const marcaG = tipoGoogle !== 'gcal' && !esReservaWeb ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
     if (marcaG && marcasPermitidas && !marcasPermitidas.has(marcaG.id)) continue
     eventos.push({
       id: ev.id,
@@ -338,11 +344,11 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       marcaSlug: marcaG?.slug ?? null,
       marcaNombre: marcaG?.nombre ?? null,
       marcaEmoji: marcaG?.emoji_marca ?? null,
-      color: marcaG?.color_calendario ?? (tipoGoogle === 'grabacion' ? '#6366F1' : '#3b82f6'),
+      color: esReservaWeb ? COLOR_RESERVA_WEB : marcaG?.color_calendario ?? (tipoGoogle === 'grabacion' ? '#6366F1' : '#3b82f6'),
       estado: null,
       meetLink: ev.meetLink,
       videosGrabados: null,
-      notas: tipoGoogle !== 'gcal' ? 'Agendado en Google Calendar' : null,
+      notas: esReservaWeb ? '🌐 Cliente nuevo · reservó desde la web (distintostudio.com)' : tipoGoogle !== 'gcal' ? 'Agendado en Google Calendar' : null,
       duracionMin: ev.durationMin,
     })
   }
