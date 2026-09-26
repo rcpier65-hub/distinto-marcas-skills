@@ -142,7 +142,8 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let reunionesRows: any[] = []
   try {
-    const COLS = ['id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id',
+    const COLS = ['id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id, duracion_min',
+                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id',
                   'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado',
                   'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas']
     for (const cols of COLS) {
@@ -153,7 +154,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
         .order('fecha_hora', { ascending: true })
       if (!r.error) { reunionesRows = r.data ?? []; break }
-      if (!/estado|google_event_id|schema cache|42703/i.test(r.error.message ?? '')) break
+      if (!/estado|google_event_id|duracion_min|schema cache|42703/i.test(r.error.message ?? '')) break
     }
   } catch { /* sin reuniones */ }
 
@@ -210,6 +211,12 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     return `${ymd}|${normTitulo(String(r.titulo ?? ''))}`
   }))
 
+  /* Duración real: la guardada en la app o, si falta (eventos viejos), la
+     del evento en Google. Así el bloque mide lo que dura (10 a 2 = 4 h). */
+  const durGoogle = new Map(gcalEvents.map((ev) => [ev.id, ev.durationMin]))
+  const durDe = (propia: number | null | undefined, gid: string | null | undefined) =>
+    (propia && propia > 0 ? propia : null) ?? (gid ? durGoogle.get(gid) ?? null : null)
+
   for (const g of grabRows) {
     const marca = marcasById.get(g.marca_id)
     eventos.push({
@@ -226,7 +233,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: null,
       notas: g.notas,
       videosGrabados: g.videos_grabados,
-      duracionMin: g.duracion_min ?? null,
+      duracionMin: durDe(g.duracion_min, g.google_event_id),
     })
   }
 
@@ -248,6 +255,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: esLink ? r.lugar_enlace : null,
       notas: r.notas ?? (r.modalidad === 'presencial' && r.lugar_enlace && !esLink ? `Lugar: ${r.lugar_enlace}` : null),
       videosGrabados: null,
+      duracionMin: durDe(r.duracion_min, r.google_event_id),
     })
   }
 

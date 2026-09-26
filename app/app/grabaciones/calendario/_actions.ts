@@ -100,6 +100,7 @@ export async function vincularEventoGcal(input: {
     lugar_enlace: input.meetLink,
     notas: null,
     google_event_id: input.gcalId,
+    ...(input.duracionMin && input.duracionMin > 0 ? { duracion_min: Math.round(input.duracionMin) } : {}),
   }
   let ins = await service.from('marca_reuniones').insert(fila)
   if (ins.error && /google_event_id|schema cache|42703/i.test(ins.error.message ?? '')) {
@@ -123,7 +124,7 @@ export async function vincularEventoGcal(input: {
  * evento en Google Calendar (los invitados lo ven moverse solo).
  */
 export async function editarReunionCal(id: string, input: {
-  fecha: string; hora: string; titulo?: string
+  fecha: string; hora: string; titulo?: string; duracionMin?: number | null
 }): Promise<Result> {
   await requireUser()
   if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden editar reuniones.' }
@@ -141,8 +142,9 @@ export async function editarReunionCal(id: string, input: {
 
   const titulo = (input.titulo ?? sel.data.titulo ?? 'Reunión').trim().slice(0, 200)
   const fechaHoraIso = new Date(`${input.fecha}T${hora}:00-05:00`).toISOString()
+  const dur = input.duracionMin && input.duracionMin > 0 ? Math.max(5, Math.min(720, Math.round(input.duracionMin))) : null
   const { error } = await service.from('marca_reuniones')
-    .update({ titulo, fecha_hora: fechaHoraIso })
+    .update({ titulo, fecha_hora: fechaHoraIso, ...(dur ? { duracion_min: dur } : {}) })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
 
@@ -161,7 +163,7 @@ export async function editarReunionCal(id: string, input: {
         summary,
         fecha: input.fecha,
         hora,
-        durationMin: actual?.durationMin ?? 45,
+        durationMin: dur ?? actual?.durationMin ?? 45,
       })
       if (!g.ok) gcalError = g.error
     } catch (e) {

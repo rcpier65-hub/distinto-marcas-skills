@@ -165,7 +165,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
     const esGoogle = e.tipo === 'gcal' || !!e.origenGoogle
     let r: { ok: true; gcalError?: string } | { ok: false; error: string }
     if (esGoogle) r = await editarEventoGoogle(e.id, { titulo: e.titulo, fecha: m.fecha, hora: m.hora, duracionMin: m.duracionMin })
-    else if (e.tipo === 'reunion') r = await editarReunionCal(e.id, { fecha: m.fecha, hora: m.hora ?? '09:00' })
+    else if (e.tipo === 'reunion') r = await editarReunionCal(e.id, { fecha: m.fecha, hora: m.hora ?? '09:00', duracionMin: m.hora ? m.duracionMin : null })
     else if (e.tipo === 'grabacion') {
       const g = await updateGrabacionFecha(e.id, m.fecha, m.hora, m.hora ? m.duracionMin : null)
       r = g.ok ? { ok: true, gcalError: g.gcalError } : g

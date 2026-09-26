@@ -146,20 +146,48 @@ export function esGrabacion(texto: string): boolean {
   return /grabaci|\bgrabar|\bgrabamos|\brodaje|sesion de (fotos|video)/.test(t)
 }
 
+/* Duración por RANGO de horas en la frase ("de 10 a 12", "desde las 10am
+   hasta las 2pm", "de 9:30 a 11"). Se calcula en código, no con la IA (Pedro
+   26-sep-2026: "pongo de 10 a tal hora y no refleja la cantidad de horas").
+   Exige "de/desde" antes de la primera hora para no confundir "el 10 a las
+   11" (día 10, 11 am) con un rango. */
+export function duracionPorRango(texto: string, horaInicio: string | null): number | null {
+  const m = texto.match(/\b(?:de|desde)\s+(?:las?\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?|am|pm)?\s*(?:a|hasta|-|–)\s*(?:las?\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?|am|pm)?/i)
+  if (!m) return null
+  const suf = (x?: string) => (x ? (/p/i.test(x) ? 'pm' : 'am') : null)
+  const aMin = (h: number, mi: number, s: 'am' | 'pm' | null) => {
+    let hh = h
+    if (s === 'pm' && hh < 12) hh += 12
+    if (s === 'am' && hh === 12) hh = 0
+    return hh * 60 + mi
+  }
+  let ini = horaInicio && /^\d{1,2}:\d{2}$/.test(horaInicio)
+    ? Number(horaInicio.split(':')[0]) * 60 + Number(horaInicio.split(':')[1])
+    : aMin(Number(m[1]), Number(m[2] ?? 0), suf(m[3]))
+  if (!horaInicio && !m[3] && ini < 7 * 60) ini += 12 * 60   // "de 3 a 5" → tarde
+  let fin = aMin(Number(m[4]), Number(m[5] ?? 0), suf(m[6]))
+  if (!m[6]) { while (fin <= ini && fin < 24 * 60) fin += 12 * 60 }   // "de 10 a 2" → 2 pm
+  const dur = fin - ini
+  return dur > 0 && dur <= 12 * 60 ? dur : null
+}
+
 export async function parseAgenda(texto: string, marcas: MarcaLite[], now = new Date()): Promise<AgendaParsed> {
   const explicita = fechaExplicita(texto, ymdLima(now))
   const ia = await parseConOpenAI(texto, marcas, now)
   // Si la IA no resolvió todo (o no hay key), completamos con el fallback.
   const fb = parseFallback(texto, marcas, now)
   const tipo = esGrabacion(texto) ? 'grabacion' : 'reunion'
+  const hora = ia?.hora ?? fb.hora
+  const rango = duracionPorRango(texto, hora)
   return {
     tipo,
     marcaSlug: ia?.marcaSlug ?? fb.marcaSlug,
     // An invalid explicit date must ask for clarification, never become "Thursday".
     fecha: explicita.encontrada ? explicita.fecha : ia?.fecha ?? fb.fecha,
-    hora: ia?.hora ?? fb.hora,
-    // Grabación: 2 h por defecto (una reunión, 45 min) salvo que la frase diga otra cosa.
-    durationMin: tipo === 'grabacion' && !(ia && /\b(\d+)\s*(h|hora|min)/i.test(texto)) ? 120 : ia?.durationMin ?? fb.durationMin,
+    hora,
+    // 1) Rango en la frase ("de 10 a 12") manda. 2) Grabación: 2 h por defecto
+    // (reunión, 45 min) salvo que la frase diga una duración ("1 hora", "90 min").
+    durationMin: rango ?? (tipo === 'grabacion' && !(ia && /\b(\d+)\s*(h|hora|min)/i.test(texto)) ? 120 : ia?.durationMin ?? fb.durationMin),
     titulo: ia?.titulo ?? fb.titulo,
   }
 }

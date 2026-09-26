@@ -173,6 +173,7 @@ export async function agendarReunion(input: {
       lugar_enlace: gen.meetLink,
       notas: null,
       google_event_id: gen.eventId,
+      duracion_min: input.durationMin > 0 ? Math.round(input.durationMin) : 45,
     }
     let ins = await service.from('marca_reuniones').insert(fila)
     if (ins.error && /google_event_id|schema cache|42703/i.test(ins.error.message ?? '')) {
