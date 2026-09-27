@@ -19,6 +19,15 @@ struct TareaHoy: Codable, Equatable, Identifiable {
     let fuente: String
 
     var isInbox: Bool { due == nil }
+    var isRapida: Bool { fuente == "pendientes_rapidos" }
+
+    /// Column / chip name. Web board groups by categoría; the API sends that as `proyecto`.
+    var columna: String {
+        if let proyecto, !proyecto.isEmpty { return proyecto }
+        if let marca, !marca.isEmpty { return marca }
+        return due == nil ? "Inbox" : "General"
+    }
+
     var statusLabel: String {
         switch status {
         case "pendiente": return "Pendiente"
@@ -38,9 +47,10 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthorized: return "Sesión inválida o expirada"
-        case .http(let code, let msg): return "HTTP \(code): \(msg)"
+        case .http(let code, let msg):
+            return msg.isEmpty ? "Error \(code)" : msg
         case .decoding: return "No se pudo leer la respuesta"
-        case .notSignedIn: return "Iniciá sesión primero"
+        case .notSignedIn: return "Inicia sesión primero"
         }
     }
 }

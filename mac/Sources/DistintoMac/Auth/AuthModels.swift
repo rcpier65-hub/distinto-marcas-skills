@@ -6,6 +6,21 @@ struct AuthSession: Codable, Equatable {
     var expiresAt: Date?
     var email: String
     var userId: String
+
+    var isPedro: Bool {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == AppConfig.pedroEmail
+    }
+
+    /// Local-part of the email, first letter uppercased. Used until we load team profile.
+    var displayName: String {
+        let local = email.split(separator: "@").first.map(String.init) ?? email
+        guard let first = local.first else { return local }
+        return first.uppercased() + local.dropFirst()
+    }
+
+    var initial: String {
+        String(displayName.prefix(1)).uppercased()
+    }
 }
 
 enum AuthError: LocalizedError {

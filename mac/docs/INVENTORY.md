@@ -13,4 +13,4 @@ Marcas: Ver todas, grilla/[slug], Agregar marca
 Personal: Hábitos, Reporte del día, Historial, Mi equipo, Settings, Perfil
 
 ## Phase 1 mac subset
-Hoy (API), Inicio (placeholder), Tareas (placeholder), Login, Shell, Logout
+Login (web card), sidebar (Workspace / Marcas / Personal), Inicio (tareas de hoy), Tareas (tablero por categoría), resto abre la web, Logout

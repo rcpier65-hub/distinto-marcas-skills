@@ -46,13 +46,23 @@ actor DistintoAPIClient {
             throw APIError.unauthorized
         }
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? ""
-            throw APIError.http(http.statusCode, msg)
+            throw APIError.http(http.statusCode, Self.serverMessage(from: data))
         }
         do {
             return try decoder.decode(TareasHoyResponse.self, from: data)
         } catch {
             throw APIError.decoding
         }
+    }
+
+    private static func serverMessage(from data: Data) -> String {
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let error = obj["error"] as? String, !error.isEmpty { return error }
+            if let message = obj["message"] as? String, !message.isEmpty { return message }
+        }
+        let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if raw.isEmpty { return "Error del servidor" }
+        if raw.count > 180 { return String(raw.prefix(180)) + "…" }
+        return raw
     }
 }

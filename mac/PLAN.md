@@ -2,7 +2,7 @@
 
 App nativa SwiftUI para Distinto. Backend en la nube: **Vercel** (`https://distinto-app.vercel.app`) + **Supabase** (`exhmimlehdisonjvedvx` / SISTEMA DE GRILLA). Misma estética light Linear/Notion del web (`--mk-*` tokens).
 
-**Estado actual:** Fase 0–1 (inventario + scaffold). **No** es la app completa.
+**Estado actual:** Login, sidebar y Hoy/Inicio nativos alineados con la web en vivo. El resto de módulos abre la web. **No** es la app completa.
 
 Pedro (CEO): `pedro@agenciadistinto.com`
 
