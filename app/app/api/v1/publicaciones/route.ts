@@ -1,16 +1,17 @@
 // GET /api/v1/publicaciones
 //   ?desde=YYYY-MM-DD   (opcional, junto con hasta)
 //   ?hasta=YYYY-MM-DD
+//   ?marca=<slug>       (opcional; 404 si el slug no existe, 403 si está fuera de marcas_acceso)
 //
 // Lista de solo lectura para el Mac. Por defecto: 21 días atrás y 45 adelante
 // (Lima). Misma normalización de estado/tipo que /publicaciones y el mismo
 // permiso de módulo. No incluye el mock de la web.
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer <supabase access_token> o Bearer dst_live_… con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { colorDeMarca } from '@/lib/marcas/branding'
 import { addDaysYmd, appBase, daysBetweenYmd, isYmd, ymdLima } from '@/lib/api/lima'
-import { apiJsonError, requireSessionMember } from '@/lib/api/session-member'
+import { apiJsonError, denyMarcaAcceso, requireSessionMember } from '@/lib/api/session-member'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
@@ -89,12 +90,29 @@ export async function GET(request: Request) {
     hasta = hastaQ
   }
 
-  if (member.marcasAcceso && member.marcasAcceso.length === 0) {
-    return NextResponse.json({ ok: true, desde, hasta, hoy, total: 0, publicaciones: [] })
+  const marcaSlug = url.searchParams.get('marca')?.trim() || null
+
+  if (!marcaSlug && member.marcasAcceso && member.marcasAcceso.length === 0) {
+    return NextResponse.json({ ok: true, desde, hasta, hoy, marca: null, total: 0, publicaciones: [] })
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+
+  let marcaId: string | null = null
+  if (marcaSlug) {
+    const { data: marca, error: marcaErr } = await service
+      .from('marcas')
+      .select('id')
+      .eq('slug', marcaSlug)
+      .maybeSingle()
+    if (marcaErr) return apiJsonError(marcaErr.message, 500)
+    if (!marca?.id) return apiJsonError(`marca '${marcaSlug}' no existe`, 404)
+    marcaId = String(marca.id)
+    const denied = denyMarcaAcceso(member, marcaId)
+    if (denied) return denied
+  }
+
   const columns = `
     id, nombre, fecha_publicacion, estado, plataformas, tipo_contenido, editor_nombre, marca_id,
     marca:marcas(slug, nombre, color_primario_hex, emoji_marca)
@@ -106,7 +124,8 @@ export async function GET(request: Request) {
     .lte('fecha_publicacion', hasta)
     .order('fecha_publicacion', { ascending: true })
     .limit(250)
-  if (member.marcasAcceso) query = query.in('marca_id', member.marcasAcceso)
+  if (marcaId) query = query.eq('marca_id', marcaId)
+  else if (member.marcasAcceso) query = query.in('marca_id', member.marcasAcceso)
 
   const { data, error } = await query
   if (error) return apiJsonError(error.message, 500)
@@ -151,6 +170,7 @@ export async function GET(request: Request) {
     desde,
     hasta,
     hoy,
+    marca: marcaSlug,
     total: publicaciones.length,
     publicaciones,
   })

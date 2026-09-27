@@ -11,7 +11,7 @@
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { listDeviceKeys } from '@/lib/api/device-keys'
+import { canIssueOwnerScope, listDeviceKeys } from '@/lib/api/device-keys'
 import type { TeamMember } from '@/lib/team/types'
 import { PerfilForm } from './_components/perfil-form'
 import { DeviceKeysCard } from './_components/device-keys-card'
@@ -57,7 +57,11 @@ export default async function PerfilPage() {
           Como admin/owner, tus datos no viven en <code>team_members</code> sino en Supabase Auth.
           Si quieres tener un perfil editable, créate un miembro desde <strong>Mi equipo</strong> con tu mismo email.
         </div>
-        <DeviceKeysCard initialKeys={deviceKeys} initialError={deviceKeysError} />
+        <DeviceKeysCard
+          initialKeys={deviceKeys}
+          initialError={deviceKeysError}
+          canIssueOwner={canIssueOwnerScope({ teamMemberId: null, rolBase: null })}
+        />
       </main>
     )
   }
@@ -78,6 +82,10 @@ export default async function PerfilPage() {
       member={member as TeamMember}
       rolNombre={rol?.nombre ?? member.rol_base}
       deviceKeys={deviceKeys}
+      canIssueOwner={canIssueOwnerScope({
+        teamMemberId: typeof member.id === 'string' ? member.id : null,
+        rolBase: typeof member.rol_base === 'string' ? member.rol_base : null,
+      })}
       deviceKeysError={deviceKeysError}
     />
   )

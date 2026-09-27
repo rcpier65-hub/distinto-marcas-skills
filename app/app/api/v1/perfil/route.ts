@@ -1,8 +1,7 @@
 // GET /api/v1/perfil
 //
 // Sesión del Mac: nombre, email y rol. No edita el perfil.
-// Auth: Authorization: Bearer <supabase access_token>
-// La clave dst_live_… no sirve acá (solo tareas:read).
+// Auth: Bearer JWT o dst_live_ con alcance owner (actúa como esa sesión).
 
 import { NextResponse } from 'next/server'
 import { requireSessionMember } from '@/lib/api/session-member'

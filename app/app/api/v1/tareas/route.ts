@@ -16,7 +16,9 @@
 // Auth (Kairos usa clave de dispositivo; NO debe llevar CRON_SECRET):
 //   A) Authorization: Bearer dst_live_…
 //      resolveApiCaller hashea el token, busca api_device_keys, rechaza revocadas
-//      y exige scope tareas:read. El alcance de filas es el del dueño (igual que el JWT).
+//      y exige scope tareas:read. El alcance owner (o full / *) también sirve.
+//      El alcance de filas es el del dueño (igual que el JWT).
+//      POST y PATCH exigen owner (o JWT). CRON_SECRET no escribe.
 //   B) Authorization: Bearer <access_token de Supabase Auth>
 //      resolveApiCaller valida el JWT con la anon key + auth.getUser(jwt).
 //      Luego createServiceClient y filtros explícitos:
@@ -40,18 +42,20 @@
 // prioridad solo existe en pendientes_rapidos; en tareas va null.
 
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
-import { resolveApiCaller, type ApiCaller } from '@/lib/api/auth'
+import { requireApiActor, resolveApiCaller } from '@/lib/api/auth'
+import { isYmd } from '@/lib/api/lima'
+import { loadTareaActor, resolveTareaScope, scopeFilter, type TareaScope } from '@/lib/api/tarea-scope'
+import { colorParaCategoria, limpiarTexto } from '@/lib/tareas/categorizar'
+import { ESTADOS_TAREA, type EstadoTarea } from '@/lib/tareas/pro-types'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
 
 const TZ = 'America/Lima'
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-type Scope =
-  | { kind: 'member'; teamMemberId: string }
-  | { kind: 'admin_null' }
+type Scope = TareaScope
 
 type TareaItem = {
   id: string
@@ -80,20 +84,6 @@ function appBase(): string {
 
 function jsonError(error: string, status: number) {
   return NextResponse.json({ ok: false, error }, { status })
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function scopeFilter(q: any, scope: Scope): any {
-  switch (scope.kind) {
-    case 'member':
-      return q.eq('team_member_id', scope.teamMemberId)
-    case 'admin_null':
-      return q.is('team_member_id', null)
-    default: {
-      const _never: never = scope
-      return _never
-    }
-  }
 }
 
 function statusFromEstado(estado: unknown): string {
@@ -125,60 +115,6 @@ function ymd(v: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function resolveScope(service: any, caller: ApiCaller, requestedId: string | null): Promise<
-  { ok: true; scope: Scope } | { ok: false; response: NextResponse }
-> {
-  if (requestedId && !UUID_RE.test(requestedId)) {
-    return { ok: false, response: jsonError('team_member_id no es un uuid', 400) }
-  }
-
-  switch (caller.kind) {
-    case 'cron':
-      if (requestedId) return { ok: true, scope: { kind: 'member', teamMemberId: requestedId } }
-      return { ok: true, scope: { kind: 'admin_null' } }
-    case 'user':
-    case 'device':
-      /* device y JWT comparten el lookup en vivo: team_member activo, o NULL si
-         el dueño no tiene fila (CEO). teamMemberId guardado en la clave es snapshot. */
-      break
-    default: {
-      const _never: never = caller
-      return _never
-    }
-  }
-
-  const { data: tm, error } = await service
-    .from('team_members')
-    .select('id, nombre, activo')
-    .eq('auth_user_id', caller.userId)
-    .maybeSingle()
-  if (error) return { ok: false, response: jsonError(error.message, 500) }
-
-  if (tm && tm.activo === false) {
-    return { ok: false, response: jsonError('Miembro desactivado', 403) }
-  }
-
-  /* Sin fila = admin/owner (Pedro). Mismo criterio que permisos-helper y que
-     crearTarea, que persiste team_member_id = null. */
-  if (!tm) {
-    if (requestedId) return { ok: true, scope: { kind: 'member', teamMemberId: requestedId } }
-    return { ok: true, scope: { kind: 'admin_null' } }
-  }
-
-  const meId = tm.id as string
-  if (requestedId && requestedId !== meId) {
-    /* /tareas: solo el dueño llamado "Pedro" ve el tablero del equipo.
-       El resto (incluido un director que no es Pedro) ve solo lo suyo. */
-    const esOwner = (tm.nombre ?? '').trim().toLowerCase() === 'pedro'
-    if (!esOwner) {
-      return { ok: false, response: jsonError('No puedes ver tareas de otro miembro', 403) }
-    }
-    return { ok: true, scope: { kind: 'member', teamMemberId: requestedId } }
-  }
-  return { ok: true, scope: { kind: 'member', teamMemberId: meId } }
-}
-
 export async function GET(request: Request) {
   const auth = await resolveApiCaller(request, { requiredScope: 'tareas:read' })
   if ('response' in auth) return auth.response
@@ -194,7 +130,7 @@ export async function GET(request: Request) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
-  const scoped = await resolveScope(service, auth.caller, requestedId)
+  const scoped = await resolveTareaScope(service, auth.caller, requestedId)
   if (!scoped.ok) return scoped.response
   const scope = scoped.scope
 
@@ -272,4 +208,219 @@ export async function GET(request: Request) {
 
   const tareas = [...deTareas, ...dePendientes]
   return NextResponse.json({ ok: true, fecha, total: tareas.length, tareas })
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const PENDIENTE_CATEGORIAS = new Set([
+  'Diseño',
+  'Edición',
+  'Comunicación',
+  'Investigación',
+  'Personal',
+  'Urgente',
+  'Administrativo',
+  'Otro',
+])
+
+function fuenteDe(value: unknown): 'tareas' | 'pendientes_rapidos' | null {
+  if (value == null || value === 'tareas') return 'tareas'
+  if (value === 'pendientes_rapidos') return 'pendientes_rapidos'
+  return null
+}
+
+function estadoTareaDe(value: unknown): EstadoTarea | null {
+  if (value == null || value === 'pendiente' || value === 'sin_empezar') return 'sin_empezar'
+  if (typeof value === 'string' && (ESTADOS_TAREA as readonly string[]).includes(value)) {
+    return value as EstadoTarea
+  }
+  return null
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function insertDroppingMissing(service: any, table: string, row: Record<string, unknown>, optional: string[]) {
+  const payload = { ...row }
+  for (let attempt = 0; attempt <= optional.length; attempt++) {
+    const { data, error } = await service.from(table).insert(payload).select('id').single()
+    if (!error) return { data }
+    const message = error.message ?? ''
+    const missing = optional.find((col) => col in payload && message.includes(col) && (
+      error.code === '42703' || error.code === 'PGRST204' || /does not exist|schema cache/i.test(message)
+    ))
+    if (!missing) return { error }
+    delete payload[missing]
+  }
+  return { error: { message: 'No se pudo crear' } }
+}
+
+export async function POST(request: Request) {
+  const actorAuth = await requireApiActor(request)
+  if ('response' in actorAuth) return actorAuth.response
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return jsonError('Body JSON inválido', 400)
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return jsonError('Body JSON inválido', 400)
+  const input = body as Record<string, unknown>
+  const permitidos = new Set([
+    'texto', 'titulo', 'fuente', 'marca_slug', 'fecha_entrega', 'estado',
+    'categoria', 'team_member_id', 'prioridad',
+  ])
+  for (const key of Object.keys(input)) {
+    if (!permitidos.has(key)) return jsonError(`Campo no permitido: ${key}`, 400)
+  }
+
+  const fuente = fuenteDe(input.fuente)
+  if (!fuente) return jsonError('fuente tiene que ser tareas o pendientes_rapidos', 400)
+
+  const rawTexto = typeof input.texto === 'string'
+    ? input.texto
+    : typeof input.titulo === 'string'
+      ? input.titulo
+      : ''
+  const textoPlano = rawTexto.trim()
+  if (!textoPlano) return jsonError('El texto es obligatorio', 400)
+  const max = fuente === 'tareas' ? 600 : 1000
+  if (textoPlano.length > max) return jsonError(`Demasiado largo (máx ${max} caracteres)`, 400)
+
+  const requestedId = typeof input.team_member_id === 'string' && input.team_member_id.trim()
+    ? input.team_member_id.trim()
+    : null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const actor = await loadTareaActor(service, actorAuth.userId)
+  if (!actor.ok) return actor.response
+
+  let scope: Scope
+  if (requestedId) {
+    if (!UUID_RE.test(requestedId)) return jsonError('team_member_id no es un uuid', 400)
+    if (!actor.actor.puedeTodo && requestedId !== actor.actor.teamMemberId) {
+      return jsonError('No puedes asignar tareas de otro miembro', 403)
+    }
+    scope = { kind: 'member', teamMemberId: requestedId }
+  } else {
+    const scoped = await resolveTareaScope(service, { kind: 'user', userId: actorAuth.userId }, null)
+    if (!scoped.ok) return scoped.response
+    scope = scoped.scope
+  }
+  const ownerId = scope.kind === 'member' ? scope.teamMemberId : null
+  const base = appBase()
+
+  if (fuente === 'pendientes_rapidos') {
+    let prioridad: 1 | 2 | 3 = 2
+    if (input.prioridad != null) {
+      const n = typeof input.prioridad === 'number' ? input.prioridad : Number(input.prioridad)
+      if (n !== 1 && n !== 2 && n !== 3) return jsonError('prioridad tiene que ser 1, 2 o 3', 400)
+      prioridad = n
+    }
+    const categoria = typeof input.categoria === 'string' && input.categoria.trim()
+      ? input.categoria.trim()
+      : 'Otro'
+    if (!PENDIENTE_CATEGORIAS.has(categoria)) {
+      return jsonError('categoria de pendiente no es válida', 400)
+    }
+
+    const inserted = await insertDroppingMissing(service, 'pendientes_rapidos', {
+      team_member_id: ownerId,
+      texto_original: textoPlano,
+      titulo: textoPlano.slice(0, 300),
+      descripcion: null,
+      categoria,
+      prioridad,
+      completado: false,
+    }, [])
+    if (inserted.error) return jsonError(inserted.error.message, 500)
+    revalidatePath('/inicio')
+    return NextResponse.json({
+      ok: true,
+      tarea: {
+        id: String(inserted.data.id),
+        titulo: textoPlano.slice(0, 300),
+        due: null,
+        status: 'pendiente',
+        prioridad,
+        proyecto: categoria,
+        marca: null,
+        link: `${base}/inicio`,
+        fuente: 'pendientes_rapidos',
+      },
+    })
+  }
+
+  let marcaSlug: string | null = null
+  let categoria = 'General'
+  if (typeof input.marca_slug === 'string' && input.marca_slug.trim()) {
+    marcaSlug = input.marca_slug.trim()
+    const { data: marca, error: marcaErr } = await service
+      .from('marcas')
+      .select('nombre, slug')
+      .eq('slug', marcaSlug)
+      .maybeSingle()
+    if (marcaErr) return jsonError(marcaErr.message, 500)
+    if (!marca) return jsonError(`marca '${marcaSlug}' no existe`, 404)
+    categoria = typeof marca.nombre === 'string' && marca.nombre.trim() ? marca.nombre.trim() : marcaSlug
+  } else if (typeof input.categoria === 'string' && input.categoria.trim()) {
+    categoria = input.categoria.trim().slice(0, 80)
+  }
+
+  let fechaEntrega: string | null = null
+  if (input.fecha_entrega != null) {
+    if (typeof input.fecha_entrega !== 'string' || !isYmd(input.fecha_entrega.trim())) {
+      return jsonError('fecha_entrega tiene que ser YYYY-MM-DD o null', 400)
+    }
+    fechaEntrega = input.fecha_entrega.trim()
+  }
+
+  let estado: EstadoTarea = 'sin_empezar'
+  if (input.estado != null) {
+    const parsed = estadoTareaDe(input.estado)
+    if (!parsed) return jsonError('estado tiene que ser sin_empezar, en_proceso o archivado', 400)
+    estado = parsed
+  }
+
+  const { data: existentes } = await service.from('tareas').select('categoria, color').limit(400)
+  const usados: string[] = []
+  const colorByCat = new Map<string, string>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const row of (existentes ?? []) as any[]) {
+    if (typeof row.categoria === 'string' && typeof row.color === 'string' && !colorByCat.has(row.categoria)) {
+      colorByCat.set(row.categoria, row.color)
+      usados.push(row.color)
+    }
+  }
+
+  const inserted = await insertDroppingMissing(service, 'tareas', {
+    team_member_id: ownerId,
+    created_by: actor.actor.teamMemberId,
+    texto: limpiarTexto(textoPlano),
+    categoria,
+    color: colorByCat.get(categoria) ?? colorParaCategoria(usados),
+    completada: false,
+    focus_lane: null,
+    marca_slug: marcaSlug,
+    fecha_entrega: fechaEntrega,
+    estado,
+  }, ['fecha_entrega', 'estado', 'marca_slug'])
+  if (inserted.error) return jsonError(inserted.error.message, 500)
+
+  revalidatePath('/tareas')
+  revalidatePath('/inicio')
+  return NextResponse.json({
+    ok: true,
+    tarea: {
+      id: String(inserted.data.id),
+      titulo: limpiarTexto(textoPlano),
+      due: fechaEntrega,
+      status: statusFromEstado(estado),
+      prioridad: null,
+      proyecto: categoria,
+      marca: marcaSlug,
+      link: `${base}/tareas`,
+      fuente: 'tareas',
+    },
+  })
 }

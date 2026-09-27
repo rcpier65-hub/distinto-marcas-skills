@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { hasOwnerScope } from '@/lib/api/device-key-scopes'
 import { toast } from 'sonner'
 
 export type DeviceKeyListItem = {
@@ -35,9 +36,11 @@ async function readError(res: Response): Promise<string> {
 export function DeviceKeysCard({
   initialKeys,
   initialError,
+  canIssueOwner,
 }: {
   initialKeys: DeviceKeyListItem[]
   initialError: string | null
+  canIssueOwner: boolean
 }) {
   const [keys, setKeys] = useState(initialKeys)
   const [loading, setLoading] = useState(false)
@@ -46,6 +49,7 @@ export function DeviceKeysCard({
   const [creating, setCreating] = useState(false)
   const [revealed, setRevealed] = useState<CreatedKey | null>(null)
   const [revokingId, setRevokingId] = useState<string | null>(null)
+  const [upgradingId, setUpgradingId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -107,6 +111,30 @@ export function DeviceKeysCard({
     }
   }
 
+  async function handleUpgrade(id: string) {
+    if (upgradingId) return
+    setUpgradingId(id)
+    try {
+      const res = await fetch(`/api/v1/device-keys/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scopes: ['owner'] }),
+      })
+      if (!res.ok) {
+        toast.error(await readError(res))
+        return
+      }
+      const body = (await res.json()) as { key?: DeviceKeyListItem }
+      const scopes = body.key?.scopes ?? ['owner']
+      setKeys((current) => current.map((key) => (key.id === id ? { ...key, scopes } : key)))
+      toast.success('Clave ampliada. El token no cambió.')
+    } catch {
+      toast.error('No se pudo ampliar la clave')
+    } finally {
+      setUpgradingId(null)
+    }
+  }
+
   async function handleRevoke(id: string) {
     if (revokingId) return
     if (!window.confirm('¿Revocar esta clave? Kairos deja de poder usarla.')) return
@@ -146,8 +174,10 @@ export function DeviceKeysCard({
           Kairos (macOS)
         </h2>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.5 }}>
-          Crea una clave de dispositivo para que la app de la barra de menú lea tus tareas.
-          Se muestra una sola vez. Puedes revocarla desde acá.
+          {canIssueOwner
+            ? 'Una clave nueva de director u owner sale con acceso completo: Nay lee y escribe con el mismo alcance que tu sesión. Las claves viejas de solo tareas se amplían acá; el token no cambia.'
+            : 'Crea una clave para que la app de la barra de menú lea tus tareas. El acceso completo lo emite un director u owner.'}
+          {' '}Se muestra una sola vez. Puedes revocarla desde acá.
         </p>
       </div>
 
@@ -260,17 +290,31 @@ export function DeviceKeysCard({
                 </div>
                 <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
                   Creada {formatWhen(key.created_at)} · Último uso {formatWhen(key.last_used_at)}
+                  {' · '}
+                  {hasOwnerScope(key.scopes) ? 'Acceso completo' : 'Solo tareas'}
                 </div>
               </div>
               {!key.revoked && (
-                <button
-                  type="button"
-                  onClick={() => void handleRevoke(key.id)}
-                  disabled={revokingId === key.id}
-                  style={{ ...dangerButton, opacity: revokingId === key.id ? 0.55 : 1 }}
-                >
-                  {revokingId === key.id ? 'Revocando…' : 'Revocar'}
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  {canIssueOwner && !hasOwnerScope(key.scopes) && (
+                    <button
+                      type="button"
+                      onClick={() => void handleUpgrade(key.id)}
+                      disabled={upgradingId === key.id}
+                      style={{ ...secondaryButton, opacity: upgradingId === key.id ? 0.55 : 1 }}
+                    >
+                      {upgradingId === key.id ? 'Ampliando…' : 'Acceso completo'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleRevoke(key.id)}
+                    disabled={revokingId === key.id}
+                    style={{ ...dangerButton, opacity: revokingId === key.id ? 0.55 : 1 }}
+                  >
+                    {revokingId === key.id ? 'Revocando…' : 'Revocar'}
+                  </button>
+                </div>
               )}
             </li>
           ))}
