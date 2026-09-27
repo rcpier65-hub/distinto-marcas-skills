@@ -1,4 +1,5 @@
 // app/app/settings/page.tsx
+import Link from 'next/link'
 import { requireUser } from '@/lib/auth/get-user'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -74,6 +75,12 @@ export default async function SettingsPage() {
           <div>
             <span className="text-muted-foreground">Provider: </span>
             <Badge variant="outline">{user.app_metadata.provider ?? 'email'}</Badge>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Kairos (macOS): </span>
+            <Link href="/perfil#claves-kairos" className="underline">
+              clave de dispositivo en Perfil
+            </Link>
           </div>
         </CardContent>
       </Card>

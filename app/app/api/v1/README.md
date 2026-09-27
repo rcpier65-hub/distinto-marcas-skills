@@ -16,10 +16,10 @@ Authorization: Bearer <CRON_SECRET>
 
 El valor de `CRON_SECRET` está en Vercel env vars del proyecto `distinto-app`.
 
-**Excepción:** `GET /api/v1/tareas` acepta el access token de una sesión de
-Supabase Auth (Kairos macOS no debe llevar `CRON_SECRET`). El fallback
-`Bearer <CRON_SECRET>` sigue disponible para rutinas de servidor. Detalle
-en esa sección.
+**Excepción:** `GET /api/v1/tareas` es el contrato de Kairos (macOS). Kairos
+manda una clave de dispositivo `dst_live_…` creada en Perfil. También acepta
+el access token de Supabase Auth. El fallback `Bearer <CRON_SECRET>` queda
+solo para rutinas de servidor: no va en el cliente. Detalle en esa sección.
 
 ---
 
@@ -31,15 +31,26 @@ Lista unificada de «qué tengo para hoy» (America/Lima). Pensada para Kairos.
 
 **URL:** `https://distinto-app.vercel.app/api/v1/tareas`
 
-**Auth (cualquiera de las dos):**
+**Auth (Kairos usa la primera):**
 
 ```
+Authorization: Bearer dst_live_…
 Authorization: Bearer <supabase access_token>
-Authorization: Bearer <CRON_SECRET>
 ```
+
+La clave de dispositivo se crea en Distinto → Perfil → «Kairos (macOS)».
+Formato `dst_live_` + secreto. En la base solo se guarda el SHA-256. El
+plaintext se muestra una vez. Alcance `tareas:read` del dueño: mismas filas
+que si ese usuario mandara su JWT (miembro → sus tareas; sin fila en
+`team_members` → alcance CEO `team_member_id IS NULL`). Una clave revocada
+responde 401. Gestionar claves (`/api/v1/device-keys`) exige la sesión o el
+JWT, no la clave de dispositivo.
 
 El access token es el JWT de sesión de Supabase Auth (`session.access_token`).
 Se valida con la anon key y `auth.getUser(jwt)`. No hace falta cookie.
+
+`CRON_SECRET` sigue aceptado en este endpoint solo como fallback de rutinas
+de servidor. No lo uses en Kairos.
 
 **Alcance:**
 
@@ -121,14 +132,21 @@ No incluye diseño ni hábitos.
 }
 ```
 
-**Ejemplo curl — JWT de usuario (Kairos):**
+**Ejemplo curl — clave de dispositivo (Kairos):**
+
+```bash
+curl -H "Authorization: Bearer dst_live_…" \
+  "https://distinto-app.vercel.app/api/v1/tareas?due=hoy&include_overdue=1"
+```
+
+**Ejemplo curl — JWT de usuario (también válido):**
 
 ```bash
 curl -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   "https://distinto-app.vercel.app/api/v1/tareas?due=hoy&include_overdue=1"
 ```
 
-**Ejemplo curl — CRON_SECRET (rutina; alcance CEO si no pasas miembro):**
+**Ejemplo curl — CRON_SECRET (solo rutina de servidor; alcance CEO si no pasas miembro):**
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" \
@@ -136,6 +154,57 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 
 curl -H "Authorization: Bearer $CRON_SECRET" \
   "https://distinto-app.vercel.app/api/v1/tareas?due=hoy&team_member_id=<uuid>"
+```
+
+---
+
+### Claves de dispositivo
+
+Sesión de Distinto (cookie) o `Authorization: Bearer <supabase access_token>`.
+No aceptan `dst_live_…`.
+
+#### `GET /api/v1/device-keys`
+
+Lista las claves del usuario logueado. No incluye el secreto ni el hash.
+
+```json
+{
+  "ok": true,
+  "keys": [
+    {
+      "id": "uuid",
+      "name": "Kairos — MacBook",
+      "prefix": "dst_live_a1b2c3d4",
+      "created_at": "2026-09-27T18:00:00.000Z",
+      "last_used_at": null,
+      "revoked": false,
+      "scopes": ["tareas:read"]
+    }
+  ]
+}
+```
+
+#### `POST /api/v1/device-keys`
+
+Body: `{ "name": "Kairos — MacBook" }`.
+
+La respuesta incluye `key.token` (`dst_live_…`) **una sola vez**.
+
+```bash
+curl -X POST -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Kairos — MacBook"}' \
+  https://distinto-app.vercel.app/api/v1/device-keys
+```
+
+#### `DELETE /api/v1/device-keys/:id`
+
+Revoca la clave (no la borra). Repetir el DELETE sobre una clave ya revocada
+responde 200.
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  https://distinto-app.vercel.app/api/v1/device-keys/<uuid>
 ```
 
 ---

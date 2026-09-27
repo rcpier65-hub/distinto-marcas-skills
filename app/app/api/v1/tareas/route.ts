@@ -13,8 +13,11 @@
 //   2. public.pendientes_rapidos — completado = false, sin fecha: inbox (due null)
 //      cuando due=hoy. La UI vive en /inicio.
 //
-// Auth (Kairos NO debe llevar CRON_SECRET):
-//   A) Authorization: Bearer <access_token de Supabase Auth>
+// Auth (Kairos usa clave de dispositivo; NO debe llevar CRON_SECRET):
+//   A) Authorization: Bearer dst_live_…
+//      resolveApiCaller hashea el token, busca api_device_keys, rechaza revocadas
+//      y exige scope tareas:read. El alcance de filas es el del dueño (igual que el JWT).
+//   B) Authorization: Bearer <access_token de Supabase Auth>
 //      resolveApiCaller valida el JWT con la anon key + auth.getUser(jwt).
 //      Luego createServiceClient y filtros explícitos:
 //        - Hay fila team_members.auth_user_id = user.id → tareas de ESE miembro
@@ -28,7 +31,7 @@
 //          (el tablero /tareas le muestra el equipo) pueden pedir otro uuid.
 //          Si el admin lo omite, sigue siendo el alcance NULL, no el tablero entero.
 //        - Miembro con activo = false → 403 (no se eleva a admin).
-//   B) Authorization: Bearer <CRON_SECRET>  (rutinas / servidor, igual que el resto de /api/v1)
+//   C) Authorization: Bearer <CRON_SECRET>  (solo rutinas / servidor, no el cliente Kairos)
 //      Con team_member_id → ese miembro.
 //      Sin team_member_id → alcance CEO (team_member_id IS NULL), no hace falta el query.
 //
@@ -135,6 +138,9 @@ async function resolveScope(service: any, caller: ApiCaller, requestedId: string
       if (requestedId) return { ok: true, scope: { kind: 'member', teamMemberId: requestedId } }
       return { ok: true, scope: { kind: 'admin_null' } }
     case 'user':
+    case 'device':
+      /* device y JWT comparten el lookup en vivo: team_member activo, o NULL si
+         el dueño no tiene fila (CEO). teamMemberId guardado en la clave es snapshot. */
       break
     default: {
       const _never: never = caller
@@ -174,7 +180,7 @@ async function resolveScope(service: any, caller: ApiCaller, requestedId: string
 }
 
 export async function GET(request: Request) {
-  const auth = await resolveApiCaller(request)
+  const auth = await resolveApiCaller(request, { requiredScope: 'tareas:read' })
   if ('response' in auth) return auth.response
 
   const url = new URL(request.url)
