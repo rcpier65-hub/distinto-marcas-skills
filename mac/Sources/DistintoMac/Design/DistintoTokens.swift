@@ -81,6 +81,15 @@ extension Color {
         let b = Double(hex & 0xFF) / 255
         self.init(.sRGB, red: r, green: g, blue: b, opacity: opacity)
     }
+
+    init?(hexString: String?) {
+        guard var raw = hexString?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        if raw.hasPrefix("#") { raw.removeFirst() }
+        guard raw.count == 6, let value = UInt32(raw, radix: 16) else { return nil }
+        self.init(hex: value)
+    }
 }
 
 extension View {

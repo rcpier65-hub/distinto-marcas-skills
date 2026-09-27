@@ -27,16 +27,23 @@ struct AppShellView: View {
             InicioView()
         case .tareas:
             TareasBoardView()
-        case .planes, .publicaciones, .editor, .diseno, .calendario, .ideas,
-             .oficina, .notas, .soporte, .reportes, .verMarcas, .marca, .nuevaMarca,
-             .habitos, .actividad, .historial, .equipo, .settings, .perfil:
+        case .perfil:
+            PerfilView()
+        case .soporte:
+            SoporteListView()
+        case .publicaciones:
+            PublicacionesListView()
+        case .calendario:
+            CalendarioListView()
+        case .planes, .editor, .diseno, .ideas, .oficina, .notas, .reportes,
+             .verMarcas, .marca, .nuevaMarca, .habitos, .actividad, .historial,
+             .equipo, .settings:
             ModulePlaceholderView(route: appState.selectedRoute)
         }
     }
 }
 
 struct ModulePlaceholderView: View {
-    @EnvironmentObject private var appState: AppState
     @Environment(\.openURL) private var openURL
     let route: AppRoute
 
@@ -74,19 +81,13 @@ struct ModulePlaceholderView: View {
             .padding(.horizontal, 28)
             .padding(.top, 28)
 
-            if route == .perfil, let session = appState.session {
-                accountCard(session)
-                    .padding(.horizontal, 28)
-                    .padding(.top, 22)
-            }
-
             Spacer()
 
             VStack(spacing: 8) {
                 Text("Este módulo sigue en Distinto web.")
                     .font(.system(size: DistintoTokens.Typography.base, weight: .medium))
                     .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
-                Text("Inicio y Tareas abren acá. El resto usa el mismo enlace que la barra lateral de la web.")
+                Text("Perfil, Soporte, Publicaciones y Calendario abren acá. El resto usa el mismo enlace de la web.")
                     .font(.system(size: DistintoTokens.Typography.sm))
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
                     .multilineTextAlignment(.center)
@@ -97,36 +98,6 @@ struct ModulePlaceholderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(DistintoTokens.ColorToken.bgBase)
-    }
-
-    private func accountCard(_ session: AuthSession) -> some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: 0xFF8A4C), Color(hex: 0xFF5252)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 36, height: 36)
-                .overlay(
-                    Text(session.initial)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.displayName)
-                    .font(.system(size: DistintoTokens.Typography.base, weight: .semibold))
-                    .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
-                Text(session.email)
-                    .font(.system(size: DistintoTokens.Typography.sm))
-                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
-            }
-            Spacer()
-        }
-        .padding(14)
-        .distintoCard(radius: 12)
     }
 }
 

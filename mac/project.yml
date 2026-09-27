@@ -22,6 +22,7 @@ targets:
     type: application
     platform: macOS
     sources:
+      # Whole tree. New Swift files are picked up by `xcodegen generate`.
       - path: Sources/DistintoMac
     settings:
       base:

@@ -7,7 +7,9 @@ actor DistintoAPIClient {
 
     init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
-        self.decoder = JSONDecoder()
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        self.decoder = decoder
     }
 
     /// GET /api/v1/tareas?due=hoy[&include_overdue=1]
@@ -33,7 +35,52 @@ actor DistintoAPIClient {
         }
         comps.queryItems = items
 
-        var req = URLRequest(url: comps.url!)
+        let req = URLRequest(url: comps.url!)
+        return try await send(req, accessToken: accessToken)
+    }
+
+    /// GET /api/v1/perfil — nombre, email y rol de la sesión.
+    func fetchPerfil(accessToken: String) async throws -> PerfilResponse {
+        try await get("api/v1/perfil", accessToken: accessToken)
+    }
+
+    /// GET /api/v1/soporte — reportes propios, o del equipo si es director.
+    func fetchSoporte(accessToken: String) async throws -> SoporteResponse {
+        try await get("api/v1/soporte", accessToken: accessToken)
+    }
+
+    /// GET /api/v1/publicaciones — próximas y recientes, solo lectura.
+    func fetchPublicaciones(accessToken: String) async throws -> PublicacionesResponse {
+        try await get("api/v1/publicaciones", accessToken: accessToken)
+    }
+
+    /// GET /api/v1/grabaciones/calendario?desde&hasta — grabaciones y reuniones.
+    func fetchCalendario(accessToken: String, desde: String, hasta: String) async throws -> CalendarioResponse {
+        try await get(
+            "api/v1/grabaciones/calendario",
+            query: [
+                URLQueryItem(name: "desde", value: desde),
+                URLQueryItem(name: "hasta", value: hasta)
+            ],
+            accessToken: accessToken
+        )
+    }
+
+    private func get<T: Decodable>(
+        _ path: String,
+        query: [URLQueryItem] = [],
+        accessToken: String
+    ) async throws -> T {
+        var comps = URLComponents(url: AppConfig.apiBaseURL, resolvingAgainstBaseURL: false)!
+        comps.path = path.hasPrefix("/") ? path : "/" + path
+        if !query.isEmpty { comps.queryItems = query }
+        guard let url = comps.url else { throw APIError.http(-1, "URL inválida") }
+        let req = URLRequest(url: url)
+        return try await send(req, accessToken: accessToken)
+    }
+
+    private func send<T: Decodable>(_ request: URLRequest, accessToken: String) async throws -> T {
+        var req = request
         req.httpMethod = "GET"
         req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -49,7 +96,7 @@ actor DistintoAPIClient {
             throw APIError.http(http.statusCode, Self.serverMessage(from: data))
         }
         do {
-            return try decoder.decode(TareasHoyResponse.self, from: data)
+            return try decoder.decode(T.self, from: data)
         } catch {
             throw APIError.decoding
         }
