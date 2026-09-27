@@ -10,4 +10,10 @@ enum AppConfig {
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4aG1pbWxlaGRpc29uanZlZHZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNTAxODQsImV4cCI6MjA5NDcyNjE4NH0.Q8JyWFxVKLM_Z6aiGZ-GuCHaOLvhh-aSI49N5tv0Cp8"
     static let timeZone = TimeZone(identifier: "America/Lima")!
     static let pedroEmail = "pedro@agenciadistinto.com"
+
+    static func webURL(_ path: String) -> URL {
+        let base = apiBaseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let suffix = path.hasPrefix("/") ? path : "/" + path
+        return URL(string: base + suffix) ?? apiBaseURL
+    }
 }

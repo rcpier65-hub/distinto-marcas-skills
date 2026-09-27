@@ -30,8 +30,14 @@ enum DistintoTokens {
         static let danger = Color(hex: 0xEB5757)
         static let info = Color(hex: 0x5E6AD2)
 
-        /// Brand purple used for “Agregar marca” and isotipo accents.
+        /// Brand purple / yellow from the Distinto manual (isotipo + login).
         static let brandPurple = Color(hex: 0xBA41F7)
+        static let brandYellow = Color(hex: 0xF2CC2C)
+        static let brandPink = Color(hex: 0xD966F7)
+
+        static let cardBorder = Color(hex: 0xF1F1F3)
+        static let fieldBorder = Color(hex: 0xE7E5E0)
+        static let ink = Color(hex: 0x111827)
     }
 
     enum Typography {
@@ -74,5 +80,18 @@ extension Color {
         let g = Double((hex >> 8) & 0xFF) / 255
         let b = Double(hex & 0xFF) / 255
         self.init(.sRGB, red: r, green: g, blue: b, opacity: opacity)
+    }
+}
+
+extension View {
+    /// White surface used by Inicio task groups (`cardStyle` on the web).
+    func distintoCard(radius: CGFloat = 14) -> some View {
+        background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(DistintoTokens.ColorToken.cardBorder, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 1, y: 1)
     }
 }

@@ -1,26 +1,24 @@
-# Distinto macOS — Phase 0–1 scaffold
+# Distinto macOS
 
-Native SwiftUI macOS client for Distinto. Cloud backend: Vercel + Supabase.
+Native SwiftUI client for Distinto. Cloud backend stays on Vercel + Supabase (no local database). Login, the sidebar, and Hoy / Inicio follow the live app at `https://distinto-app.vercel.app` (`--mk-*` light theme, email + password only).
 
-> **Not a finished app.** This folder is the Phase 0–1 scaffold + plan.
-> See [PLAN.md](./PLAN.md) for phases and web module inventory.
+> The rest of the sidebar opens the same routes on the web. See [PLAN.md](./PLAN.md).
 
-## Open on a Mac
+## Regenerate the Xcode project
+
+`project.yml` is the source of truth. Regenerate `DistintoMac.xcodeproj` with XcodeGen whenever sources or the spec change. Do not hand-edit the `.xcodeproj`.
 
 ```bash
-# Option A — XcodeGen (recommended)
 brew install xcodegen
 cd mac
-cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
-# edit Secrets.xcconfig with anon key if needed
+cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig   # first time only
 xcodegen generate
 open DistintoMac.xcodeproj
-
-# Option B — Swift Package (library targets; app entry still needs an Xcode app target)
-open Package.swift
 ```
 
-Minimum: macOS 14+, Xcode 15+.
+Run `xcodegen generate` again after adding or removing files under `Sources/DistintoMac`. Requires macOS 14+ and Xcode 15+.
+
+`Package.swift` is only the library target. The app entry point is the XcodeGen target above.
 
 ## Layout
 
@@ -47,17 +45,21 @@ PLAN.md
 | Supabase URL | `https://exhmimlehdisonjvedvx.supabase.co` |
 | Supabase anon | copy from Supabase dashboard / `Secrets.example.xcconfig` |
 
-Hoy llama `GET /api/v1/tareas?due=hoy&include_overdue=1` con una **clave de dispositivo** creada en Distinto → Perfil → Kairos (macOS). Header: `Authorization: Bearer dst_live_…`. La clave solo lee las tareas del dueño. No uses el secreto de cron del servidor en la app.
+Hoy / Inicio calls `GET /api/v1/tareas?due=hoy&include_overdue=1` with the signed-in Supabase session:
 
-El scaffold de Fase 0–1 todavía puede iniciar sesión con email + password y mandar el access token de Supabase. Ese JWT sigue siendo válido en el mismo endpoint. La clave de dispositivo evita copiar el JWT desde Local Storage.
+```http
+Authorization: Bearer <supabase access_token>
+```
+
+The same endpoint also accepts a device key `dst_live_…` from Distinto → Perfil. Do not ship the server cron secret in the app.
 
 ```bash
-curl -H "Authorization: Bearer dst_live_…" \
+curl -H "Authorization: Bearer <supabase access_token>" \
   "https://distinto-app.vercel.app/api/v1/tareas?due=hoy&include_overdue=1"
 ```
 
-## Next step
+## First run
 
-1. This folder is the native client at `mac/` in the monorepo.
-2. On a Mac: `xcodegen generate && open DistintoMac.xcodeproj`, sign with a personal/team, run.
-3. Log in as `pedro@agenciadistinto.com` (or any team member) and verify Hoy loads.
+1. `xcodegen generate && open DistintoMac.xcodeproj`
+2. Sign with a personal or team certificate and run.
+3. Log in with the same email and password as the website. Inicio should list today's tasks; Tareas shows them as colored columns.
