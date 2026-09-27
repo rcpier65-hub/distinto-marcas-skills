@@ -54,17 +54,22 @@ Un miembro con `activo = false` recibe 403. No se le trata como admin.
 **Query params:**
 
 - `due=hoy` — único valor de v1. Si se omite, equivale a `hoy`. Otro valor → 400.
-- `include_overdue=1` — en `tareas`, `fecha_entrega <= hoy` en lugar de `= hoy`. No afecta a pendientes rápidos (no tienen fecha).
+- `include_overdue=1` — en `tareas` que SÍ tienen fecha, `fecha_entrega <= hoy` en lugar de `= hoy`. No cambia las tareas sin fecha ni los pendientes rápidos.
 - `team_member_id=<uuid>` — ver tabla de alcance.
 
 **Fuentes (v1):**
 
-1. `public.tareas` con `completada = false` y fecha en `fecha_entrega`.
+1. `public.tareas` con `completada = false`. Con `due=hoy` la unión es
+   las que tienen fecha y caen hoy (`fecha_entrega = hoy`, o `<= hoy` si
+   `include_overdue=1`) más las abiertas con `fecha_entrega IS NULL`.
+   Esas sin fecha entran como inbox con `due: null` (misma idea que los
+   pendientes rápidos); `fuente` sigue siendo `"tareas"`. Hasta 200 con fecha
+   y 200 sin fecha.
    `texto` → `titulo`, `estado` → `status` (`sin_empezar` o null → `pendiente`;
    `en_proceso` y el resto se devuelven tal cual), `marca_slug` → `marca`
    (nombre de la marca si existe, si no el slug) y, si no hay categoría, también
    `proyecto`. `categoria` del tablero → `proyecto`. `prioridad` es `null`
-   (esa columna no existe en `tareas`). `link` → `/tareas`. `fuente`: `"tareas"`.
+   (esa columna no existe en `tareas`). `link` → `/tareas`.
 2. `public.pendientes_rapidos` con `completado = false`. No tienen fecha: entran
    como inbox con `due: null` y `fuente: "pendientes_rapidos"`. `status` es
    `"pendiente"`. `prioridad` es el número guardado. La UI está en `/inicio`.
@@ -77,7 +82,7 @@ No incluye diseño ni hábitos.
 {
   "ok": true,
   "fecha": "2026-09-27",
-  "total": 2,
+  "total": 3,
   "tareas": [
     {
       "id": "uuid",
@@ -87,6 +92,17 @@ No incluye diseño ni hábitos.
       "prioridad": null,
       "proyecto": "Typhouse",
       "marca": "Typhouse",
+      "link": "https://distinto-app.vercel.app/tareas",
+      "fuente": "tareas"
+    },
+    {
+      "id": "uuid",
+      "titulo": "Revisar contrato del local",
+      "due": null,
+      "status": "pendiente",
+      "prioridad": null,
+      "proyecto": "Administrativo",
+      "marca": null,
       "link": "https://distinto-app.vercel.app/tareas",
       "fuente": "tareas"
     },
