@@ -1,11 +1,13 @@
-// Identidad del JWT de Supabase para los GET nativos de macOS.
-// No usa la cookie de la web ni getCurrentMemberPermisos (eso leería la sesión
-// del browser, no el Bearer). Misma regla que permisos-helper: sin fila en
-// team_members = admin/owner (Pedro) y ve todo.
+// Identidad del JWT de Supabase, o de una clave dst_live_ con alcance owner,
+// para los GET nativos de macOS. No usa la cookie de la web ni
+// getCurrentMemberPermisos (eso leería la sesión del browser, no el Bearer).
+// Misma regla que permisos-helper: sin fila en team_members = admin/owner
+// (Pedro) y ve todo. La clave actúa como ese usuario.
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { resolveApiCaller } from '@/lib/api/auth'
+import { DEVICE_KEY_NEEDS_OWNER, resolveApiCaller } from '@/lib/api/auth'
+import { OWNER_SCOPE, scopeSatisfies } from '@/lib/api/device-keys'
 import { mergePermisos, tieneAcceso, type Permisos } from '@/lib/team/types'
 
 export type SessionMember = {
@@ -23,6 +25,10 @@ export type SessionMember = {
   /** null = todas las marcas. */
   marcasAcceso: string[] | null
   puedePublicaciones: boolean
+  /** Mismo módulo, flag puede_editar. Sin fila de rol, puede editar. */
+  puedeEditarPublicaciones: boolean
+  /** Módulo settings. El rol director del seed no lo tiene; el owner sin fila sí. */
+  puedeSettings: boolean
   /** Módulo Reportes (`metricas`). Sin fila de rol, ve todo. */
   puedeMetricas: boolean
 }
@@ -43,8 +49,9 @@ function asPermisos(value: unknown): Permisos {
 }
 
 /**
- * Bearer de sesión (access token de Supabase).
- * La clave `dst_live_…` solo está habilitada para tareas:read.
+ * Bearer de sesión (access token de Supabase) o clave `dst_live_…` con
+ * alcance `owner`. En ambos casos la identidad es el dueño: mismas
+ * marcas_acceso y permisos de módulo. Una clave solo `tareas:read` recibe 403.
  * El secreto de cron no abre estas listas.
  */
 export async function requireSessionMember(
@@ -54,16 +61,17 @@ export async function requireSessionMember(
   if ('response' in auth) return auth
   const caller = auth.caller
 
+  let userId: string
   switch (caller.kind) {
     case 'user':
+      userId = caller.userId
       break
     case 'device':
-      return {
-        response: apiJsonError(
-          'Esta lista usa la sesión de Distinto. La clave de dispositivo solo lee tareas.',
-          403,
-        ),
+      if (!scopeSatisfies(caller.scopes, OWNER_SCOPE)) {
+        return { response: apiJsonError(DEVICE_KEY_NEEDS_OWNER, 403) }
       }
+      userId = caller.userId
+      break
     case 'cron':
       return { response: apiJsonError('Unauthorized: necesitás la sesión de Distinto', 401) }
     default: {
@@ -71,8 +79,6 @@ export async function requireSessionMember(
       return _never
     }
   }
-
-  const userId = caller.userId
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let service: any
@@ -114,6 +120,8 @@ export async function requireSessionMember(
         teamMemberId: null,
         marcasAcceso: null,
         puedePublicaciones: true,
+        puedeEditarPublicaciones: true,
+        puedeSettings: true,
         puedeMetricas: true,
       },
     }
@@ -127,6 +135,8 @@ export async function requireSessionMember(
   let rolNombre: string | null = rolBase
   // Sin fila de rol, permisos-helper devuelve null (= ve todo). Con rol, manda el merge.
   let puedePublicaciones = true
+  let puedeEditarPublicaciones = true
+  let puedeSettings = true
   let puedeMetricas = true
 
   if (rolBase) {
@@ -140,6 +150,8 @@ export async function requireSessionMember(
       rolNombre = typeof rol.nombre === 'string' && rol.nombre.trim() ? rol.nombre.trim() : rolBase
       const permisos = mergePermisos(asPermisos(rol.permisos_default), asPermisos(row.permisos_override))
       puedePublicaciones = tieneAcceso(permisos, 'publicaciones')
+      puedeEditarPublicaciones = puedePublicaciones && permisos.publicaciones?.puede_editar === true
+      puedeSettings = tieneAcceso(permisos, 'settings')
       puedeMetricas = tieneAcceso(permisos, 'metricas')
     }
   }
@@ -166,7 +178,27 @@ export async function requireSessionMember(
       teamMemberId: typeof row.id === 'string' ? row.id : null,
       marcasAcceso: asMarcaIds(row.marcas_acceso),
       puedePublicaciones,
+      puedeEditarPublicaciones,
+      puedeSettings,
       puedeMetricas,
     },
   }
+}
+
+/** 403 si la marca no está en marcas_acceso. null = todas. */
+export function denyMarcaAcceso(member: SessionMember, marcaId: string): NextResponse | null {
+  if (member.marcasAcceso == null) return null
+  if (member.marcasAcceso.includes(marcaId)) return null
+  return apiJsonError('No tienes acceso a esa marca', 403)
+}
+
+/**
+ * Datos canon (marca_facts): owner sin team_member, rol director/admin,
+ * o quien tenga el módulo settings. Igual que /settings para el owner,
+ * y abierto al director aunque el seed de ese rol no traiga settings.
+ */
+export function puedeEscribirMarcaFacts(member: SessionMember): boolean {
+  if (!member.esEquipo) return true
+  if (member.esDirector || member.rolBase === 'admin') return true
+  return member.puedeSettings
 }

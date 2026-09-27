@@ -3,7 +3,7 @@
 // Próximas (misma ventana que el home) y notas recientes.
 // Director, o sesión sin team_member, ve las notas del equipo.
 // El resto ve solo las suyas. No crea ni edita. El detalle abre la web.
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer JWT o dst_live_ con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { appBase, ymdLima } from '@/lib/api/lima'

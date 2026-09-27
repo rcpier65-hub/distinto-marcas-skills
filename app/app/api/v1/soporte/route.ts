@@ -4,7 +4,7 @@
 //   - director, o admin sin team_member: todos (hasta 300, más nuevos primero)
 //   - el resto: solo los propios
 // No crea ni resuelve. El detalle sigue en la web (no hay ruta por reporte).
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer JWT o dst_live_ con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { appBase } from '@/lib/api/lima'

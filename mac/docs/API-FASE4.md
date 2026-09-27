@@ -1,8 +1,44 @@
 # API macOS — Perfil, Soporte, Publicaciones, Calendario, Reportes, Notas, Oficina, Ideas
 
-Cliente: `Authorization: Bearer <supabase access_token>` (la sesión del login).
+Cliente: `Authorization: Bearer <supabase access_token>` (la sesión del login)
+**o** `Authorization: Bearer dst_live_…` con alcance `owner`.
 
-La clave `dst_live_…` sigue sirviendo solo para `GET /api/v1/tareas` (`tareas:read`). En estas rutas responde 403. No mandar `CRON_SECRET` desde el Mac.
+Una clave solo `tareas:read` sigue limitada a `GET /api/v1/tareas` (403 en el resto).
+La clave de un director, admin u owner se crea ya con `owner`. Las viejas se
+amplían en Perfil → Kairos («Acceso completo») o con
+`PATCH /api/v1/device-keys/:id` `{"scopes":["owner"]}`: el token no cambia.
+
+**Nunca poner `CRON_SECRET` en el Mac ni en Nay.** Ese secreto es solo de rutinas
+del servidor. La matriz completa está en `app/app/api/v1/README.md`.
+
+Con `owner`, Nay llama igual que la sesión del dueño (mismos módulos y
+`marcas_acceso`):
+
+```bash
+# Publicaciones de una marca
+curl -H "Authorization: Bearer dst_live_…" \
+  "https://distinto-app.vercel.app/api/v1/publicaciones?marca=kintu"
+
+# Marca + facts + drive (drive.folder_id parseado de drive_url)
+curl -H "Authorization: Bearer dst_live_…" \
+  https://distinto-app.vercel.app/api/v1/marcas/kintu
+
+# Editar una publicación
+curl -X PATCH -H "Authorization: Bearer dst_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"copy":"Nuevo copy","estado":"aprobar"}' \
+  https://distinto-app.vercel.app/api/v1/publicaciones/<uuid>
+
+# Crear una tarea
+curl -X POST -H "Authorization: Bearer dst_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"texto":"Cerrar pauta","marca_slug":"kintu"}' \
+  https://distinto-app.vercel.app/api/v1/tareas
+```
+
+`GET /api/v1/marcas/:slug/facts` también acepta la clave `owner` (y sigue
+aceptando `CRON_SECRET` para la Routine). Escribir facts es `PATCH` o `PUT`
+en esa ruta, solo director/owner, sin cron.
 
 Base: `https://distinto-app.vercel.app`
 
@@ -61,7 +97,9 @@ Misma visibilidad que `/soporte`: director, o usuario sin `team_member`, ve el e
 
 ## `GET /api/v1/publicaciones`
 
-Lista de solo lectura. Default: desde 21 días atrás hasta 45 adelante (Lima). Opcional `?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (máx. 120 días).
+Lista de solo lectura. Default: desde 21 días atrás hasta 45 adelante (Lima). Opcional `?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (máx. 120 días) y `?marca=<slug>` (404 si el slug no existe, 403 si está fuera de `marcas_acceso`).
+
+`GET /api/v1/publicaciones/:id` devuelve copy, guion, estado real, fechas, Drive y links. `PATCH` en esa ruta actualiza esos campos si el usuario puede editar publicaciones. Detalle y curls en `app/app/api/v1/README.md`.
 
 Exige el módulo `publicaciones` (si no: 403 `No tienes acceso a Publicaciones`). Respeta `marcas_acceso`. Los estados salen como en el listado web (`pendiente`, `publicando`, `publicado`, `error`, `borrador`). `link` abre `/publicaciones/{id}`.
 

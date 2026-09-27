@@ -1,5 +1,7 @@
 // GET  /api/v1/device-keys     lista metadata (sin hash ni plaintext)
 // POST /api/v1/device-keys     crea { name } y devuelve el token dst_live_ una sola vez
+//   Director, admin, o usuario sin team_member: scopes ["owner"].
+//   El resto: ["tareas:read"]. Ampliar una clave vieja: PATCH /api/v1/device-keys/:id.
 //
 // Auth: cookie de sesión de Distinto o Bearer JWT de Supabase.
 // No acepta la clave de dispositivo ni CRON_SECRET.
@@ -8,7 +10,12 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { resolveDeviceKeyOwner } from '@/lib/api/auth'
 import { generateDeviceApiKey } from '@/lib/api/device-key-token'
-import { TAREAS_READ_SCOPE, listDeviceKeys, loadOwnerTeamMember, toPublicKey } from '@/lib/api/device-keys'
+import {
+  defaultDeviceKeyScopes,
+  listDeviceKeys,
+  loadKeyIssuer,
+  toPublicKey,
+} from '@/lib/api/device-keys'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,9 +45,16 @@ export async function GET(request: Request) {
   const auth = await resolveDeviceKeyOwner(request)
   if ('response' in auth) return auth.response
 
+  const issuer = await loadKeyIssuer(auth.userId)
+  if (!issuer.ok) return jsonError(issuer.error, issuer.status)
+
   const listed = await listDeviceKeys(auth.userId)
   if (!listed.ok) return jsonError(listed.error, listed.status)
-  return NextResponse.json({ ok: true, keys: listed.keys })
+  return NextResponse.json({
+    ok: true,
+    can_issue_owner: issuer.issuer.canIssueOwner,
+    keys: listed.keys,
+  })
 }
 
 export async function POST(request: Request) {
@@ -56,8 +70,8 @@ export async function POST(request: Request) {
   const parsed = parseName(body)
   if (!parsed.ok) return jsonError(parsed.error, 400)
 
-  const member = await loadOwnerTeamMember(auth.userId)
-  if (!member.ok) return jsonError(member.error, member.status)
+  const issuer = await loadKeyIssuer(auth.userId)
+  if (!issuer.ok) return jsonError(issuer.error, issuer.status)
 
   const generated = generateDeviceApiKey()
 
@@ -73,11 +87,11 @@ export async function POST(request: Request) {
     .from('api_device_keys')
     .insert({
       user_id: auth.userId,
-      team_member_id: member.teamMemberId,
+      team_member_id: issuer.issuer.teamMemberId,
       name: parsed.name,
       key_prefix: generated.prefix,
       key_hash: generated.hash,
-      scopes: [TAREAS_READ_SCOPE],
+      scopes: defaultDeviceKeyScopes(issuer.issuer.canIssueOwner),
     })
     .select('id, name, key_prefix, scopes, created_at, last_used_at, revoked_at')
     .single()

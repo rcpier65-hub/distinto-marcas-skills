@@ -5,7 +5,7 @@
 // Agenda de solo lectura: grabaciones + reuniones del rango.
 // Mismo permiso que /grabaciones/calendario (módulo publicaciones) y el
 // mismo filtro de marcas. Los eventos de Google Calendar siguen solo en la web.
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer JWT o dst_live_ con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { formatHora12 } from '@/lib/utils/format-hora'

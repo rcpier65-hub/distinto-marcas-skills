@@ -18,9 +18,10 @@ type Props = {
   rolNombre: string
   deviceKeys: DeviceKeyListItem[]
   deviceKeysError: string | null
+  canIssueOwner: boolean
 }
 
-export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysError }: Props) {
+export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysError, canIssueOwner }: Props) {
   const router = useRouter()
   const [member, setMember] = useState(initial)
   const [pending, startTransition] = useTransition()
@@ -209,7 +210,7 @@ export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysE
                 placeholder={rolNombre}
                 style={fieldStyle}
               />
-              <Hint>Si lo dejas vacío, se muestra "{rolNombre}".</Hint>
+              <Hint>Si lo dejas vacío, se muestra &quot;{rolNombre}&quot;.</Hint>
             </Campo>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Campo label="Cumpleaños">
@@ -290,7 +291,7 @@ export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysE
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <DeviceKeysCard initialKeys={deviceKeys} initialError={deviceKeysError} />
+          <DeviceKeysCard initialKeys={deviceKeys} initialError={deviceKeysError} canIssueOwner={canIssueOwner} />
         </div>
       </div>
     </main>

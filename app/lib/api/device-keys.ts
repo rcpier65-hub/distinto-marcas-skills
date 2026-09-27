@@ -3,8 +3,23 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { hashDeviceApiKey } from '@/lib/api/device-key-token'
+import { canIssueOwnerScope } from '@/lib/api/device-key-scopes'
 
-export const TAREAS_READ_SCOPE = 'tareas:read'
+export {
+  TAREAS_READ_SCOPE,
+  OWNER_SCOPE,
+  scopeSatisfies,
+  hasOwnerScope,
+  canIssueOwnerScope,
+  defaultDeviceKeyScopes,
+  parseReplacementScopes,
+} from '@/lib/api/device-key-scopes'
+
+export type KeyIssuer = {
+  teamMemberId: string | null
+  rolBase: string | null
+  canIssueOwner: boolean
+}
 
 export type DeviceKeyPublic = {
   id: string
@@ -137,9 +152,8 @@ export async function listDeviceKeys(userId: string): Promise<
   return { ok: true, keys }
 }
 
-export async function loadOwnerTeamMember(userId: string): Promise<
-  | { ok: true; teamMemberId: string | null }
-  | { ok: false; status: number; error: string }
+export async function loadKeyIssuer(userId: string): Promise<
+  { ok: true; issuer: KeyIssuer } | { ok: false; status: number; error: string }
 > {
   const db = service()
   if ('error' in db) return { ok: false, status: 500, error: db.error }
@@ -148,7 +162,7 @@ export async function loadOwnerTeamMember(userId: string): Promise<
   const svc = db.client as any
   const { data, error } = await svc
     .from('team_members')
-    .select('id, activo')
+    .select('id, activo, rol_base')
     .eq('auth_user_id', userId)
     .maybeSingle()
 
@@ -156,5 +170,24 @@ export async function loadOwnerTeamMember(userId: string): Promise<
   if (data && data.activo === false) {
     return { ok: false, status: 403, error: 'Miembro desactivado' }
   }
-  return { ok: true, teamMemberId: (data?.id as string | undefined) ?? null }
+
+  const teamMemberId = (data?.id as string | undefined) ?? null
+  const rolBase = typeof data?.rol_base === 'string' ? data.rol_base : null
+  return {
+    ok: true,
+    issuer: {
+      teamMemberId,
+      rolBase,
+      canIssueOwner: canIssueOwnerScope({ teamMemberId, rolBase }),
+    },
+  }
+}
+
+export async function loadOwnerTeamMember(userId: string): Promise<
+  | { ok: true; teamMemberId: string | null }
+  | { ok: false; status: number; error: string }
+> {
+  const loaded = await loadKeyIssuer(userId)
+  if (!loaded.ok) return loaded
+  return { ok: true, teamMemberId: loaded.issuer.teamMemberId }
 }

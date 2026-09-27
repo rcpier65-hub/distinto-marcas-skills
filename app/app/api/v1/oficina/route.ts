@@ -2,7 +2,7 @@
 //
 // Escritorios del mapa, quién los reclamó, salas y atajos.
 // Caminar, hablar y reclamar un puesto sigue en la web.
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer JWT o dst_live_ con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { appBase } from '@/lib/api/lima'

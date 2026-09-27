@@ -8,18 +8,58 @@ base de datos. La app de Distinto es el "data layer", la Routine es el "cerebro"
 
 ## Auth
 
-La mayoría de endpoints requieren header:
+La mayoría de endpoints de **rutinas** requieren header:
 
 ```
 Authorization: Bearer <CRON_SECRET>
 ```
 
 El valor de `CRON_SECRET` está en Vercel env vars del proyecto `distinto-app`.
+**Nunca va en el Mac ni en Nay.** Solo lo usan rutinas del servidor.
 
-**Excepción:** `GET /api/v1/tareas` es el contrato de Kairos (macOS). Kairos
-manda una clave de dispositivo `dst_live_…` creada en Perfil. También acepta
-el access token de Supabase Auth. El fallback `Bearer <CRON_SECRET>` queda
-solo para rutinas de servidor: no va en el cliente. Detalle en esa sección.
+### Matriz para Nay (Kairos)
+
+Nay usa una clave de dispositivo `dst_live_…` (Perfil → Kairos) o el JWT de
+Supabase de la sesión (`Authorization: Bearer <supabase access_token>`).
+La clave con alcance `owner` actúa como el usuario que la creó: mismos
+módulos y `marcas_acceso` que esa sesión (director/owner, por ejemplo
+pedro@agenciadistinto.com).
+
+| Quién emite la clave | `scopes` al crearla |
+|---|---|
+| Sin fila en `team_members`, o rol `director` / `admin` | `["owner"]` |
+| Cualquier otro miembro | `["tareas:read"]` |
+
+`owner` cubre `tareas:read` y el resto de la API de usuario. Al validar también
+valen los alias `full` y `*`. Una clave vieja que solo tiene `tareas:read` se
+amplía **sin rotar el token**:
+
+```bash
+curl -X PATCH -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":["owner"]}' \
+  https://distinto-app.vercel.app/api/v1/device-keys/<uuid>
+```
+
+Eso lo puede hacer el dueño de la clave si es director, admin u owner. En la
+web: Perfil → Kairos → «Acceso completo». Bajar de nuevo: `{"scopes":["tareas:read"]}`.
+
+| Endpoint | `dst_live_` `owner` | JWT de sesión | `dst_live_` solo `tareas:read` | `CRON_SECRET` |
+|---|---|---|---|---|
+| `GET /api/v1/tareas` | sí | sí | sí | sí (solo servidor) |
+| `POST /api/v1/tareas`, `PATCH /api/v1/tareas/:id` | sí | sí | no | no |
+| `GET /api/v1/publicaciones` (`?marca=`) | sí | sí | no | no |
+| `GET` y `PATCH /api/v1/publicaciones/:id` | sí | sí | no | no |
+| `GET /api/v1/marcas/:slug` | sí | sí | no | no |
+| `GET /api/v1/marcas/:slug/facts` | sí | sí | no | sí (rutina) |
+| `PATCH` y `PUT /api/v1/marcas/:slug/facts` | sí (director/owner) | sí (director/owner) | no | no |
+| GET Mac: perfil, soporte, reportes, calendario, notas, oficina, ideas | sí | sí | no | no |
+| `GET /api/v1/marcas` (lista) y el resto de rutinas de comentarios | no | no | no | sí |
+
+Los GET que antes pedían solo JWT (perfil, soporte, publicaciones, reportes,
+calendario, notas, oficina, ideas) aceptan la misma clave `owner`. El permiso
+de módulo y `marcas_acceso` siguen siendo los del dueño. `CRON_SECRET` no abre
+esas listas.
 
 ---
 
@@ -40,11 +80,11 @@ Authorization: Bearer <supabase access_token>
 
 La clave de dispositivo se crea en Distinto → Perfil → «Kairos (macOS)».
 Formato `dst_live_` + secreto. En la base solo se guarda el SHA-256. El
-plaintext se muestra una vez. Alcance `tareas:read` del dueño: mismas filas
-que si ese usuario mandara su JWT (miembro → sus tareas; sin fila en
-`team_members` → alcance CEO `team_member_id IS NULL`). Una clave revocada
-responde 401. Gestionar claves (`/api/v1/device-keys`) exige la sesión o el
-JWT, no la clave de dispositivo.
+plaintext se muestra una vez. Una clave `tareas:read` o `owner` ve las mismas
+filas que si ese usuario mandara su JWT (miembro → sus tareas; sin fila en
+`team_members` → alcance CEO `team_member_id IS NULL`). `owner` también crea
+y completa tareas. Una clave revocada responde 401. Gestionar claves
+(`/api/v1/device-keys`) exige la sesión o el JWT, no la clave de dispositivo.
 
 El access token es el JWT de sesión de Supabase Auth (`session.access_token`).
 Se valida con la anon key y `auth.getUser(jwt)`. No hace falta cookie.
@@ -178,7 +218,7 @@ Lista las claves del usuario logueado. No incluye el secreto ni el hash.
       "created_at": "2026-09-27T18:00:00.000Z",
       "last_used_at": null,
       "revoked": false,
-      "scopes": ["tareas:read"]
+      "scopes": ["owner"]
     }
   ]
 }
@@ -197,6 +237,22 @@ curl -X POST -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   https://distinto-app.vercel.app/api/v1/device-keys
 ```
 
+Director, admin u owner reciben `scopes: ["owner"]`. El resto recibe
+`["tareas:read"]`. `GET /api/v1/device-keys` incluye `can_issue_owner`.
+
+#### `PATCH /api/v1/device-keys/:id`
+
+Amplía o reduce el alcance **sin cambiar** el `dst_live_…`. Body:
+`{"scopes":["owner"]}` o `{"scopes":["tareas:read"]}`. Una clave revocada
+responde 409. Quien no es director/admin/owner no puede pedir `owner` (403).
+
+```bash
+curl -X PATCH -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":["owner"]}' \
+  https://distinto-app.vercel.app/api/v1/device-keys/<uuid>
+```
+
 #### `DELETE /api/v1/device-keys/:id`
 
 Revoca la clave (no la borra). Repetir el DELETE sobre una clave ya revocada
@@ -206,6 +262,154 @@ responde 200.
 curl -X DELETE -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   https://distinto-app.vercel.app/api/v1/device-keys/<uuid>
 ```
+
+---
+
+### `POST /api/v1/tareas`
+
+Crea una tarea o un pendiente rápido. Auth: JWT o `dst_live_` con `owner`.
+No acepta `CRON_SECRET`.
+
+```bash
+curl -X POST -H "Authorization: Bearer dst_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"texto":"Cerrar pauta de Kintu","marca_slug":"kintu","fecha_entrega":"2026-09-28"}' \
+  https://distinto-app.vercel.app/api/v1/tareas
+```
+
+`fuente` opcional: `tareas` (default) o `pendientes_rapidos`. En pendientes,
+`prioridad` es 1, 2 o 3 y `categoria` es Diseño, Edición, Comunicación,
+Investigación, Personal, Urgente, Administrativo u Otro. `team_member_id`
+asigna a otra persona solo si el dueño es director, admin, owner o el miembro
+llamado Pedro.
+
+### `PATCH /api/v1/tareas/:id`
+
+Completa o edita. Misma auth que el POST. Quien puede tocarla: owner sin
+`team_members`, director, admin, Pedro, el asignado o el creador.
+
+```bash
+curl -X PATCH -H "Authorization: Bearer dst_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"completada":true}' \
+  https://distinto-app.vercel.app/api/v1/tareas/<uuid>
+```
+
+Pendiente rápido: `{"fuente":"pendientes_rapidos","completado":true}`.
+
+### `GET /api/v1/publicaciones`
+
+Además de `desde` y `hasta`, acepta `?marca=<slug>`.
+
+- Slug que no existe → 404.
+- Slug fuera de `marcas_acceso` → 403.
+- Sin el módulo publicaciones → 403.
+
+Auth: JWT o `dst_live_` `owner`. No usa `CRON_SECRET` (semana y mes siguen
+siendo de rutina).
+
+```bash
+curl -H "Authorization: Bearer dst_live_…" \
+  "https://distinto-app.vercel.app/api/v1/publicaciones?marca=kintu"
+```
+
+La respuesta incluye `marca` (el slug pedido, o `null`).
+
+### `GET /api/v1/publicaciones/:id`
+
+Ficha para Nay: nombre, copy, guion, estado (valor real del pipeline),
+estado_tarea, fechas, plataformas, tipo, marca, `drive_material_url`,
+`drive_resultado_url`, links de TikTok e Instagram, portadas y videos.
+404 si no existe. 403 si la marca está fuera de `marcas_acceso`.
+
+### `PATCH /api/v1/publicaciones/:id`
+
+Actualiza los campos que mandes (estado, copy, guion, fechas, URLs de Drive,
+links, checklist). Exige `puede_editar` del módulo publicaciones, igual que
+la web. No dispara el push ni el flujo de «mandar a diseño» del formulario.
+No acepta `CRON_SECRET`.
+
+```bash
+curl -X PATCH -H "Authorization: Bearer dst_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"estado":"aprobar","copy":"Nuevo copy","drive_resultado_url":"https://drive.google.com/drive/folders/abc"}' \
+  https://distinto-app.vercel.app/api/v1/publicaciones/<uuid>
+```
+
+`estado` es el enum de la grilla (`tareas`, `idear`, `editar`, `disenar`,
+`aprobar`, `programar`, `publicado`, …). Las URLs tienen que ser `http` o
+`https`.
+
+### `GET /api/v1/marcas/:slug`
+
+Branding, facts y Drive para Nay. JWT o `dst_live_` `owner`. 404 slug inválido
+o inexistente. 403 fuera de `marcas_acceso`. No incluye tokens de Metricool.
+No usa `CRON_SECRET`.
+
+```bash
+curl -H "Authorization: Bearer dst_live_…" \
+  https://distinto-app.vercel.app/api/v1/marcas/kintu
+```
+
+```json
+{
+  "ok": true,
+  "has_facts": true,
+  "marca": {
+    "slug": "kintu",
+    "nombre": "Kintu",
+    "emoji": "🌿",
+    "color": "#234347",
+    "logo_url": null,
+    "activa": true,
+    "drive": {
+      "drive_url": "https://drive.google.com/drive/folders/FOLDER_ID",
+      "folder_id": "FOLDER_ID"
+    }
+  },
+  "facts": {
+    "nombre_comercial": "Kintu",
+    "web_principal": null,
+    "whatsapp_principal": null,
+    "puntos_venta": [],
+    "proximamente": [],
+    "productos_datos": {},
+    "frases_prohibidas": [],
+    "frases_canon": [],
+    "notas": null,
+    "updated_at": null
+  }
+}
+```
+
+`folder_id` sale de `drive_url`: `/folders/ID` o `open?id=ID`. Si no hay URL,
+`folder_id` es `null`.
+
+### `GET /api/v1/marcas/:slug/facts`
+
+Sigue aceptando `CRON_SECRET` para la Routine (respuesta anterior, con
+`metricool_blog_id`, que es un id y no un token). También acepta JWT o
+`dst_live_` `owner`, con `marcas_acceso`. Nay usa esta ruta o
+`GET /api/v1/marcas/:slug`. No hace falta el secreto de cron en el Mac.
+
+### `PATCH` y `PUT /api/v1/marcas/:slug/facts`
+
+Escribe los campos presentes de `marca_facts`. Los que no vienen se conservan.
+Strings vacíos se guardan como `null`. `productos_datos` es un objeto JSON
+(reemplaza el objeto entero). Permiso: usuario sin `team_members`, rol
+director o admin, o módulo settings. JWT o `dst_live_` `owner`. No acepta
+`CRON_SECRET`.
+
+```bash
+curl -X PATCH -H "Authorization: Bearer dst_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"nombre_comercial":"Kintu","web_principal":"kintu.pe","frases_canon":["Ingresa a kintu.pe"]}' \
+  https://distinto-app.vercel.app/api/v1/marcas/kintu/facts
+```
+
+Campos: `nombre_comercial`, `web_principal`, `whatsapp_principal`,
+`puntos_venta`, `proximamente`, `productos_datos`, `frases_prohibidas`,
+`frases_canon`, `notas`.
 
 ---
 

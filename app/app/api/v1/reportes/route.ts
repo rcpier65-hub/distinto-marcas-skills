@@ -3,7 +3,7 @@
 // Marcas activas que esta sesión puede ver, con el último mes de reporte
 // (seed + reportes_mensuales, la base gana). Misma data que el hub de
 // /reportes. No edita meses. El detalle y el formulario siguen en la web.
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer JWT o dst_live_ con alcance owner.
 // Exige el módulo metricas. Respeta marcas_acceso (null = todas).
 
 import { NextResponse } from 'next/server'

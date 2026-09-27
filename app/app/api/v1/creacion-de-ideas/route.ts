@@ -4,7 +4,7 @@
 // Banco compartido de Creación de Ideas. Las ideas guardadas por cada
 // persona viven en el navegador y no salen en este GET.
 // Crear un guion sigue en la web.
-// Auth: Authorization: Bearer <supabase access_token>
+// Auth: Bearer JWT o dst_live_ con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { appBase } from '@/lib/api/lima'

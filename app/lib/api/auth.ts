@@ -9,7 +9,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/auth/get-user'
-import { authenticateDeviceKey } from '@/lib/api/device-keys'
+import { authenticateDeviceKey, OWNER_SCOPE, scopeSatisfies } from '@/lib/api/device-keys'
 import { isDeviceApiKeyToken } from '@/lib/api/device-key-token'
 
 export function checkApiBearer(request: Request): { ok: true } | { response: NextResponse } {
@@ -42,6 +42,9 @@ const UNAUTHORIZED_MSG =
 
 const SESSION_UNAUTHORIZED_MSG =
   'Unauthorized: necesitás iniciar sesión en Distinto o mandar Authorization: Bearer <supabase access_token>'
+
+export const DEVICE_KEY_NEEDS_OWNER =
+  'La clave de dispositivo solo tiene tareas:read. En Perfil → Kairos ampliá el alcance a owner (el token dst_live_ no cambia) o creá una clave nueva.'
 
 function unauthorized(): NextResponse {
   return NextResponse.json({ ok: false, error: UNAUTHORIZED_MSG }, { status: 401 })
@@ -82,6 +85,7 @@ function bearerToken(request: Request): string | null {
  *
  * 1. `Bearer dst_live_…` → clave de dispositivo. Rechaza revocadas, actualiza
  *    last_used_at y devuelve el dueño. Si `requiredScope` no está en la clave → 403.
+ *    El alcance `owner` (o alias `full` / `*`) cubre cualquier scope, incluido `tareas:read`.
  * 2. `Bearer <CRON_SECRET>` → `{ kind: 'cron' }` solo para rutinas de servidor.
  * 3. Cualquier otro bearer se valida como JWT de Supabase (`auth.getUser`).
  *
@@ -102,7 +106,7 @@ export async function resolveApiCaller(
       return { response: jsonError(error, found.status) }
     }
     const required = options?.requiredScope
-    if (required && !found.scopes.includes(required)) {
+    if (required && !scopeSatisfies(found.scopes, required)) {
       return { response: jsonError(`La clave no incluye el permiso ${required}`, 403) }
     }
     return {
@@ -164,4 +168,32 @@ export async function resolveDeviceKeyOwner(
   const user = await getUser()
   if (!user) return { response: unauthorizedSession() }
   return { ok: true, userId: user.id }
+}
+
+/**
+ * Escritura de usuario: JWT de Supabase o clave dst_live_ con alcance owner.
+ * No acepta CRON_SECRET (eso queda en las rutinas de servidor).
+ * La clave con solo tareas:read recibe 403.
+ */
+export async function requireApiActor(
+  request: Request,
+): Promise<{ ok: true; userId: string } | { response: NextResponse }> {
+  const auth = await resolveApiCaller(request)
+  if ('response' in auth) return auth
+
+  switch (auth.caller.kind) {
+    case 'user':
+      return { ok: true, userId: auth.caller.userId }
+    case 'device':
+      if (!scopeSatisfies(auth.caller.scopes, OWNER_SCOPE)) {
+        return { response: jsonError(DEVICE_KEY_NEEDS_OWNER, 403) }
+      }
+      return { ok: true, userId: auth.caller.userId }
+    case 'cron':
+      return { response: jsonError('Unauthorized: esta operación no acepta CRON_SECRET', 401) }
+    default: {
+      const _never: never = auth.caller
+      return _never
+    }
+  }
 }
