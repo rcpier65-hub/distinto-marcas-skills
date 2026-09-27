@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DEVICE_KEY_NEEDS_OWNER, resolveApiCaller } from '@/lib/api/auth'
 import { OWNER_SCOPE, scopeSatisfies } from '@/lib/api/device-keys'
+import { esPedroEmail } from '@/lib/planes/catalogo'
 import { mergePermisos, tieneAcceso, type Permisos } from '@/lib/team/types'
 
 export type SessionMember = {
@@ -31,6 +32,18 @@ export type SessionMember = {
   puedeSettings: boolean
   /** Módulo Reportes (`metricas`). Sin fila de rol, ve todo. */
   puedeMetricas: boolean
+  puedeEditor: boolean
+  puedeDiseno: boolean
+  puedeGrilla: boolean
+  puedeMarcas: boolean
+  puedeEquipo: boolean
+  /** Diseño, publicaciones, director, admin, o sin fila de equipo. */
+  puedeHistorias: boolean
+  /** Sidebar «Ver todas» / «Agregar marca»: director, admin, o sin fila. */
+  puedeGestionarMarcas: boolean
+  /** Sidebar Historial y reporte de todo el equipo: director o sin fila. */
+  esCeo: boolean
+  esPedro: boolean
 }
 
 export function apiJsonError(error: string, status: number): NextResponse {
@@ -107,7 +120,7 @@ export async function requireSessionMember(
   if (!row) {
     return {
       ok: true,
-      member: {
+      member: memberPayload({
         userId,
         email: authEmail,
         nombre: null,
@@ -123,7 +136,12 @@ export async function requireSessionMember(
         puedeEditarPublicaciones: true,
         puedeSettings: true,
         puedeMetricas: true,
-      },
+        puedeEditor: true,
+        puedeDiseno: true,
+        puedeGrilla: true,
+        puedeMarcas: true,
+        puedeEquipo: true,
+      }),
     }
   }
 
@@ -138,6 +156,11 @@ export async function requireSessionMember(
   let puedeEditarPublicaciones = true
   let puedeSettings = true
   let puedeMetricas = true
+  let puedeEditor = true
+  let puedeDiseno = true
+  let puedeGrilla = true
+  let puedeMarcas = true
+  let puedeEquipo = true
 
   if (rolBase) {
     const { data: rol, error: rolError } = await service
@@ -153,6 +176,11 @@ export async function requireSessionMember(
       puedeEditarPublicaciones = puedePublicaciones && permisos.publicaciones?.puede_editar === true
       puedeSettings = tieneAcceso(permisos, 'settings')
       puedeMetricas = tieneAcceso(permisos, 'metricas')
+      puedeEditor = tieneAcceso(permisos, 'editor')
+      puedeDiseno = tieneAcceso(permisos, 'diseno')
+      puedeGrilla = tieneAcceso(permisos, 'grilla')
+      puedeMarcas = tieneAcceso(permisos, 'marcas')
+      puedeEquipo = tieneAcceso(permisos, 'equipo')
     }
   }
 
@@ -165,7 +193,7 @@ export async function requireSessionMember(
 
   return {
     ok: true,
-    member: {
+    member: memberPayload({
       userId,
       email: authEmail ?? emailMiembro,
       nombre,
@@ -181,7 +209,27 @@ export async function requireSessionMember(
       puedeEditarPublicaciones,
       puedeSettings,
       puedeMetricas,
-    },
+      puedeEditor,
+      puedeDiseno,
+      puedeGrilla,
+      puedeMarcas,
+      puedeEquipo,
+    }),
+  }
+}
+
+type MemberCore = Omit<SessionMember, 'puedeHistorias' | 'puedeGestionarMarcas' | 'esCeo' | 'esPedro'>
+
+function memberPayload(core: MemberCore): SessionMember {
+  const owner = !core.esEquipo
+  const director = core.rolBase === 'director'
+  const admin = core.rolBase === 'admin'
+  return {
+    ...core,
+    puedeHistorias: owner || director || admin || core.puedeDiseno || core.puedePublicaciones,
+    puedeGestionarMarcas: owner || director || admin,
+    esCeo: owner || director,
+    esPedro: esPedroEmail(core.email),
   }
 }
 

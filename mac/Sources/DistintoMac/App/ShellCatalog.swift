@@ -7,12 +7,14 @@ enum AppRoute: Hashable {
     case publicaciones
     case editor
     case diseno
+    case historias
     case calendario
     case ideas
     case oficina
     case notas
     case soporte
     case reportes
+    case influencers
     case verMarcas
     case marca(String)
     case nuevaMarca
@@ -31,12 +33,14 @@ enum AppRoute: Hashable {
         case .publicaciones: return "Publicaciones"
         case .editor: return "Editor"
         case .diseno: return "Diseño"
+        case .historias: return "Historias"
         case .calendario: return "Calendario"
         case .ideas: return "Creación de Ideas"
         case .oficina: return "Oficina"
         case .notas: return "Notas y reuniones"
         case .soporte: return "Soporte"
         case .reportes: return "Reportes"
+        case .influencers: return "Influencers"
         case .verMarcas: return "Ver todas"
         case .marca(let slug):
             return MarcaCatalog.all.first { $0.slug == slug }?.nombreCorto ?? slug
@@ -58,12 +62,14 @@ enum AppRoute: Hashable {
         case .publicaciones: return "calendar"
         case .editor: return "pencil"
         case .diseno: return "paintbrush"
+        case .historias: return "circle.dashed"
         case .calendario: return "video"
         case .ideas: return "sparkles"
         case .oficina: return "building.2"
         case .notas: return "note.text"
         case .soporte: return "lifepreserver"
         case .reportes: return "chart.bar"
+        case .influencers: return "person.crop.rectangle"
         case .verMarcas: return "square.grid.2x2"
         case .marca: return "tag"
         case .nuevaMarca: return "plus"
@@ -84,12 +90,14 @@ enum AppRoute: Hashable {
         case .publicaciones: return "/publicaciones"
         case .editor: return "/editor"
         case .diseno: return "/diseno"
+        case .historias: return "/historias"
         case .calendario: return "/grabaciones/calendario"
         case .ideas: return "/creacion-de-ideas"
         case .oficina: return "/oficina"
         case .notas: return "/notas-reuniones"
         case .soporte: return "/soporte"
         case .reportes: return "/reportes"
+        case .influencers: return "/influencers"
         case .verMarcas: return "/dashboard"
         case .marca(let slug): return "/grilla/\(slug)"
         case .nuevaMarca: return "/dashboard?nueva=1"
@@ -99,48 +107,6 @@ enum AppRoute: Hashable {
         case .equipo: return "/equipo"
         case .settings: return "/settings"
         case .perfil: return "/perfil"
-        }
-    }
-
-    /// Native working surfaces. Everything else opens as a branded placeholder
-    /// with a link to the same route on the web.
-    var isNative: Bool {
-        switch self {
-        case .inicio, .tareas, .publicaciones, .calendario, .ideas, .oficina, .notas, .soporte, .reportes, .perfil:
-            return true
-        case .planes, .editor, .diseno,
-             .verMarcas, .marca, .nuevaMarca, .habitos, .actividad, .historial,
-             .equipo, .settings:
-            return false
-        }
-    }
-
-    var placeholderDetail: String {
-        switch self {
-        case .inicio, .tareas, .publicaciones, .calendario, .ideas, .oficina, .notas, .soporte, .reportes, .perfil:
-            return ""
-        case .planes:
-            return "Los planes de contenido de cada marca."
-        case .editor:
-            return "Piezas que están en edición."
-        case .diseno:
-            return "Piezas que están en diseño."
-        case .verMarcas:
-            return "Todas las marcas de la agencia."
-        case .marca:
-            return "La grilla de esta marca vive en la web."
-        case .nuevaMarca:
-            return "Sumar una marca nueva desde el dashboard."
-        case .habitos:
-            return "Hábitos del día."
-        case .actividad:
-            return "El reporte del día."
-        case .historial:
-            return "Historial de actividad."
-        case .equipo:
-            return "Personas del equipo y permisos."
-        case .settings:
-            return "Ajustes de Distinto."
         }
     }
 }
@@ -163,8 +129,9 @@ struct ShellItem: Identifiable, Hashable {
     let emoji: String?
     /// “Agregar marca” uses the brand purple plus, matching the web sidebar.
     let brandIcon: Bool
+    let titleOverride: String?
 
-    var label: String { route.title }
+    var label: String { titleOverride ?? route.title }
     var systemImage: String { route.systemImage }
 
     static func == (lhs: ShellItem, rhs: ShellItem) -> Bool { lhs.id == rhs.id }
@@ -179,9 +146,27 @@ struct MarcaNavItem: Identifiable, Hashable {
     let colorHex: UInt32
     var id: String { slug }
     var color: Color { Color(hex: colorHex) }
+
+    static func from(dto: MarcaNavDTO) -> MarcaNavItem {
+        MarcaNavItem(
+            slug: dto.slug,
+            nombre: dto.nombre,
+            nombreCorto: dto.nombreCorto.isEmpty ? dto.nombre : dto.nombreCorto,
+            emoji: dto.emoji.flatMap { $0.isEmpty ? nil : $0 } ?? "•",
+            colorHex: Self.hex(dto.color)
+        )
+    }
+
+    private static func hex(_ raw: String?) -> UInt32 {
+        guard var text = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return 0x7170FF
+        }
+        if text.hasPrefix("#") { text.removeFirst() }
+        return UInt32(text, radix: 16) ?? 0x7170FF
+    }
 }
 
-/// Same order as `MARCAS_NAV` in `app/lib/mock-marcas.ts`.
+/// Same order as `MARCAS_NAV` in `app/lib/mock-marcas.ts`. Fallback titles only.
 enum MarcaCatalog {
     static let all: [MarcaNavItem] = [
         .init(slug: "manrique", nombre: "Centro Psicológico Manrique", nombreCorto: "Manrique", emoji: "🧠", colorHex: 0x6FB8D8),
@@ -195,62 +180,128 @@ enum MarcaCatalog {
     ]
 }
 
+/// Visibility matches `Sidebar.tsx`. Gated modules stay hidden until `/api/v1/perfil` answers.
+struct SidebarAccess: Equatable {
+    var esPedro: Bool
+    var esCeo: Bool
+    var puedeGestionarMarcas: Bool
+    var publicaciones: Bool
+    var editor: Bool
+    var diseno: Bool
+    var historias: Bool
+    var metricas: Bool
+    var marcas: Bool
+    var influencers: Bool
+    var equipo: Bool
+    var settings: Bool
+    var marcasNav: [MarcaNavItem]
+
+    static func pending(isPedro: Bool) -> SidebarAccess {
+        SidebarAccess(
+            esPedro: isPedro,
+            esCeo: isPedro,
+            puedeGestionarMarcas: isPedro,
+            publicaciones: false,
+            editor: false,
+            diseno: false,
+            historias: false,
+            metricas: false,
+            marcas: false,
+            influencers: false,
+            equipo: false,
+            settings: false,
+            marcasNav: []
+        )
+    }
+}
+
 enum ShellCatalog {
-    /// Same visibility as `Sidebar.tsx` when `permisos` is null: every module is shown.
-    /// Planes stays Pedro-only. Influencers stays off until a brand has `influencersActivo`.
-    static func items(isPedro: Bool) -> [ShellItem] {
-        let workspace: [ShellItem] = [
-            item("inicio", .inicio, .workspace, shortcut: "1"),
-            item("planes", .planes, .workspace, shortcut: "P", pedroOnly: true),
-            item("tareas", .tareas, .workspace, shortcut: "T"),
-            item("publicaciones", .publicaciones, .workspace, shortcut: "3"),
-            item("editor", .editor, .workspace, indent: true),
-            item("diseno", .diseno, .workspace, indent: true),
-            item("calendario", .calendario, .workspace, shortcut: "4"),
+    static func items(access: SidebarAccess) -> [ShellItem] {
+        var workspace: [ShellItem] = [
+            item("inicio", .inicio, .workspace, shortcut: "1")
+        ]
+        if access.esPedro {
+            workspace.append(item("planes", .planes, .workspace, shortcut: "P", pedroOnly: true))
+        }
+        workspace.append(item("tareas", .tareas, .workspace, shortcut: "T"))
+        if access.publicaciones {
+            workspace.append(item("publicaciones", .publicaciones, .workspace, shortcut: "3"))
+        }
+        if access.editor {
+            workspace.append(item("editor", .editor, .workspace, indent: access.publicaciones))
+        }
+        if access.diseno {
+            workspace.append(item("diseno", .diseno, .workspace, indent: access.publicaciones))
+        }
+        if access.historias {
+            workspace.append(item("historias", .historias, .workspace, indent: access.publicaciones || access.diseno))
+        }
+        if access.publicaciones {
+            workspace.append(item("calendario", .calendario, .workspace, shortcut: "4"))
+        }
+        workspace.append(contentsOf: [
             item("ideas", .ideas, .workspace),
             item("oficina", .oficina, .workspace, shortcut: "O"),
             item("notas", .notas, .workspace),
-            item("soporte", .soporte, .workspace),
-            item("reportes", .reportes, .workspace)
-        ]
-
-        var marcas: [ShellItem] = [
-            item("ver-marcas", .verMarcas, .marcas)
-        ]
-        marcas += MarcaCatalog.all.map { marca in
-            ShellItem(
-                id: "marca:\(marca.slug)",
-                route: .marca(marca.slug),
-                section: .marcas,
-                shortcut: nil,
-                indent: false,
-                pedroOnly: false,
-                emoji: marca.emoji,
-                brandIcon: false
-            )
+            item("soporte", .soporte, .workspace)
+        ])
+        if access.metricas {
+            workspace.append(item("reportes", .reportes, .workspace))
         }
-        marcas.append(
-            ShellItem(
-                id: "nueva-marca",
-                route: .nuevaMarca,
-                section: .marcas,
-                shortcut: nil,
-                indent: false,
-                pedroOnly: false,
-                emoji: nil,
-                brandIcon: true
-            )
-        )
+        if access.influencers {
+            workspace.append(item("influencers", .influencers, .workspace))
+        }
 
-        let personal: [ShellItem] = [
+        var marcas: [ShellItem] = []
+        if access.marcas && !access.marcasNav.isEmpty {
+            if access.puedeGestionarMarcas {
+                marcas.append(item("ver-marcas", .verMarcas, .marcas))
+            }
+            marcas += access.marcasNav.map { marca in
+                ShellItem(
+                    id: "marca:\(marca.slug)",
+                    route: .marca(marca.slug),
+                    section: .marcas,
+                    shortcut: nil,
+                    indent: false,
+                    pedroOnly: false,
+                    emoji: marca.emoji,
+                    brandIcon: false,
+                    titleOverride: marca.nombreCorto
+                )
+            }
+            if access.puedeGestionarMarcas {
+                marcas.append(
+                    ShellItem(
+                        id: "nueva-marca",
+                        route: .nuevaMarca,
+                        section: .marcas,
+                        shortcut: nil,
+                        indent: false,
+                        pedroOnly: false,
+                        emoji: nil,
+                        brandIcon: true,
+                        titleOverride: nil
+                    )
+                )
+            }
+        }
+
+        var personal: [ShellItem] = [
             item("habitos", .habitos, .personal),
-            item("actividad", .actividad, .personal),
-            item("historial", .historial, .personal),
-            item("equipo", .equipo, .personal),
-            item("settings", .settings, .personal)
+            item("actividad", .actividad, .personal)
         ]
+        if access.esCeo {
+            personal.append(item("historial", .historial, .personal))
+        }
+        if access.equipo {
+            personal.append(item("equipo", .equipo, .personal))
+        }
+        if access.settings {
+            personal.append(item("settings", .settings, .personal))
+        }
 
-        return (workspace + marcas + personal).filter { isPedro || !$0.pedroOnly }
+        return workspace + marcas + personal
     }
 
     private static func item(
@@ -269,7 +320,8 @@ enum ShellCatalog {
             indent: indent,
             pedroOnly: pedroOnly,
             emoji: nil,
-            brandIcon: false
+            brandIcon: false,
+            titleOverride: nil
         )
     }
 }

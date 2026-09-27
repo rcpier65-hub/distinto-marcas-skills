@@ -65,6 +65,8 @@ Nombre, email y rol del usuario de la sesión. No edita nada.
 
 Sin fila en `team_members` (admin/owner): `es_equipo: false`, `nombre` y `rol` en null. Miembro inactivo: 403.
 
+El mismo JSON incluye `modulos` y `marcas_nav` para el sidebar. Esas puertas están en [API-FASE5.md](./API-FASE5.md).
+
 Las claves de dispositivo se siguen creando en la web (Perfil → Kairos). Este GET no las lista.
 
 ## `GET /api/v1/soporte`

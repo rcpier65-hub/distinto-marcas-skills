@@ -15,6 +15,8 @@ struct PerfilUsuario: Codable, Equatable {
     let esEquipo: Bool
     let activo: Bool
     let esDirector: Bool
+    let modulos: ModulosAcceso?
+    let marcasNav: [MarcaNavDTO]?
 
     var nombreVisible: String {
         if let nombre, !nombre.isEmpty { return nombre }
@@ -29,4 +31,30 @@ struct PerfilUsuario: Codable, Equatable {
         if esDirector, !esEquipo { return "Administrador" }
         return nil
     }
+}
+
+struct ModulosAcceso: Codable, Equatable {
+    let publicaciones: Bool
+    let editor: Bool
+    let diseno: Bool
+    let historias: Bool
+    let metricas: Bool
+    let marcas: Bool
+    let grilla: Bool
+    let equipo: Bool
+    let settings: Bool
+    let esPedro: Bool
+    let esCeo: Bool
+    let puedeGestionarMarcas: Bool
+    let influencers: Bool
+}
+
+struct MarcaNavDTO: Codable, Equatable, Identifiable {
+    let slug: String
+    let nombre: String
+    let nombreCorto: String
+    let emoji: String?
+    let color: String?
+    let influencersActivo: Bool
+    var id: String { slug }
 }

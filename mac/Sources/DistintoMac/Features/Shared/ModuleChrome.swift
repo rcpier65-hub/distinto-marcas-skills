@@ -202,6 +202,33 @@ enum ModuleLoad {
         if let urlError = error as? URLError, urlError.code == .cancelled { return true }
         return false
     }
+
+    @MainActor
+    static func fetch(
+        appState: AppState,
+        loading: Binding<Bool>,
+        error: Binding<String?>,
+        loaded: Bool,
+        force: Bool,
+        work: (String) async throws -> Void
+    ) async {
+        if loading.wrappedValue { return }
+        if loaded && !force { return }
+        guard let token = appState.accessToken else {
+            error.wrappedValue = APIError.notSignedIn.localizedDescription
+            return
+        }
+        loading.wrappedValue = true
+        error.wrappedValue = nil
+        defer { loading.wrappedValue = false }
+        do {
+            try await work(token)
+        } catch let caught {
+            if isCancellation(caught) || Task.isCancelled { return }
+            guard appState.accessToken == token else { return }
+            error.wrappedValue = caught.localizedDescription
+        }
+    }
 }
 
 enum WebLink {

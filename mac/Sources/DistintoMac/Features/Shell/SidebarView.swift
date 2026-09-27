@@ -12,9 +12,9 @@ struct SidebarView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    section(.workspace, open: $workspaceOpen, count: nil)
-                    section(.marcas, open: $marcasOpen, count: MarcaCatalog.all.count)
-                    section(.personal, open: $personalOpen, count: nil)
+                    section(.workspace, open: $workspaceOpen)
+                    section(.marcas, open: $marcasOpen)
+                    section(.personal, open: $personalOpen)
                 }
                 .padding(.horizontal, 6)
                 .padding(.vertical, 8)
@@ -153,8 +153,23 @@ struct SidebarView: View {
     }
 
     @ViewBuilder
-    private func section(_ section: ShellSection, open: Binding<Bool>, count: Int?) -> some View {
+    private func section(_ section: ShellSection, open: Binding<Bool>) -> some View {
         let items = appState.shellItems.filter { $0.section == section }
+        let brandCount = items.reduce(0) { count, item in
+            if case .marca = item.route { return count + 1 }
+            return count
+        }
+        if !items.isEmpty {
+            sectionBlock(section, items: items, open: open, count: section == .marcas ? brandCount : nil)
+        }
+    }
+
+    private func sectionBlock(
+        _ section: ShellSection,
+        items: [ShellItem],
+        open: Binding<Bool>,
+        count: Int?
+    ) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Button {
                 withAnimation(.easeOut(duration: 0.15)) {

@@ -540,6 +540,29 @@ Avisar a Pedro internamente:
 
 ---
 
+## MacOS — resto del sidebar
+
+Los GET de listas del Mac aceptan el JWT de Supabase o `dst_live_…` con alcance `owner`. No aceptan `CRON_SECRET`. Una clave `tareas:read` recibe 403. Contratos en `mac/docs/API-FASE5.md`.
+
+| Método | Ruta | Puerta |
+|--------|------|--------|
+| GET | `/api/v1/editor` | módulo `editor` |
+| GET | `/api/v1/diseno` | módulo `diseno` |
+| GET | `/api/v1/historias` | diseño, publicaciones, director o admin |
+| GET | `/api/v1/influencers` | módulo `publicaciones` |
+| GET | `/api/v1/planes` | solo `pedro@agenciadistinto.com` |
+| GET | `/api/v1/dashboard` | director, admin u owner |
+| GET | `/api/v1/grilla/:slug` | módulo `grilla` + `marcas_acceso` |
+| GET | `/api/v1/habitos` | el miembro de la sesión |
+| GET | `/api/v1/actividad` | el día; el director ve al equipo |
+| GET | `/api/v1/historial` | director u owner |
+| GET | `/api/v1/equipo` | módulo `equipo` (sin contraseñas) |
+| GET | `/api/v1/settings` | módulo `settings` (sin tokens ni keys) |
+
+`GET /api/v1/perfil` incluye `modulos` y `marcas_nav` para armar el sidebar. `GET /api/v1/marcas` sigue pidiendo `CRON_SECRET` y no lo usa el Mac.
+
+---
+
 ## Workflow típico (Routine que corre 8:30am)
 
 ```
