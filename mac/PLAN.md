@@ -52,9 +52,11 @@ Fuente: `app/components/layout/Sidebar.tsx` + rutas bajo `app/app/` (checkout lo
 | `/perfil` | Perfil (footer) |
 
 ### API para macOS (Hoy)
-- `GET https://distinto-app.vercel.app/api/v1/tareas?due=hoy`
-- Auth: `Authorization: Bearer <supabase session.access_token>` (no CRON_SECRET en el cliente)
-- Opcional: `include_overdue=1`, `team_member_id=<uuid>`
+- `GET https://distinto-app.vercel.app/api/v1/tareas?due=hoy&include_overdue=1`
+- Auth preferida: `Authorization: Bearer dst_live_…` (clave de dispositivo creada en Perfil; solo lectura de las tareas del dueño)
+- También válido: `Authorization: Bearer <supabase session.access_token>`
+- No mandar el secreto de cron del servidor desde el cliente
+- Opcional: `team_member_id=<uuid>` (mismas reglas que la web)
 - Response: `{ ok, fecha, total, tareas: [{ id, titulo, due, status, prioridad, proyecto, marca, link, fuente }] }`
 
 ---
@@ -99,7 +101,7 @@ Fuente: `app/components/layout/Sidebar.tsx` + rutas bajo `app/app/` (checkout lo
 ---
 
 ## Decisiones técnicas
-1. **Cliente no lleva CRON_SECRET** — solo JWT de usuario.
+1. **Cliente no lleva el secreto de cron del servidor.** Kairos usa una clave `dst_live_…` (Perfil). El JWT de Supabase sigue siendo válido.
 2. **Backend sigue en Vercel+Supabase** — la app mac es thin client.
 3. **UI light-first** — mismos tokens que `globals.css` (no dark Linear legacy).
 4. **Build solo en macOS** — este box es Linux; el scaffold es source-complete.

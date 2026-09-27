@@ -11,13 +11,16 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { actualizarMiPerfil, subirAvatar } from '../_actions'
 import type { TeamMember } from '@/lib/team/types'
+import { DeviceKeysCard, type DeviceKeyListItem } from './device-keys-card'
 
 type Props = {
   member: TeamMember
   rolNombre: string
+  deviceKeys: DeviceKeyListItem[]
+  deviceKeysError: string | null
 }
 
-export function PerfilForm({ member: initial, rolNombre }: Props) {
+export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysError }: Props) {
   const router = useRouter()
   const [member, setMember] = useState(initial)
   const [pending, startTransition] = useTransition()
@@ -284,6 +287,10 @@ export function PerfilForm({ member: initial, rolNombre }: Props) {
               {pending ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <DeviceKeysCard initialKeys={deviceKeys} initialError={deviceKeysError} />
         </div>
       </div>
     </main>

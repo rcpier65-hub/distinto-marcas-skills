@@ -11,6 +11,8 @@ actor DistintoAPIClient {
     }
 
     /// GET /api/v1/tareas?due=hoy[&include_overdue=1]
+    /// `accessToken` es una clave de dispositivo `dst_live_…` o un access token de Supabase.
+    /// El cliente no envía el secreto de cron del servidor.
     func fetchTareasHoy(
         accessToken: String,
         includeOverdue: Bool = true,

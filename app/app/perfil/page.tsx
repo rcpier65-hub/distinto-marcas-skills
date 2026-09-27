@@ -11,13 +11,18 @@
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { PerfilForm } from './_components/perfil-form'
+import { listDeviceKeys } from '@/lib/api/device-keys'
 import type { TeamMember } from '@/lib/team/types'
+import { PerfilForm } from './_components/perfil-form'
+import { DeviceKeysCard } from './_components/device-keys-card'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PerfilPage() {
   const user = await requireUser()
+  const listed = await listDeviceKeys(user.id)
+  const deviceKeys = listed.ok ? listed.keys : []
+  const deviceKeysError = listed.ok ? null : listed.error
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
@@ -47,10 +52,12 @@ export default async function PerfilPage() {
           border: '1px solid #ddd6fe',
           borderRadius: 12,
           fontSize: 13.5, color: '#5b21b6', lineHeight: 1.6,
+          marginBottom: 24,
         }}>
           Como admin/owner, tus datos no viven en <code>team_members</code> sino en Supabase Auth.
           Si quieres tener un perfil editable, créate un miembro desde <strong>Mi equipo</strong> con tu mismo email.
         </div>
+        <DeviceKeysCard initialKeys={deviceKeys} initialError={deviceKeysError} />
       </main>
     )
   }
@@ -70,6 +77,8 @@ export default async function PerfilPage() {
     <PerfilForm
       member={member as TeamMember}
       rolNombre={rol?.nombre ?? member.rol_base}
+      deviceKeys={deviceKeys}
+      deviceKeysError={deviceKeysError}
     />
   )
 }
