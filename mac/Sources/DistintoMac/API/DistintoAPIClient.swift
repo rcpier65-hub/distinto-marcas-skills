@@ -74,6 +74,65 @@ actor DistintoAPIClient {
         try await get("api/v1/creacion-de-ideas", accessToken: accessToken)
     }
 
+    func fetchEditor(accessToken: String) async throws -> EditorResponse {
+        try await get("api/v1/editor", accessToken: accessToken)
+    }
+
+    func fetchDiseno(accessToken: String) async throws -> DisenoResponse {
+        try await get("api/v1/diseno", accessToken: accessToken)
+    }
+
+    func fetchHistorias(accessToken: String) async throws -> HistoriasResponse {
+        try await get("api/v1/historias", accessToken: accessToken)
+    }
+
+    func fetchInfluencers(accessToken: String, marca: String?) async throws -> InfluencersResponse {
+        var query: [URLQueryItem] = []
+        if let marca, !marca.isEmpty {
+            query.append(URLQueryItem(name: "marca", value: marca))
+        }
+        return try await get("api/v1/influencers", query: query, accessToken: accessToken)
+    }
+
+    func fetchPlanes(accessToken: String) async throws -> PlanesResponse {
+        try await get("api/v1/planes", accessToken: accessToken)
+    }
+
+    func fetchDashboard(accessToken: String) async throws -> DashboardResponse {
+        try await get("api/v1/dashboard", accessToken: accessToken)
+    }
+
+    func fetchGrilla(accessToken: String, slug: String, vista: String) async throws -> GrillaResponse {
+        let encoded = slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? slug
+        return try await get(
+            "api/v1/grilla/\(encoded)",
+            query: [URLQueryItem(name: "vista", value: vista)],
+            accessToken: accessToken
+        )
+    }
+
+    func fetchHabitos(accessToken: String) async throws -> HabitosResponse {
+        try await get("api/v1/habitos", accessToken: accessToken)
+    }
+
+    func fetchActividad(accessToken: String, fecha: String?) async throws -> ActividadResponse {
+        var query: [URLQueryItem] = []
+        if let fecha { query.append(URLQueryItem(name: "fecha", value: fecha)) }
+        return try await get("api/v1/actividad", query: query, accessToken: accessToken)
+    }
+
+    func fetchHistorial(accessToken: String) async throws -> HistorialResponse {
+        try await get("api/v1/historial", accessToken: accessToken)
+    }
+
+    func fetchEquipo(accessToken: String) async throws -> EquipoResponse {
+        try await get("api/v1/equipo", accessToken: accessToken)
+    }
+
+    func fetchSettings(accessToken: String) async throws -> SettingsResponse {
+        try await get("api/v1/settings", accessToken: accessToken)
+    }
+
     /// GET /api/v1/grabaciones/calendario?desde&hasta — grabaciones y reuniones.
     func fetchCalendario(accessToken: String, desde: String, hasta: String) async throws -> CalendarioResponse {
         try await get(

@@ -43,69 +43,34 @@ struct AppShellView: View {
             OficinaBoardView()
         case .ideas:
             IdeasListView()
-        case .planes, .editor, .diseno,
-             .verMarcas, .marca, .nuevaMarca, .habitos, .actividad, .historial,
-             .equipo, .settings:
-            ModulePlaceholderView(route: appState.selectedRoute)
+        case .planes:
+            PlanesListView()
+        case .editor:
+            EditorListView()
+        case .diseno:
+            DisenoListView()
+        case .historias:
+            HistoriasListView()
+        case .influencers:
+            InfluencersListView()
+        case .verMarcas:
+            MarcasDashboardView()
+        case .marca(let slug):
+            GrillaListView(slug: slug)
+                .id(slug)
+        case .nuevaMarca:
+            NuevaMarcaView()
+        case .habitos:
+            HabitosListView()
+        case .actividad:
+            ActividadListView()
+        case .historial:
+            HistorialListView()
+        case .equipo:
+            EquipoListView()
+        case .settings:
+            SettingsListView()
         }
-    }
-}
-
-struct ModulePlaceholderView: View {
-    @Environment(\.openURL) private var openURL
-    let route: AppRoute
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: route.systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(DistintoTokens.ColorToken.accent)
-                    .frame(width: 36, height: 36)
-                    .background(DistintoTokens.ColorToken.accentBg)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(route.title)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
-                    Text(route.placeholderDetail)
-                        .font(.system(size: DistintoTokens.Typography.sm))
-                        .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
-                }
-                Spacer(minLength: 12)
-                Button {
-                    openURL(AppConfig.webURL(route.webPath))
-                } label: {
-                    Label("Abrir en la web", systemImage: "arrow.up.right")
-                        .font(.system(size: DistintoTokens.Typography.sm, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(DistintoTokens.ColorToken.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: DistintoTokens.Radius.md, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 28)
-
-            Spacer()
-
-            VStack(spacing: 8) {
-                Text("Este módulo sigue en Distinto web.")
-                    .font(.system(size: DistintoTokens.Typography.base, weight: .medium))
-                    .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
-                Text("Reportes, Notas, Oficina e Ideas también abren acá. Editor, Diseño y el resto siguen en la web.")
-                    .font(.system(size: DistintoTokens.Typography.sm))
-                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 420)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, 64)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(DistintoTokens.ColorToken.bgBase)
     }
 }
 

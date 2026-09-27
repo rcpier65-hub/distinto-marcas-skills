@@ -2,7 +2,7 @@
 
 App nativa SwiftUI para Distinto. Backend en la nube: **Vercel** (`https://distinto-app.vercel.app`) + **Supabase** (`exhmimlehdisonjvedvx` / SISTEMA DE GRILLA). Misma estética light Linear/Notion del web (`--mk-*` tokens).
 
-**Estado actual:** Login, sidebar, Hoy/Inicio, Tareas, Perfil, Soporte, Publicaciones, Calendario, Reportes, Notas y reuniones, Oficina y Creación de Ideas nativos (listas). Editor, Diseño, Influencers, grillas y el resto abren la web. **No** es la app completa.
+**Estado actual:** Cada módulo del sidebar de staff tiene pantalla nativa (lista o resumen). El detalle pesado (editor inline, kanban, alta de marca, marcar hábitos) sigue en la web. **No** incluye notarización ni Sparkle.
 
 Pedro (CEO): `pedro@agenciadistinto.com`
 
@@ -74,6 +74,25 @@ Sesión: `Authorization: Bearer <supabase access_token>`. La clave `dst_live_…
 | GET | `/api/v1/oficina` | Escritorios, salas y atajos |
 | GET | `/api/v1/creacion-de-ideas` | Banco de ideas |
 
+### API para macOS (resto del sidebar)
+
+Misma auth que Fase 4: JWT o `dst_live_…` con alcance `owner`. Detalle en [docs/API-FASE5.md](docs/API-FASE5.md).
+
+| Método | Ruta | Uso |
+|--------|------|-----|
+| GET | `/api/v1/editor` | Cola de edición |
+| GET | `/api/v1/diseno` | Tareas de diseño |
+| GET | `/api/v1/historias` | Planificador (diseño, publicaciones, director) |
+| GET | `/api/v1/influencers` | Pedidos, teléfono y productos |
+| GET | `/api/v1/planes` | Catálogo, solo Pedro |
+| GET | `/api/v1/dashboard` | Marcas (director/admin). No es `/api/v1/marcas` |
+| GET | `/api/v1/grilla/:slug` | Semana o mes |
+| GET | `/api/v1/habitos` | Hábitos de hoy |
+| GET | `/api/v1/actividad` | Reporte del día |
+| GET | `/api/v1/historial` | Grillas pedidas (director) |
+| GET | `/api/v1/equipo` | Miembros, sin contraseñas |
+| GET | `/api/v1/settings` | Prefs, sin secretos |
+
 ---
 
 ## Fases
@@ -115,6 +134,13 @@ Sesión: `Authorization: Bearer <supabase access_token>`. La clave `dst_live_…
 - [x] Creación de Ideas: banco nativo; crear un guion abre la web
 - [ ] Tareas board (CRUD; hoy es solo lectura)
 - [ ] Notificaciones / menú bar (Distinto macOS)
+
+### Fase 4b — Resto del sidebar (listas nativas)
+- [x] Editor, Diseño, Historias, Influencers, Planes (Pedro)
+- [x] Ver todas, grilla por marca, Agregar marca (alta en la web)
+- [x] Hábitos, Reporte del día, Historial (director), Mi equipo, Settings
+- [x] Sidebar con las mismas puertas que la web (`modulos` en `/api/v1/perfil`)
+- [ ] CRUD dentro del Mac (editar pieza, marcar hábito, crear marca)
 
 ### Fase 5 — Pulido y distribución
 - [ ] Firma Apple Developer + notarización

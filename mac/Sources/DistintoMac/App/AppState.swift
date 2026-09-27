@@ -116,6 +116,28 @@ final class AppState: ObservableObject {
     var accessToken: String? { session?.accessToken }
 
     var shellItems: [ShellItem] {
-        ShellCatalog.items(isPedro: session?.isPedro == true)
+        ShellCatalog.items(access: sidebarAccess)
+    }
+
+    private var sidebarAccess: SidebarAccess {
+        let pedro = session?.isPedro == true
+        guard let perfil = perfil?.perfil, let modulos = perfil.modulos else {
+            return .pending(isPedro: pedro)
+        }
+        return SidebarAccess(
+            esPedro: pedro || modulos.esPedro,
+            esCeo: modulos.esCeo,
+            puedeGestionarMarcas: modulos.puedeGestionarMarcas,
+            publicaciones: modulos.publicaciones,
+            editor: modulos.editor,
+            diseno: modulos.diseno,
+            historias: modulos.historias,
+            metricas: modulos.metricas,
+            marcas: modulos.marcas,
+            influencers: modulos.influencers,
+            equipo: modulos.equipo,
+            settings: modulos.settings,
+            marcasNav: (perfil.marcasNav ?? []).map { MarcaNavItem.from(dto: $0) }
+        )
     }
 }
