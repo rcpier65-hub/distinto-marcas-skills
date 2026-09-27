@@ -1,0 +1,40 @@
+name: DistintoMac
+options:
+  bundleIdPrefix: com.agenciadistinto
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    PRODUCT_NAME: Distinto
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Config/Debug.xcconfig
+  Release: Config/Release.xcconfig
+targets:
+  DistintoMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/DistintoMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.agenciadistinto.distinto-mac
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleName: Distinto
+        CFBundleDisplayName: Distinto
+        LSMinimumSystemVersion: "14.0"
+        NSPrincipalClass: NSApplication
