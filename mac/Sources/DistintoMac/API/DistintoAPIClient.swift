@@ -54,6 +54,26 @@ actor DistintoAPIClient {
         try await get("api/v1/publicaciones", accessToken: accessToken)
     }
 
+    /// GET /api/v1/reportes — marcas con el último mes. Sesión, no clave de dispositivo.
+    func fetchReportes(accessToken: String) async throws -> ReportesResponse {
+        try await get("api/v1/reportes", accessToken: accessToken)
+    }
+
+    /// GET /api/v1/notas-reuniones — próximas y notas recientes.
+    func fetchNotas(accessToken: String) async throws -> NotasResponse {
+        try await get("api/v1/notas-reuniones", accessToken: accessToken)
+    }
+
+    /// GET /api/v1/oficina — escritorios, salas y atajos.
+    func fetchOficina(accessToken: String) async throws -> OficinaResponse {
+        try await get("api/v1/oficina", accessToken: accessToken)
+    }
+
+    /// GET /api/v1/creacion-de-ideas — banco compartido.
+    func fetchIdeas(accessToken: String) async throws -> IdeasResponse {
+        try await get("api/v1/creacion-de-ideas", accessToken: accessToken)
+    }
+
     /// GET /api/v1/grabaciones/calendario?desde&hasta — grabaciones y reuniones.
     func fetchCalendario(accessToken: String, desde: String, hasta: String) async throws -> CalendarioResponse {
         try await get(

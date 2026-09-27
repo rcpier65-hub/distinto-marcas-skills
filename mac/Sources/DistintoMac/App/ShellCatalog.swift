@@ -106,9 +106,9 @@ enum AppRoute: Hashable {
     /// with a link to the same route on the web.
     var isNative: Bool {
         switch self {
-        case .inicio, .tareas, .publicaciones, .calendario, .soporte, .perfil:
+        case .inicio, .tareas, .publicaciones, .calendario, .ideas, .oficina, .notas, .soporte, .reportes, .perfil:
             return true
-        case .planes, .editor, .diseno, .ideas, .oficina, .notas, .reportes,
+        case .planes, .editor, .diseno,
              .verMarcas, .marca, .nuevaMarca, .habitos, .actividad, .historial,
              .equipo, .settings:
             return false
@@ -117,7 +117,7 @@ enum AppRoute: Hashable {
 
     var placeholderDetail: String {
         switch self {
-        case .inicio, .tareas, .publicaciones, .calendario, .soporte, .perfil:
+        case .inicio, .tareas, .publicaciones, .calendario, .ideas, .oficina, .notas, .soporte, .reportes, .perfil:
             return ""
         case .planes:
             return "Los planes de contenido de cada marca."
@@ -125,14 +125,6 @@ enum AppRoute: Hashable {
             return "Piezas que están en edición."
         case .diseno:
             return "Piezas que están en diseño."
-        case .ideas:
-            return "Banco de ideas de contenido."
-        case .oficina:
-            return "La oficina del equipo."
-        case .notas:
-            return "Notas y reuniones."
-        case .reportes:
-            return "Métricas y reportes."
         case .verMarcas:
             return "Todas las marcas de la agencia."
         case .marca:

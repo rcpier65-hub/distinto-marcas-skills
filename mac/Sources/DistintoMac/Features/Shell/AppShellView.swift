@@ -35,7 +35,15 @@ struct AppShellView: View {
             PublicacionesListView()
         case .calendario:
             CalendarioListView()
-        case .planes, .editor, .diseno, .ideas, .oficina, .notas, .reportes,
+        case .reportes:
+            ReportesListView()
+        case .notas:
+            NotasListView()
+        case .oficina:
+            OficinaBoardView()
+        case .ideas:
+            IdeasListView()
+        case .planes, .editor, .diseno,
              .verMarcas, .marca, .nuevaMarca, .habitos, .actividad, .historial,
              .equipo, .settings:
             ModulePlaceholderView(route: appState.selectedRoute)
@@ -87,7 +95,7 @@ struct ModulePlaceholderView: View {
                 Text("Este módulo sigue en Distinto web.")
                     .font(.system(size: DistintoTokens.Typography.base, weight: .medium))
                     .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
-                Text("Perfil, Soporte, Publicaciones y Calendario abren acá. El resto usa el mismo enlace de la web.")
+                Text("Reportes, Notas, Oficina e Ideas también abren acá. Editor, Diseño y el resto siguen en la web.")
                     .font(.system(size: DistintoTokens.Typography.sm))
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
                     .multilineTextAlignment(.center)

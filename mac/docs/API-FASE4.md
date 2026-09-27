@@ -1,4 +1,4 @@
-# API macOS — Perfil, Soporte, Publicaciones, Calendario
+# API macOS — Perfil, Soporte, Publicaciones, Calendario, Reportes, Notas, Oficina, Ideas
 
 Cliente: `Authorization: Bearer <supabase access_token>` (la sesión del login).
 
@@ -97,3 +97,129 @@ Incluye `grabaciones` y `marca_reuniones`. No incluye Google Calendar (sigue en 
 ```
 
 `tipo`: `grabacion` | `reunion`. `GET /api/v1/grabaciones/proximas` sigue siendo de rutina y no lo usa el Mac.
+
+## `GET /api/v1/reportes`
+
+Marcas activas de la sesión y el último mes de reporte (seed + `reportes_mensuales`; la base gana). Exige el módulo `metricas`. Si no: 403 `No tienes acceso a Reportes`.
+
+`marcas_acceso` null ve todas. Una lista vacía devuelve cero marcas. Si hay ids, solo esas.
+
+El hub web sigue pidiendo el código de acceso en el navegador. Este GET no lo usa y el Mac no lo guarda. Editar un mes sigue en `/reportes` (`link` de cada fila).
+
+```json
+{
+  "ok": true,
+  "total": 1,
+  "con_datos": 1,
+  "marcas": [{
+    "slug": "little-joe",
+    "nombre": "TypHouse",
+    "emoji": "💙",
+    "color": "#61B3D1",
+    "tiene_datos": true,
+    "meses": 7,
+    "ultimo_mes": "2026-07",
+    "ultimo_mes_label": "Julio 2026",
+    "leads": 1015,
+    "ventas_totales": 339,
+    "ingreso_directo": 28748,
+    "roas_directo": 4.72,
+    "link": "https://distinto-app.vercel.app/reportes"
+  }]
+}
+```
+
+Sin meses cargados: `tiene_datos: false` y los KPI en null. Las marcas con datos van primero.
+
+## `GET /api/v1/notas-reuniones`
+
+Misma ventana de «Próximas» que el home (`marca_reuniones`, Google Calendar si el servidor lo tiene, y notas en curso si no hay agenda) y hasta 80 notas recientes.
+
+Director, o sesión sin fila en `team_members`, ve las notas del equipo (`ve_todo: true`). El resto ve solo las suyas. No incluye transcript ni chat. `link` abre `/notas-reuniones/{id}`. Crear una nota sigue en `/notas-reuniones/nueva`.
+
+```json
+{
+  "ok": true,
+  "hoy": "2026-09-27",
+  "ve_todo": false,
+  "total": 1,
+  "proximas": [{
+    "id": "marca_reuniones:…",
+    "titulo": "Revisión de grilla",
+    "starts_at": "2026-09-28T15:00:00.000Z",
+    "ends_at": null,
+    "fuente": "marca_reuniones",
+    "link": "https://distinto-app.vercel.app/grabaciones/calendario"
+  }],
+  "notas": [{
+    "id": "…",
+    "titulo": "Standup",
+    "preview": "Primera línea de la nota",
+    "estado": "borrador",
+    "autor_nombre": "Yo",
+    "es_mio": true,
+    "created_at": "2026-09-27T15:00:00.000Z",
+    "updated_at": "2026-09-27T16:00:00.000Z",
+    "link": "https://distinto-app.vercel.app/notas-reuniones/…"
+  }]
+}
+```
+
+`estado`: `borrador` | `en_curso` | `finalizada`. `fuente`: `marca_reuniones` | `google_calendar` | `nota`.
+
+## `GET /api/v1/oficina`
+
+Escritorios con nombre del mapa, quién los reclamó, salas y atajos (pizarra, TV). No es el mapa caminable: entrar, hablar y reclamar un puesto sigue en `/oficina`.
+
+```json
+{
+  "ok": true,
+  "total": 1,
+  "escritorios": [{
+    "id": "pedro",
+    "etiqueta": "Pedro",
+    "zona": "Open space",
+    "libre": true,
+    "es_mio": false,
+    "ocupante": null,
+    "link": "https://distinto-app.vercel.app/oficina"
+  }],
+  "sin_puesto": [],
+  "zonas": [{
+    "id": "juntas",
+    "nombre": "Sala de Juntas",
+    "emoji": "🤝",
+    "color": "#7170ff",
+    "link": "https://distinto-app.vercel.app/oficina"
+  }],
+  "accesos": [{
+    "id": "ver-el-calendario-de-la-semana",
+    "titulo": "Ver el calendario de la semana",
+    "icono": "📅",
+    "link": "https://distinto-app.vercel.app/grabaciones/calendario"
+  }]
+}
+```
+
+`es_mio` compara el `user_id` de la sesión con quien reclamó el escritorio.
+
+## `GET /api/v1/creacion-de-ideas`
+
+Banco compartido (el mismo que la pestaña Ideas del módulo). Opcional `?nicho=marketing` (400 si el nicho no existe).
+
+Las ideas que cada persona guarda en el navegador (`localStorage`, clave `creacion-ideas.v1`) no están en Supabase y no salen acá. Crear un guion abre `/creacion-de-ideas`.
+
+```json
+{
+  "ok": true,
+  "total": 24,
+  "nichos": ["marketing", "fitness", "comida", "belleza", "inmobiliaria", "educacion", "ecommerce", "finanzas", "viajes", "tecnologia", "emprendimiento", "mascotas"],
+  "ideas": [{
+    "id": "banco-1",
+    "nicho": "marketing",
+    "idea": "Auditar en vivo el perfil de un negocio local…",
+    "gancho": "Le arreglé el perfil a esta cafetería en 60 segundos…",
+    "link": "https://distinto-app.vercel.app/creacion-de-ideas"
+  }]
+}
+```

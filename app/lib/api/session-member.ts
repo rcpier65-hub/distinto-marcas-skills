@@ -23,6 +23,8 @@ export type SessionMember = {
   /** null = todas las marcas. */
   marcasAcceso: string[] | null
   puedePublicaciones: boolean
+  /** Módulo Reportes (`metricas`). Sin fila de rol, ve todo. */
+  puedeMetricas: boolean
 }
 
 export function apiJsonError(error: string, status: number): NextResponse {
@@ -112,6 +114,7 @@ export async function requireSessionMember(
         teamMemberId: null,
         marcasAcceso: null,
         puedePublicaciones: true,
+        puedeMetricas: true,
       },
     }
   }
@@ -124,6 +127,7 @@ export async function requireSessionMember(
   let rolNombre: string | null = rolBase
   // Sin fila de rol, permisos-helper devuelve null (= ve todo). Con rol, manda el merge.
   let puedePublicaciones = true
+  let puedeMetricas = true
 
   if (rolBase) {
     const { data: rol, error: rolError } = await service
@@ -136,6 +140,7 @@ export async function requireSessionMember(
       rolNombre = typeof rol.nombre === 'string' && rol.nombre.trim() ? rol.nombre.trim() : rolBase
       const permisos = mergePermisos(asPermisos(rol.permisos_default), asPermisos(row.permisos_override))
       puedePublicaciones = tieneAcceso(permisos, 'publicaciones')
+      puedeMetricas = tieneAcceso(permisos, 'metricas')
     }
   }
 
@@ -161,6 +166,7 @@ export async function requireSessionMember(
       teamMemberId: typeof row.id === 'string' ? row.id : null,
       marcasAcceso: asMarcaIds(row.marcas_acceso),
       puedePublicaciones,
+      puedeMetricas,
     },
   }
 }
