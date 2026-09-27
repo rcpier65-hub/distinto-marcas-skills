@@ -6,7 +6,10 @@
 //   ?team_member_id=<uuid>   ver alcance abajo
 //
 // «Qué tengo para hoy» para Kairos (macOS). Une dos fuentes, sin diseño ni hábitos:
-//   1. public.tareas — completada = false, fecha en fecha_entrega (America/Lima).
+//   1. public.tareas — completada = false. Unión: (fecha_entrega = hoy, o <= hoy
+//      si include_overdue=1) OR (fecha_entrega IS NULL). Las sin fecha salen como
+//      inbox con due: null, igual que los pendientes rápidos. fuente sigue siendo
+//      "tareas".
 //   2. public.pendientes_rapidos — completado = false, sin fecha: inbox (due null)
 //      cuando due=hoy. La UI vive en /inicio.
 //
@@ -189,12 +192,15 @@ export async function GET(request: Request) {
   if (!scoped.ok) return scoped.response
   const scope = scoped.scope
 
-  let tareasQ = service
-    .from('tareas')
-    .select('id, texto, estado, fecha_entrega, marca_slug, categoria')
-    .eq('completada', false)
-  tareasQ = scopeFilter(tareasQ, scope)
-  tareasQ = includeOverdue ? tareasQ.lte('fecha_entrega', fecha) : tareasQ.eq('fecha_entrega', fecha)
+  const tareaSelect = 'id, texto, estado, fecha_entrega, marca_slug, categoria'
+  let datedQ = service.from('tareas').select(tareaSelect).eq('completada', false)
+  datedQ = scopeFilter(datedQ, scope)
+  datedQ = includeOverdue ? datedQ.lte('fecha_entrega', fecha) : datedQ.eq('fecha_entrega', fecha)
+
+  /* due=hoy también trae el tablero abierto sin fecha (inbox, due null).
+     include_overdue solo cambia el lado con fecha. */
+  let sinFechaQ = service.from('tareas').select(tareaSelect).eq('completada', false).is('fecha_entrega', null)
+  sinFechaQ = scopeFilter(sinFechaQ, scope)
 
   let pendQ = service
     .from('pendientes_rapidos')
@@ -203,15 +209,17 @@ export async function GET(request: Request) {
   pendQ = scopeFilter(pendQ, scope)
   pendQ = pendQ.order('prioridad', { ascending: true }).order('created_at', { ascending: false }).limit(100)
 
-  const [tareasRes, pendRes] = await Promise.all([
-    tareasQ.order('fecha_entrega', { ascending: true }).limit(200),
+  const [datedRes, sinFechaRes, pendRes] = await Promise.all([
+    datedQ.order('fecha_entrega', { ascending: true }).limit(200),
+    sinFechaQ.order('created_at', { ascending: false }).limit(200),
     pendQ,
   ])
-  if (tareasRes.error) return jsonError(tareasRes.error.message, 500)
+  if (datedRes.error) return jsonError(datedRes.error.message, 500)
+  if (sinFechaRes.error) return jsonError(sinFechaRes.error.message, 500)
   if (pendRes.error) return jsonError(pendRes.error.message, 500)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filasTareas = (tareasRes.data ?? []) as any[]
+  const filasTareas = [...((datedRes.data ?? []) as any[]), ...((sinFechaRes.data ?? []) as any[])]
   const slugs = [...new Set(filasTareas.map((t) => (typeof t.marca_slug === 'string' ? t.marca_slug : '')).filter(Boolean))]
   const nombres = new Map<string, string>()
   if (slugs.length > 0) {
