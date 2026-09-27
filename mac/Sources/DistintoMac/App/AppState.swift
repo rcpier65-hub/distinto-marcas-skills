@@ -12,6 +12,10 @@ final class AppState: ObservableObject {
     @Published private(set) var tareasError: String?
     @Published private(set) var tareasLoading = false
 
+    @Published private(set) var perfil: PerfilResponse?
+    @Published private(set) var perfilError: String?
+    @Published private(set) var perfilLoading = false
+
     let auth: SupabaseAuthClient
     let api: DistintoAPIClient
 
@@ -38,6 +42,8 @@ final class AppState: ObservableObject {
         selectedRoute = .inicio
         tareasHoy = nil
         tareasError = nil
+        perfil = nil
+        perfilError = nil
     }
 
     func signOut() async {
@@ -48,6 +54,9 @@ final class AppState: ObservableObject {
         tareasHoy = nil
         tareasError = nil
         tareasLoading = false
+        perfil = nil
+        perfilError = nil
+        perfilLoading = false
     }
 
     func select(_ route: AppRoute) {
@@ -72,6 +81,36 @@ final class AppState: ObservableObject {
             guard accessToken == token else { return }
             tareasError = error.localizedDescription
         }
+    }
+
+    func reloadPerfil() async {
+        guard !perfilLoading else { return }
+        guard let token = accessToken else {
+            perfilError = APIError.notSignedIn.localizedDescription
+            return
+        }
+        perfilLoading = true
+        perfilError = nil
+        defer { perfilLoading = false }
+        do {
+            let response = try await api.fetchPerfil(accessToken: token)
+            guard accessToken == token else { return }
+            perfil = response
+            if let nombre = response.perfil.nombre {
+                noteNombre(nombre)
+            }
+        } catch {
+            guard accessToken == token else { return }
+            perfilError = error.localizedDescription
+        }
+    }
+
+    func noteNombre(_ nombre: String) {
+        guard var current = session else { return }
+        let trimmed = nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, current.nombre != trimmed else { return }
+        current.nombre = trimmed
+        session = current
     }
 
     var accessToken: String? { session?.accessToken }

@@ -106,36 +106,31 @@ enum AppRoute: Hashable {
     /// with a link to the same route on the web.
     var isNative: Bool {
         switch self {
-        case .inicio, .tareas: return true
-        case .planes, .publicaciones, .editor, .diseno, .calendario, .ideas,
-             .oficina, .notas, .soporte, .reportes, .verMarcas, .marca, .nuevaMarca,
-             .habitos, .actividad, .historial, .equipo, .settings, .perfil:
+        case .inicio, .tareas, .publicaciones, .calendario, .soporte, .perfil:
+            return true
+        case .planes, .editor, .diseno, .ideas, .oficina, .notas, .reportes,
+             .verMarcas, .marca, .nuevaMarca, .habitos, .actividad, .historial,
+             .equipo, .settings:
             return false
         }
     }
 
     var placeholderDetail: String {
         switch self {
-        case .inicio, .tareas:
+        case .inicio, .tareas, .publicaciones, .calendario, .soporte, .perfil:
             return ""
         case .planes:
             return "Los planes de contenido de cada marca."
-        case .publicaciones:
-            return "Calendario de publicaciones."
         case .editor:
             return "Piezas que están en edición."
         case .diseno:
             return "Piezas que están en diseño."
-        case .calendario:
-            return "Grabaciones y calendario del equipo."
         case .ideas:
             return "Banco de ideas de contenido."
         case .oficina:
             return "La oficina del equipo."
         case .notas:
             return "Notas y reuniones."
-        case .soporte:
-            return "Pedidos de soporte."
         case .reportes:
             return "Métricas y reportes."
         case .verMarcas:
@@ -154,8 +149,6 @@ enum AppRoute: Hashable {
             return "Personas del equipo y permisos."
         case .settings:
             return "Ajustes de Distinto."
-        case .perfil:
-            return "Tu cuenta de equipo."
         }
     }
 }

@@ -21,6 +21,9 @@ struct SidebarView: View {
             }
             footer
         }
+        .task {
+            await appState.reloadPerfil()
+        }
         .frame(width: DistintoTokens.Layout.sidebarWidth)
         .background(DistintoTokens.ColorToken.bgElevated)
         .overlay(alignment: .trailing) {
@@ -146,20 +149,7 @@ struct SidebarView: View {
     }
 
     private var avatar: some View {
-        Circle()
-            .fill(
-                LinearGradient(
-                    colors: [Color(hex: 0xFF8A4C), Color(hex: 0xFF5252)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .frame(width: 22, height: 22)
-            .overlay(
-                Text(appState.session?.initial ?? "?")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
+        UserAvatar(initial: appState.session?.initial ?? "?", size: 22)
     }
 
     @ViewBuilder

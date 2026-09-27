@@ -6,13 +6,19 @@ struct AuthSession: Codable, Equatable {
     var expiresAt: Date?
     var email: String
     var userId: String
+    /// Nombre de team_members, cuando /api/v1/perfil ya respondió.
+    var nombre: String? = nil
 
     var isPedro: Bool {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == AppConfig.pedroEmail
     }
 
-    /// Local-part of the email, first letter uppercased. Used until we load team profile.
+    /// Nombre del equipo, o la parte local del email hasta que cargue el perfil.
     var displayName: String {
+        if let nombre {
+            let trimmed = nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
         let local = email.split(separator: "@").first.map(String.init) ?? email
         guard let first = local.first else { return local }
         return first.uppercased() + local.dropFirst()

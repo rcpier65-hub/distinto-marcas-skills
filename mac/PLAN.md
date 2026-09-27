@@ -2,7 +2,7 @@
 
 App nativa SwiftUI para Distinto. Backend en la nube: **Vercel** (`https://distinto-app.vercel.app`) + **Supabase** (`exhmimlehdisonjvedvx` / SISTEMA DE GRILLA). Misma estética light Linear/Notion del web (`--mk-*` tokens).
 
-**Estado actual:** Login, sidebar y Hoy/Inicio nativos alineados con la web en vivo. El resto de módulos abre la web. **No** es la app completa.
+**Estado actual:** Login, sidebar, Hoy/Inicio, Tareas, Perfil, Soporte, Publicaciones y Calendario nativos. El resto de módulos abre la web. **No** es la app completa.
 
 Pedro (CEO): `pedro@agenciadistinto.com`
 
@@ -59,6 +59,17 @@ Fuente: `app/components/layout/Sidebar.tsx` + rutas bajo `app/app/` (checkout lo
 - Opcional: `team_member_id=<uuid>` (mismas reglas que la web)
 - Response: `{ ok, fecha, total, tareas: [{ id, titulo, due, status, prioridad, proyecto, marca, link, fuente }] }`
 
+### API para macOS (Fase 4)
+
+Sesión: `Authorization: Bearer <supabase access_token>`. La clave `dst_live_…` no abre estas listas. Detalle en [docs/API-FASE4.md](docs/API-FASE4.md).
+
+| Método | Ruta | Uso |
+|--------|------|-----|
+| GET | `/api/v1/perfil` | Nombre, email, rol |
+| GET | `/api/v1/soporte` | Reportes propios o del equipo (director) |
+| GET | `/api/v1/publicaciones` | Próximas y recientes, solo lectura |
+| GET | `/api/v1/grabaciones/calendario` | Grabaciones y reuniones del mes |
+
 ---
 
 ## Fases
@@ -84,14 +95,18 @@ Fuente: `app/components/layout/Sidebar.tsx` + rutas bajo `app/app/` (checkout lo
 - [ ] Abrir `link` en browser / deep link a web
 
 ### Fase 3 — Shell completo (navegación)
-- [ ] Sidebar con secciones Workspace / Marcas / Personal (subset)
-- [ ] Inicio, Tareas (web-view o native board MVP), Perfil, Logout
-- [ ] Permisos básicos (ocultar Planes si no es Pedro)
+- [x] Sidebar con secciones Workspace / Marcas / Personal
+- [x] Inicio y Tareas nativos (lectura de `/api/v1/tareas`)
+- [x] Permisos básicos (ocultar Planes si no es Pedro)
+- [x] Perfil nativo y cerrar sesión (Keychain → Login)
 
 ### Fase 4 — Módulos nativos prioritarios
-- [ ] Tareas board (CRUD vía nuevas APIs o Supabase RLS)
+- [x] Perfil: sesión (nombre, email, rol), Cerrar sesión, aviso de claves Kairos en la web
+- [x] Soporte: lista nativa (propios, o equipo si director / sin team member)
+- [x] Publicaciones: lista de solo lectura con chips de estado; la fila abre la web
+- [x] Calendario: lista del mes (grabaciones + reuniones); la fila abre la web
+- [ ] Tareas board (CRUD; hoy es solo lectura)
 - [ ] Notificaciones / menú bar (Distinto macOS)
-- [ ] Publicaciones / Calendario (read-only primero)
 
 ### Fase 5 — Pulido y distribución
 - [ ] Firma Apple Developer + notarización
@@ -110,4 +125,4 @@ Fuente: `app/components/layout/Sidebar.tsx` + rutas bajo `app/app/` (checkout lo
 - Mac con Xcode 15+ para compilar / XcodeGen.
 - Apple Developer ID para distribución fuera de debug.
 - Anon key + URL en `Config/Secrets.xcconfig` (ver `Config/Secrets.example.xcconfig`).
-- Local monorepo checkout desactualizado vs `main` (API `tareas` ya está en GitHub `main` y en prod).
+- `GET /api/v1/publicaciones/semana`, `/mes` y `/grabaciones/proximas` siguen pidiendo el secreto de cron. El Mac usa las rutas nuevas de sesión documentadas arriba.

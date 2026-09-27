@@ -1,8 +1,8 @@
 # Distinto macOS
 
-Native SwiftUI client for Distinto. Cloud backend stays on Vercel + Supabase (no local database). Login, the sidebar, and Hoy / Inicio follow the live app at `https://distinto-app.vercel.app` (`--mk-*` light theme, email + password only).
+Native SwiftUI client for Distinto. Cloud backend stays on Vercel + Supabase (no local database). Login, the sidebar, Hoy / Inicio, Tareas, Perfil, Soporte, Publicaciones, and Calendario follow the live app at `https://distinto-app.vercel.app` (`--mk-*` light theme, email + password only).
 
-> The rest of the sidebar opens the same routes on the web. See [PLAN.md](./PLAN.md).
+> Planes stays Pedro-only. The other sidebar modules still open the same routes on the web. See [PLAN.md](./PLAN.md).
 
 ## Regenerate the Xcode project
 
@@ -30,7 +30,7 @@ Sources/DistintoMac/
   Auth/                     # Supabase email/password + Keychain
   API/                      # DistintoAPIClient + models
   Features/
-    Login/  Shell/  Hoy/
+    Login/  Shell/  Hoy/  Perfil/  Soporte/  Publicaciones/  Calendario/
 Config/                     # xcconfig (Secrets gitignored)
 project.yml                 # XcodeGen
 Package.swift
@@ -53,6 +53,13 @@ Authorization: Bearer <supabase access_token>
 
 The same endpoint also accepts a device key `dst_live_…` from Distinto → Perfil. Do not ship the server cron secret in the app.
 
+Perfil, Soporte, Publicaciones, and Calendario use the signed-in session only (not the device key). See [docs/API-FASE4.md](docs/API-FASE4.md).
+
+```bash
+curl -H "Authorization: Bearer <supabase access_token>" \
+  https://distinto-app.vercel.app/api/v1/perfil
+```
+
 ```bash
 curl -H "Authorization: Bearer <supabase access_token>" \
   "https://distinto-app.vercel.app/api/v1/tareas?due=hoy&include_overdue=1"
@@ -62,4 +69,4 @@ curl -H "Authorization: Bearer <supabase access_token>" \
 
 1. `xcodegen generate && open DistintoMac.xcodeproj`
 2. Sign with a personal or team certificate and run.
-3. Log in with the same email and password as the website. Inicio should list today's tasks; Tareas shows them as colored columns.
+3. Log in with the same email and password as the website. Inicio lists today's tasks. Perfil, Soporte, Publicaciones, and Calendario load inside the sidebar; a row opens the web detail.
