@@ -2,7 +2,7 @@
 
 App nativa SwiftUI para Distinto. Backend en la nube: **Vercel** (`https://distinto-app.vercel.app`) + **Supabase** (`exhmimlehdisonjvedvx` / SISTEMA DE GRILLA). Misma estética light Linear/Notion del web (`--mk-*` tokens).
 
-**Estado actual:** Login, sidebar, Hoy/Inicio, Tareas, Perfil, Soporte, Publicaciones y Calendario nativos. El resto de módulos abre la web. **No** es la app completa.
+**Estado actual:** Login, sidebar, Hoy/Inicio, Tareas, Perfil, Soporte, Publicaciones, Calendario, Reportes, Notas y reuniones, Oficina y Creación de Ideas nativos (listas). Editor, Diseño, Influencers, grillas y el resto abren la web. **No** es la app completa.
 
 Pedro (CEO): `pedro@agenciadistinto.com`
 
@@ -69,6 +69,10 @@ Sesión: `Authorization: Bearer <supabase access_token>`. La clave `dst_live_…
 | GET | `/api/v1/soporte` | Reportes propios o del equipo (director) |
 | GET | `/api/v1/publicaciones` | Próximas y recientes, solo lectura |
 | GET | `/api/v1/grabaciones/calendario` | Grabaciones y reuniones del mes |
+| GET | `/api/v1/reportes` | Marcas y último mes (`metricas`) |
+| GET | `/api/v1/notas-reuniones` | Próximas y notas recientes |
+| GET | `/api/v1/oficina` | Escritorios, salas y atajos |
+| GET | `/api/v1/creacion-de-ideas` | Banco de ideas |
 
 ---
 
@@ -105,6 +109,10 @@ Sesión: `Authorization: Bearer <supabase access_token>`. La clave `dst_live_…
 - [x] Soporte: lista nativa (propios, o equipo si director / sin team member)
 - [x] Publicaciones: lista de solo lectura con chips de estado; la fila abre la web
 - [x] Calendario: lista del mes (grabaciones + reuniones); la fila abre la web
+- [x] Reportes: lista de marcas (permiso `metricas`); la fila abre el hub web
+- [x] Notas y reuniones: próximas + notas; la fila abre la nota en la web
+- [x] Oficina: tablero de escritorios, salas y atajos; entrar al mapa abre la web
+- [x] Creación de Ideas: banco nativo; crear un guion abre la web
 - [ ] Tareas board (CRUD; hoy es solo lectura)
 - [ ] Notificaciones / menú bar (Distinto macOS)
 
