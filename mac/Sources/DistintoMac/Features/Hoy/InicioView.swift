@@ -227,23 +227,76 @@ struct InicioView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .center, spacing: 16) {
+                UserAvatar(initial: String(nombre.prefix(1)), size: 64)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(LimaFormat.greeting(name: appState.session?.displayName ?? ""))
-                        .font(.system(size: DistintoTokens.Typography.xxl, weight: .semibold))
+                    Text(LimaFormat.greeting(name: nombre))
+                        .font(.system(size: 28, weight: .semibold))
                         .tracking(-0.4)
-                        .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
-                    Text(subtitle)
-                        .font(.system(size: DistintoTokens.Typography.sm))
-                        .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                        .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    Text(bienvenida)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(hex: 0x6B7280))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
                 RefreshButton()
+            }
+            HStack(spacing: 8) {
+                acceso("Tareas", .tareas)
+                acceso("Calendario", .calendario)
+                acceso("Soporte", .soporte)
+                acceso("Hábitos", .habitos)
+                Spacer(minLength: 0)
+            }
+            if let frase = appState.tareasHoy?.frase {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("“\(frase.texto)”")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(DistintoTokens.ColorToken.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text([frase.autor, frase.contexto].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.system(size: 12))
+                        .foregroundStyle(DistintoTokens.ColorToken.accent)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DistintoTokens.ColorToken.accent.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             if appState.tareasHoy != nil {
                 filtros
             }
         }
+    }
+
+    private var nombre: String {
+        appState.perfil?.perfil.nombreVisible ?? appState.session?.displayName ?? ""
+    }
+
+    private var bienvenida: String {
+        let rol = appState.perfil?.perfil.cargo
+            ?? appState.perfil?.perfil.rolVisible
+            ?? "equipo"
+        return "Bienvenido a tu espacio en Distinto Agencia. Tu rol: \(rol)."
+    }
+
+    private func acceso(_ title: String, _ route: AppRoute) -> some View {
+        Button {
+            appState.select(route)
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(DistintoTokens.ColorToken.ink)
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(DistintoTokens.ColorToken.borderDefault, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private var subtitle: String {

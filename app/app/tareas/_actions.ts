@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { cerrarSesion } from '@/lib/tareas/tiempo'
-import { categorizarTarea, limpiarTexto, colorParaCategoria } from '@/lib/tareas/categorizar'
+import { limpiarTexto, colorParaCategoria } from '@/lib/tareas/categorizar'
+import { insertarTareaRapida } from '@/lib/tareas/insertar-tarea'
 import { TAREA_SELECT as SELECT, rowToTarea } from '@/lib/tareas/serialize'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
 
@@ -27,10 +28,6 @@ async function currentMember(service: Service, authUserId: string): Promise<{ id
     // error transitorio → reintenta una vez
   }
   return { id: null, esCEO: false }
-}
-
-function primerNombre(n: string): string {
-  return (n ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? ''
 }
 
 /* Crea una tarea rápida YA asociada a una marca — botón "+ Tarea" de las cards
@@ -94,102 +91,12 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
 > {
   const user = await requireUser()
   const service = createServiceClient() as Service
-  const texto = (textoOriginal ?? '').trim()
-  if (!texto) return { ok: false, error: 'No escribiste nada' }
-  if (texto.length > 600) return { ok: false, error: 'Demasiado largo' }
-
   const me = await currentMember(service, user.id)
-
-  /* Miembros activos (para resolver asignación por nombre). */
-  const { data: members } = await service.from('team_members').select('id, nombre').eq('activo', true)
-
-  /* Categorías + colores existentes (para reusar color por columna). */
-  const { data: existentes } = await service.from('tareas').select('categoria, color')
-  const colorByCat = new Map<string, string>()
-  const usados: string[] = []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of (existentes ?? []) as any[]) {
-    if (!colorByCat.has(r.categoria)) { colorByCat.set(r.categoria, r.color); usados.push(r.color) }
-  }
-
-  /* Marcas del workspace → para que "mil ideas", "kintu", etc. caigan en su
-     categoría de marca de forma determinística (sin depender solo de la IA). */
-  const { data: marcasData } = await service.from('marcas').select('nombre, slug')
-  const marcas = ((marcasData ?? []) as { nombre: string; slug: string }[])
-
-  const categoria = await categorizarTarea(texto, [...colorByCat.keys()], marcas)
-
-  /* ASIGNACIÓN: SOLO por @mención EXPLÍCITA. Si el texto trae "@Nombre" y coincide
-     con un miembro activo, la tarea es de esa persona; si no, es del CREADOR.
-     ANTES se asignaba si la CATEGORÍA (que la IA saca del texto) coincidía con un
-     nombre → "reunión con lorena…" se la quedaba Lorena sin que la etiqueten, y se
-     filtraba a la lista de otro. Pedro 5-ago-2026: "las tareas no deben filtrarse
-     a otros usuarios, salvo que usen @ y etiqueten al usuario". */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const miembros = (members ?? []) as any[]
-  let ownerId = me.id
-  /* ASIGNACIÓN EXPLÍCITA por el selector "Para: [persona]" (gana sobre todo).
-     Es la forma CONFIABLE de que, p.ej., Lorena le pase una tarea a Ailyn, sin
-     depender de escribir "@Nombre" exacto (que casi nadie hacía → las tareas se
-     quedaban con el creador y nunca llegaban al asignado). Pedro 12-ago-2026. */
-  if (assigneeId) {
-    const target = miembros.find((m) => m.id === assigneeId)
-    if (target) ownerId = target.id
-  } else {
-    // Fallback: @mención dentro del texto (por si alguien la usa).
-    const mention = texto.match(/@([\p{L}][\p{L}.]*)/u)
-    if (mention) {
-      const mname = mention[1].toLowerCase().replace(/\.+$/, '')
-      const target = miembros.find((m) => {
-        const nombre = (m.nombre ?? '').toLowerCase().trim()
-        return primerNombre(m.nombre) === mname || nombre.replace(/\s+/g, '') === mname || nombre.split(/\s+/).includes(mname)
-      })
-      if (target) ownerId = target.id
-    }
-  }
-
-  const color = colorByCat.get(categoria) ?? colorParaCategoria(usados)
-
-  /* Etiquetar la MARCA cuando la categoría es una marca (case-insensitive):
-     así toda tarea de "Typhouse" queda con marca_slug='little-joe' y el
-     PORTAL del cliente la ve, se escriba donde se escriba. Pedro 31-ago-2026:
-     "todas las de typhouse deben sincronizarse con la app directamente". */
-  const marcaDeCategoria = marcas.find((m) => m.nombre.trim().toLowerCase() === categoria.trim().toLowerCase())
-
-  const { data, error } = await service
-    .from('tareas')
-    .insert({
-      team_member_id: ownerId,
-      created_by: me.id,
-      texto: limpiarTexto(texto),
-      categoria,
-      color,
-      completada: false,
-      focus_lane: null,
-      marca_slug: marcaDeCategoria?.slug ?? null,
-    })
-    .select(SELECT)
-    .single()
-  if (error) return { ok: false, error: error.message }
-
-  /* Si la tarea se le asignó a OTRA persona, avísale por push (así Ailyn se
-     entera de que Lorena le agendó algo, sin depender de que abra el tablero).
-     Best-effort: si el push falla, la tarea igual quedó creada. */
-  if (ownerId !== me.id) {
-    try {
-      const { enviarPushAMiembroId } = await import('@/lib/push/send')
-      const quien = miembros.find((m) => m.id === me.id)?.nombre?.split(' ')[0] ?? 'Alguien'
-      await enviarPushAMiembroId(ownerId, {
-        title: '📋 Nueva tarea para ti',
-        body: `${quien} te asignó: ${limpiarTexto(texto).slice(0, 70)}`,
-        url: '/tareas',
-      })
-    } catch { /* noop */ }
-  }
-
-  revalidatePath('/tareas')
-  revalidatePath('/inicio')
-  return { ok: true, tarea: rowToTarea(data) }
+  return insertarTareaRapida(service, {
+    memberId: me.id,
+    textoOriginal,
+    assigneeId,
+  })
 }
 
 /* Verifica que el usuario pueda tocar esta tarea (dueño, CREADOR o CEO). */

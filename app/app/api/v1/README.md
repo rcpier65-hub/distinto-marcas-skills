@@ -195,7 +195,8 @@ Auth, en este orden:
 |--------|------|-------|----------------|
 | GET | `/api/v1/grabaciones/calendario` | módulo publicaciones; la clave `dst_live_` necesita alcance `owner` | `cargarAgendaCalendario` — los mismos eventos que pinta `/grabaciones/calendario` |
 | POST | `/api/v1/grabaciones/calendario` | director, admin, o usuario sin `team_member`; clave con `owner` | `ejecutarAgendarReunion` o `ejecutarAgendarGrabacion` (asistente «Agendar reunión o grabación») |
-| GET | `/api/v1/tareas?due=hoy` | el miembro; clave con `tareas:read` u `owner` | `cargarTrabajoDeHoy` + `cargarPendientesInicio` (`/inicio`) y `cargarTareasParaHoy` (alcance de `/tareas`) |
+| GET | `/api/v1/tareas?due=hoy` | el miembro; clave con `tareas:read` u `owner` | `cargarTrabajoDeHoy` + `cargarPendientesInicio` (`/inicio`), `cargarTareasParaHoy` y la frase del día |
+| GET | `/api/v1/tareas?vista=tablero` | el mismo alcance de persona que `/tareas` | tablero abierto (columnas, color, estado, archivo, equipo, marcas). No cambia `due=hoy` |
 | GET, POST | `/api/v1/device-keys` | cookie o JWT. No acepta `dst_live_` | alta y listado de claves |
 | PATCH, DELETE | `/api/v1/device-keys/:id` | el dueño de la clave | ampliar alcance (`["owner"]` o `["tareas:read"]`) o revocar |
 
@@ -234,7 +235,7 @@ Listas del cliente macOS, más dos POST chicos (hábito de hoy y tarea hecha). C
 |--------|------|----------------|
 | GET | `/api/v1/perfil` | módulos del sidebar y `marcas_nav` |
 | GET | `/api/v1/soporte` | reportes de `/soporte` |
-| POST | `/api/v1/soporte` | `{ "tipo": "falla"\|"pedido"\|"consulta", "descripcion" }` — misma alta que `crearReporte` (sin capturas) |
+| POST | `/api/v1/soporte` | alta `{ tipo, descripcion }` como `crearReporte` (sin capturas), o `{ id, accion: "tomar"\|"resolver", nota? }` como la web |
 | GET | `/api/v1/publicaciones` | piezas de `/publicaciones` |
 | GET | `/api/v1/reportes` | `getReportes` |
 | GET | `/api/v1/notas-reuniones` | `getProximasSemana` + notas |
@@ -247,13 +248,13 @@ Listas del cliente macOS, más dos POST chicos (hábito de hoy y tarea hecha). C
 | GET | `/api/v1/planes` | `PLANES` (solo Pedro) |
 | GET | `/api/v1/dashboard` | marcas de `/dashboard` |
 | GET | `/api/v1/grilla/:slug` | publicaciones de `/grilla/:slug` |
-| GET | `/api/v1/habitos` | hábitos del miembro |
+| GET | `/api/v1/habitos` | hábitos del miembro; cada uno trae `dias` (fechas hechas de los últimos 7 días) |
 | POST | `/api/v1/habitos` | `{ "id" }` marca o desmarca hoy, igual que `toggleHabitoHoy` |
 | GET | `/api/v1/actividad` | `loadActividadDerivada` |
 | GET | `/api/v1/historial` | grillas pedidas |
 | GET | `/api/v1/equipo` | miembros, sin `password_inicial` |
 | GET | `/api/v1/settings` | booleanos de integración y marcas, sin tokens |
-| POST | `/api/v1/tareas` | `{ "id", "completada": true }` igual que `completarTarea` |
+| POST | `/api/v1/tareas` | `{ "id", "completada" }` igual que `completarTarea`, o `{ "texto", "assignee_id"? }` igual que `crearTarea` |
 
 ## Versionado
 

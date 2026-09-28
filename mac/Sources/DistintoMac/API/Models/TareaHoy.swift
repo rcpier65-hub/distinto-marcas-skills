@@ -9,9 +9,11 @@ struct TareasHoyResponse: Codable, Equatable {
     let trabajoHoy: [TrabajoHoyItem]
     /// Pendientes rápidos de /inicio.
     let pendientes: [PendienteRapido]
+    /// Frase del día de /inicio. Vacía si el JSON no la trae.
+    let frase: FraseDia?
 
     enum CodingKeys: String, CodingKey {
-        case ok, fecha, total, tareas, pendientes
+        case ok, fecha, total, tareas, pendientes, frase
         case trabajoHoy = "trabajo_hoy"
     }
 
@@ -23,6 +25,7 @@ struct TareasHoyResponse: Codable, Equatable {
         tareas = try container.decodeIfPresent([TareaHoy].self, forKey: .tareas) ?? []
         trabajoHoy = (try? container.decode([TrabajoHoyItem].self, forKey: .trabajoHoy)) ?? []
         pendientes = (try? container.decode([PendienteRapido].self, forKey: .pendientes)) ?? []
+        frase = try container.decodeIfPresent(FraseDia.self, forKey: .frase)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -33,7 +36,14 @@ struct TareasHoyResponse: Codable, Equatable {
         try container.encode(tareas, forKey: .tareas)
         try container.encode(trabajoHoy, forKey: .trabajoHoy)
         try container.encode(pendientes, forKey: .pendientes)
+        try container.encodeIfPresent(frase, forKey: .frase)
     }
+}
+
+struct FraseDia: Codable, Equatable {
+    let texto: String
+    let autor: String
+    let contexto: String?
 }
 
 struct TrabajoHoyItem: Codable, Equatable, Identifiable {
@@ -94,6 +104,61 @@ struct TareaHoy: Codable, Equatable, Identifiable {
         default: return status.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
+}
+
+struct TareasTableroResponse: Codable, Equatable {
+    let ok: Bool
+    let vista: String
+    let esDueno: Bool
+    let meId: String?
+    let total: Int
+    let tareas: [TareaTablero]
+    let archivo: [TareaTablero]
+    let equipo: [PersonaTablero]
+    let marcas: [MarcaTablero]
+}
+
+struct TareaTablero: Codable, Equatable, Identifiable {
+    let id: String
+    let titulo: String
+    let categoria: String
+    let color: String
+    let estado: String
+    let fechaEntrega: String?
+    let fechaInicio: String?
+    let completadaAt: String?
+    let marca: String?
+    let marcaSlug: String?
+    let asignado: String?
+    let asignadoId: String?
+    let link: String
+
+    var estadoLabel: String {
+        switch estado {
+        case "en_proceso": return "En proceso"
+        case "archivado": return "Archivo"
+        default: return "Pendiente"
+        }
+    }
+}
+
+struct PersonaTablero: Codable, Equatable, Identifiable {
+    let id: String
+    let nombre: String
+}
+
+struct MarcaTablero: Codable, Equatable, Identifiable {
+    let slug: String
+    let nombre: String
+    var id: String { slug }
+}
+
+struct TareaCreadaResponse: Codable, Equatable {
+    let ok: Bool
+    let id: String
+    let titulo: String
+    let categoria: String
+    let color: String
 }
 
 enum APIError: LocalizedError {

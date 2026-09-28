@@ -5,14 +5,14 @@ struct HabitosListView: View {
     @State private var response: HabitosResponse?
     @State private var loading = false
     @State private var error: String?
-    @State private var detail: NativeDetail?
 
     var body: some View {
         ModuleScreen(
             title: "Hábitos",
             subtitle: subtitle,
             webPath: "/habitos",
-            webLabel: "Crear en la web",
+            webLabel: "Nuevo hábito",
+            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
@@ -22,7 +22,7 @@ struct HabitosListView: View {
         ) {
             if let response {
                 if response.habitos.isEmpty {
-                    ModuleEmptyState(title: "Sin hábitos", message: "Todavía no tienes hábitos activos. Puedes crearlos en la web.")
+                    ModuleEmptyState(title: "Sin hábitos", message: "Todavía no tienes hábitos activos.")
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
                         ForEach(response.habitos) { habito in
@@ -32,47 +32,65 @@ struct HabitosListView: View {
                 }
             }
         }
-        .sheet(item: $detail, onDismiss: { Task { await load(force: true) } }) { item in
-            NativeDetailView(detail: item)
-        }
         .task { await load() }
     }
 
     private func habitoCard(_ habito: HabitoFila) -> some View {
-        let color = Color(hexString: habito.color) ?? DistintoTokens.ColorToken.accent
+        let color = Color(hexString: habito.color) ?? Color(hex: 0xBA41F7)
+        let hoy = response?.today ?? LimaFormat.todayYMD()
+        let dias = (0..<7).map { LimaFormat.shift(hoy, days: $0 - 6) }
+        let hechos = Set(habito.dias ?? [])
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .top) {
                 Text(habito.icono)
                     .font(.system(size: 22))
                     .frame(width: 40, height: 40)
                     .background(color.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Spacer()
-                Button {
-                    Task { await toggle(habito) }
-                } label: {
-                    Image(systemName: habito.completadoHoy ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(habito.completadoHoy ? DistintoTokens.ColorToken.success : DistintoTokens.ColorToken.textQuaternary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(habito.nombre)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(DistintoTokens.ColorToken.ink)
+                        .lineLimit(2)
+                    Text(habito.aplicaHoy ? "\(habito.hechosSemana)/7 esta semana" : "Hoy no aplica")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
                 }
-                .buttonStyle(.plain)
-                .disabled(!habito.aplicaHoy)
+                Spacer(minLength: 8)
+                HabitoDonut(hechos: habito.hechosSemana, tint: color)
+            }
+            HStack(spacing: 6) {
+                ForEach(dias, id: \.self) { dia in
+                    let hecho = hechos.contains(dia)
+                    VStack(spacing: 4) {
+                        Text(String(LimaFormat.weekdayShort(dia).prefix(1)))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                        Circle()
+                            .fill(hecho ? color : Color(hex: 0xE5E7EB))
+                            .frame(width: 16, height: 16)
+                            .overlay {
+                                if dia == hoy {
+                                    Circle().stroke(color, lineWidth: 1.5).padding(-2)
+                                }
+                            }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
             Button {
-                detail = habitoDetail(habito)
+                Task { await toggle(habito) }
             } label: {
-                Text(habito.nombre)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(DistintoTokens.ColorToken.ink)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(habito.completadoHoy ? "Hecho" : "¡Hecho!")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(habito.completadoHoy ? color : .white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
+                    .background(habito.completadoHoy ? color.opacity(0.12) : color)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
-            Text(habito.aplicaHoy ? "\(habito.hechosSemana)/7 esta semana" : "No aplica hoy · \(habito.hechosSemana)/7")
-                .font(.system(size: 12))
-                .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
-            ProgressView(value: Double(habito.hechosSemana), total: 7)
-                .tint(color)
+            .disabled(!habito.aplicaHoy)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -102,6 +120,7 @@ struct HabitosListView: View {
                             aplicaHoy: row.aplicaHoy,
                             completadoHoy: result.completado,
                             hechosSemana: max(0, row.hechosSemana + delta),
+                            dias: diasActualizados(row.dias, hoy: result.today, hecho: result.completado),
                             link: row.link
                         )
                     }
@@ -113,22 +132,10 @@ struct HabitosListView: View {
         }
     }
 
-    private func habitoDetail(_ habito: HabitoFila) -> NativeDetail {
-        NativeDetail(
-            id: habito.id,
-            title: habito.nombre,
-            eyebrow: "Hábito",
-            fields: DetailRows.make([
-                ("Hoy", habito.completadoHoy ? "Hecho" : (habito.aplicaHoy ? "Pendiente" : "No aplica hoy")),
-                ("Esta semana", "\(habito.hechosSemana)/7")
-            ]),
-            webPath: "/habitos",
-            primaryTitle: habito.aplicaHoy ? (habito.completadoHoy ? "Desmarcar hoy" : "Marcar hecho hoy") : nil,
-            onPrimary: habito.aplicaHoy ? {
-                guard let token = self.appState.accessToken else { throw APIError.notSignedIn }
-                _ = try await self.appState.api.toggleHabito(accessToken: token, id: habito.id)
-            } : nil
-        )
+    private func diasActualizados(_ dias: [String]?, hoy: String, hecho: Bool) -> [String] {
+        var set = Set(dias ?? [])
+        if hecho { set.insert(hoy) } else { set.remove(hoy) }
+        return set.sorted()
     }
 
     private var subtitle: String {
@@ -142,6 +149,26 @@ struct HabitosListView: View {
         await ModuleLoad.fetch(appState: appState, loading: $loading, error: $error, loaded: response != nil, force: force) {
             response = try await appState.api.fetchHabitos(accessToken: $0)
         }
+    }
+}
+
+private struct HabitoDonut: View {
+    let hechos: Int
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color(hex: 0xEDE9FE), lineWidth: 5)
+            Circle()
+                .trim(from: 0, to: CGFloat(min(hechos, 7)) / 7)
+                .stroke(tint, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text("\(hechos)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(tint)
+        }
+        .frame(width: 36, height: 36)
     }
 }
 
@@ -358,7 +385,8 @@ struct EquipoListView: View {
             title: "Mi equipo",
             subtitle: subtitle,
             webPath: "/equipo",
-            webLabel: "Gestionar en la web",
+            webLabel: "Alta de miembro",
+            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
@@ -462,7 +490,8 @@ struct SettingsListView: View {
             title: "Settings",
             subtitle: "Cuenta, integraciones y marcas",
             webPath: "/settings",
-            webLabel: "Editar en la web",
+            webLabel: "Conectar",
+            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,

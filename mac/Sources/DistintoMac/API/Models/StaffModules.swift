@@ -185,6 +185,7 @@ struct HabitoFila: Codable, Equatable, Identifiable {
     let aplicaHoy: Bool
     let completadoHoy: Bool
     let hechosSemana: Int
+    let dias: [String]?
     let link: String
 }
 

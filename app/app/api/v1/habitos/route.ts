@@ -88,6 +88,7 @@ export async function GET(request: Request) {
       aplica_hoy: aplicaHoy,
       completado_hoy: set.has(today),
       hechos_semana: hechosSemana,
+      dias: [...set].filter((fecha) => fecha >= desde && fecha <= today).sort(),
       link: `${base}/habitos`,
     }
   })

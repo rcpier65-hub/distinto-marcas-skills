@@ -44,7 +44,6 @@ struct IdeasListView: View {
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
             Spacer(minLength: 8)
-            WebHandoffButton(title: "Crear en la web", path: "/creacion-de-ideas")
             ModuleRefreshButton(loading: loading, action: reload)
         }
     }
@@ -52,7 +51,7 @@ struct IdeasListView: View {
     private var subtitle: String {
         guard let response else { return "Banco de ideas para guiones" }
         let noun = response.total == 1 ? "idea" : "ideas"
-        return "\(response.total) \(noun) en el banco · las que guardas viven en la web"
+        return "\(response.total) \(noun) en el banco"
     }
 
     private var filtros: some View {
@@ -141,7 +140,9 @@ struct IdeasListView: View {
                                 ("Gancho", idea.gancho),
                                 ("Nicho", idea.nicho)
                             ]),
-                            webPath: "/creacion-de-ideas"
+                            webPath: "/creacion-de-ideas",
+                            showsWebLink: true,
+                            webLinkTitle: "Armar guion"
                         )
                     }
                 }

@@ -91,7 +91,8 @@ struct NuevaMarcaView: View {
             title: "Agregar marca",
             subtitle: "El alta sigue en el dashboard web",
             webPath: "/dashboard?nueva=1",
-            webLabel: "Crear en la web",
+            webLabel: "Nueva marca",
+            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
@@ -152,7 +153,8 @@ struct GrillaListView: View {
             title: response?.marca.nombre ?? slug,
             subtitle: subtitle,
             webPath: "/grilla/\(slug)",
-            webLabel: "Editar grilla",
+            webLabel: "Lienzo",
+            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
@@ -231,7 +233,9 @@ struct GrillaListView: View {
                     ("Plataformas", pieza.plataformas.joined(separator: ", ")),
                     ("Tipos", pieza.tipos.joined(separator: ", "))
                 ]),
-                webPath: NativeDetail.path(from: pieza.link, fallback: "/grilla/\(slug)")
+                webPath: NativeDetail.path(from: pieza.link, fallback: "/grilla/\(slug)"),
+                showsWebLink: true,
+                webLinkTitle: "Abrir en el lienzo"
             )
         } label: {
             VStack(alignment: .leading, spacing: 4) {

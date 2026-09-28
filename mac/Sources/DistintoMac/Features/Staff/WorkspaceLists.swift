@@ -6,13 +6,15 @@ struct EditorListView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var detail: NativeDetail?
+    @State private var filtro = "Por editar"
+    @State private var busqueda = ""
 
     var body: some View {
         ModuleScreen(
             title: "Editor",
             subtitle: subtitle,
             webPath: "/editor",
-            webLabel: "Abrir editor",
+            webLabel: "Abrir guion",
             loading: loading,
             error: error,
             loaded: response != nil,
@@ -21,11 +23,12 @@ struct EditorListView: View {
             onRefresh: reload
         ) {
             if let response {
-                conteos(response.conteos)
-                if response.piezas.isEmpty {
-                    ModuleEmptyState(title: "Cola vacía", message: "No hay piezas en edición, aprobación o programación.")
+                metricas(response.conteos)
+                filtros
+                if filtradas(response.piezas).isEmpty {
+                    ModuleEmptyState(title: "Nada en este filtro", message: "Prueba otro estado o limpia la búsqueda.")
                 } else {
-                    editorBoard(response.piezas)
+                    tabla(filtradas(response.piezas))
                 }
             }
         }
@@ -33,79 +36,138 @@ struct EditorListView: View {
         .task { await load() }
     }
 
-    private var subtitle: String {
-        guard let response else { return "Piezas en la cola de edición" }
-        return "\(response.total) en cola"
+    private var filtros: some View {
+        HStack(spacing: 8) {
+            ViewModeBar(titles: ["Por editar", "Aprobar", "Programar", "Publicar", "Todas"], selection: filtro) { filtro = $0 }
+            TextField("Buscar pieza o marca", text: $busqueda)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .frame(maxWidth: 220)
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(DistintoTokens.ColorToken.borderDefault, lineWidth: 1)
+                )
+            Spacer(minLength: 0)
+        }
     }
 
-    private func editorBoard(_ piezas: [EditorPieza]) -> some View {
-        let order = ["editar", "aprobar", "programar", "publicar", "borrador"]
-        let grouped = Dictionary(grouping: piezas, by: \.estado)
-        let keys = order.filter { grouped[$0] != nil } + grouped.keys.filter { !order.contains($0) }.sorted()
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 10) {
-                ForEach(keys, id: \.self) { key in
-                    let chip = StaffChip.estado(key)
-                    let items = grouped[key] ?? []
-                    KanbanLane(title: chip.0, tint: chip.1, count: items.count) {
-                        ForEach(items) { pieza in
-                            Button {
-                                detail = NativeDetail(
-                                    id: pieza.id,
-                                    title: pieza.nombre,
-                                    eyebrow: "Editor",
-                                    fields: DetailRows.make([
-                                        ("Estado", chip.0),
-                                        ("Marca", pieza.marca?.nombre),
-                                        ("Editor", pieza.editorNombre),
-                                        ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) }),
-                                        ("Plataformas", pieza.plataformas.joined(separator: ", "))
-                                    ]),
-                                    webPath: "/editor"
-                                )
-                            } label: {
-                                PiezaMiniCard(
-                                    title: pieza.nombre,
-                                    subtitle: detalle(pieza),
-                                    emoji: pieza.marca?.emoji,
-                                    tint: chip.1
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+    private func filtradas(_ piezas: [EditorPieza]) -> [EditorPieza] {
+        let clave: String
+        switch filtro {
+        case "Aprobar": clave = "aprobar"
+        case "Programar": clave = "programar"
+        case "Publicar": clave = "publicar"
+        case "Todas": clave = "todas"
+        case "Por editar": clave = "editar"
+        default: clave = "editar"
+        }
+        return piezas.filter { pieza in
+            let pasaEstado = clave == "todas" || pieza.estado == clave
+            let q = busqueda.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let pasaTexto = q.isEmpty
+                || pieza.nombre.lowercased().contains(q)
+                || (pieza.marca?.nombre.lowercased().contains(q) ?? false)
+            return pasaEstado && pasaTexto
+        }
+    }
+
+    private func tabla(_ piezas: [EditorPieza]) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("Pieza").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Marca").frame(width: 120, alignment: .leading)
+                Text("Estado").frame(width: 96, alignment: .leading)
+                Text("Editor").frame(width: 110, alignment: .leading)
+                Text("Fecha").frame(width: 88, alignment: .leading)
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Color(hex: 0xF8F8FA))
+            ForEach(piezas) { pieza in
+                let chip = StaffChip.estado(pieza.estado)
+                Button {
+                    detail = NativeDetail(
+                        id: pieza.id,
+                        title: pieza.nombre,
+                        eyebrow: "Editor",
+                        fields: DetailRows.make([
+                            ("Estado", chip.0),
+                            ("Marca", pieza.marca?.nombre),
+                            ("Editor", pieza.editorNombre),
+                            ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) }),
+                            ("Plataformas", pieza.plataformas.joined(separator: ", "))
+                        ]),
+                        webPath: "/editor",
+                        showsWebLink: true,
+                        webLinkTitle: "Abrir guion"
+                    )
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(pieza.nombre)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DistintoTokens.ColorToken.ink)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(pieza.marca?.nombre ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                            .lineLimit(1)
+                            .frame(width: 120, alignment: .leading)
+                        StatusChip(label: chip.0, color: chip.1)
+                            .frame(width: 96, alignment: .leading)
+                        Text(pieza.editorNombre ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                            .lineLimit(1)
+                            .frame(width: 110, alignment: .leading)
+                        Text(pieza.fecha.map { LimaFormat.shortDate($0) } ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                            .frame(width: 88, alignment: .leading)
                     }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                Divider().overlay(DistintoTokens.ColorToken.borderSubtle)
             }
         }
+        .distintoCard(radius: 12)
     }
 
-    private func detalle(_ pieza: EditorPieza) -> String {
-        [pieza.marca?.nombre, pieza.editorNombre, pieza.plataformas.joined(separator: " · ")]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-            .joined(separator: " · ")
-    }
-
-    private func conteos(_ conteos: EditorConteos) -> some View {
+    private func metricas(_ conteos: EditorConteos) -> some View {
         HStack(spacing: 8) {
-            conteo("Editar", conteos.editar, Color(hex: 0x7C3AED))
-            conteo("Aprobar", conteos.aprobar, Color(hex: 0xD97706))
-            conteo("Programar", conteos.programar, Color(hex: 0x2563EB))
+            metrica("Por editar", conteos.editar, Color(hex: 0x7C3AED))
+            metrica("Aprobar", conteos.aprobar, Color(hex: 0xD97706))
+            metrica("Programar", conteos.programar, Color(hex: 0x2563EB))
+            metrica("Publicar", conteos.publicar, Color(hex: 0x0891B2))
         }
     }
 
-    private func conteo(_ label: String, _ value: Int, _ color: Color) -> some View {
+    private func metrica(_ label: String, _ value: Int, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(value)")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: DistintoTokens.Typography.xs))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .distintoCard(radius: 12)
+    }
+
+    private var subtitle: String {
+        guard let response else { return "Cola de edición" }
+        return "\(response.total) en cola · filtro \(filtro)"
     }
 
     private func reload() { Task { await load(force: true) } }
@@ -123,13 +185,14 @@ struct DisenoListView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var detail: NativeDetail?
+    @State private var modo = "Tabla"
 
     var body: some View {
         ModuleScreen(
             title: "Diseño",
             subtitle: subtitle,
             webPath: "/diseno",
-            webLabel: "Abrir diseño",
+            webLabel: "Abrir pieza",
             loading: loading,
             error: error,
             loaded: response != nil,
@@ -138,6 +201,7 @@ struct DisenoListView: View {
             onRefresh: reload
         ) {
             if let response {
+                ViewModeBar(titles: ["Tabla", "Kanban"], selection: modo) { modo = $0 }
                 if response.migracionPendiente {
                     Text("Falta la marca de tareas de diseño en la base.")
                         .font(.system(size: DistintoTokens.Typography.sm))
@@ -145,6 +209,8 @@ struct DisenoListView: View {
                 }
                 if response.piezas.isEmpty {
                     ModuleEmptyState(title: "Sin tareas", message: "No hay piezas marcadas para diseño.")
+                } else if modo == "Tabla" {
+                    tablaDiseno(response.piezas)
                 } else {
                     disenoBoard(response.piezas)
                 }
@@ -154,10 +220,75 @@ struct DisenoListView: View {
         .task { await load() }
     }
 
+    private func tablaDiseno(_ piezas: [DisenoPieza]) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("Proyecto").frame(width: 140, alignment: .leading)
+                Text("Tarea").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Fecha").frame(width: 100, alignment: .leading)
+                Text("Estado").frame(width: 110, alignment: .leading)
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Color(hex: 0xF8F8FA))
+            ForEach(piezas) { pieza in
+                let chip = StaffChip.estado(pieza.estado)
+                Button {
+                    abrir(pieza)
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(pieza.marca?.nombre ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                            .lineLimit(1)
+                            .frame(width: 140, alignment: .leading)
+                        Text(pieza.nombre)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DistintoTokens.ColorToken.ink)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(pieza.fecha.map { LimaFormat.shortDate($0) } ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                            .frame(width: 100, alignment: .leading)
+                        StatusChip(label: chip.0, color: chip.1)
+                            .frame(width: 110, alignment: .leading)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(DistintoTokens.ColorToken.borderSubtle)
+            }
+        }
+        .distintoCard(radius: 12)
+    }
+
+    private func abrir(_ pieza: DisenoPieza) {
+        let chip = StaffChip.estado(pieza.estado)
+        detail = NativeDetail(
+            id: pieza.id,
+            title: pieza.nombre,
+            eyebrow: "Diseño",
+            fields: DetailRows.make([
+                ("Estado", chip.0),
+                ("Marca", pieza.marca?.nombre),
+                ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) })
+            ]),
+            webPath: NativeDetail.path(from: pieza.link, fallback: "/diseno/\(pieza.id)"),
+            showsWebLink: true,
+            webLinkTitle: "Abrir pieza"
+        )
+    }
+
     private func disenoBoard(_ piezas: [DisenoPieza]) -> some View {
         let order = ["sin_empezar", "en_progreso", "pausada", "listo", "enviado", "archivado"]
         let grouped = Dictionary(grouping: piezas, by: \.estado)
-        let keys = order.filter { grouped[$0] != nil } + grouped.keys.filter { !order.contains($0) }.sorted()
+        let keys = order
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 10) {
                 ForEach(keys, id: \.self) { key in
@@ -166,17 +297,7 @@ struct DisenoListView: View {
                     KanbanLane(title: chip.0, tint: chip.1, count: items.count) {
                         ForEach(items) { pieza in
                             Button {
-                                detail = NativeDetail(
-                                    id: pieza.id,
-                                    title: pieza.nombre,
-                                    eyebrow: "Diseño",
-                                    fields: DetailRows.make([
-                                        ("Estado", chip.0),
-                                        ("Marca", pieza.marca?.nombre),
-                                        ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) })
-                                    ]),
-                                    webPath: NativeDetail.path(from: pieza.link, fallback: "/diseno/\(pieza.id)")
-                                )
+                                abrir(pieza)
                             } label: {
                                 PiezaMiniCard(
                                     title: pieza.nombre,

@@ -10,17 +10,12 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { enviarPushAMiembros, enviarPushAMiembroId } from '@/lib/push/send'
 import { insertarReporteSoporte } from '@/lib/soporte/crear-reporte'
+import { resolverReporteEquipo, tomarReporteEquipo } from '@/lib/soporte/gestionar-reporte'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 type Result = { ok: true } | { ok: false; error: string }
-
-const TIPOS = ['falla', 'pedido', 'consulta'] as const
-type Tipo = (typeof TIPOS)[number]
-/* Cómo se nombra cada tipo dentro del mensaje ("...resolvimos LA FALLA que..."). */
-const FRASE: Record<Tipo, string> = { falla: 'la falla', pedido: 'el pedido', consulta: 'la consulta' }
 
 async function currentMember(service: Service, authUserId: string): Promise<{ id: string | null; nombre: string; esAdmin: boolean }> {
   const { data } = await service.from('team_members').select('id, nombre, rol_base').eq('auth_user_id', authUserId).maybeSingle()
@@ -74,21 +69,12 @@ export async function tomarReporte(id: string): Promise<Result> {
   const user = await requireUser()
   const service = createServiceClient() as Service
   const me = await currentMember(service, user.id)
-  if (!me.esAdmin) return { ok: false, error: 'Solo Erick/Pedro pueden gestionar reportes.' }
-  const { data: r } = await service.from('soporte_reportes').select('team_member_id, descripcion, estado').eq('id', id).maybeSingle()
-  const { error } = await service.from('soporte_reportes').update({ estado: 'en_proceso', tomado_at: new Date().toISOString() }).eq('id', id).eq('estado', 'pendiente')
-  if (error) return { ok: false, error: error.message }
-  /* Avisar al AUTOR que ya lo están viendo (solo si venía pendiente). */
-  if (r?.estado === 'pendiente' && r?.team_member_id) {
-    await enviarPushAMiembroId(r.team_member_id, {
-      title: '👀 Ya estamos viendo tu reporte',
-      body: `${me.nombre || 'Erick'} está revisando: ${(r.descripcion ?? '').slice(0, 80)}`,
-      url: '/soporte',
-      tag: `soporte-visto-${id}`,
-    })
-  }
-  revalidatePath('/soporte')
-  return { ok: true }
+  return tomarReporteEquipo(service, {
+    esAdmin: me.esAdmin,
+    memberId: me.id,
+    memberNombre: me.nombre,
+    id,
+  })
 }
 
 /* Erick lo resuelve: push al autor + devuelve el mensaje para WhatsApp. */
@@ -98,37 +84,12 @@ export async function resolverReporte(id: string, nota?: string): Promise<
   const user = await requireUser()
   const service = createServiceClient() as Service
   const me = await currentMember(service, user.id)
-  if (!me.esAdmin) return { ok: false, error: 'Solo Erick/Pedro pueden resolver.' }
-
-  const { data: r } = await service
-    .from('soporte_reportes')
-    .select('team_member_id, autor_nombre, tipo, descripcion')
-    .eq('id', id)
-    .maybeSingle()
-
-  const { error } = await service
-    .from('soporte_reportes')
-    .update({ estado: 'resuelto', resuelto_at: new Date().toISOString(), resuelto_por: me.id, nota_resolucion: (nota ?? '').trim() || null })
-    .eq('id', id)
-  if (error) return { ok: false, error: error.message }
-
-  /* Push al AUTOR del reporte (a su celular). */
-  if (r?.team_member_id) {
-    await enviarPushAMiembroId(r.team_member_id, {
-      title: '✅ Tu reporte ya se resolvió',
-      body: `${(r.descripcion ?? '').slice(0, 100)}`,
-      url: '/soporte',
-      tag: `soporte-resuelto-${id}`,
-    })
-  }
-
-  const t = (r?.tipo ?? 'consulta') as Tipo
-  const frase = FRASE[t] ?? 'la consulta'
-  const mensaje = `Hola ${r?.autor_nombre ?? ''} 👋\n\nYa resolvimos ${frase} que reportaste:\n"${r?.descripcion ?? ''}"\n\n¡Cualquier otra cosa, avísame! 💙`.trim()
-
-  revalidatePath('/soporte')
-  revalidatePath('/inicio')
-  return { ok: true, whatsapp: mensaje }
+  return resolverReporteEquipo(service, {
+    esAdmin: me.esAdmin,
+    memberId: me.id,
+    id,
+    nota,
+  })
 }
 
 /* Marca que ya se avisó al usuario (cuando Erick abre WhatsApp desde el botón). */

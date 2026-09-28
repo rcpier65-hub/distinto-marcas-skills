@@ -10,6 +10,7 @@ struct PublicacionesListView: View {
     @State private var filtro: Filtro = .proximas
     @State private var vista = "Listado"
     @State private var monthOffset = 0
+    @State private var weekOffset = 0
 
     private enum Filtro: String, CaseIterable, Identifiable {
         case proximas
@@ -60,8 +61,7 @@ struct PublicacionesListView: View {
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
             Spacer(minLength: 8)
-            ViewModeBar(titles: ["Listado", "Calendario"], selection: vista) { vista = $0 }
-            WebHandoffButton(title: "Abrir en la web", path: "/publicaciones")
+            ViewModeBar(titles: ["Listado", "Semana", "Mes"], selection: vista) { vista = $0 }
             ModuleRefreshButton(loading: loading, action: reload)
         }
     }
@@ -72,11 +72,32 @@ struct PublicacionesListView: View {
         return "\(response.total) \(noun) · \(LimaFormat.shortDate(response.desde)) – \(LimaFormat.shortDate(response.hasta))"
     }
 
+    @ViewBuilder
     private var filtros: some View {
-        if vista == "Calendario" {
-            return AnyView(monthNav)
+        if vista == "Mes" {
+            monthNav
+        } else if vista == "Semana" {
+            weekNav
+        } else {
+            listFilters
         }
-        return AnyView(listFilters)
+    }
+
+    private var weekNav: some View {
+        HStack(spacing: 8) {
+            navButton("chevron.left") { weekOffset -= 1 }
+            Text(LimaFormat.weekRange(offset: weekOffset).label)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(minWidth: 160)
+            navButton("chevron.right") { weekOffset += 1 }
+            if weekOffset != 0 {
+                Button("Hoy") { weekOffset = 0 }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DistintoTokens.ColorToken.accent)
+            }
+            Spacer()
+        }
     }
 
     private var monthNav: some View {
@@ -142,8 +163,10 @@ struct PublicacionesListView: View {
             } else {
                 ModuleLoadingBlock(message: "Cargando publicaciones…")
             }
-        } else if vista == "Calendario" {
+        } else if vista == "Mes" {
             calendario
+        } else if vista == "Semana" {
+            semana
         } else if days.isEmpty {
             ModuleEmptyState(
                 title: "Sin publicaciones",
@@ -175,6 +198,33 @@ struct PublicacionesListView: View {
         .padding(.horizontal, 12)
         .frame(height: 32)
         .background(Color(hex: 0xF8F8FA))
+    }
+
+    private var semana: some View {
+        let days = LimaFormat.weekRange(offset: weekOffset).days
+        let hoy = response?.hoy ?? LimaFormat.todayYMD()
+        return DistintoWeekBoard(days: days, hoy: hoy) { day in
+            ForEach(pubs(on: day)) { item in
+                Button {
+                    open(item)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.titulo)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DistintoTokens.ColorToken.ink)
+                            .lineLimit(2)
+                        Text(item.estadoChip.label)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(item.estadoChip.color)
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background((item.marca?.colorValue ?? DistintoTokens.ColorToken.accent).opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var calendario: some View {
@@ -235,7 +285,9 @@ struct PublicacionesListView: View {
                 ("Plataformas", item.plataformas.joined(separator: ", ")),
                 ("Editor", item.editor)
             ]),
-            webPath: NativeDetail.path(from: item.link, fallback: "/publicaciones/\(item.id)")
+            webPath: NativeDetail.path(from: item.link, fallback: "/publicaciones/\(item.id)"),
+            showsWebLink: true,
+            webLinkTitle: "Abrir pieza"
         )
     }
 

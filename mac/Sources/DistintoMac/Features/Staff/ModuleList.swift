@@ -10,6 +10,7 @@ struct ModuleScreen<Content: View>: View {
     let loaded: Bool
     let loadingMessage: String
     var maxWidth: CGFloat = 860
+    var showWebTool = false
     let onRefresh: () -> Void
     @ViewBuilder var content: () -> Content
 
@@ -26,7 +27,9 @@ struct ModuleScreen<Content: View>: View {
                             .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
                     }
                     Spacer(minLength: 8)
-                    WebHandoffButton(title: webLabel, path: webPath)
+                    if showWebTool {
+                        WebHandoffButton(title: webLabel, path: webPath)
+                    }
                     ModuleRefreshButton(loading: loading, action: onRefresh)
                 }
                 if let error, loaded {

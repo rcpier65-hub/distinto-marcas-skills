@@ -38,7 +38,6 @@ struct ReportesListView: View {
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
             Spacer(minLength: 8)
-            WebHandoffButton(title: "Abrir en la web", path: "/reportes")
             ModuleRefreshButton(loading: loading, action: reload)
         }
     }

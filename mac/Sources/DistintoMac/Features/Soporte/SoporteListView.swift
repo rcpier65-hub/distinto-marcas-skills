@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Lista de reportes. Crear y resolver sigue en la web.
+/// Reportes de soporte: alta, lista, tomar y resolver. Las capturas siguen en la web.
 struct SoporteListView: View {
     @EnvironmentObject private var appState: AppState
     @State private var response: SoporteResponse?
@@ -60,7 +60,6 @@ struct SoporteListView: View {
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
             Spacer(minLength: 8)
-            WebHandoffButton(title: "Reportar en la web", path: "/soporte")
             ModuleRefreshButton(loading: loading, action: reload)
         }
     }
@@ -146,9 +145,9 @@ struct SoporteListView: View {
 
     private var subtitle: String {
         if response?.esAdmin == true {
-            return "Reportes del equipo. Toca uno para seguirlo en la web."
+            return "Reportes del equipo. Puedes tomarlos y resolverlos acá."
         }
-        return "Tus reportes. Toca uno para seguirlo en la web."
+        return "Tus reportes de fallas, pedidos y consultas."
     }
 
     @ViewBuilder
@@ -174,7 +173,7 @@ struct SoporteListView: View {
             if reportes.isEmpty {
                 ModuleEmptyState(
                     title: "Sin reportes",
-                    message: "Todavía no has enviado ningún reporte. Puedes crear uno en Soporte web."
+                    message: "Todavía no has enviado ningún reporte. Escríbelo arriba."
                 )
             } else {
                 ForEach(reportes) { reporte in
@@ -200,7 +199,13 @@ struct SoporteListView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 } else {
                     ForEach(abiertos) { reporte in
-                        ReporteCard(reporte: reporte, showAuthor: true) { open(reporte) }
+                        ReporteCard(
+                            reporte: reporte,
+                            showAuthor: true,
+                            canManage: true,
+                            onTomar: { Task { await gestionar(reporte, accion: "tomar") } },
+                            onResolver: { Task { await gestionar(reporte, accion: "resolver") } }
+                        ) { open(reporte) }
                     }
                 }
             }
@@ -225,6 +230,17 @@ struct SoporteListView: View {
 
     private func reload() {
         Task { await load(force: true) }
+    }
+
+    private func gestionar(_ reporte: ReporteSoporte, accion: String) async {
+        guard let token = appState.accessToken else { return }
+        do {
+            try await appState.api.gestionarReporte(accessToken: token, id: reporte.id, accion: accion, nota: nil)
+            aviso = accion == "resolver" ? "Reporte resuelto." : "Reporte en proceso."
+            await load(force: true)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func open(_ reporte: ReporteSoporte) {
@@ -268,10 +284,14 @@ struct SoporteListView: View {
 private struct ReporteCard: View {
     let reporte: ReporteSoporte
     var showAuthor = false
+    var canManage = false
+    var onTomar: (() -> Void)?
+    var onResolver: (() -> Void)?
     let onOpen: () -> Void
 
     var body: some View {
-        Button(action: onOpen) {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: onOpen) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     tipoChip
@@ -309,7 +329,19 @@ private struct ReporteCard: View {
                         .foregroundStyle(Color(hex: 0x16A34A))
                 }
             }
-            .padding(14)
+            }
+            .buttonStyle(.plain)
+            if canManage, reporte.estado != "resuelto" {
+                HStack(spacing: 8) {
+                    if reporte.estado == "pendiente" {
+                        accion("Tomar", onTomar)
+                    }
+                    accion("Resolver", onResolver)
+                    Spacer()
+                }
+            }
+        }
+        .padding(14)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(alignment: .leading) {
@@ -324,8 +356,17 @@ private struct ReporteCard: View {
             )
             .shadow(color: Color.black.opacity(0.04), radius: 1, y: 1)
             .opacity(reporte.estado == "resuelto" ? 0.92 : 1)
-        }
-        .buttonStyle(.plain)
+    }
+
+    private func accion(_ title: String, _ action: (() -> Void)?) -> some View {
+        Button(title) { action?() }
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(title == "Resolver" ? .white : DistintoTokens.ColorToken.ink)
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(title == "Resolver" ? DistintoTokens.ColorToken.ink : Color(hex: 0xF3F4F6))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var tipoChip: some View {

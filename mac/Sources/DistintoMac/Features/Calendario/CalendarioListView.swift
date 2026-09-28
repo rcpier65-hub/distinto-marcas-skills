@@ -87,7 +87,6 @@ struct CalendarioListView: View {
                 }
                 .buttonStyle(.plain)
             }
-            WebHandoffButton(title: "Abrir en la web", path: "/grabaciones/calendario")
             ModuleRefreshButton(loading: loading) { Task { await load() } }
         }
     }

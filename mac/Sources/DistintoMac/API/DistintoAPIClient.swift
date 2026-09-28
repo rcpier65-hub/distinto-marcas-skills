@@ -138,6 +138,20 @@ actor DistintoAPIClient {
         try await post("api/v1/habitos", body: ["id": id], accessToken: accessToken)
     }
 
+    /// GET /api/v1/tareas?vista=tablero — tablero abierto de /tareas.
+    func fetchTareasTablero(accessToken: String) async throws -> TareasTableroResponse {
+        try await get("api/v1/tareas", query: [URLQueryItem(name: "vista", value: "tablero")], accessToken: accessToken)
+    }
+
+    /// POST /api/v1/tareas { texto } — misma alta que el compositor de /tareas.
+    func crearTarea(accessToken: String, texto: String, assigneeId: String?) async throws -> TareaCreadaResponse {
+        var body: [String: Any] = ["texto": texto]
+        if let assigneeId, !assigneeId.isEmpty {
+            body["assignee_id"] = assigneeId
+        }
+        return try await post("api/v1/tareas", body: body, accessToken: accessToken)
+    }
+
     /// POST /api/v1/tareas { id, completada } — misma marca de hecha que /tareas.
     func completarTarea(accessToken: String, id: String, completada: Bool = true) async throws {
         let _: TareaCompletarResponse = try await post(
@@ -145,6 +159,13 @@ actor DistintoAPIClient {
             body: ["id": id, "completada": completada],
             accessToken: accessToken
         )
+    }
+
+    /// POST /api/v1/soporte { id, accion } — tomar o resolver, igual que /soporte.
+    func gestionarReporte(accessToken: String, id: String, accion: String, nota: String?) async throws {
+        var body: [String: Any] = ["id": id, "accion": accion]
+        if let nota, !nota.isEmpty { body["nota"] = nota }
+        let _: OkFlag = try await post("api/v1/soporte", body: body, accessToken: accessToken)
     }
 
     /// POST /api/v1/soporte — misma alta que el formulario de /soporte, sin capturas.
