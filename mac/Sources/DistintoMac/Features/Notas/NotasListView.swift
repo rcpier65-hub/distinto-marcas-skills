@@ -17,7 +17,7 @@ struct NotasListView: View {
                 }
                 bodyContent
             }
-            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: 1040, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
@@ -58,8 +58,18 @@ struct NotasListView: View {
                 ModuleLoadingBlock(message: "Cargando notas…")
             }
         } else if let response {
-            proximas(response.proximas)
-            recientes(response)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    proximas(response.proximas)
+                        .frame(width: 360)
+                    recientes(response)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                VStack(alignment: .leading, spacing: 22) {
+                    proximas(response.proximas)
+                    recientes(response)
+                }
+            }
         }
     }
 

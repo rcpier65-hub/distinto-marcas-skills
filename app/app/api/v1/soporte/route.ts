@@ -1,15 +1,17 @@
-// GET /api/v1/soporte
+// GET  /api/v1/soporte
+// POST /api/v1/soporte  { tipo, descripcion }
 //
 // Lista de reportes, misma visibilidad que /soporte:
 //   - director, o admin sin team_member: todos (hasta 300, más nuevos primero)
 //   - el resto: solo los propios
-// No crea ni resuelve. El detalle sigue en la web (no hay ruta por reporte).
-// Auth: Bearer JWT o dst_live_ con alcance owner.
+// POST crea el reporte con la misma función que el formulario web (sin capturas).
+// Resolver sigue en la web. Auth: Bearer JWT o dst_live_ con alcance owner.
 
 import { NextResponse } from 'next/server'
 import { appBase } from '@/lib/api/lima'
 import { requireSessionMember } from '@/lib/api/session-member'
 import { createServiceClient } from '@/lib/supabase/service'
+import { insertarReporteSoporte } from '@/lib/soporte/crear-reporte'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
@@ -90,4 +92,40 @@ export async function GET(request: Request) {
     total: reportes.length,
     reportes,
   })
+}
+
+// POST /api/v1/soporte  { tipo, descripcion }
+// Misma alta que el formulario de /soporte (sin capturas: esas siguen en la web).
+export async function POST(request: Request) {
+  const auth = await requireSessionMember(request)
+  if ('response' in auth) return auth.response
+  const member = auth.member
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ ok: false, error: 'JSON inválido' }, { status: 400 })
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ ok: false, error: 'JSON inválido' }, { status: 400 })
+  }
+  const input = body as Record<string, unknown>
+  const tipo = typeof input.tipo === 'string' ? input.tipo : 'falla'
+  const descripcion = typeof input.descripcion === 'string' ? input.descripcion : ''
+  const nombre = member.nombre?.trim()
+    || member.email?.split('@')[0]
+    || 'Alguien'
+
+  const creado = await insertarReporteSoporte({
+    teamMemberId: member.teamMemberId,
+    autorNombre: nombre,
+    tipo,
+    descripcion,
+  })
+  if (!creado.ok) {
+    const status = creado.error.includes('Demasiado') || creado.error.startsWith('Escribe') ? 400 : 500
+    return NextResponse.json({ ok: false, error: creado.error }, { status })
+  }
+  return NextResponse.json({ ok: true, id: creado.id })
 }

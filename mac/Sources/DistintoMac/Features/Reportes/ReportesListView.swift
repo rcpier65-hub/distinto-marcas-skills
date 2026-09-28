@@ -17,7 +17,7 @@ struct ReportesListView: View {
                 }
                 bodyContent
             }
-            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: 1080, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
@@ -64,7 +64,7 @@ struct ReportesListView: View {
                     message: "No hay marcas con acceso a Reportes en esta sesión."
                 )
             } else {
-                VStack(spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
                     ForEach(response.marcas) { marca in
                         MarcaReporteCard(marca: marca) { open(marca) }
                     }

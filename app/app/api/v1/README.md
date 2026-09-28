@@ -234,6 +234,7 @@ Listas del cliente macOS, más dos POST chicos (hábito de hoy y tarea hecha). C
 |--------|------|----------------|
 | GET | `/api/v1/perfil` | módulos del sidebar y `marcas_nav` |
 | GET | `/api/v1/soporte` | reportes de `/soporte` |
+| POST | `/api/v1/soporte` | `{ "tipo": "falla"\|"pedido"\|"consulta", "descripcion" }` — misma alta que `crearReporte` (sin capturas) |
 | GET | `/api/v1/publicaciones` | piezas de `/publicaciones` |
 | GET | `/api/v1/reportes` | `getReportes` |
 | GET | `/api/v1/notas-reuniones` | `getProximasSemana` + notas |

@@ -3,6 +3,8 @@ import SwiftUI
 /// Colored columns, same language as the web tareas board (`CardArrastrable`).
 struct TareasBoardView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var modo = "Tablero"
+    @State private var estado = "Todas"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -18,6 +20,7 @@ struct TareasBoardView: View {
         .background(DistintoTokens.ColorToken.bgBase)
     }
 
+    @ViewBuilder
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "sparkles")
@@ -36,17 +39,36 @@ struct TareasBoardView: View {
                     .foregroundStyle(Color(hex: 0x6B7280))
             }
             Spacer(minLength: 8)
-            Text("Tablero")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .frame(height: 30)
-                .background(DistintoTokens.ColorToken.ink)
-                .clipShape(Capsule())
+            ViewModeBar(titles: ["Tablero", "Lista"], selection: modo) { modo = $0 }
             RefreshButton()
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
+        if appState.tareasHoy != nil {
+            HStack(spacing: 6) {
+                ForEach(["Todas", "Pendiente", "En proceso"], id: \.self) { item in
+                    let active = estado == item
+                    Button {
+                        estado = item
+                    } label: {
+                        Text(item)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(active ? DistintoTokens.ColorToken.accent : DistintoTokens.ColorToken.textTertiary)
+                            .padding(.horizontal, 10)
+                            .frame(height: 26)
+                            .background(active ? DistintoTokens.ColorToken.accentBg : Color.white)
+                            .overlay(
+                                Capsule().stroke(active ? DistintoTokens.ColorToken.accent.opacity(0.35) : DistintoTokens.ColorToken.borderSubtle, lineWidth: 1)
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 10)
+        }
     }
 
     private var subtitle: String {
@@ -69,6 +91,18 @@ struct TareasBoardView: View {
                 message: "No hay tareas abiertas para hoy. Las que entren en Distinto aparecen acá, por categoría."
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if modo == "Lista" {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(filtered) { tarea in
+                        TareaListRow(tarea: tarea, fecha: fecha)
+                    }
+                }
+                .padding(12)
+                .distintoCard()
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+            }
         } else {
             ScrollView([.horizontal, .vertical]) {
                 HStack(alignment: .top, spacing: 8) {
@@ -82,8 +116,20 @@ struct TareasBoardView: View {
         }
     }
 
+    private var filtered: [TareaHoy] {
+        let all = appState.tareasHoy?.tareas ?? []
+        switch estado {
+        case "Pendiente":
+            return all.filter { $0.status == "pendiente" }
+        case "En proceso":
+            return all.filter { $0.status == "en_proceso" }
+        default:
+            return all
+        }
+    }
+
     private var columns: [TareaColumn] {
-        TareaOrganizer.columns(from: appState.tareasHoy?.tareas ?? [])
+        TareaOrganizer.columns(from: filtered)
     }
 
     private var fecha: String { appState.tareasHoy?.fecha ?? "" }

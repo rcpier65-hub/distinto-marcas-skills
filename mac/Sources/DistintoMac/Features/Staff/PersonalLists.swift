@@ -17,23 +17,16 @@ struct HabitosListView: View {
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando hábitos…",
+            maxWidth: 980,
             onRefresh: reload
         ) {
             if let response {
                 if response.habitos.isEmpty {
                     ModuleEmptyState(title: "Sin hábitos", message: "Todavía no tienes hábitos activos. Puedes crearlos en la web.")
                 } else {
-                    ForEach(response.habitos) { habito in
-                        ModuleRowButton(
-                            title: habito.nombre,
-                            detail: habito.aplicaHoy
-                                ? "\(habito.hechosSemana)/7 esta semana"
-                                : "No aplica hoy · \(habito.hechosSemana)/7 esta semana",
-                            emoji: habito.icono,
-                            chip: habito.completadoHoy ? "Hecho" : (habito.aplicaHoy ? "Pendiente" : "Otro día"),
-                            chipColor: habito.completadoHoy ? Color(hex: 0x16A34A) : DistintoTokens.ColorToken.textTertiary
-                        ) {
-                            detail = habitoDetail(habito)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
+                        ForEach(response.habitos) { habito in
+                            habitoCard(habito)
                         }
                     }
                 }
@@ -43,6 +36,81 @@ struct HabitosListView: View {
             NativeDetailView(detail: item)
         }
         .task { await load() }
+    }
+
+    private func habitoCard(_ habito: HabitoFila) -> some View {
+        let color = Color(hexString: habito.color) ?? DistintoTokens.ColorToken.accent
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(habito.icono)
+                    .font(.system(size: 22))
+                    .frame(width: 40, height: 40)
+                    .background(color.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Spacer()
+                Button {
+                    Task { await toggle(habito) }
+                } label: {
+                    Image(systemName: habito.completadoHoy ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(habito.completadoHoy ? DistintoTokens.ColorToken.success : DistintoTokens.ColorToken.textQuaternary)
+                }
+                .buttonStyle(.plain)
+                .disabled(!habito.aplicaHoy)
+            }
+            Button {
+                detail = habitoDetail(habito)
+            } label: {
+                Text(habito.nombre)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            Text(habito.aplicaHoy ? "\(habito.hechosSemana)/7 esta semana" : "No aplica hoy · \(habito.hechosSemana)/7")
+                .font(.system(size: 12))
+                .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+            ProgressView(value: Double(habito.hechosSemana), total: 7)
+                .tint(color)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .distintoCard(radius: 16)
+        .opacity(habito.aplicaHoy ? 1 : 0.55)
+    }
+
+    private func toggle(_ habito: HabitoFila) async {
+        guard habito.aplicaHoy, let token = appState.accessToken else { return }
+        do {
+            let result = try await appState.api.toggleHabito(accessToken: token, id: habito.id)
+            if var current = response, let index = current.habitos.firstIndex(where: { $0.id == habito.id }) {
+                let item = current.habitos[index]
+                let delta = result.completado == item.completadoHoy ? 0 : (result.completado ? 1 : -1)
+                current = HabitosResponse(
+                    ok: current.ok,
+                    today: current.today,
+                    total: current.total,
+                    completados: max(0, current.completados + delta),
+                    habitos: current.habitos.enumerated().map { offset, row in
+                        guard offset == index else { return row }
+                        return HabitoFila(
+                            id: row.id,
+                            nombre: row.nombre,
+                            icono: row.icono,
+                            color: row.color,
+                            aplicaHoy: row.aplicaHoy,
+                            completadoHoy: result.completado,
+                            hechosSemana: max(0, row.hechosSemana + delta),
+                            link: row.link
+                        )
+                    }
+                )
+                response = current
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func habitoDetail(_ habito: HabitoFila) -> NativeDetail {
@@ -105,28 +173,54 @@ struct ActividadListView: View {
                 if response.actividad.isEmpty {
                     ModuleEmptyState(title: "Sin actividad", message: "No hay tareas cerradas ni videos editados en este día.")
                 } else {
-                    ForEach(Array(response.actividad.enumerated()), id: \.offset) { _, fila in
-                        ModuleRowButton(
-                            title: fila.detalle?.isEmpty == false ? (fila.detalle ?? fila.accion) : fila.accion,
-                            detail: [fila.actorNombre, fila.marcaSlug].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
-                            trailing: hora(fila.createdAt),
-                            chip: fila.accion,
-                            chipColor: DistintoTokens.ColorToken.accent
-                        ) {
-                            detail = NativeDetail(
-                                id: fila.id,
-                                title: fila.detalle?.isEmpty == false ? (fila.detalle ?? fila.accion) : fila.accion,
-                                eyebrow: "Reporte del día",
-                                fields: DetailRows.make([
-                                    ("Acción", fila.accion),
-                                    ("Persona", fila.actorNombre),
-                                    ("Rol", fila.rol),
-                                    ("Marca", fila.marcaSlug),
-                                    ("Detalle", fila.detalle),
-                                    ("Hora", hora(fila.createdAt))
-                                ]),
-                                webPath: "/actividad"
-                            )
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(response.actividad.enumerated()), id: \.offset) { _, fila in
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(spacing: 0) {
+                                    Circle().fill(DistintoTokens.ColorToken.accent).frame(width: 8, height: 8).padding(.top, 6)
+                                    Rectangle().fill(DistintoTokens.ColorToken.borderSubtle).frame(width: 1)
+                                }
+                                .frame(width: 12)
+                                Button {
+                                    detail = NativeDetail(
+                                        id: fila.id,
+                                        title: fila.detalle?.isEmpty == false ? (fila.detalle ?? fila.accion) : fila.accion,
+                                        eyebrow: "Reporte del día",
+                                        fields: DetailRows.make([
+                                            ("Acción", fila.accion),
+                                            ("Persona", fila.actorNombre),
+                                            ("Rol", fila.rol),
+                                            ("Marca", fila.marcaSlug),
+                                            ("Detalle", fila.detalle),
+                                            ("Hora", hora(fila.createdAt))
+                                        ]),
+                                        webPath: "/actividad"
+                                    )
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        HStack {
+                                            Text(fila.actorNombre)
+                                                .font(.system(size: 13, weight: .semibold))
+                                            Spacer()
+                                            Text(hora(fila.createdAt))
+                                                .font(.system(size: 11, design: .monospaced))
+                                                .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                                        }
+                                        Text(fila.detalle?.isEmpty == false ? (fila.detalle ?? fila.accion) : fila.accion)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
+                                            .multilineTextAlignment(.leading)
+                                        Text(fila.accion)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(DistintoTokens.ColorToken.accent)
+                                    }
+                                    .padding(10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .distintoCard(radius: 12)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.bottom, 8)
+                            }
                         }
                     }
                 }
@@ -181,27 +275,48 @@ struct HistorialListView: View {
                 if response.grillas.isEmpty {
                     ModuleEmptyState(title: "Sin grillas", message: "Todavía no hay grillas pedidas.")
                 } else {
-                    ForEach(response.grillas) { grilla in
-                        let chip = StaffChip.estado(grilla.estado)
-                        ModuleRowButton(
-                            title: grilla.marca?.nombre ?? "Marca",
-                            detail: semana(grilla),
-                            emoji: grilla.marca?.emoji,
-                            chip: chip.0 == grilla.estado.replacingOccurrences(of: "_", with: " ") ? grilla.estado : chip.0,
-                            chipColor: chip.1
-                        ) {
-                            detail = NativeDetail(
-                                id: grilla.id,
-                                title: grilla.marca?.nombre ?? "Marca",
-                                eyebrow: "Historial",
-                                fields: DetailRows.make([
-                                    ("Estado", chip.0),
-                                    ("Semana", semana(grilla)),
-                                    ("Pedida", grilla.pedidaAt),
-                                    ("Enviada", grilla.enviadaAt)
-                                ]),
-                                webPath: "/historial"
-                            )
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(response.grillas) { grilla in
+                            let chip = StaffChip.estado(grilla.estado)
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(spacing: 0) {
+                                    Circle().fill(chip.1).frame(width: 10, height: 10)
+                                    Rectangle().fill(DistintoTokens.ColorToken.borderSubtle).frame(width: 1)
+                                }
+                                .frame(width: 12)
+                                Button {
+                                    detail = NativeDetail(
+                                        id: grilla.id,
+                                        title: grilla.marca?.nombre ?? "Marca",
+                                        eyebrow: "Historial",
+                                        fields: DetailRows.make([
+                                            ("Estado", chip.0),
+                                            ("Semana", semana(grilla)),
+                                            ("Pedida", grilla.pedidaAt),
+                                            ("Enviada", grilla.enviadaAt)
+                                        ]),
+                                        webPath: "/historial"
+                                    )
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text("\(grilla.marca?.emoji ?? "") \(grilla.marca?.nombre ?? "Marca")")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(DistintoTokens.ColorToken.ink)
+                                            Spacer()
+                                            StatusChip(label: chip.0, color: chip.1)
+                                        }
+                                        Text(semana(grilla))
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                                    }
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .distintoCard(radius: 12)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.bottom, 10)
+                            }
                         }
                     }
                 }
@@ -248,34 +363,57 @@ struct EquipoListView: View {
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando equipo…",
+            maxWidth: 1000,
             onRefresh: reload
         ) {
             if let response {
                 if response.miembros.isEmpty {
                     ModuleEmptyState(title: "Sin miembros", message: "Todavía no hay personas en el equipo.")
                 } else {
-                    ForEach(response.miembros) { miembro in
-                        ModuleRowButton(
-                            title: miembro.nombre,
-                            detail: detalle(miembro),
-                            chip: miembro.activo ? (miembro.rol ?? "Activo") : "Inactivo",
-                            chipColor: miembro.activo ? DistintoTokens.ColorToken.accent : DistintoTokens.ColorToken.textTertiary
-                        ) {
-                            detail = NativeDetail(
-                                id: miembro.id,
-                                title: miembro.nombre,
-                                eyebrow: "Mi equipo",
-                                fields: DetailRows.make([
-                                    ("Email", miembro.email),
-                                    ("Rol", miembro.rol),
-                                    ("Rol base", miembro.rolBase),
-                                    ("Cargo", miembro.cargo),
-                                    ("Estado", miembro.activo ? "Activo" : "Inactivo"),
-                                    ("Marcas", miembro.marcas.map { "\($0)" } ?? "Todas"),
-                                    ("En edición", "\(miembro.enEdicion)")
-                                ]),
-                                webPath: "/equipo"
-                            )
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 12)], spacing: 12) {
+                        ForEach(response.miembros) { miembro in
+                            Button {
+                                detail = NativeDetail(
+                                    id: miembro.id,
+                                    title: miembro.nombre,
+                                    eyebrow: "Mi equipo",
+                                    fields: DetailRows.make([
+                                        ("Email", miembro.email),
+                                        ("Rol", miembro.rol),
+                                        ("Rol base", miembro.rolBase),
+                                        ("Cargo", miembro.cargo),
+                                        ("Estado", miembro.activo ? "Activo" : "Inactivo"),
+                                        ("Marcas", miembro.marcas.map { "\($0)" } ?? "Todas"),
+                                        ("En edición", "\(miembro.enEdicion)")
+                                    ]),
+                                    webPath: "/equipo"
+                                )
+                            } label: {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(spacing: 10) {
+                                        UserAvatar(initial: String(miembro.nombre.prefix(1)), size: 36)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(miembro.nombre)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(DistintoTokens.ColorToken.ink)
+                                            Text(miembro.rol ?? (miembro.activo ? "Activo" : "Inactivo"))
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+                                    Text(detalle(miembro))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                                        .lineLimit(3)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                .padding(14)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .distintoCard(radius: 16)
+                                .opacity(miembro.activo ? 1 : 0.55)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -366,28 +504,47 @@ struct SettingsListView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .distintoCard(radius: 12)
 
-                ForEach(response.marcas) { marca in
-                    ModuleRowButton(
-                        title: marca.nombre,
-                        detail: detalle(marca),
-                        emoji: marca.emoji,
-                        chip: marca.activa ? "Activa" : "Inactiva",
-                        chipColor: marca.activa ? Color(hex: 0x16A34A) : DistintoTokens.ColorToken.textTertiary
-                    ) {
-                        detail = NativeDetail(
-                            id: marca.slug,
-                            title: marca.nombre,
-                            eyebrow: "Settings",
-                            fields: DetailRows.make([
-                                ("Estado", marca.activa ? "Activa" : "Inactiva"),
-                                ("Logo", marca.tieneLogo ? "Sí" : "No"),
-                                ("WhatsApp", marca.whatsappGrupo),
-                                ("Envío real", marca.envioReal ? "Sí" : "No"),
-                                ("Decisor", marca.decisor),
-                                ("Correos", "\(marca.correos)")
-                            ]),
-                            webPath: "/settings"
-                        )
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 12)], spacing: 12) {
+                    ForEach(response.marcas) { marca in
+                        Button {
+                            detail = NativeDetail(
+                                id: marca.slug,
+                                title: marca.nombre,
+                                eyebrow: "Settings",
+                                fields: DetailRows.make([
+                                    ("Estado", marca.activa ? "Activa" : "Inactiva"),
+                                    ("Logo", marca.tieneLogo ? "Sí" : "No"),
+                                    ("WhatsApp", marca.whatsappGrupo),
+                                    ("Envío real", marca.envioReal ? "Sí" : "No"),
+                                    ("Decisor", marca.decisor),
+                                    ("Correos", "\(marca.correos)")
+                                ]),
+                                webPath: "/settings"
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(marca.emoji ?? "🏷️")
+                                    Text(marca.nombre)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    StatusChip(
+                                        label: marca.activa ? "Activa" : "Inactiva",
+                                        color: marca.activa ? Color(hex: 0x16A34A) : DistintoTokens.ColorToken.textTertiary
+                                    )
+                                }
+                                Text(detalle(marca))
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                                    .lineLimit(3)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .distintoCard(radius: 14)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }

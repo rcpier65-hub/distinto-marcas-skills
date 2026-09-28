@@ -7,11 +7,21 @@ struct SoporteListView: View {
     @State private var detail: NativeDetail?
     @State private var loading = false
     @State private var error: String?
+    @State private var tipo = "falla"
+    @State private var borrador = ""
+    @State private var enviando = false
+    @State private var aviso: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
+                composer
+                if let aviso {
+                    Text(aviso)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color(hex: 0x166534))
+                }
                 if let error, response != nil {
                     ModuleErrorBanner(message: error, onRetry: reload)
                 }
@@ -52,6 +62,85 @@ struct SoporteListView: View {
             Spacer(minLength: 8)
             WebHandoffButton(title: "Reportar en la web", path: "/soporte")
             ModuleRefreshButton(loading: loading, action: reload)
+        }
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ForEach(["falla", "pedido", "consulta"], id: \.self) { item in
+                    let meta = tipoMeta(item)
+                    let active = tipo == item
+                    Button {
+                        tipo = item
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: meta.symbol)
+                            Text(meta.label)
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(active ? meta.color : DistintoTokens.ColorToken.textTertiary)
+                        .padding(.horizontal, 10)
+                        .frame(height: 32)
+                        .background(active ? meta.background : Color.clear)
+                        .overlay(Capsule().stroke(active ? meta.color : Color(hex: 0xE5E7EB), lineWidth: 1))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            TextField("Qué falló, qué pedís o qué duda tenés", text: $borrador, axis: .vertical)
+                .lineLimit(3...6)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .padding(10)
+                .background(Color(hex: 0xFAFAFA))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            HStack {
+                Text("Las capturas siguen en la web.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                Spacer()
+                Button(enviando ? "Enviando…" : "Enviar reporte") {
+                    Task { await enviar() }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(DistintoTokens.ColorToken.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .disabled(enviando || borrador.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(16)
+        .distintoCard(radius: 16)
+    }
+
+    private func tipoMeta(_ tipo: String) -> ReporteSoporte.TipoMeta {
+        switch tipo {
+        case "pedido":
+            return .init(label: "Pedido", symbol: "lightbulb", color: Color(hex: 0xD97706), background: Color(hex: 0xFFFBEB))
+        case "consulta":
+            return .init(label: "Consulta", symbol: "questionmark.circle", color: Color(hex: 0x2563EB), background: Color(hex: 0xEFF6FF))
+        default:
+            return .init(label: "Falla", symbol: "ladybug", color: Color(hex: 0xDC2626), background: Color(hex: 0xFEF2F2))
+        }
+    }
+
+    private func enviar() async {
+        guard let token = appState.accessToken else { return }
+        enviando = true
+        aviso = nil
+        defer { enviando = false }
+        do {
+            try await appState.api.crearReporte(accessToken: token, tipo: tipo, descripcion: borrador)
+            borrador = ""
+            aviso = "Enviado. Erick ya tiene el reporte."
+            await load(force: true)
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 

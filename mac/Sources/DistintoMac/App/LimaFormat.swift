@@ -111,6 +111,90 @@ enum LimaFormat {
         return (ymd.string(from: start), ymd.string(from: end), capitalized)
     }
 
+    struct MonthCell: Identifiable, Hashable {
+        let ymd: String
+        let inMonth: Bool
+        var id: String { "\(ymd)-\(inMonth)" }
+    }
+
+    static func shift(_ ymd: String, days: Int) -> String {
+        addDays(ymd, days)
+    }
+
+    static func todayYMD() -> String {
+        let formatter = makeFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
+    static func dayOfMonth(_ ymd: String) -> String {
+        guard let date = parse(ymd) else { return "" }
+        let formatter = makeFormatter()
+        formatter.dateFormat = "d"
+        return formatter.string(from: date)
+    }
+
+    static func weekdayShort(_ ymd: String) -> String {
+        guard let date = parse(ymd) else { return "" }
+        let formatter = makeFormatter()
+        formatter.dateFormat = "EEE"
+        let text = formatter.string(from: date)
+        guard let first = text.first else { return text }
+        return first.uppercased() + text.dropFirst()
+    }
+
+    /// Semana lun–dom en Lima, desplazada `offset` semanas desde la actual.
+    static func weekRange(offset: Int) -> (label: String, days: [String]) {
+        let today = todayYMD()
+        guard let date = parse(today) else { return ("", []) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = AppConfig.timeZone
+        let weekday = calendar.component(.weekday, from: date)
+        let backToMonday = (weekday + 5) % 7
+        guard let monday = calendar.date(byAdding: .day, value: -backToMonday + offset * 7, to: date) else {
+            return ("", [])
+        }
+        let ymd = makeFormatter()
+        ymd.dateFormat = "yyyy-MM-dd"
+        let days = (0..<7).compactMap { index -> String? in
+            guard let day = calendar.date(byAdding: .day, value: index, to: monday) else { return nil }
+            return ymd.string(from: day)
+        }
+        guard let first = days.first, let last = days.last else { return ("", days) }
+        return ("\(shortDate(first)) – \(shortDate(last))", days)
+    }
+
+    /// Grilla lun–dom del mes, con días de relleno para completar las semanas.
+    static func monthGrid(offset: Int) -> (label: String, weeks: [[MonthCell]]) {
+        let window = monthWindow(offset: offset)
+        guard let start = parse(window.desde) else { return (window.label, []) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = AppConfig.timeZone
+        let weekday = calendar.component(.weekday, from: start)
+        let leading = (weekday + 5) % 7
+        guard let firstCell = calendar.date(byAdding: .day, value: -leading, to: start) else {
+            return (window.label, [])
+        }
+        let month = calendar.component(.month, from: start)
+        let ymd = makeFormatter()
+        ymd.dateFormat = "yyyy-MM-dd"
+        var cells: [MonthCell] = []
+        for index in 0..<42 {
+            guard let date = calendar.date(byAdding: .day, value: index, to: firstCell) else { continue }
+            cells.append(MonthCell(
+                ymd: ymd.string(from: date),
+                inMonth: calendar.component(.month, from: date) == month
+            ))
+        }
+        if cells.count == 42, cells.suffix(7).allSatisfy({ !$0.inMonth }) {
+            cells.removeLast(7)
+        }
+        let weeks = stride(from: 0, to: cells.count, by: 7).map { startIndex in
+            Array(cells[startIndex..<min(startIndex + 7, cells.count)])
+        }
+        return (window.label, weeks)
+    }
+
     private static func parse(_ ymd: String) -> Date? {
         let formatter = makeFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

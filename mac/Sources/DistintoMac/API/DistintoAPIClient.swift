@@ -147,6 +147,39 @@ actor DistintoAPIClient {
         )
     }
 
+    /// POST /api/v1/soporte — misma alta que el formulario de /soporte, sin capturas.
+    func crearReporte(accessToken: String, tipo: String, descripcion: String) async throws {
+        let _: OkFlag = try await post(
+            "api/v1/soporte",
+            body: ["tipo": tipo, "descripcion": descripcion],
+            accessToken: accessToken
+        )
+    }
+
+    /// POST /api/v1/grabaciones/calendario — agendar reunión o grabación (director).
+    func agendar(
+        accessToken: String,
+        tipo: String,
+        marcaSlug: String,
+        fecha: String,
+        hora: String,
+        durationMin: Int,
+        titulo: String
+    ) async throws -> AgendaCreadaResponse {
+        try await post(
+            "api/v1/grabaciones/calendario",
+            body: [
+                "tipo": tipo,
+                "marca_slug": marcaSlug,
+                "fecha": fecha,
+                "hora": hora,
+                "duration_min": durationMin,
+                "titulo": titulo
+            ],
+            accessToken: accessToken
+        )
+    }
+
     /// GET /api/v1/grabaciones/calendario?desde&hasta — grabaciones y reuniones.
     func fetchCalendario(accessToken: String, desde: String, hasta: String) async throws -> CalendarioResponse {
         try await get(
@@ -222,4 +255,16 @@ actor DistintoAPIClient {
         if raw.count > 180 { return String(raw.prefix(180)) + "…" }
         return raw
     }
+}
+
+struct OkFlag: Codable, Equatable {
+    let ok: Bool
+}
+
+struct AgendaCreadaResponse: Codable, Equatable {
+    let ok: Bool
+    let tipo: String
+    let id: String?
+    let meetLink: String?
+    let gcalSynced: Bool?
 }

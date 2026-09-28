@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { enviarPushAMiembros, enviarPushAMiembroId } from '@/lib/push/send'
+import { insertarReporteSoporte } from '@/lib/soporte/crear-reporte'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -18,7 +19,6 @@ type Result = { ok: true } | { ok: false; error: string }
 
 const TIPOS = ['falla', 'pedido', 'consulta'] as const
 type Tipo = (typeof TIPOS)[number]
-const EMOJI: Record<Tipo, string> = { falla: '🐞', pedido: '💡', consulta: '❓' }
 /* Cómo se nombra cada tipo dentro del mensaje ("...resolvimos LA FALLA que..."). */
 const FRASE: Record<Tipo, string> = { falla: 'la falla', pedido: 'el pedido', consulta: 'la consulta' }
 
@@ -55,33 +55,16 @@ export async function subirImagenSoporte(formData: FormData): Promise<
 export async function crearReporte(tipo: string, descripcion: string, imagenes: string[] = []): Promise<Result> {
   const user = await requireUser()
   const service = createServiceClient() as Service
-  const texto = (descripcion ?? '').trim()
-  if (!texto) return { ok: false, error: 'Escribe qué necesitas o qué falló.' }
-  if (texto.length > 2000) return { ok: false, error: 'Demasiado largo (máx. 2000).' }
-  const t: Tipo = (TIPOS as readonly string[]).includes(tipo) ? (tipo as Tipo) : 'falla'
-  /* Solo URLs de nuestro bucket, máximo 6 capturas. */
-  const imgs = (Array.isArray(imagenes) ? imagenes : []).filter((u) => typeof u === 'string' && u.includes('/storage/')).slice(0, 6)
   const me = await currentMember(service, user.id)
   const nombre = me.nombre || user.email?.split('@')[0] || 'Alguien'
-
-  const { data, error } = await service
-    .from('soporte_reportes')
-    .insert({ team_member_id: me.id, autor_nombre: nombre, tipo: t, descripcion: texto, estado: 'pendiente', imagenes: imgs })
-    .select('id')
-    .single()
-  if (error) return { ok: false, error: error.message }
-
-  /* Aviso a Erick + directores (Pedro). enviarPushAMiembros siempre incluye
-     a los directores, así que con ['erick'] llega a Erick y a Pedro. */
-  await enviarPushAMiembros(['erick'], {
-    title: `${EMOJI[t]} Nuevo reporte de soporte`,
-    body: `${nombre}: ${texto.slice(0, 100)}`,
-    url: '/soporte',
-    tag: `soporte-nuevo-${data.id}`,
+  const creado = await insertarReporteSoporte({
+    teamMemberId: me.id,
+    autorNombre: nombre,
+    tipo,
+    descripcion,
+    imagenes,
   })
-
-  revalidatePath('/soporte')
-  revalidatePath('/inicio')
+  if (!creado.ok) return creado
   return { ok: true }
 }
 
