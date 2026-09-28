@@ -8,7 +8,7 @@ Ruta: `/creacion-de-ideas`. Sustituye el iframe anterior, que se conserva como a
 2. Agregar fuentes públicas HTTPS o extractos de documentos/productos. La IA solo recibe fuentes marcadas como revisadas. No se hace crawling de sitios completos ni extracción automática de PDF privados.
 3. Crear una tanda de 1–30 guiones con cantidades Ads/orgánico, objetivo, plataforma y grabación opcional. La configuración puede editarse posteriormente.
 4. Trabajar un guion por vez: enfoque y conciencia → idea → insight/ángulo → formato/estructura → gancho → escenas/planos → prueba/payoff → CTA/requerimientos → revisión.
-5. Aplicar propuestas de IA por decisión y editarlas. Los seis criterios de viralidad son validaciones humanas opcionales, no una puntuación de resultados.
+5. El copiloto propone cinco alternativas al entrar a cada etapa con un objetivo/idea disponible. Permite explorar cinco más, refinar lo escrito, aplicar/deshacer y recuperar generaciones. El checklist se evalúa automáticamente tras una pausa de escritura; cada criterio muestra cumple, por mejorar o falta contexto con evidencia y ajuste concreto. La revisión final de marca sigue siendo humana.
 6. Marcar el guion revisado; crear una copia en Publicaciones. La creación es idempotente y respeta permisos de edición. Las revisiones futuras no pisan el guion de la publicación.
 7. Descargar el Word completo o seleccionar una carpeta de Google Drive. Los borradores se identifican como tales en el documento.
 
@@ -37,3 +37,13 @@ El equipo restringido solo puede navegar y guardar dentro de `marcas.drive_url`.
 - El guardado real en Drive solo puede probarse después de otorgar el consentimiento de Drive; la descarga no depende de esa autorización.
 
 Prueba con la sesión real en producción (28-sep-2026): creación y edición de una tanda de Manrique, guardado del guion, tres sugerencias de IA, aplicación de una sugerencia, elección de plano y campos de producción. Word descargado y XML inspeccionado: contiene el contenido guardado, plano, diálogo, texto, requerimientos y estado BORRADOR. Se confirmó el mensaje de consentimiento pendiente de Drive. La tanda «Prueba del estudio · 2 guiones» queda como ejemplo sin aprobación ni envío a Publicaciones.
+
+## Copiloto contextual (28 septiembre)
+
+- Nueva migración aditiva `20260928_creative_ai_generations.sql`. Guarda cada generación antes de llamar al modelo: UUID, usuario, marca vía tanda, guion, etapa, entrada, estado, resultado, tokens y estimación de coste. RLS sin acceso directo; consulta autorizada por marca en `/api/creative-studio?generation=<uuid>`.
+- SHA-256 deduplica solicitudes automáticas idénticas; las solicitudes explícitas permiten cinco opciones nuevas. Un fallo conserva la respuesta incompleta para diagnóstico; la UI muestra error y reintento. Historial recuperable de las últimas 12 generaciones por guion/etapa.
+- Cinco propuestas deben satisfacer el contrato de la etapa. Un patch de IA no puede marcar listo, aprobar la marca o tocar campos de otra etapa. Los resultados que llegan tarde permanecen asociados a su etapa/guion.
+- Evaluación automática tras 6,5 segundos sin cambios; firma del contenido + perfil + objetivo de tanda + plataforma invalida evaluaciones obsoletas. No se aprueba formato/personaje sin ADN. La IA debe citar el contenido y explicar qué falta; no se garantiza viralidad.
+- El prompt copiable para investigar el insight incorpora objetivo, conciencia, idea, audiencia y límites de marca. Abrir ChatGPT no transmite el prompt; el usuario lo pega. Los hallazgos pegados son hipótesis hasta que el equipo marca que revisó sus fuentes. No se simula investigación web dentro del generador.
+- Modelo existente `gpt-4o-mini`; valoración aproximada de tokens según https://developers.openai.com/api/docs/models/gpt-4o-mini (28 septiembre 2026), no equivale a factura. Límite de 12 generaciones/minuto/usuario y hasta 95s por llamada.
+- Verificación: `npx tsx --test lib/creative-studio/studio.test.ts lib/creative-studio/ai-contract.test.ts lib/grilla/render-response.test.ts` y `node --test scripts/test-grilla-sw.mjs`: 22 pruebas. TypeScript, ESLint y compilación correctos. Migración aplicada y acceso anon/authenticated denegado comprobado.

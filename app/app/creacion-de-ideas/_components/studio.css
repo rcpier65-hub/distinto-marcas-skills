@@ -1254,3 +1254,276 @@
     padding-bottom: max(88px, env(safe-area-inset-bottom));
   }
 }
+
+/* The copilot stays beside the decision, ahead of the manual fields. */
+.cs-copilot {
+  margin: 0 0 26px;
+  padding: 20px;
+  border: 1px solid #e3daf7;
+  border-radius: 18px;
+  background: #fffdfd;
+}
+.cs-copilot .cs-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cs-ai-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #7554ce;
+}
+.cs-spin {
+  animation: cs-spin 1.2s linear infinite;
+}
+@keyframes cs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cs-copilot-context {
+  margin: 12px 0;
+  color: #786997;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.cs-copilot-context span {
+  display: block;
+  color: #8d839a;
+  max-height: 46px;
+  overflow: auto;
+}
+.cs-refine-input {
+  display: block;
+  margin: 12px 0;
+  font-size: 11px;
+  color: #786997;
+}
+.cs-refine-input input {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 11px 12px;
+  font: inherit;
+  background: #f9f7fc;
+  border: 1px solid #e3dced;
+  border-radius: 10px;
+}
+.cs-ai-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cs-ai-actions button {
+  font-size: 11px;
+}
+.cs-proposals-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: #9586aa;
+  margin-top: 20px;
+}
+.cs-root .cs-proposal-strip {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(210px, 75%);
+  gap: 12px;
+  overflow-x: auto;
+  padding: 7px 3px 16px;
+  margin-top: 7px;
+  scroll-snap-type: x proximity;
+}
+.cs-proposal-strip article {
+  scroll-snap-align: start;
+  transform: none;
+}
+.cs-proposal-strip pre {
+  max-height: 330px;
+  overflow: auto;
+}
+.cs-proposal-strip article h3 {
+  font-size: 14px;
+}
+.cs-proposal-strip article p {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.cs-proposal-strip article button {
+  font-size: 11px;
+  margin-top: auto;
+}
+.cs-generation-history {
+  display: block;
+  margin-top: 12px;
+  font-size: 10px;
+  color: #887a9c;
+}
+.cs-generation-history select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #e3dced;
+  border-radius: 8px;
+  background: white;
+  font-size: 11px;
+}
+.cs-ai-stale {
+  font-size: 10px;
+  color: #896b32;
+  padding: 9px;
+  background: #fff8e8;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+.cs-ai-stale button {
+  border: 0;
+  padding: 2px;
+  color: #7351c8;
+  background: transparent;
+  font-size: inherit;
+}
+.cs-ai-error {
+  color: #b44156;
+  background: #fff3f5;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+.cs-research {
+  padding: 20px;
+  border: 1px solid #d9e7e2;
+  background: #f2f8f5;
+  border-radius: 14px;
+  margin: 20px 0;
+}
+.cs-research h3 {
+  font-size: 17px;
+  margin: 9px 0;
+}
+.cs-research p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #698477;
+}
+.cs-research .cs-row {
+  margin: 14px 0;
+}
+.cs-research a {
+  font-size: 11px;
+}
+.cs-research details {
+  margin: 15px 0;
+}
+.cs-research summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #578774;
+}
+.cs-research details textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d9e7e2;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+.cs-research small {
+  display: block;
+  color: #829489;
+  font-size: 10px;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.cs-research-reviewed {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+  color: #577667;
+  line-height: 1.6;
+}
+.cs-review-status {
+  color: #8e7da5;
+  font-size: 10px;
+  line-height: 1.6;
+  margin: -8px 0 16px;
+}
+.cs-assessment-item {
+  margin: 14px 0;
+}
+.cs-assessment-item summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  color: #8f849e;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.cs-assessment-item summary::-webkit-details-marker {
+  display: none;
+}
+.cs-assessment-item input {
+  pointer-events: none;
+}
+.cs-assessment-item em {
+  display: block;
+  font-size: 9px;
+  font-style: normal;
+  color: #a998ba;
+}
+.cs-assessment-cumple summary,
+.cs-assessment-cumple em {
+  color: #39916b;
+}
+.cs-assessment-mejorar em {
+  color: #b18736;
+}
+.cs-assessment-item p,
+.cs-assessment-summary {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #847593;
+  padding-left: 23px;
+  margin: 8px 0;
+}
+.cs-assessment-summary {
+  padding: 10px;
+  border-radius: 8px;
+  background: #f3effa;
+}
+.cs-review-button {
+  font-size: 10px !important;
+  width: 100%;
+  margin-top: 12px;
+}
+@media (min-width: 1650px) {
+  .cs-root .cs-proposal-strip {
+    grid-auto-columns: minmax(220px, 47%);
+  }
+}
+@media (max-width: 700px) {
+  .cs-copilot {
+    padding: 15px;
+  }
+  .cs-root .cs-proposal-strip {
+    grid-auto-columns: 90%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-spin {
+    animation: none;
+  }
+}

@@ -42,6 +42,19 @@ export const sceneSchema = z.object({
   text: text,
   purpose: z.enum(["Gancho", "Desarrollo", "Prueba", "Payoff", "CTA"]),
 });
+export const assessmentItemSchema = z.object({
+  status: z.enum(["cumple", "mejorar", "sin_contexto"]),
+  reason: z.string().min(1).max(700),
+  improvement: z.string().max(700),
+});
+export const assessmentSchema = z.object({
+  contextKey: z.string().max(64),
+  generationId: z.string().uuid(),
+  evaluatedAt: z.string().datetime(),
+  summary: z.string().max(1000),
+  items: z.array(assessmentItemSchema).length(6),
+});
+export type Assessment = z.infer<typeof assessmentSchema>;
 export const scriptSchema = z.object({
   id: z.string().uuid(),
   title: z.string().max(160),
@@ -50,6 +63,8 @@ export const scriptSchema = z.object({
   objective: text,
   idea: text,
   insight: text,
+  research: text.default(""),
+  researchReviewed: z.boolean().default(false),
   angle: text,
   format: z.string().max(160),
   character: text,
@@ -63,6 +78,7 @@ export const scriptSchema = z.object({
   cta: text,
   requirements: text,
   checks: z.array(z.boolean()).length(6),
+  assessment: assessmentSchema.nullable().optional(),
   brandReviewed: z.boolean(),
   status: z.enum(["borrador", "listo"]),
 });
@@ -208,7 +224,7 @@ export const checks = [
 export const stages = [
   "Enfoque",
   "Idea",
-  "Ángulo",
+  "Insight y ángulo",
   "Formato",
   "Gancho",
   "Escenas y planos",
@@ -225,6 +241,8 @@ export function newScript(type: Script["type"] = "organico"): Script {
     objective: "",
     idea: "",
     insight: "",
+    research: "",
+    researchReviewed: false,
     angle: "",
     format: "",
     character: "",
@@ -280,5 +298,5 @@ export function missingScript(s: Script): string[] {
     .map(([k]) => String(k));
 }
 export function scriptText(s: Script): string {
-  return `${s.title || "Sin título"}\n${s.type === "ads" ? "ADS" : "ORGÁNICO"} · Conciencia ${s.awareness}: ${awareness[s.awareness - 1][0]}\nObjetivo: ${s.objective}\nIdea: ${s.idea}\nInsight: ${s.insight}\nÁngulo: ${s.angle}\nFormato: ${s.format}\nPersonaje: ${s.character}\nEstructura: ${s.structure}\n\nGANCHO\nVoz: ${s.hookSpoken}\nVisual: ${s.hookVisual}\nTexto: ${s.hookText}\n\nESCENAS\n${s.scenes.map((x, i) => `${i + 1}. ${x.purpose} · ${x.seconds}s · ${x.shot}\nVisual: ${x.visual}\nAudio: ${x.audio}\nTexto: ${x.text}`).join("\n\n")}\n\nPrueba: ${s.proof}\nPayoff: ${s.payoff}\nCTA: ${s.cta}\n\nREQUERIMIENTOS\n${s.requirements}`;
+  return `${s.title || "Sin título"}\n${s.type === "ads" ? "ADS" : "ORGÁNICO"} · Conciencia ${s.awareness}: ${awareness[s.awareness - 1][0]}\nObjetivo: ${s.objective}\nIdea: ${s.idea}\nInsight: ${s.insight}\nInvestigación (${s.researchReviewed ? "revisada por el equipo" : "por validar"}): ${s.research || "Pendiente"}\nÁngulo: ${s.angle}\nFormato: ${s.format}\nPersonaje: ${s.character}\nEstructura: ${s.structure}\n\nGANCHO\nVoz: ${s.hookSpoken}\nVisual: ${s.hookVisual}\nTexto: ${s.hookText}\n\nESCENAS\n${s.scenes.map((x, i) => `${i + 1}. ${x.purpose} · ${x.seconds}s · ${x.shot}\nVisual: ${x.visual}\nAudio: ${x.audio}\nTexto: ${x.text}`).join("\n\n")}\n\nPrueba: ${s.proof}\nPayoff: ${s.payoff}\nCTA: ${s.cta}\n\nREQUERIMIENTOS\n${s.requirements}`;
 }

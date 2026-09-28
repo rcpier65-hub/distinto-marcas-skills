@@ -9,6 +9,7 @@ import {
   TableCell,
   WidthType,
 } from "docx";
+import { creativeContextKey } from "./ai-contract";
 import { type Batch, type Profile, scriptText, checks } from "./model";
 export async function createWord(
   batch: Batch,
@@ -90,6 +91,11 @@ export async function createWord(
         ),
       }),
     );
+    const assessment =
+      s.assessment?.contextKey ===
+      creativeContextKey(s, profile, batch.data.objective, batch.data.platform)
+        ? s.assessment
+        : null;
     children.push(
       h("Prueba, resolución y acción"),
       p(`Prueba: ${s.proof}`),
@@ -98,7 +104,22 @@ export async function createWord(
       h("Requerimientos para el cliente"),
       p(s.requirements),
       h("Revisión creativa"),
-      ...checks.map((c, j) => p(`${s.checks[j] ? "☑" : "☐"} ${c}`)),
+      ...checks.flatMap((c, j) => {
+        const item = assessment?.items[j];
+        return [
+          p(
+            `${item?.status === "cumple" ? "☑" : "☐"} ${c} · ${item ? { cumple: "Cumple", mejorar: "Por mejorar", sin_contexto: "Falta contexto" }[item.status] : "Pendiente de evaluar"}`,
+          ),
+          ...(item
+            ? [
+                p(item.reason),
+                ...(item.improvement
+                  ? [p(`Ajuste sugerido: ${item.improvement}`)]
+                  : []),
+              ]
+            : []),
+        ];
+      }),
       p("Criterios editoriales: no garantizan resultados ni viralidad."),
     );
   }

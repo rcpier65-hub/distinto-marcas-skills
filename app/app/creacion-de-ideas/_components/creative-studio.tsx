@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ChevronLeft,
   X,
-  Sparkles,
   Check,
   Download,
   FolderOpen,
@@ -39,19 +38,23 @@ import {
   formats,
   structures,
   shots,
-  checks,
   stages,
   missingScript,
   scriptText,
   profileSchema,
   batchDataSchema,
 } from "@/lib/creative-studio/model";
+import { useCreativeAI } from "./use-creative-ai";
+import {
+  CreativeCopilot,
+  CreativeChecklist,
+  ResearchAssistant,
+} from "./creative-copilot";
 import "./studio.css";
 
 type History = { id: string; nombre: string; guion: string };
 type Recording = { id: string; fecha_planeada: string; estado: string };
 type Link = { batch_id: string; script_id: string; publicacion_id: string };
-type Suggestion = { title: string; reason: string; patch: Partial<Script> };
 type BrandData = {
   profile: Profile;
   profileRevision: number;
@@ -202,7 +205,17 @@ function localDraft(batch: Batch, userId: string): Batch | null {
     const raw = localStorage.getItem(`studio-draft-${userId}-${batch.id}`);
     if (!raw) return null;
     const value = JSON.parse(raw);
-    return batchDataSchema.safeParse(value.data).success ? value : null;
+    const local = batchDataSchema.safeParse(value.data);
+    const server = batchDataSchema.safeParse(batch.data);
+    if (!local.success) return null;
+    if (
+      server.success &&
+      JSON.stringify(local.data) === JSON.stringify(server.data)
+    ) {
+      localStorage.removeItem(`studio-draft-${userId}-${batch.id}`);
+      return null;
+    }
+    return { ...value, data: local.data };
   } catch {
     return null;
   }
@@ -235,10 +248,7 @@ export default function CreativeStudio() {
     [userId, setUserId] = useState(""),
     [legacy, setLegacy] = useState<unknown[]>([]),
     [recovery, setRecovery] = useState<Batch | null>(null);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]),
-    [instruction, setInstruction] = useState(""),
-    [aiBusy, setAiBusy] = useState(false),
-    [undo, setUndo] = useState<Script | null>(null),
+  const [undo, setUndo] = useState<Script | null>(null),
     [showAside, setShowAside] = useState(false),
     [showBrands, setShowBrands] = useState(false);
   const batchRef = useRef<Batch | null>(null),
@@ -344,7 +354,13 @@ export default function CreativeStudio() {
                 ...s,
                 ...patch,
                 ...(Object.keys(patch).some(
-                  (k) => !["checks", "brandReviewed", "status"].includes(k),
+                  (k) =>
+                    ![
+                      "checks",
+                      "assessment",
+                      "brandReviewed",
+                      "status",
+                    ].includes(k),
                 )
                   ? { status: "borrador" as const, brandReviewed: false }
                   : {}),
@@ -379,17 +395,10 @@ export default function CreativeStudio() {
     blocked.current = false;
     setScriptId(b.data.scripts[0]?.id || "");
     setStage(0);
-    setSuggestions([]);
     setUndo(null);
     setShowBrands(false);
     setRecovery(null);
-    try {
-      const raw = localStorage.getItem(`studio-draft-${uid.current}-${b.id}`);
-      if (raw) {
-        const value = JSON.parse(raw);
-        if (batchDataSchema.safeParse(value.data).success) setRecovery(value);
-      }
-    } catch {}
+    setRecovery(localDraft(b, uid.current));
   };
   const openBrand = async (b: Brand) => {
     try {
@@ -411,7 +420,6 @@ export default function CreativeStudio() {
         setScriptId(data.batches[0].data.scripts[0]?.id || "");
       }
       setStage(0);
-      setSuggestions([]);
       setUndo(null);
       setShowBrands(false);
     } catch (e) {
@@ -485,35 +493,26 @@ export default function CreativeStudio() {
     }));
     setScriptId(s.id);
     setStage(0);
-    setSuggestions([]);
     setUndo(null);
   };
-  const askAI = async () => {
-    if (!script || !batch || aiBusy) return;
-    setAiBusy(true);
-    setError("");
-    try {
-      await persist();
-      const d = await api("", {
-        action: "suggest",
-        batchId: batch.id,
-        script,
-        step: stage,
-        instruction,
-        previous: suggestions.map((s) => s.title),
-      });
-      setSuggestions(d.suggestions);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setAiBusy(false);
-    }
-  };
+  const aiEnabled = !loading && !recovery && !blocked.current;
+  const ai = useCreativeAI({
+    batch,
+    script,
+    profile: brandData?.profile,
+    stage,
+    enabled: aiEnabled,
+    persist,
+    applyAssessment: (assessment) =>
+      edit({
+        assessment,
+        checks: assessment.items.map((item) => item.status === "cumple"),
+      }),
+  });
+  const aiBusy = ai.busy;
   const selectStage = (n: number) => {
     setStage(n);
-    setSuggestions([]);
     setUndo(null);
-    setInstruction("");
   };
   const exportWord = async (folderId?: string) => {
     await persist();
@@ -678,7 +677,7 @@ export default function CreativeStudio() {
               <div
                 className={`cs-brand-line ${brand?.id === b.id ? "active" : ""}`}
               >
-                <button disabled={busy || aiBusy} onClick={() => openBrand(b)}>
+                <button disabled={busy} onClick={() => openBrand(b)}>
                   <span>{b.emoji_marca || "◈"}</span>
                   <strong>{b.nombre}</strong>
                   <ChevronRight size={14} />
@@ -697,7 +696,7 @@ export default function CreativeStudio() {
                 <div className="cs-batches">
                   {brandData?.batches.map((b) => (
                     <button
-                      disabled={busy || aiBusy}
+                      disabled={busy}
                       key={b.id}
                       className={batch?.id === b.id ? "active" : ""}
                       onClick={() => run(() => openBatch(b))}
@@ -873,7 +872,6 @@ export default function CreativeStudio() {
                     {stages.map((s, i) => (
                       <button
                         key={s}
-                        disabled={aiBusy}
                         aria-current={stage === i ? "step" : undefined}
                         className={stage === i ? "active" : ""}
                         onClick={() => selectStage(i)}
@@ -918,6 +916,26 @@ export default function CreativeStudio() {
                       }
                     </p>
                   </div>
+                  {stage < 8 && (
+                    <CreativeCopilot
+                      key={`${batch.id}-${script.id}-${stage}`}
+                      ai={ai}
+                      stage={stage}
+                      script={script}
+                      hasUndo={!!undo}
+                      onApply={(suggestion) => {
+                        setUndo(script);
+                        edit(suggestion.patch);
+                        setNotice(
+                          "Propuesta aplicada. La IA revisará el checklist con tus cambios.",
+                        );
+                      }}
+                      onUndo={() => {
+                        if (undo) edit(undo);
+                        setUndo(null);
+                      }}
+                    />
+                  )}
                   {stage === 0 && (
                     <div className="cs-stage-body">
                       <div className="cs-type-toggle">
@@ -992,6 +1010,14 @@ export default function CreativeStudio() {
                           {script.idea || "Define tu idea en el paso anterior"}
                         </strong>
                       </div>
+                      <ResearchAssistant
+                        key={script.id}
+                        script={script}
+                        profile={brandData!.profile}
+                        brand={brand!.nombre}
+                        batch={batch}
+                        onEdit={edit}
+                      />
                       <Field
                         label="Insight · ¿qué verdad, tensión o deseo reconoces?"
                         value={script.insight}
@@ -1078,10 +1104,11 @@ export default function CreativeStudio() {
                           ].map((h) => (
                             <button
                               key={h}
+                              disabled={aiBusy}
                               onClick={() =>
-                                setInstruction(
-                                  `Proponer ganchos con estructura: ${h}`,
-                                )
+                                void ai.ask({
+                                  instruction: `Proponer ganchos con estructura: ${h}`,
+                                })
                               }
                             >
                               {h}
@@ -1307,87 +1334,9 @@ export default function CreativeStudio() {
                       )}
                     </div>
                   )}
-                  {stage < 8 && (
-                    <section className="cs-ai">
-                      <div className="cs-row">
-                        <div>
-                          <span className="cs-eyebrow">
-                            TU COPILOTO CREATIVO
-                          </span>
-                          <p>Propuestas para esta decisión</p>
-                        </div>
-                        <button
-                          disabled={aiBusy || busy}
-                          className="cs-ai-button"
-                          onClick={askAI}
-                        >
-                          <Sparkles size={16} />
-                          {aiBusy
-                            ? "Pensando…"
-                            : suggestions.length
-                              ? "Pedir más ideas"
-                              : "Sugerir con IA"}
-                        </button>
-                      </div>
-                      <input
-                        aria-label="Orientación para la IA"
-                        value={instruction}
-                        onChange={(e) => setInstruction(e.target.value)}
-                        placeholder="Dale una dirección: más cotidiano, menos técnico, otro formato…"
-                      />
-                      <div className="cs-suggestions">
-                        {suggestions.map((s, i) => (
-                          <article
-                            key={`${s.title}-${i}`}
-                            className={`cs-sticky cs-sticky-${i % 3}`}
-                          >
-                            <span>PROPUESTA {i + 1}</span>
-                            <h3>{s.title}</h3>
-                            <p>{s.reason}</p>
-                            <details>
-                              <summary>Ver propuesta completa</summary>
-                              <pre>
-                                {Object.entries(s.patch)
-                                  .map(
-                                    ([k, v]) =>
-                                      `${({ objective: "Objetivo", awareness: "Conciencia", title: "Título", idea: "Idea", insight: "Insight", angle: "Ángulo", format: "Formato", character: "Personaje", structure: "Estructura", hookSpoken: "Voz", hookVisual: "Visual", hookText: "Texto", proof: "Prueba", payoff: "Payoff", cta: "CTA", requirements: "Requerimientos" } as Record<string, string>)[k] || k}: ${k === "scenes" ? (v as Scene[]).map((x) => `${x.seconds}s · ${x.shot}\n${x.visual}\n${x.audio}`).join("\n\n") : v}`,
-                                  )
-                                  .join("\n\n")}
-                              </pre>
-                            </details>
-                            <button
-                              onClick={() => {
-                                setUndo(script);
-                                edit(s.patch);
-                                setNotice(
-                                  "Propuesta aplicada a esta etapa. Puedes editarla o deshacer.",
-                                );
-                              }}
-                            >
-                              Usar esta propuesta <ArrowRight size={14} />
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                      {undo && (
-                        <button
-                          onClick={() => {
-                            edit(undo);
-                            setUndo(null);
-                          }}
-                        >
-                          <RotateCcw size={14} /> Deshacer propuesta
-                        </button>
-                      )}
-                      <small>
-                        La IA usa el ADN de marca, las fuentes revisadas y sus
-                        guiones anteriores. Tú eliges y validas.
-                      </small>
-                    </section>
-                  )}
                   <footer className="cs-step-footer">
                     <button
-                      disabled={stage === 0 || aiBusy}
+                      disabled={stage === 0}
                       onClick={() => selectStage(stage - 1)}
                     >
                       <ChevronLeft size={16} /> Anterior
@@ -1398,7 +1347,6 @@ export default function CreativeStudio() {
                     {stage < 8 ? (
                       <button
                         className="cs-primary"
-                        disabled={aiBusy}
                         onClick={() => selectStage(stage + 1)}
                       >
                         Continuar <ArrowRight size={16} />
@@ -1458,7 +1406,6 @@ export default function CreativeStudio() {
           <div className="cs-script-list">
             {batch?.data.scripts.map((s, i) => (
               <button
-                disabled={aiBusy}
                 key={s.id}
                 className={scriptId === s.id ? "active" : ""}
                 onClick={() => {
@@ -1488,7 +1435,7 @@ export default function CreativeStudio() {
             <div className="cs-add-scripts">
               {remaining("ads") > 0 && (
                 <button
-                  disabled={busy || aiBusy}
+                  disabled={busy}
                   onClick={() => run(() => addScript("ads"))}
                 >
                   <Plus size={14} /> Ads{" "}
@@ -1497,7 +1444,7 @@ export default function CreativeStudio() {
               )}
               {remaining("organico") > 0 && (
                 <button
-                  disabled={busy || aiBusy}
+                  disabled={busy}
                   onClick={() => run(() => addScript("organico"))}
                 >
                   <Plus size={14} /> Orgánico{" "}
@@ -1506,32 +1453,7 @@ export default function CreativeStudio() {
               )}
             </div>
           )}
-          <div className="cs-checklist">
-            <span className="cs-eyebrow">MIRADA CREATIVA</span>
-            <h3>Checklist de viralidad</h3>
-            {checks.map((c, i) => (
-              <label key={c}>
-                <input
-                  type="checkbox"
-                  checked={script?.checks[i] || false}
-                  disabled={!script}
-                  onChange={(e) =>
-                    script &&
-                    edit({
-                      checks: script.checks.map((v, j) =>
-                        j === i ? e.target.checked : v,
-                      ),
-                    })
-                  }
-                />
-                <span>{c}</span>
-              </label>
-            ))}
-            <small>
-              Valida lo que aplica a esta idea. No necesitas forzar los seis
-              criterios y no garantizan viralidad.
-            </small>
-          </div>
+          <CreativeChecklist ai={ai} script={script} enabled={aiEnabled} />
           {brand && (
             <button
               className="cs-brand-settings"

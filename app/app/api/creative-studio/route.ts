@@ -17,14 +17,53 @@ import {
   missingScript,
 } from "@/lib/creative-studio/model";
 import { readWebsite } from "@/lib/creative-studio/web-source";
-import { suggest } from "@/lib/creative-studio/ai";
+import { generateCreative } from "@/lib/creative-studio/ai";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 export async function GET(req: Request) {
   try {
     const a = await studioActor(req);
     const url = new URL(req.url);
+    const batchId = url.searchParams.get("batch");
+    if (batchId) {
+      await batchAccess(a, batchId);
+      const scriptId = z.string().uuid().parse(url.searchParams.get("script"));
+      const step = z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(7)
+        .parse(url.searchParams.get("step"));
+      const { data, error } = await a.db
+        .from("creative_generations")
+        .select("id,result,created_at")
+        .eq("batch_id", batchId)
+        .eq("script_id", scriptId)
+        .eq("kind", "suggest")
+        .eq("step", step)
+        .eq("status", "complete")
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return Response.json(
+        { generations: data },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    const generationId = url.searchParams.get("generation");
+    if (generationId) {
+      z.string().uuid().parse(generationId);
+      const { data, error } = await a.db
+        .from("creative_generations")
+        .select("id,batch_id,status,result,created_at,completed_at")
+        .eq("id", generationId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new StudioError("Propuesta no encontrada", 404);
+      await batchAccess(a, data.batch_id);
+      return Response.json(data, { headers: { "Cache-Control": "no-store" } });
+    }
     const brandId = url.searchParams.get("brand");
     if (!brandId) {
       let q = a.db
@@ -104,6 +143,7 @@ export async function POST(req: Request) {
         "save",
         "source",
         "suggest",
+        "assess",
         "publish",
         "settings",
       ])
@@ -258,18 +298,23 @@ export async function POST(req: Request) {
         );
       return Response.json(r.data);
     }
-    if (action === "suggest") {
+    if (action === "suggest" || action === "assess") {
       const script = scriptSchema.parse(body.script);
       if (!batch.data.scripts.some((s: { id: string }) => s.id === script.id))
         throw new StudioError("Guarda el guion antes de pedir sugerencias");
-      const step = z.number().int().min(0).max(7).parse(body.step);
+      const step =
+        action === "assess"
+          ? 8
+          : z.number().int().min(0).max(7).parse(body.step);
+      const mode = z.enum(["explore", "refine"]).parse(body.mode ?? "explore");
+      const nonce = z.string().uuid().optional().parse(body.nonce);
       const instruction = z
         .string()
         .max(1000)
         .parse(body.instruction ?? "");
       const previous = z
         .array(z.string().max(300))
-        .max(12)
+        .max(25)
         .parse(body.previous ?? []);
       const brand = await brandAccess(a, batch.marca_id);
       const [{ data: p, error: pe }, { data: history, error: he }] =
@@ -288,13 +333,17 @@ export async function POST(req: Request) {
             .limit(12),
         ]);
       if (pe || he) throw pe || he;
-      return Response.json({
-        suggestions: await suggest({
+      return Response.json(
+        await generateCreative(a, batch.id, {
+          kind: action,
           step,
           script,
           profile: profileSchema.parse(p?.data ?? emptyProfile),
           brand: brand.nombre,
           brief: batch.data.objective,
+          platform: batch.data.platform,
+          mode,
+          nonce,
           history: (history ?? []).map(
             (x: { nombre: string; guion: string }) => ({
               ...x,
@@ -310,7 +359,7 @@ export async function POST(req: Request) {
           instruction,
           previous,
         }),
-      });
+      );
     }
     const member = await requireSessionMember(req);
     if ("response" in member) return member.response;
