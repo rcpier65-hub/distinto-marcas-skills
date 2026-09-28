@@ -4,13 +4,14 @@
 // Pattern: single source of truth (mismo HTML para preview y PNG final).
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { enviarGrillaAlGrupo } from '../_actions'
+import { leerGrillaHTML, solicitarGrillaPNG } from '@/lib/grilla/render-response'
 
 type Marca = {
   slug: string
@@ -99,6 +100,33 @@ export function GrillaWorkspace({
     return `/api/render-grilla-html?${params.toString()}`
   }, [marca.slug, semanaInicio, semanaFin, publicaciones, bust])
 
+  const [preview, setPreview] = useState<{ url: string; html?: string; error?: string } | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    async function cargarPreview() {
+      try {
+        const response = await fetch(previewUrl, {
+          cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal: controller.signal,
+        })
+        const html = await leerGrillaHTML(response)
+        if (!controller.signal.aborted) setPreview({ url: previewUrl, html })
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setPreview({
+            url: previewUrl,
+            error: error instanceof TypeError
+              ? 'No se pudo cargar la grilla. Revisa tu conexión y pulsa Recargar.'
+              : error instanceof Error ? error.message : 'No se pudo cargar la grilla. Pulsa Recargar.',
+          })
+        }
+      }
+    }
+    void cargarPreview()
+    return () => controller.abort()
+  }, [previewUrl])
+  // No mostrar la semana anterior mientras se carga una nueva URL.
+  const currentPreview = preview?.url === previewUrl ? preview : null
+
   function handleEnviar() {
     if (!confirm(`¿Enviar grilla al grupo WhatsApp de ${marca.nombre}?\n\nEl PNG se genera ahora con la plantilla profesional y se manda al cliente.`)) return
     startSending(async () => {
@@ -159,22 +187,7 @@ export function GrillaWorkspace({
     return `/api/render-grilla?${params.toString()}`
   }, [marca.slug, semanaInicio, semanaFin, publicaciones])
 
-  /* Copiar PNG al portapapeles.
-     Critical: la Clipboard API rechaza el write si blob.type no coincide
-     con la KEY del dictionary ('image/png'). Si el server devuelve algo
-     que NO es PNG (ej. error en text/plain por timeout de Chromium), el
-     browser tira:
-       "Type image/png does not match the blob's type text/plain"
-     Pedro vio exactamente ese error.
-
-     Fix robusto:
-     1. fetch + verificar response OK + content-type empieza con image/
-     2. Si no es imagen, leer el body como texto y mostrar el ERROR REAL
-        del servidor (mejor que un misleading "no se pudo copiar")
-     3. Si es imagen, RE-CREAR el blob con type forzado a 'image/png'
-        para garantizar que coincida con la key del ClipboardItem
-     4. clipboard.write
-  */
+  // Validar tipo y firma PNG antes de copiar o descargar; nunca convertir HTML en imagen.
   async function handleCopyImage() {
     if (isCopyingImage) return
     setIsCopyingImage(true)
@@ -188,18 +201,10 @@ export function GrillaWorkspace({
        ClipboardItem; el navegador reserva la escritura en el momento del clic
        y espera a que el PNG llegue, sin perder el permiso. */
     const pngBlobPromise = (async () => {
-      const res = await fetch(pngEndpointUrl)
-      if (!res.ok) {
-        const body = await res.text().catch(() => '')
-        throw new Error(`Servidor falló (${res.status})${body ? `: ${body.slice(0, 160)}` : ''}`)
-      }
-      const ct = res.headers.get('content-type') ?? ''
-      if (!ct.startsWith('image/')) {
-        const body = await res.text().catch(() => '')
-        throw new Error(`Esperaba PNG pero recibí ${ct || 'desconocido'}${body ? `: ${body.slice(0, 160)}` : ''}`)
-      }
-      // Forzar type image/png para que coincida con la key del ClipboardItem.
-      return new Blob([await res.arrayBuffer()], { type: 'image/png' })
+      const bytes = await solicitarGrillaPNG(pngEndpointUrl, {
+        credentials: 'same-origin', signal: AbortSignal.timeout(65_000),
+      })
+      return new Blob([bytes], { type: 'image/png' })
     })()
 
     try {
@@ -336,7 +341,7 @@ export function GrillaWorkspace({
                 type="button"
                 onClick={() => setBust(Date.now())}
                 className="px-2 py-0.5 rounded text-xs border hover:bg-muted"
-                title="Forzar recarga del iframe (rompe el cache del navegador)"
+                title="Volver a cargar la vista previa"
               >
                 ↻ Recargar
               </button>
@@ -352,8 +357,9 @@ export function GrillaWorkspace({
                 background: 'white',
               }}
             >
-              <iframe
-                src={previewUrl}
+              {currentPreview?.html ? <iframe
+                srcDoc={currentPreview.html}
+                sandbox=""
                 title="Preview grilla"
                 style={{
                   width: 1080,
@@ -362,10 +368,12 @@ export function GrillaWorkspace({
                   transform: `scale(${zoom})`,
                   transformOrigin: 'top left',
                 }}
-              />
+              /> : <div role={currentPreview?.error ? 'alert' : 'status'} className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-600">
+                {currentPreview?.error || 'Cargando vista previa…'}
+              </div>}
             </div>
             <p className="text-[10px] text-muted-foreground mt-2">
-              Preview HTML en vivo · El PNG 1080×1620 se genera al apretar Enviar
+              Vista previa de la grilla · Imagen de 1080 × 1620 px
             </p>
           </CardContent>
         </Card>
