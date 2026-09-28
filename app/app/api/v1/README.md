@@ -226,6 +226,34 @@ Hay que aplicar `app/supabase/migrations/20260928140001_api_device_keys.sql` si 
 
 ---
 
+### Listas del Mac (misma auth que calendario)
+
+Listas del cliente macOS, más dos POST chicos (hábito de hoy y tarea hecha). Cookie, JWT de Supabase, o `dst_live_` con alcance `owner`. Una clave solo `tareas:read` recibe 403. No usan `CRON_SECRET`. Cada una llama la misma fuente que la página web (loader existente, catálogo, o la misma consulta de la página). No cambian las pantallas de `/inicio`, `/grabaciones/calendario`, `/tareas` ni `/perfil`.
+
+| Método | Ruta | Qué envuelve |
+|--------|------|----------------|
+| GET | `/api/v1/perfil` | módulos del sidebar y `marcas_nav` |
+| GET | `/api/v1/soporte` | reportes de `/soporte` |
+| GET | `/api/v1/publicaciones` | piezas de `/publicaciones` |
+| GET | `/api/v1/reportes` | `getReportes` |
+| GET | `/api/v1/notas-reuniones` | `getProximasSemana` + notas |
+| GET | `/api/v1/oficina` | `MUEBLES`/`ZONAS` de la oficina + `leerPerfilesDb` |
+| GET | `/api/v1/creacion-de-ideas` | banco del HTML de `/creacion-de-ideas` |
+| GET | `/api/v1/editor` | cola de `/editor` |
+| GET | `/api/v1/diseno` | tareas de `/diseno` |
+| GET | `/api/v1/historias` | planificador de `/historias` |
+| GET | `/api/v1/influencers` | `leerInfluencersDb` |
+| GET | `/api/v1/planes` | `PLANES` (solo Pedro) |
+| GET | `/api/v1/dashboard` | marcas de `/dashboard` |
+| GET | `/api/v1/grilla/:slug` | publicaciones de `/grilla/:slug` |
+| GET | `/api/v1/habitos` | hábitos del miembro |
+| POST | `/api/v1/habitos` | `{ "id" }` marca o desmarca hoy, igual que `toggleHabitoHoy` |
+| GET | `/api/v1/actividad` | `loadActividadDerivada` |
+| GET | `/api/v1/historial` | grillas pedidas |
+| GET | `/api/v1/equipo` | miembros, sin `password_inicial` |
+| GET | `/api/v1/settings` | booleanos de integración y marcas, sin tokens |
+| POST | `/api/v1/tareas` | `{ "id", "completada": true }` igual que `completarTarea` |
+
 ## Versionado
 
 Es `v1`. Si Anthropic / nosotros queremos breaking changes en el futuro,

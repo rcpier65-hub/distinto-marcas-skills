@@ -120,6 +120,7 @@ hace mejor (creatividad, relación con cliente) queda. Lo repetitivo se automati
 ```
 distinto-marcas-skills/
 │
+├── mac/                              ← Cliente nativo macOS (SwiftUI). `cd mac && xcodegen generate`
 ├── app/                              ← Next.js app (deploy a Vercel)
 │   ├── app/                          ← App Router routes
 │   │   ├── dashboard/                ← Resumen de la agencia
