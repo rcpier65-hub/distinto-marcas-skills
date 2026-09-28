@@ -25,6 +25,7 @@ import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { loadReporteDelDia } from '@/lib/inicio/load-reporte-del-dia'
 import { getTrabajoEquipo } from '@/lib/inicio/get-trabajo-equipo'
 import { formatHora12 } from '@/lib/utils/format-hora'
+import { cargarPendientesInicio, cargarTrabajoDeHoy } from '@/lib/hoy/trabajo-de-hoy'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,107 +172,14 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     }
   })
 
-  /* Datos contextuales según el rol */
-  let tareasMias: InicioData['tareasMias'] = []
+  /* Datos contextuales según el rol — misma consulta que GET /api/v1/tareas (trabajo_hoy). */
+  const tareasMias = await cargarTrabajoDeHoy(service, {
+    esOwner,
+    nombre: memberData.nombre,
+    permisos: p?.permisos ?? null,
+    hoy,
+  })
 
-  if (esOwner) {
-    /* SOLO el dueño (Pedro): pulso del día con las publicaciones más recientes
-       pendientes de cualquier estado activo. Erick (director) NO cae acá — ve
-       solo su propio trabajo por rol (abajo). Pedro 14-jul-2026. */
-    const { data } = await service
-      .from('publicaciones')
-      .select(`id, nombre, fecha_publicacion, estado, marca:marcas(slug, nombre, color_primario_hex)`)
-      .in('estado', ['tareas', 'idear', 'disenar', 'editar', 'aprobar', 'programar'])
-      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
-      .limit(3)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tareasMias = ((data ?? []) as any[]).map((r) => {
-      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
-      return {
-        id: r.id as string,
-        nombre: (r.nombre ?? '—') as string,
-        marca: (m?.nombre ?? m?.slug ?? 'Marca') as string,
-        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
-        meta: r.fecha_publicacion
-          ? `${r.estado} · ${new Date(r.fecha_publicacion + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}`
-          : (r.estado as string),
-        marcadaHoy: false,
-        modulo: 'editor' as const, /* solo para tipear, el título no se usa */
-      }
-    })
-  } else if (tieneAcceso(p!.permisos, 'editor')) {
-    /* Editor: videos asignados a su nombre con estado='editar' */
-    const { data } = await service
-      .from('publicaciones')
-      .select(`id, nombre, fecha_publicacion, fecha_edicion, fecha_marcada_para_editar, editor_nombre, marca:marcas(slug, nombre, color_primario_hex)`)
-      .ilike('editor_nombre', memberData.nombre)
-      .eq('estado', 'editar')
-      .order('fecha_publicacion', { ascending: true, nullsFirst: false })
-      .limit(3)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tareasMias = ((data ?? []) as any[]).map((r) => {
-      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
-      return {
-        id: r.id as string,
-        nombre: (r.nombre ?? '—') as string,
-        marca: (m?.nombre ?? m?.slug ?? 'Marca') as string,
-        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
-        meta: r.fecha_publicacion
-          ? `Publica ${new Date(r.fecha_publicacion + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}`
-          : 'Sin fecha',
-        marcadaHoy: r.fecha_marcada_para_editar === hoy,
-        modulo: 'editor' as const,
-      }
-    })
-  } else if (tieneAcceso(p!.permisos, 'diseno')) {
-    /* Diseñadora: SOLO tareas del módulo Diseño (es_tarea_diseno=true).
-       Las pubs del pipeline en etapa 'disenar' no son suyas (modelo
-       Notion de Pedro: Diseño = base de datos aparte). Excluimos las
-       terminadas/archivadas. */
-    const { data } = await service
-      .from('publicaciones')
-      .select(`id, nombre, fecha_diseno, estado_tarea, marca:marcas(slug, nombre, color_primario_hex)`)
-      .eq('es_tarea_diseno', true)
-      .not('estado_tarea', 'in', '(listo,archivado)')
-      .order('fecha_diseno', { ascending: true, nullsFirst: false })
-      .limit(3)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tareasMias = ((data ?? []) as any[]).map((r) => {
-      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
-      return {
-        id: r.id as string,
-        nombre: (r.nombre ?? '—') as string,
-        marca: (m?.nombre ?? m?.slug ?? 'Marca') as string,
-        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
-        meta: r.fecha_diseno
-          ? `Entrega ${new Date(r.fecha_diseno + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}`
-          : 'Sin fecha',
-        marcadaHoy: false,
-        modulo: 'diseno' as const,
-      }
-    })
-  } else if (tieneAcceso(p!.permisos, 'comentarios') || tieneAcceso(p!.permisos, 'inbox')) {
-    /* Community Manager: comentarios pendientes */
-    const { data } = await service
-      .from('comentarios_inbox')
-      .select(`id, author_username, author_display_name, comment_text, marca:marcas(slug, nombre, color_primario_hex)`)
-      .eq('status', 'pending')
-      .order('comment_created_at', { ascending: false })
-      .limit(3)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tareasMias = ((data ?? []) as any[]).map((r) => {
-      const m = Array.isArray(r.marca) ? r.marca[0] : r.marca
-      return {
-        id: r.id as string,
-        nombre: ((r.comment_text ?? '').substring(0, 60) || '—') as string,
-        marca: (m?.nombre ?? m?.slug ?? 'Marca') as string,
-        marcaColor: (m?.color_primario_hex ?? '#737373') as string,
-        meta: `@${r.author_display_name || r.author_username || 'anon'}`,
-        marcadaHoy: false,
-        modulo: 'comentarios' as const,
-      }
-    })
-  }
 
   /* Reuniones pendientes (publicaciones con reunion_hora seteada
      y fecha_publicacion futura o de hoy). */
@@ -375,30 +283,9 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   const seedId = memberData.id ?? user.id
   const fraseDia = getFraseDelDia(memberData.rol_base, seedId)
 
-  /* Pendientes rápidos NO completados del miembro o del admin (team_member_id NULL) */
-  let pendientesQuery = service
-    .from('pendientes_rapidos')
-    .select('id, titulo, descripcion, categoria, prioridad, completado, created_at')
-    .eq('completado', false)
-    .order('prioridad', { ascending: true })
-    .order('created_at', { ascending: false })
-    .limit(30)
-  if (memberData.id) {
-    pendientesQuery = pendientesQuery.eq('team_member_id', memberData.id)
-  } else {
-    pendientesQuery = pendientesQuery.is('team_member_id', null)
-  }
-  const { data: pendientesRaw } = await pendientesQuery
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pendientes = ((pendientesRaw ?? []) as any[]).map((row) => ({
-    id: row.id as string,
-    titulo: row.titulo as string,
-    descripcion: (row.descripcion ?? null) as string | null,
-    categoria: row.categoria as string,
-    prioridad: row.prioridad as 1 | 2 | 3,
-    completado: row.completado as boolean,
-    created_at: row.created_at as string,
-  }))
+  /* Pendientes rápidos NO completados — misma consulta que GET /api/v1/tareas. */
+  const pendientes = await cargarPendientesInicio(service, memberData.id)
+
 
   /* Cockpit ejecutivo embebido — Pedro unificó Cockpit con Inicio.
      Solo lo cargamos si el user tiene permiso 'metricas' (admin/director/CM

@@ -181,6 +181,51 @@ Avisar a Pedro internamente:
 
 ---
 
+## Nay / Kairos (sesión, JWT o clave `dst_live_`)
+
+Estas rutas envuelven la web de Production. No usan `CRON_SECRET`.
+
+Auth, en este orden:
+
+1. Sin header `Authorization`: cookie de sesión de Distinto.
+2. `Authorization: Bearer dst_live_…`: clave de dispositivo. El plaintext se muestra una sola vez; en `api_device_keys` queda el SHA-256.
+3. `Authorization: Bearer <access_token de Supabase>`.
+
+| Método | Ruta | Quién | Qué envuelve |
+|--------|------|-------|----------------|
+| GET | `/api/v1/grabaciones/calendario` | módulo publicaciones; la clave `dst_live_` necesita alcance `owner` | `cargarAgendaCalendario` — los mismos eventos que pinta `/grabaciones/calendario` |
+| POST | `/api/v1/grabaciones/calendario` | director, admin, o usuario sin `team_member`; clave con `owner` | `ejecutarAgendarReunion` o `ejecutarAgendarGrabacion` (asistente «Agendar reunión o grabación») |
+| GET | `/api/v1/tareas?due=hoy` | el miembro; clave con `tareas:read` u `owner` | `cargarTrabajoDeHoy` + `cargarPendientesInicio` (`/inicio`) y `cargarTareasParaHoy` (alcance de `/tareas`) |
+| GET, POST | `/api/v1/device-keys` | cookie o JWT. No acepta `dst_live_` | alta y listado de claves |
+| PATCH, DELETE | `/api/v1/device-keys/:id` | el dueño de la clave | ampliar alcance (`["owner"]` o `["tareas:read"]`) o revocar |
+
+Directores, admin, o un usuario sin fila en `team_members` crean claves con `scopes: ["owner"]`. El resto queda en `["tareas:read"]`. `owner` cubre `tareas:read`.
+
+POST calendario:
+
+```json
+{ "tipo": "reunion", "marca_slug": "kintu", "fecha": "2026-10-10", "hora": "11:00", "titulo": "Reunión con Kintu", "duration_min": 45 }
+```
+
+`tipo` es `reunion` (Meet + invitación, falla si Google Calendar no está conectado) o `grabacion` (queda en Grabaciones aunque Google falle). `hora` acepta `11:00` o `11am`. Si omites `correos` en una reunión, se usan los `correos_clientes` de la marca.
+
+GET calendario sin `desde`/`hasta` devuelve la semana en curso (lunes a domingo, Lima), igual que la vista por defecto de la página.
+
+### Dónde va la tarjeta de claves en Perfil
+
+Perfil todavía no tiene la tarjeta. El lugar es `app/app/perfil/page.tsx`, debajo de `<PerfilForm />` (y en la pantalla de admin sin `team_member`, debajo del aviso violeta). Misma caja que ese aviso: padding 16, fondo `#f5f3ff`, borde `1px solid #ddd6fe`, radio 12. La tarjeta lista con `GET /api/v1/device-keys` y crea con `POST { "name": "Nay" }`; el token `dst_live_…` se muestra una sola vez. Hasta que exista la tarjeta, un director la crea con la cookie de sesión o un JWT:
+
+```bash
+curl -X POST -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Nay"}' \
+  https://distinto-app.vercel.app/api/v1/device-keys
+```
+
+Hay que aplicar `app/supabase/migrations/20260928140001_api_device_keys.sql` si la tabla no está en Supabase.
+
+---
+
 ## Versionado
 
 Es `v1`. Si Anthropic / nosotros queremos breaking changes en el futuro,
