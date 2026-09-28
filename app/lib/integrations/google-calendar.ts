@@ -75,14 +75,15 @@ function getClientCreds(): { id: string; secret: string } | null {
  * access_type=offline + prompt=consent garantiza que Google devuelva un
  * refresh_token (sin esto, en logins repetidos no lo manda).
  */
-export function buildAuthUrl(state: string): string | null {
+export function buildAuthUrl(state: string, drive = false): string | null {
   const creds = getClientCreds()
   if (!creds) return null
   const params = new URLSearchParams({
     client_id: creds.id,
     redirect_uri: getRedirectUri(),
     response_type: 'code',
-    scope: SCOPE,
+    scope: drive ? `${SCOPE} https://www.googleapis.com/auth/drive` : SCOPE,
+    include_granted_scopes: 'true',
     access_type: 'offline',
     prompt: 'consent',
     state,
