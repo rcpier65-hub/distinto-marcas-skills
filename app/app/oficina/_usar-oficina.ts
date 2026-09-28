@@ -12,23 +12,14 @@
 //     oficina. El canal solo se abre cuando uno ENTRA (antes se veía a la
 //     gente "en línea" apenas abría la página).
 //
-// Correcciones de fondo respecto de la primera versión:
-//   1. El micrófono se pide AL ENTRAR (antes solo al tocar el botón, así que
-//      no se agregaba ninguna pista y la negociación WebRTC nunca arrancaba:
-//      nadie escuchaba a nadie aunque el botón se viera encendido).
-//   2. Un peer que fallaba quedaba muerto en el mapa y esa persona no volvía
-//      a conectar nunca. Ahora se cierra y se borra.
-//   3. El volumen se calculaba en dos lugares con reglas distintas. Ahora
-//      sale de una sola función (_audio-grafo.ts).
-//   4. El volumen va por Web Audio, no por `<video>.volume` (que en iPhone
-//      no hace nada).
-//   5. Negociación "educada" (perfect negotiation) en ambos lados, para que
-//      no se pierdan conexiones cuando los dos ofrecen a la vez.
+// Entrar no captura dispositivos. Un transceiver permite escuchar antes de activar el micro.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { MediaSession } from './_media-session'
 import { sonarAviso } from '@/lib/sonido/sonidos'
 import type { AvatarConfig, Direccion, EstadoUsuario } from './_avatar'
 import {
@@ -64,7 +55,7 @@ export const HAY_TURN = !!process.env.NEXT_PUBLIC_TURN_URL
 const ENVIO_MS = 80        // 12.5 Hz de posición
 const KEEPALIVE_MS = 2000
 const PROX_MS = 250        // recálculo de vecinos 4 Hz
-const TTL_MS = 12000       // sin noticias de alguien por 12s → se va del mapa
+const TTL_MS = 120000       // tolera la limitación de temporizadores en pestañas de fondo
 const SPOT_MAX_MS = 90000  // el spotlight se corta solo a los 90s
 
 export type Jugador = {
@@ -119,12 +110,15 @@ type Pos = {
 /* Estado por peer: la conexión más lo necesario para negociar sin pisarnos. */
 type Peer = {
   pc: RTCPeerConnection
+  mediaSenders: Partial<Record<'audio' | 'video', RTCRtpSender>>
   educado: boolean       // el "educado" cede si los dos ofrecen a la vez
   ofreciendo: boolean
   ignorarOferta: boolean
 }
 
 export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) {
+  const router = useRouter()
+  const media = useRef<MediaSession | null>(null)
   const [remotos, setRemotos] = useState<Remoto[]>([])
   const [listaUI, setListaUI] = useState<Jugador[]>([])
   const [micOn, setMicOn] = useState(false)
@@ -185,12 +179,13 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     const pc = new RTCPeerConnection(ICE)
     /* "Educado" = el de id mayor. Si los dos ofrecen a la vez, el educado se
        hace a un lado y acepta la oferta del otro en vez de chocar. */
-    const peer: Peer = { pc, educado: yoId > otroId, ofreciendo: false, ignorarOferta: false }
+    const peer: Peer = { pc, mediaSenders: {}, educado: yoId > otroId, ofreciendo: false, ignorarOferta: false }
     peers.current.set(otroId, peer)
 
     localRef.current?.getTracks().forEach((t) => {
-      try { pc.addTrack(t, localRef.current!) } catch { /* noop */ }
+      try { peer.mediaSenders[t.kind as 'audio' | 'video'] = pc.addTrack(t, localRef.current!) } catch { /* noop */ }
     })
+    if (!localRef.current?.getAudioTracks().length) peer.mediaSenders.audio = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender
     if (pantallaRef.current) {
       pantallaRef.current.getTracks().forEach((t) => {
         try { pc.addTrack(t, pantallaRef.current!) } catch { /* noop */ }
@@ -201,8 +196,8 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       if (e.candidate) enviar({ tipo: 'ice', de: yoId, para: otroId, candidato: e.candidate.toJSON() })
     }
     pc.ontrack = (e) => {
-      const stream = e.streams[0]
-      if (!stream) return
+      const stream = e.streams[0] ?? new MediaStream([e.track])
+      if (e.track.kind === 'audio') { mezcla.current?.agregar(otroId, stream); return }
       const nom = jugadores.current.get(otroId)?.nombre ?? 'Alguien'
       /* El segundo stream que llega de la misma persona es la pantalla. */
       setRemotos((prev) => {
@@ -236,89 +231,53 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   }, [enviar, yoId, cerrarPeer])
 
   /* ============ Micrófono / cámara / pantalla ============ */
-  const publicarTracks = useCallback(async (stream: MediaStream) => {
+  const actualizarTrack = useCallback((kind: 'audio' | 'video', track: MediaStreamTrack | null) => {
+    const stream = localRef.current ?? new MediaStream()
+    stream.getTracks().filter(t => t.kind === kind).forEach(t => stream.removeTrack(t))
+    if (track) stream.addTrack(track)
+    localRef.current = stream
+    setLocal(new MediaStream(stream.getTracks()))
+    if (kind === 'audio') setMicOn(!!track && track.readyState === 'live')
+    else { camaraTrackRef.current = track; setCamOn(!!track && track.readyState === 'live') }
     for (const peer of peers.current.values()) {
-      const senders = peer.pc.getSenders()
-      for (const track of stream.getTracks()) {
-        const sender = senders.find((x) => x.track?.kind === track.kind)
-        if (sender) { try { await sender.replaceTrack(track) } catch { /* noop */ } }
-        else { try { peer.pc.addTrack(track, stream) } catch { /* noop */ } }
-      }
+      const { pc } = peer
+      const sender = peer.mediaSenders[kind]
+      if (sender) {
+        sender.setStreams(stream)
+        void sender.replaceTrack(track).catch(() => setError('No se pudo actualizar el dispositivo. Apágalo y vuelve a activarlo.'))
+      } else if (track) peer.mediaSenders[kind] = pc.addTrack(track, stream)
     }
   }, [])
 
-  const pedirMedia = useCallback(async (video: boolean): Promise<MediaStream | null> => {
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        /* Sin cancelación de eco, con 3 personas en el open space y un audio
-           de fondo siempre sonando, el retorno es insoportable. */
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: video ? { width: { ideal: 640 }, height: { ideal: 480 } } : false,
-      })
-      localRef.current?.getTracks().forEach((t) => t.stop())
-      localRef.current = s
-      camaraTrackRef.current = s.getVideoTracks()[0] ?? null
-      setLocal(s)
-      await publicarTracks(s)
-      setError(null)
-      return s
-    } catch {
-      setError('No pudimos usar tu micrófono. Revisa los permisos del navegador.')
-      return null
-    }
-  }, [publicarTracks])
-
-  /** Entrar a la oficina: el gesto que habilita micrófono y audio. */
   const entrar = useCallback(async () => {
-    mezcla.current ??= new MezcladorOficina()
-    await mezcla.current.iniciar()
-    const s = await pedirMedia(false)
-    setMicOn(!!s)
-    setEntrado(true)
+    if (entradoRef.current || !yoId) return
     entradoRef.current = true
-  }, [pedirMedia])
+    mezcla.current ??= new MezcladorOficina()
+    void mezcla.current.iniciar().catch(() => {})
+    media.current ??= new MediaSession(c => navigator.mediaDevices.getUserMedia(c), actualizarTrack)
+    setEntrado(true)
+  }, [yoId, actualizarTrack])
 
-  /** Salir de la oficina (corta audio, micrófono y presencia). */
   const salir = useCallback(() => {
     entradoRef.current = false
+    media.current?.close()
+    pantallaRef.current?.getTracks().forEach(t => t.stop())
+    setCompartiendo(false)
     setEntrado(false)
-    setMicOn(false)
-    setCamOn(false)
     setLocal(null)
     setRemotos([])
     setListaUI([])
     jugadores.current.clear()
   }, [])
 
-  /** Si el navegador dejó el audio en pausa (entrada automática sin toque),
-      el primer clic en la app lo reactiva. */
-  const reanudarAudio = useCallback(() => { void mezcla.current?.iniciar() }, [])
-
-  const alternarMic = useCallback(async () => {
-    if (!localRef.current) { const s = await pedirMedia(false); setMicOn(!!s); return }
-    const nuevo = !micOn
-    localRef.current.getAudioTracks().forEach((t) => { t.enabled = nuevo })
-    setMicOn(nuevo)
-  }, [micOn, pedirMedia])
-
-  const alternarCam = useCallback(async () => {
-    if (!camOn) {
-      const s = await pedirMedia(true)
-      if (!s) return
-      s.getAudioTracks().forEach((t) => { t.enabled = micOn })
-      setCamOn(true)
-    } else {
-      /* Solo apagamos la pista de video: volver a pedir getUserMedia cortaría
-         el audio y en iPhone deja a los demás con la imagen congelada. */
-      camaraTrackRef.current?.stop()
-      camaraTrackRef.current = null
-      for (const peer of peers.current.values()) {
-        const sender = peer.pc.getSenders().find((x) => x.track?.kind === 'video')
-        if (sender) { try { await sender.replaceTrack(null) } catch { /* noop */ } }
-      }
-      setCamOn(false)
-    }
-  }, [camOn, micOn, pedirMedia])
+  const reanudarAudio = useCallback(() => { void mezcla.current?.iniciar().catch(() => {}) }, [])
+  const alternarDispositivo = useCallback(async (kind: 'audio' | 'video') => {
+    if (!entradoRef.current) return
+    try { await media.current?.toggle(kind); setError(null) }
+    catch { setError(`No pudimos usar ${kind === 'audio' ? 'el micrófono' : 'la cámara'}. Revisa los permisos del navegador.`) }
+  }, [])
+  const alternarMic = useCallback(() => alternarDispositivo('audio'), [alternarDispositivo])
+  const alternarCam = useCallback(() => alternarDispositivo('video'), [alternarDispositivo])
 
   const soportaPantalla = typeof navigator !== 'undefined'
     && typeof navigator.mediaDevices?.getDisplayMedia === 'function'
@@ -333,6 +292,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     }
     try {
       const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+      if (!entradoRef.current) { s.getTracks().forEach(t => t.stop()); return }
       pantallaRef.current = s
       setCompartiendo(true)
       yo.current.pantalla = true
@@ -428,7 +388,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
         /* Si está en otro módulo, el cartel de aceptar vive en /oficina. */
         if (!window.location.pathname.startsWith('/oficina')) {
           toast(`🔒 ${s.deNombre.split(' ')[0]} quiere hablar en privado`, {
-            duration: 15000, action: { label: 'Ir a la oficina', onClick: () => { window.location.href = '/oficina' } },
+            duration: 15000, action: { label: 'Ir a la oficina', onClick: () => { router.push('/oficina') } },
           })
         }
         return
@@ -440,7 +400,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
         toast(`🔔 ${quien} te está avisando`, {
           description: 'Te busca en la oficina.',
           duration: 12000,
-          action: window.location.pathname.startsWith('/oficina') ? undefined : { label: 'Ir a la oficina', onClick: () => { window.location.href = '/oficina' } },
+          action: window.location.pathname.startsWith('/oficina') ? undefined : { label: 'Ir a la oficina', onClick: () => { router.push('/oficina') } },
         })
         try {
           if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
@@ -493,6 +453,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     return () => {
       peersSnapshot.forEach((p) => { try { p.pc.close() } catch { /* noop */ } })
       peersSnapshot.clear()
+      media.current?.close()
       localRef.current?.getTracks().forEach((t) => t.stop())
       localRef.current = null
       pantallaRef.current?.getTracks().forEach((t) => t.stop())

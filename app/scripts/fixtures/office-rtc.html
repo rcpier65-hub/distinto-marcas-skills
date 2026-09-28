@@ -1,0 +1,31 @@
+<!doctype html><html><meta charset="utf-8"><title>Prueba local WebRTC sin micrófono</title><button id="run">Probar audio simulado</button><pre id="result">Usa dos conexiones locales y sonido sintético. No solicita micrófono.</pre><script>
+document.querySelector('#run').onclick=async()=>{
+ const out=document.querySelector('#result'); out.textContent='Probando…';
+ const a=new RTCPeerConnection(), b=new RTCPeerConnection(); let ctx;
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ try {
+  ctx=new AudioContext(); await ctx.resume();
+  const pendingA=[],pendingB=[];
+  a.onicecandidate=e=>{if(e.candidate){if(b.remoteDescription)b.addIceCandidate(e.candidate);else pendingB.push(e.candidate)}};
+  b.onicecandidate=e=>{if(e.candidate){if(a.remoteDescription)a.addIceCandidate(e.candidate);else pendingA.push(e.candidate)}};
+  let received;
+  b.ontrack=e=>{received=e.streams[0]||new MediaStream([e.track])};
+  const sender=a.addTransceiver('audio',{direction:'sendrecv'}).sender;
+  b.addTransceiver('audio',{direction:'sendrecv'});
+  await a.setLocalDescription();await b.setRemoteDescription(a.localDescription);await b.setLocalDescription();await a.setRemoteDescription(b.localDescription);
+  for(const c of pendingA)await a.addIceCandidate(c);for(const c of pendingB)await b.addIceCandidate(c);
+  await wait(500);
+  if(!received)throw Error('No se creó la pista receptora sin micrófono');
+  const destination=ctx.createMediaStreamDestination(), oscillator=ctx.createOscillator(); oscillator.connect(destination); oscillator.start();
+  sender.setStreams(destination.stream);await sender.replaceTrack(destination.stream.getAudioTracks()[0]);
+  const anchor=document.createElement('audio');anchor.srcObject=received;anchor.muted=true;anchor.autoplay=true;await anchor.play();
+  const input=ctx.createMediaStreamSource(received),analyser=ctx.createAnalyser(), silence=ctx.createGain();silence.gain.value=0;input.connect(analyser);analyser.connect(silence);silence.connect(ctx.destination);
+  await wait(1500);
+  const samples=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(samples);
+  const peak=Math.max(...samples.map(Math.abs));
+  if(peak<.001){ const sa=await a.getStats(), sb=await b.getStats(); throw Error('Sin audio: '+JSON.stringify({ctx:ctx.state,a:a.connectionState,b:b.connectionState,track:received.getTracks().map(t=>({muted:t.muted,readyState:t.readyState})),sender:Array.from(sa.values()).filter(v=>v.type==='outbound-rtp'),receiver:Array.from(sb.values()).filter(v=>v.type==='inbound-rtp')})) }
+  await sender.replaceTrack(null);destination.stream.getTracks().forEach(t=>t.stop());oscillator.stop();await wait(500);
+  out.textContent='PASS: conexión inicial sin micrófono; audio sintético recibido; reemplazo y liberación de la pista. Amplitud recibida: '+peak.toFixed(3);
+ }catch(e){out.textContent='FAIL: '+e.message}finally{a.close();b.close();if(ctx)await ctx.close()}
+};
+</script></html>

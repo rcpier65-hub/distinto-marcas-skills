@@ -38,7 +38,7 @@ export type Mueble = Rect & {
 }
 
 /* ===================== PAREDES ===================== */
-const PAREDES: Rect[] = [
+export const PAREDES: Rect[] = [
   // Perímetro
   { x: 0, y: 0, w: MAPA_W, h: 1 },
   { x: 0, y: MAPA_H - 1, w: MAPA_W, h: 1 },
@@ -59,7 +59,7 @@ const PAREDES: Rect[] = [
 ]
 
 /* Huecos de puerta: se restan de las paredes. */
-const PUERTAS: Rect[] = [
+export const PUERTAS: Rect[] = [
   { x: 6, y: 9, w: 2, h: 1 },    // juntas
   { x: 32, y: 9, w: 2, h: 1 },   // estudio
   { x: 27, y: 13, w: 1, h: 2 },  // diseño

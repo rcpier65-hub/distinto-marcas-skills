@@ -15,7 +15,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Building2, Mic, MicOff, LogOut } from 'lucide-react'
 import { usarOficina } from './_usar-oficina'
@@ -108,6 +108,7 @@ export function useOficina(): Valor | null {
 
 export function OficinaProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [datos, setDatos] = useState<Datos | null>(null)
   const [avatar, setAvatar] = useState<AvatarConfig>(() => avatarPorNombre('equipo'))
   const [duenos, setDuenos] = useState<PerfilLite[]>([])
@@ -144,12 +145,12 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const entrarManual = useCallback(async () => {
-    try { localStorage.removeItem(LS_SALIO) } catch { /* nada */ }
+    try { localStorage.removeItem(LS_SALIO); sessionStorage.setItem('oficina-activa', '1') } catch { /* nada */ }
     await entrar()
   }, [entrar])
 
   const salirManual = useCallback(() => {
-    try { localStorage.setItem(LS_SALIO, hoyLima()) } catch { /* nada */ }
+    try { localStorage.setItem(LS_SALIO, hoyLima()); sessionStorage.removeItem('oficina-activa') } catch { /* nada */ }
     salir()
     toast('Saliste de la oficina', { description: 'Hoy ya no se abre sola. Vuelve cuando quieras desde Oficina.' })
   }, [salir])
@@ -159,13 +160,16 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!datos || entrado) return
     const intentar = async () => {
-      if (entrandoRef.current || salioHoy() || !enHorario()) return
+      let reanudarSesion = false
+      try { reanudarSesion = sessionStorage.getItem('oficina-activa') === '1' } catch { /* almacenamiento opcional */ }
+      if (entrandoRef.current || salioHoy() || (!enHorario() && !reanudarSesion)) return
       entrandoRef.current = true
       try {
         await entrar()
+        try { sessionStorage.setItem('oficina-activa', '1') } catch { /* almacenamiento opcional */ }
         toast.success('Entraste a la oficina', {
-          description: 'Se abre sola en horario de trabajo. Quien se acerque a tu avatar te podrá hablar.',
-          action: { label: 'Ir a la oficina', onClick: () => { window.location.href = '/oficina' } },
+          description: 'Sigues conectado al cambiar de módulo. Tu micrófono y cámara están apagados.',
+          action: { label: 'Ir a la oficina', onClick: () => { router.push('/oficina') } },
         })
       } finally { entrandoRef.current = false }
     }
@@ -173,7 +177,7 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
     const ms = msHastaApertura()
     const t = ms !== null ? setTimeout(() => void intentar(), ms + 1000) : null
     return () => { if (t) clearTimeout(t) }
-  }, [datos, entrado, entrar])
+  }, [datos, entrado, entrar, router])
 
   /* Si entró sola (sin toque), el primer clic en la app reactiva el audio. */
   useEffect(() => {

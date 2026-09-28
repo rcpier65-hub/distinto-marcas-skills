@@ -14,6 +14,7 @@
    (El chat propio se quitó: se usa el chat oficial de la app.) */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -37,6 +38,7 @@ import { MUEBLES } from '../_mapa'
 import { useOficina, motor, esDispositivoMovil, type ActividadOficina } from '../_contexto'
 import { buscarCamino, sillaDeEscritorio, sillaEn } from '../_camino'
 
+const Oficina3D = dynamic(() => import('./oficina-3d'), { ssr: false })
 const VEL = 6.2
 const CORRER = 1.6
 const EMOTES = ['👋', '👍', '🎉', '❤️', '😂', '✋', '❓']
@@ -144,6 +146,10 @@ function OficinaMapa() {
   const [editorAbierto, setEditorAbierto] = useState(false)
   const [entrando, setEntrando] = useState(false)
 
+  const [vista3D, setVista3D] = useState(true)
+  const vista3DRef = useRef(true)
+  useEffect(() => { vista3DRef.current = vista3D }, [vista3D])
+  const yaw = useRef(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fondoRef = useRef<HTMLCanvasElement | null>(null)
   const colisiones = useMemo(() => construirColisiones(), [])
@@ -252,6 +258,12 @@ function OficinaMapa() {
       if (k.has('w') || k.has('arrowup')) vy -= 1
       if (k.has('s') || k.has('arrowdown')) vy += 1
 
+      if (vista3DRef.current) {
+        const cos = Math.cos(yaw.current), sin = Math.sin(yaw.current)
+        const nx = vx * cos + vy * sin
+        vy = -vx * sin + vy * cos; vx = nx
+      }
+
       /* Seguir a una persona ("ir con"): recalcula el camino cada 0.6 s. */
       if (!vx && !vy && m.guia) {
         const j = jugadores.current.get(m.guia.id)
@@ -314,6 +326,7 @@ function OficinaMapa() {
       }
 
       avanzar(dt)
+      if (vista3DRef.current) { raf = requestAnimationFrame(frame); return }
 
       const vw = cv.clientWidth, vh = cv.clientHeight
       const dpr = Math.min(2, window.devicePixelRatio || 1)
@@ -540,8 +553,8 @@ function OficinaMapa() {
             style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>D</div>
           <h1 className="text-xl font-extrabold mb-1">Oficina Distinto</h1>
           <p className="text-[13.5px] text-black/55 mb-5">
-            Vas a entrar como <b>{nombre}</b>. Al acercarte a alguien se abre el audio solo,
-            como en una oficina de verdad.
+            Vas a entrar como <b>{nombre}</b>, con el micrófono y la cámara apagados.
+            Actívalos cuando quieras conversar con el equipo.
           </p>
           <button onClick={async () => { setEntrando(true); try { await entrarManual() } finally { setEntrando(false) } }} disabled={entrando}
             className="w-full h-12 rounded-xl text-white font-bold text-[15px]"
@@ -549,7 +562,7 @@ function OficinaMapa() {
             {entrando ? 'Entrando…' : 'Entrar a la oficina'}
           </button>
           <p className="text-[11.5px] text-black/40 mt-3">
-            El navegador te va a pedir permiso del micrófono. Es necesario para que te escuchen.
+            Los permisos se solicitan solo al activar tu micrófono o cámara.
           </p>
           <p className="text-[11.5px] text-black/40 mt-2">
             Se abre sola de lunes a sábado desde las 8:00 am, y sigues adentro aunque cambies de módulo.
@@ -561,8 +574,16 @@ function OficinaMapa() {
 
   return (
     <div className="relative w-full" style={{ height: '100dvh', background: '#eceef5' }}>
-      <canvas ref={canvasRef} onClick={alClic} className="w-full h-full block" style={{ cursor: 'pointer', touchAction: 'manipulation' }} />
+      <canvas ref={canvasRef} onClick={alClic} className="w-full h-full block" style={{ visibility: vista3D ? 'hidden' : 'visible', cursor: 'pointer', touchAction: 'manipulation' }} />
 
+      {vista3D && <Oficina3D
+        personas={() => [{ id: yoId, nombre, x: motor.pos.x, y: motor.pos.y, dir: motor.dir, mov: motor.mov, sentado: motor.sentado, avatar, emote: emoteRef.current?.emoji }, ...Array.from(jugadores.current.values())]}
+        caminar={caminarA} orientar={angle => { yaw.current = angle }}
+        fallar={() => { setVista3D(false); toast.info('Usando la vista 2D: el equipo no pudo iniciar los gráficos 3D.') }} />}
+      <button className="absolute bottom-24 left-4 rounded-xl bg-white/95 px-4 py-2 text-sm font-semibold shadow-lg" onClick={() => setVista3D(v => !v)}>
+        {vista3D ? 'Vista 3D · Cambiar a 2D' : 'Vista 2D · Cambiar a 3D'}
+      </button>
+      {vista3D && <div className="absolute bottom-36 left-4 rounded-xl bg-white/90 px-3 py-2 text-xs text-slate-600">WASD: caminar · Arrastrar: girar · Rueda: zoom</div>}
       {/* ===== Cabecera ===== */}
       <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap max-w-[62%]">
         <div className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl bg-white/95 shadow-lg backdrop-blur border border-black/5">
@@ -757,7 +778,7 @@ function OficinaMapa() {
       )}
 
       {/* ===== Opciones flotantes sobre la persona cercana ===== */}
-      {vecino && (() => {
+      {!vista3D && vecino && (() => {
         const j = listaUI.find((x) => x.id === vecino)
         if (!j) return null
         const act = actividad[vecino]
