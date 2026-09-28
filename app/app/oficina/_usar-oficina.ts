@@ -14,12 +14,14 @@
 //
 // Entrar no captura dispositivos. Un transceiver permite escuchar antes de activar el micro.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { MediaSession } from './_media-session'
+import { AudioSenderGate } from './_audio-sender'
+import { InvitacionesOficina, conversacionesVacias, type SenalConversacion } from './_invitaciones'
 import { sonarAviso } from '@/lib/sonido/sonidos'
 import type { AvatarConfig, Direccion, EstadoUsuario } from './_avatar'
 import {
@@ -82,6 +84,10 @@ export type Jugador = {
   gain: number
   videoAlpha: number
   fijado: boolean
+  conexion: 'desconectado' | 'conectando' | 'conectado' | 'error'
+  gainSalida: number
+  mic: boolean
+  motivo: Decision['motivo']
   nivel: number       // 0..1 — qué tan fuerte está hablando ahora
 }
 
@@ -96,27 +102,29 @@ type Senal =
   | { tipo: 'oferta'; de: string; para: string; sdp: RTCSessionDescriptionInit }
   | { tipo: 'respuesta'; de: string; para: string; sdp: RTCSessionDescriptionInit }
   | { tipo: 'ice'; de: string; para: string; candidato: RTCIceCandidateInit }
-  | { tipo: 'llamada'; de: string; deNombre: string; para: string }
+  | { tipo: 'conversacion'; de: string; para: string; mensaje: SenalConversacion }
   | { tipo: 'toque'; de: string; deNombre: string; para: string }
-  | { tipo: 'privada-invita'; de: string; deNombre: string; para: string; sala: string }
+
 
 type Pos = {
   id: string; x: number; y: number; dir: Direccion
   mov: boolean; ghost: boolean; quiet: boolean; spot: boolean
   privada: string | null; pantalla: boolean; zona: string | null
   sentado?: boolean
+  mic?: boolean
 }
 
 /* Estado por peer: la conexión más lo necesario para negociar sin pisarnos. */
 type Peer = {
   pc: RTCPeerConnection
-  mediaSenders: Partial<Record<'audio' | 'video', RTCRtpSender>>
+  mediaSenders: Map<'audio' | 'video', RTCRtpSender>
+  audioGate: AudioSenderGate
   educado: boolean       // el "educado" cede si los dos ofrecen a la vez
   ofreciendo: boolean
   ignorarOferta: boolean
 }
 
-export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) {
+export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarConfig) {
   const router = useRouter()
   const media = useRef<MediaSession | null>(null)
   const [remotos, setRemotos] = useState<Remoto[]>([])
@@ -127,10 +135,12 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   const [estado, setEstado] = useState<EstadoUsuario>('disponible')
   const [quiet, setQuiet] = useState(false)
   const [spot, setSpot] = useState(false)
-  const [privada, setPrivada] = useState<string | null>(null)
+  const [conversaciones, setConversaciones] = useState(conversacionesVacias)
+  const privada = conversaciones.activa?.id ?? null
+  const llamada = conversaciones.entrante
+  const llamadaSaliente = conversaciones.saliente
   const [local, setLocal] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [llamada, setLlamada] = useState<{ de: string; nombre: string; sala?: string } | null>(null)
   const [conectado, setConectado] = useState(false)
   const [entrado, setEntrado] = useState(false)
   /* Quién acaba de entrar (para el avisito "X llegó a la oficina"). */
@@ -143,6 +153,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   })
   const canalRef = useRef<RealtimeChannel | null>(null)
   const peers = useRef<Map<string, Peer>>(new Map())
+  const fallosPeer = useRef(new Map<string, number>())
   const localRef = useRef<MediaStream | null>(null)
   const pantallaRef = useRef<MediaStream | null>(null)
   const camaraTrackRef = useRef<MediaStreamTrack | null>(null)
@@ -150,9 +161,12 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   const decisiones = useRef<Map<string, Decision>>(new Map())
   /* El id llega después (el proveedor carga los datos al montar). */
   useEffect(() => { yo.current.id = yoId }, [yoId])
-  const avatarRef = useRef(avatar); avatarRef.current = avatar
-  const nombreRef = useRef(nombre); nombreRef.current = nombre
-  const estadoRef = useRef(estado); estadoRef.current = estado
+  const avatarRef = useRef(avatar)
+  useEffect(() => { avatarRef.current = avatar }, [avatar])
+  const nombreRef = useRef(nombre)
+  useEffect(() => { nombreRef.current = nombre }, [nombre])
+  const estadoRef = useRef(estado)
+  useEffect(() => { estadoRef.current = estado }, [estado])
   const ultimoEnvio = useRef(0)
   const emoteRef = useRef<{ emoji: string; hasta: number } | null>(null)
   const spotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -162,10 +176,26 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     canalRef.current?.send({ type: 'broadcast', event: 'senal', payload: s })
   }, [])
 
+  const invitaciones = useMemo(() => new InvitacionesOficina(
+    () => yoId,
+    mensaje => enviar({ tipo: 'conversacion', de: yoId, para: mensaje.tipo === 'invitar' ? mensaje.invitacion.para : mensaje.para, mensaje }),
+    setConversaciones,
+  ), [yoId, enviar])
+  const estadoDe = useCallback((id: string): EstadoAudio | null => {
+    const j = jugadores.current.get(id)
+    // Usar posición recibida, no la interpolación visual, al decidir privacidad.
+    return j ? { ...j, x: j.tx, y: j.ty } : null
+  }, [])
+  const puedeEnviar = useCallback((id: string) => {
+    const otro = estadoDe(id)
+    return !!otro && decidir(otro, yo.current, true).gain > 0
+  }, [estadoDe])
+
   /* ============ WebRTC ============ */
   const cerrarPeer = useCallback((otroId: string) => {
     const p = peers.current.get(otroId)
     if (!p) return
+    p.audioGate.dispose()
     try { p.pc.close() } catch { /* noop */ }
     peers.current.delete(otroId)
     decisiones.current.delete(otroId)
@@ -179,13 +209,16 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     const pc = new RTCPeerConnection(ICE)
     /* "Educado" = el de id mayor. Si los dos ofrecen a la vez, el educado se
        hace a un lado y acepta la oferta del otro en vez de chocar. */
-    const peer: Peer = { pc, mediaSenders: {}, educado: yoId > otroId, ofreciendo: false, ignorarOferta: false }
+    const audioSender = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender
+    const audioGate = new AudioSenderGate(audioSender, () => { fallosPeer.current.set(otroId, Date.now()); cerrarPeer(otroId) })
+    const peer: Peer = { pc, audioGate, mediaSenders: new Map([['audio', audioSender]]), educado: yoId > otroId, ofreciendo: false, ignorarOferta: false }
     peers.current.set(otroId, peer)
 
-    localRef.current?.getTracks().forEach((t) => {
-      try { peer.mediaSenders[t.kind as 'audio' | 'video'] = pc.addTrack(t, localRef.current!) } catch { /* noop */ }
+    localRef.current?.getVideoTracks().forEach((t) => {
+      try { peer.mediaSenders.set(t.kind as 'audio' | 'video', pc.addTrack(t, localRef.current!)) } catch { /* noop */ }
     })
-    if (!localRef.current?.getAudioTracks().length) peer.mediaSenders.audio = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender
+    if (localRef.current) audioSender.setStreams(localRef.current)
+    audioGate.set(localRef.current?.getAudioTracks()[0] ?? null, puedeEnviar(otroId))
     if (pantallaRef.current) {
       pantallaRef.current.getTracks().forEach((t) => {
         try { pc.addTrack(t, pantallaRef.current!) } catch { /* noop */ }
@@ -214,7 +247,11 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       /* Antes solo se sacaba de la lista visual: el peer muerto quedaba en el
          mapa y la guarda de crearPeer devolvía siempre ese cadáver, así que
          esa persona no volvía a conectar en toda la sesión. */
-      if (['failed', 'closed'].includes(pc.connectionState)) cerrarPeer(otroId)
+      if (pc.connectionState === 'connected') fallosPeer.current.delete(otroId)
+      if (['failed', 'closed'].includes(pc.connectionState)) {
+        if (pc.connectionState === 'failed') fallosPeer.current.set(otroId, Date.now())
+        cerrarPeer(otroId)
+      }
     }
     pc.onnegotiationneeded = async () => {
       try {
@@ -228,7 +265,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       }
     }
     return peer
-  }, [enviar, yoId, cerrarPeer])
+  }, [enviar, yoId, cerrarPeer, puedeEnviar])
 
   /* ============ Micrófono / cámara / pantalla ============ */
   const actualizarTrack = useCallback((kind: 'audio' | 'video', track: MediaStreamTrack | null) => {
@@ -239,15 +276,18 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     setLocal(new MediaStream(stream.getTracks()))
     if (kind === 'audio') setMicOn(!!track && track.readyState === 'live')
     else { camaraTrackRef.current = track; setCamOn(!!track && track.readyState === 'live') }
-    for (const peer of peers.current.values()) {
+    for (const [id, peer] of peers.current) {
       const { pc } = peer
-      const sender = peer.mediaSenders[kind]
+      const sender = peer.mediaSenders.get(kind)
+      if (kind === 'audio') {
+        sender?.setStreams(stream); peer.audioGate.set(track, puedeEnviar(id)); continue
+      }
       if (sender) {
         sender.setStreams(stream)
         void sender.replaceTrack(track).catch(() => setError('No se pudo actualizar el dispositivo. Apágalo y vuelve a activarlo.'))
-      } else if (track) peer.mediaSenders[kind] = pc.addTrack(track, stream)
+      } else if (track) peer.mediaSenders.set(kind, pc.addTrack(track, stream))
     }
-  }, [])
+  }, [puedeEnviar])
 
   const entrar = useCallback(async () => {
     if (entradoRef.current || !yoId) return
@@ -260,6 +300,9 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
 
   const salir = useCallback(() => {
     entradoRef.current = false
+    invitaciones.reset()
+    if (spotTimer.current) clearTimeout(spotTimer.current)
+    setSpot(false); yo.current.spot = false
     media.current?.close()
     pantallaRef.current?.getTracks().forEach(t => t.stop())
     setCompartiendo(false)
@@ -268,7 +311,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     setRemotos([])
     setListaUI([])
     jugadores.current.clear()
-  }, [])
+  }, [invitaciones])
 
   const reanudarAudio = useCallback(() => { void mezcla.current?.iniciar().catch(() => {}) }, [])
   const alternarDispositivo = useCallback(async (kind: 'audio' | 'video') => {
@@ -350,7 +393,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
             x: 0, y: 0, tx: 0, ty: 0, dir: 's', mov: false, sentado: false,
             ghost: false, quiet: false, spot: false, privada: null, pantalla: false,
             zona: null, paso: 0, visto: Date.now(),
-            gain: 0, videoAlpha: 1, fijado: false, nivel: 0,
+            gain: 0, gainSalida: 0, videoAlpha: 0, fijado: false, nivel: 0, mic: false, motivo: 'lejos', conexion: 'desconectado',
           })
         }
       }
@@ -367,6 +410,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       j.tx = p.x; j.ty = p.y; j.dir = p.dir; j.mov = p.mov; j.sentado = !!p.sentado
       j.ghost = p.ghost; j.quiet = p.quiet; j.spot = p.spot
       j.privada = p.privada; j.pantalla = p.pantalla; j.zona = p.zona
+      j.mic = !!p.mic
       j.visto = Date.now()
       if (j.x === 0 && j.y === 0) { j.x = p.x; j.y = p.y }
     })
@@ -382,13 +426,17 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     canal.on('broadcast', { event: 'senal' }, async ({ payload }) => {
       const s = payload as Senal
       if (s.para !== yoId) return
-      if (s.tipo === 'llamada') { sonarAviso(); setLlamada({ de: s.de, nombre: s.deNombre }); return }
-      if (s.tipo === 'privada-invita') {
-        sonarAviso(); setLlamada({ de: s.de, nombre: s.deNombre, sala: s.sala })
-        /* Si está en otro módulo, el cartel de aceptar vive en /oficina. */
-        if (!window.location.pathname.startsWith('/oficina')) {
-          toast(`🔒 ${s.deNombre.split(' ')[0]} quiere hablar en privado`, {
-            duration: 15000, action: { label: 'Ir a la oficina', onClick: () => { router.push('/oficina') } },
+      if (s.tipo === 'conversacion') {
+        if (!jugadores.current.has(s.de)) return
+        const m = s.mensaje
+        if (!m || (m.tipo === 'invitar' ? m.invitacion?.de : m.de) !== s.de) return
+        if (yo.current.estado === 'nomolestar' && m.tipo === 'invitar') {
+          enviar({ tipo: 'conversacion', de: yoId, para: s.de, mensaje: { tipo: 'rechazar', id: m.invitacion.id, de: yoId, para: s.de } }); return
+        }
+        if (invitaciones.recibir(m)) {
+          sonarAviso()
+          if (!window.location.pathname.startsWith('/oficina')) toast(`${jugadores.current.get(s.de)?.nombre ?? 'Alguien'} quiere hablar contigo`, {
+            duration: 15000, action: { label: 'Ir a la oficina', onClick: () => router.push('/oficina') },
           })
         }
         return
@@ -414,6 +462,8 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       }
       try {
         if (s.tipo === 'oferta' || s.tipo === 'respuesta') {
+          const otro = estadoDe(s.de)
+          if (!otro || !debeConectar(yo.current, otro, peers.current.has(s.de))) return
           const peer = crearPeer(s.de)
           const desc = new RTCSessionDescription(s.sdp)
           /* Negociación educada: si llega una oferta mientras yo también
@@ -451,7 +501,8 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
 
     const peersSnapshot = peers.current
     return () => {
-      peersSnapshot.forEach((p) => { try { p.pc.close() } catch { /* noop */ } })
+      invitaciones.reset()
+      peersSnapshot.forEach((p) => { p.audioGate.dispose(); try { p.pc.close() } catch { /* noop */ } })
       peersSnapshot.clear()
       media.current?.close()
       localRef.current?.getTracks().forEach((t) => t.stop())
@@ -481,22 +532,27 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
   useEffect(() => {
     const t = setInterval(() => {
       const ahora = Date.now()
+      invitaciones.tick(ahora)
       const mio = yo.current
 
       for (const j of Array.from(jugadores.current.values())) {
         // TTL: si dejó de mandar posición, se fue (cerró la pestaña).
         if (ahora - j.visto > TTL_MS) {
+          if (invitaciones.state.activa?.peer === j.id) invitaciones.terminar()
           jugadores.current.delete(j.id)
           cerrarPeer(j.id)
           continue
         }
         const suyo: EstadoAudio = {
-          id: j.id, x: j.x, y: j.y, zona: j.zona, privada: j.privada,
+          id: j.id, x: j.tx, y: j.ty, zona: j.zona, privada: j.privada,
           spot: j.spot, ghost: j.ghost, quiet: j.quiet, estado: j.estado,
         }
         const yaEstaba = peers.current.has(j.id)
         const dec = decidir(mio, suyo, yaEstaba)
         decisiones.current.set(j.id, dec)
+        const salida = decidir(suyo, mio, yaEstaba)
+        j.motivo = dec.motivo
+        j.gainSalida = salida.gain
         j.gain = dec.gain
         j.videoAlpha = dec.videoAlpha
         j.fijado = dec.fijado
@@ -505,17 +561,20 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
         j.nivel = dec.gain > 0 ? (mezcla.current?.nivel(j.id) ?? 0) : 0
 
         if (debeConectar(mio, suyo, yaEstaba)) {
-          if (!yaEstaba) crearPeer(j.id)
+          if (!yaEstaba && ahora - (fallosPeer.current.get(j.id) ?? 0) > 10000) crearPeer(j.id)
+          peers.current.get(j.id)?.audioGate.set(localRef.current?.getAudioTracks()[0] ?? null, salida.gain > 0)
           mezcla.current?.ajustar(j.id, dec.gain, paneo(mio, suyo))
         } else if (yaEstaba) {
           cerrarPeer(j.id)
         }
+        const pc = peers.current.get(j.id)?.pc
+        j.conexion = pc?.connectionState === 'connected' ? 'conectado' : pc ? 'conectando' : fallosPeer.current.has(j.id) && (dec.gain > 0 || salida.gain > 0) ? 'error' : 'desconectado'
       }
 
       setListaUI(Array.from(jugadores.current.values()).map((j) => ({ ...j })))
     }, PROX_MS)
     return () => clearInterval(t)
-  }, [crearPeer, cerrarPeer])
+  }, [crearPeer, cerrarPeer, invitaciones])
 
   /* ============ API para el render loop ============ */
   const publicarPos = useCallback((x: number, y: number, dir: Direccion, mov: boolean, ghost: boolean, zona: string | null, sentado = false) => {
@@ -530,6 +589,7 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
       type: 'broadcast', event: 'pos',
       payload: {
         id: yoId, x, y, dir, mov, ghost, zona, sentado,
+        mic: !!localRef.current?.getAudioTracks().some(t => t.readyState === 'live'),
         quiet: yo.current.quiet, spot: yo.current.spot,
         privada: yo.current.privada, pantalla: yo.current.pantalla,
       } satisfies Pos,
@@ -559,22 +619,19 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     enviar({ tipo: 'toque', de: yoId, deNombre: nombreRef.current, para: id })
   }, [enviar, yoId])
 
-  const llamarA = useCallback((id: string) => {
-    enviar({ tipo: 'llamada', de: yoId, deNombre: nombreRef.current, para: id })
-  }, [enviar, yoId])
-
-  /** Invitar a alguien a una conversación privada (solo entre ustedes). */
-  const invitarPrivada = useCallback((id: string) => {
-    const sala = `${yoId}:${id}`.split(':').sort().join(':')
-    setPrivada(sala)
-    yo.current.privada = sala
-    enviar({ tipo: 'privada-invita', de: yoId, deNombre: nombreRef.current, para: id, sala })
-  }, [enviar, yoId])
-
-  const salirPrivada = useCallback(() => {
-    setPrivada(null)
-    yo.current.privada = null
-  }, [])
+  const invitar = useCallback((id: string, privada: boolean) => {
+    const j = jugadores.current.get(id)
+    if (!j || j.estado === 'nomolestar') { toast('Esta persona no está disponible.'); return }
+    if (invitaciones.invitar(id, nombreRef.current, privada)) toast('Invitación enviada. Esperando respuesta.')
+    else toast('Termina o cancela la conversación pendiente primero.')
+  }, [invitaciones])
+  const llamarA = useCallback((id: string) => invitar(id, false), [invitar])
+  const invitarPrivada = useCallback((id: string) => invitar(id, true), [invitar])
+  const salirPrivada = useCallback(() => invitaciones.terminar(), [invitaciones])
+  const aceptarLlamada = useCallback(() => invitaciones.aceptar(), [invitaciones])
+  const rechazarLlamada = useCallback(() => invitaciones.rechazar(), [invitaciones])
+  const cancelarLlamada = useCallback(() => invitaciones.cancelar(), [invitaciones])
+  const reintentarAudio = useCallback(() => { fallosPeer.current.clear(); void mezcla.current?.iniciar() }, [])
 
   return {
     jugadores, listaUI, remotos, decisiones, emoteRef, conectado, error, entrado,
@@ -583,6 +640,6 @@ export function usarOficina(yoId: string, nombre: string, avatar: AvatarConfig) 
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
     entro, setEntro,
-    publicarPos, avanzar, mandarEmote, llamarA, avisarA, llamada, setLlamada,
+    publicarPos, avanzar, mandarEmote, llamarA, avisarA, llamada, llamadaSaliente, aceptarLlamada, rechazarLlamada, cancelarLlamada, reintentarAudio,
   }
 }

@@ -7,7 +7,7 @@
 // · Sillas: si te quedas quieto sobre una silla, te sientas mirando hacia
 //   donde apunta la silla (hacia el escritorio).
 
-import { MAPA_W, MAPA_H, ASIENTOS } from './_mapa'
+import { MAPA_W, MAPA_H, ASIENTOS, zonaDe } from './_mapa'
 import type { Direccion } from './_avatar'
 
 export type Punto = { x: number; y: number }
@@ -140,4 +140,20 @@ export function sillaEn(x: number, y: number): Silla | null {
 
 export function sillaDeEscritorio(label: string): Silla | null {
   return SILLAS.find(s => s.puesto === label) ?? null
+}
+
+/** Acercarse sin ocupar el cuerpo, escritorio o respaldo del compañero. */
+export function caminoParaAcercarse(grid: Uint8Array, desde: Punto, persona: Punto, ocupados: Punto[] = []): Punto[] | null {
+  let mejor: Punto[] | null = null, menor = Infinity
+  for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]) {
+    const destino = { x: Math.floor(persona.x) + .5 + dx, y: Math.floor(persona.y) + .5 + dy }
+    if (!libreCasilla(grid, Math.floor(destino.x), Math.floor(destino.y)) || zonaDe(destino.x,destino.y)?.id !== zonaDe(persona.x,persona.y)?.id) continue
+    if (ocupados.some(p => Math.hypot(destino.x-p.x,destino.y-p.y) < .75)) continue
+    const camino = buscarCamino(grid, desde, destino)
+    if (!camino) continue
+    let anterior = desde, largo = 0
+    for (const p of camino) { largo += Math.hypot(p.x-anterior.x,p.y-anterior.y); anterior=p }
+    if (largo < menor) { mejor=camino; menor=largo }
+  }
+  return mejor
 }

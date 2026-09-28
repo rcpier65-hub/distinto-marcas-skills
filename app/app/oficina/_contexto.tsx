@@ -18,7 +18,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Building2, Mic, MicOff, LogOut } from 'lucide-react'
-import { usarOficina } from './_usar-oficina'
+import { useOficinaRealtime } from './_usar-oficina'
 import { avatarPorNombre, avatarValido, type AvatarConfig, type Direccion } from './_avatar'
 import { SPAWN, zonaDe, construirColisiones, esSolido } from './_mapa'
 import { actividadOficina, datosOficina, guardarAvatarOficina } from './_actions'
@@ -86,7 +86,7 @@ function salioHoy(): boolean {
 }
 
 type Datos = NonNullable<Awaited<ReturnType<typeof datosOficina>>>
-type Valor = ReturnType<typeof usarOficina> & {
+type Valor = ReturnType<typeof useOficinaRealtime> & {
   datos: Datos
   avatar: AvatarConfig
   guardarAvatar: (a: AvatarConfig) => Promise<boolean>
@@ -135,7 +135,7 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
     return () => { vivo = false }
   }, [])
 
-  const of = usarOficina(datos?.yoId ?? '', datos?.nombre ?? '', avatar)
+  const of = useOficinaRealtime(datos?.yoId ?? '', datos?.nombre ?? '', avatar)
   const { entrado, entrar, salir, publicarPos, avanzar, reanudarAudio } = of
 
   const guardarAvatar = useCallback(async (a: AvatarConfig) => {

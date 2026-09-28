@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Mic, MicOff, Video, VideoOff, Users, X, Ghost, Palette, Phone, MapPin,
-  MonitorUp, MonitorOff, Megaphone, Lock, Maximize2, Minimize2, VolumeX, Armchair, AlertTriangle, LogOut, Loader2,
+  MonitorUp, MonitorOff, Megaphone, Lock, Maximize2, Minimize2, VolumeX, Armchair, LogOut, Loader2,
   Monitor,
 } from 'lucide-react'
 import {
@@ -21,7 +21,7 @@ import { HAY_TURN } from '../_usar-oficina'
 import { reclamarEscritorio } from '../_actions'
 import { MUEBLES } from '../_mapa'
 import { useOficina, motor, esDispositivoMovil } from '../_contexto'
-import { buscarCamino, sillaDeEscritorio, sillaEn } from '../_camino'
+import { buscarCamino, caminoParaAcercarse, sillaDeEscritorio, sillaEn } from '../_camino'
 
 const Oficina3D = dynamic(() => import('./oficina-3d'), { ssr: false, loading: () => <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-sm text-slate-500">Cargando la oficina…</div> })
 const EditorAvatar = dynamic(() => import('./editor-avatar'), { ssr: false })
@@ -70,7 +70,7 @@ function OficinaMapa() {
     estado, setEstado, quiet, setQuiet, spot, alternarSpot,
     privada, invitarPrivada, salirPrivada,
     entro, setEntro,
-    avanzar, mandarEmote, llamarA, llamada, setLlamada,
+    avanzar, mandarEmote, llamarA, llamada, llamadaSaliente, aceptarLlamada, rechazarLlamada, cancelarLlamada, reintentarAudio, conectado,
   } = of
   const yoId = datos.yoId
   const nombre = datos.nombre
@@ -84,6 +84,7 @@ function OficinaMapa() {
   const colisiones = useMemo(() => construirColisiones(), [])
   const teclas = useRef<Set<string>>(new Set())
   const [panelAbierto, setPanelAbierto] = useState(false)
+  const [ayuda, setAyuda] = useState(false)
   const [objetoActivo, setObjetoActivo] = useState<{ titulo: string; href: string; icono: string } | null>(null)
   const objetoRef = useRef<{ titulo: string; href: string; icono: string } | null>(null)
   const [zonaActual, setZonaActual] = useState<string | null>(null)
@@ -181,7 +182,9 @@ function OficinaMapa() {
         if (!j || Date.now() > m.guia.hasta) m.guia = null
         else if ((recalcGuia -= dt) <= 0) {
           recalcGuia = 0.6
-          if (Math.hypot(j.x - m.pos.x, j.y - m.pos.y) > 1.3) caminarA(j.x, j.y + 1)
+          if (Math.hypot(j.tx - m.pos.x, j.ty - m.pos.y) > 1.5 || zonaDe(j.tx,j.ty)?.id !== zonaDe(m.pos.x,m.pos.y)?.id) {
+            m.camino = caminoParaAcercarse(colisiones, m.pos, { x: j.tx, y: j.ty }, Array.from(jugadores.current.values())) ?? []
+          }
           else { m.camino = []; m.guia = null }
         }
       }
@@ -259,12 +262,14 @@ function OficinaMapa() {
     if (!seat || !caminarA(seat.x, seat.y)) toast('No hay un asiento libre accesible en esta zona.')
   }, [caminarA, listaUI])
 
-  const irCon = useCallback((id: string) => {
+  const irCon = (id: string) => {
     const j = jugadores.current.get(id)
     if (!j) { toast.error('Esa persona ya no está en la oficina'); return }
     motor.guia = { id, hasta: Date.now() + 20000 }
-    caminarA(j.x, j.y + 1)
-  }, [jugadores, caminarA])
+    const camino = caminoParaAcercarse(colisiones, motor.pos, { x: j.tx, y: j.ty }, Array.from(jugadores.current.values()))
+    if (camino) motor.camino = camino
+    else { motor.guia = null; toast('No hay un lugar libre junto a esa persona.') }
+  }
 
   /* Escritorio propio: caminar hasta su silla (y sentarse al llegar). */
   const irAMiEscritorio = useCallback(() => {
@@ -285,9 +290,11 @@ function OficinaMapa() {
     toast.success(`El escritorio de ${label} ahora es tuyo`)
   }, [yoId, nombre, setDuenos])
 
-  const cercanos = listaUI.filter((j) => j.gain > 0.05)
+  const cercanos = listaUI.filter(j => j.gain > 0 || j.gainSalida > 0)
+  const escuchando = cercanos.filter(j => j.conexion === 'conectado' && j.gain > 0 && j.nivel > .08)
+  const destinatarios = cercanos.filter(j => j.conexion === 'conectado' && j.gainSalida > 0)
   const zonaInfo = ZONAS.find((z) => z.id === zonaActual) ?? null
-  const pantallasRemotas = remotos.filter((r) => r.tipo === 'pantalla')
+  const pantallasRemotas = remotos.filter(r => r.tipo === 'pantalla' && listaUI.some(j => j.id === r.id && j.gain > 0 && j.conexion === 'conectado'))
 
   /* ===== Entrada sin captura automática ===== */
   if (!entrado) {
@@ -317,26 +324,12 @@ function OficinaMapa() {
     )
   }
 
+  const remotosVisibles = remotos.filter(r => listaUI.some(j => j.id === r.id && j.gain > 0 && j.conexion === 'conectado'))
   return (
-    <div className="relative w-full" style={{ height: '100dvh', background: '#eceef5' }}>
-      {!error3D && <Oficina3D key={escenaKey}
-        personas={() => [{ id: yoId, nombre, x: motor.pos.x, y: motor.pos.y, dir: motor.dir, mov: motor.mov, sentado: motor.sentado, avatar, emote: emoteRef.current?.emoji }, ...Array.from(jugadores.current.values())]}
-        caminar={(x, y) => { motor.guia = null; if (!caminarA(x, y)) toast('No hay camino hasta ese lugar.') }}
-        orientar={angle => { yaw.current = angle }} destino={() => motor.camino.at(-1) ?? null}
-        fallar={() => setError3D(true)} />}
-      {error3D && <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-100 text-slate-600">
-        <p>No se pudo iniciar la vista 3D. Tu conexión de Oficina sigue abierta.</p>
-        <button className="rounded-xl bg-violet-600 px-5 py-3 text-white" onClick={() => { setEscenaKey(k => k + 1); setError3D(false) }}>Reintentar vista 3D</button>
-      </div>}
-      <div className="absolute bottom-24 left-4 max-w-[70%] rounded-2xl border border-white/60 bg-white/90 p-3 shadow-sm backdrop-blur">
-        <div className="mb-2 text-[11px] text-slate-500">Clic en un asiento: caminar y sentarte · WASD: caminar · Arrastrar: girar</div>
-        <div className="flex flex-wrap gap-2">{[['gerencia', 'Gerencia'], ['lounge', 'Lounge'], ['juntas', 'Juntas'], ['diseno', 'Ideas']].map(([id, label]) =>
-          <button key={id} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-violet-100" onClick={() => irAZona(id)}>Ir a {label}</button>)}
-          {sentadoUI && <button className="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700" onClick={levantarse}>Levantarse</button>}
-        </div>
-      </div>
+    <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-slate-100">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2">
       {/* ===== Cabecera ===== */}
-      <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap max-w-[62%]">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <div className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl bg-white/95 shadow-lg backdrop-blur border border-black/5">
           <span className="w-6 h-6 rounded-lg inline-flex items-center justify-center text-white text-[12px] font-bold"
             style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>D</span>
@@ -346,7 +339,7 @@ function OficinaMapa() {
         {zonaInfo && (
           <div className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl shadow-lg backdrop-blur text-[13px] font-bold text-white"
             style={{ background: zonaInfo.color }}>
-            {zonaInfo.emoji} {zonaInfo.nombre} · sala privada
+            {zonaInfo.emoji} {zonaInfo.nombre} · audio por cercanía
           </div>
         )}
         {sentadoUI && (
@@ -373,9 +366,13 @@ function OficinaMapa() {
         )}
       </div>
 
+        <button onClick={() => setAyuda(v => !v)} aria-expanded={ayuda} className="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Cómo funciona</button>
+      </header>
+      {ayuda && <div className="shrink-0 border-b bg-violet-50 px-4 py-3 text-xs leading-relaxed text-violet-900">Acércate para conversar; al alejarte el audio se corta, incluso dentro de una sala. Las paredes separan conversaciones. Activa tu micrófono para hablar. Una llamada privada requiere aceptación y se mantiene hasta colgar. Clic en el suelo o un asiento: caminar · WASD: moverte · Arrastrar: girar · Rueda: zoom.</div>}
+{(remotosVisibles.length > 0 || camOn) && <>
       {/* ===== Burbujas de video ===== */}
-      <div className="absolute top-3 right-3 flex flex-col items-end gap-2 max-h-[50vh] overflow-y-auto">
-        {remotos.filter((r) => r.tipo === 'camara').map((r) => {
+      <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-white p-3">
+        {remotosVisibles.filter((r) => r.tipo === 'camara').map((r) => {
           const j = listaUI.find((x) => x.id === r.id)
           return <BurbujaVideo key={`c-${r.id}`} remoto={r} alpha={j?.videoAlpha ?? 1} gain={j?.gain ?? 0} fijado={!!j?.fijado} />
         })}
@@ -396,6 +393,17 @@ function OficinaMapa() {
         )}
       </div>
 
+</>}      <div className="flex min-h-0 flex-1">
+        <div data-office-scene className="relative min-w-0 flex-1">
+      {!error3D && <Oficina3D key={escenaKey}
+        personas={() => [{ id: yoId, nombre, x: motor.pos.x, y: motor.pos.y, dir: motor.dir, mov: motor.mov, sentado: motor.sentado, avatar, emote: emoteRef.current?.emoji }, ...Array.from(jugadores.current.values())]}
+        caminar={(x, y) => { motor.guia = null; if (!caminarA(x, y)) toast('No hay camino hasta ese lugar.') }}
+        orientar={angle => { yaw.current = angle }} destino={() => motor.camino.at(-1) ?? null}
+        fallar={() => setError3D(true)} />}
+      {error3D && <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-100 text-slate-600">
+        <p>No se pudo iniciar la vista 3D. Tu conexión de Oficina sigue abierta.</p>
+        <button className="rounded-xl bg-violet-600 px-5 py-3 text-white" onClick={() => { setEscenaKey(k => k + 1); setError3D(false) }}>Reintentar vista 3D</button>
+      </div>}
       {/* ===== Pantalla compartida en grande ===== */}
       {pantallaGrande && (() => {
         const r = pantallasRemotas.find((p) => p.id === pantallaGrande)
@@ -415,15 +423,98 @@ function OficinaMapa() {
         )
       })()}
 
-      {objetoActivo && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-24 px-4 py-2.5 rounded-xl bg-black/80 text-white text-[13px] font-semibold shadow-xl backdrop-blur flex items-center gap-2">
-          <span>{objetoActivo.icono}</span>{objetoActivo.titulo}
-          <kbd className="ml-1 px-2 py-0.5 rounded bg-white/20 text-[11px] font-bold">X</kbd>
         </div>
+      {/* ===== Panel de personas ===== */}
+      {panelAbierto && (
+        <aside className="w-[280px] max-w-[40%] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-black/45">En la oficina</span>
+            <button onClick={() => setPanelAbierto(false)} className="w-6 h-6 rounded-lg hover:bg-black/5 inline-flex items-center justify-center"><X className="w-3.5 h-3.5" /></button>
+          </div>
+
+          <div className="flex items-center gap-2 p-2 rounded-xl mb-1" style={{ background: '#7170ff12' }}>
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ESTADO_COLOR[estado] }} />
+            <span className="text-[13px] font-bold truncate flex-1">{nombre}</span>
+            <span className="text-[10.5px] text-black/40">tú</span>
+          </div>
+          <select aria-label="Mi disponibilidad" value={estado} onChange={(e) => setEstado(e.target.value as EstadoUsuario)}
+            className="w-full h-8 px-2 mb-2 rounded-lg border text-[12px] bg-white outline-none">
+            {(Object.keys(ESTADO_LABEL) as EstadoUsuario[]).map((s) => (
+              <option key={s} value={s}>{ESTADO_LABEL[s]}</option>
+            ))}
+          </select>
+
+          {listaUI.length === 0 ? (
+            <p className="text-[12px] text-black/45 py-2">
+              Nadie más conectado. Cuando entre alguien del equipo, lo verás caminando por acá. 👋
+            </p>
+          ) : listaUI.map((j) => (
+            <div key={j.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-black/[0.03] group">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ESTADO_COLOR[j.estado] }} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold truncate">{j.nombre}{j.spot ? ' 📢' : ''}{j.pantalla ? ' 🖥' : ''}</div>
+                <div className="text-[10.5px] text-black/40 truncate">
+                  {j.estado === 'nomolestar' ? 'No molestar' : j.conexion === 'error' ? 'No se pudo conectar' : j.gain > 0 ? (j.conexion === 'conectado' ? (j.mic ? 'Cerca · micro encendido' : 'Cerca · micro apagado') : 'Conectando…') : j.zona ? `En ${ZONAS.find((z) => z.id === j.zona)?.nombre}` : 'Fuera de alcance'}
+                </div>
+              </div>
+              <button onClick={() => irCon(j.id)} title={`Ir con ${j.nombre}`}
+                className="w-7 h-7 rounded-lg hover:bg-black/10 inline-flex items-center justify-center"><MapPin className="w-3.5 h-3.5" /></button>
+              <button onClick={() => invitarPrivada(j.id)} title={`Hablar en privado con ${j.nombre}`}
+                className="w-7 h-7 rounded-lg hover:bg-black/10 inline-flex items-center justify-center"><Lock className="w-3.5 h-3.5" /></button>
+              <button onClick={() => llamarA(j.id)} title={`Llamar a ${j.nombre}`}
+                className="w-7 h-7 rounded-lg hover:bg-black/10 inline-flex items-center justify-center"><Phone className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+
+          {/* Escritorios: cada uno reclama el suyo y puede volver a él. */}
+          <div className="mt-3 pt-2.5 border-t">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-black/45 mb-1.5">Escritorios</div>
+            <div className="flex flex-wrap gap-1">
+              {MUEBLES.filter((m) => m.tipo === 'escritorio' && m.label).map((m) => {
+                const dueno = duenos.find((d) => d.escritorio === m.label)
+                const mio = dueno?.userId === yoId
+                return (
+                  <button key={m.label} onClick={() => tomarEscritorio(m.label!)}
+                    disabled={!!dueno && !mio} title={dueno?.nombre ? `Puesto de ${dueno.nombre}` : 'Libre — tócalo para reclamarlo'}
+                    className="h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:cursor-default"
+                    style={mio ? { background: '#7170ff', color: '#fff', borderColor: '#7170ff' }
+                      : dueno ? { borderColor: 'rgba(0,0,0,0.12)', color: '#6b7280' }
+                      : { borderColor: '#43d69f66', color: '#15803d' }}>
+                    {m.label}{dueno && !mio ? ` · ${dueno.nombre?.split(' ')[0]}` : ''}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <details className="mt-3 border-t pt-3 text-xs text-slate-500"><summary className="cursor-pointer">Estado de conexión</summary><p className="mt-2">{conectado ? 'Presencia conectada.' : 'Reconectando presencia…'} {HAY_TURN ? 'Servidor de retransmisión configurado.' : 'Sin servidor TURN: algunas redes pueden impedir conectar el audio.'}</p><button onClick={reintentarAudio} className="mt-2 rounded-lg border px-3 py-2">Reintentar audio</button></details>
+          <div className="mt-3 pt-2.5 border-t text-[11px] text-black/45 leading-relaxed">
+            <b>Clic</b> caminar (rodea obstáculos) · <b>WASD</b> moverte · <b>Shift</b> correr<br />
+            Quieto en una silla = <b>sentarte</b> · <b>G</b> fantasma · <b>1-7</b> emotes · <b>X</b> usar objeto
+          </div>
+        </aside>
       )}
 
+      </div>
+      <footer data-office-controls className="shrink-0 space-y-2 border-t border-slate-200 bg-white px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-slate-600"><strong>{privada ? 'Llamada privada' : spot ? 'Anuncio a la oficina' : 'Audio por cercanía'}</strong><span className="mx-2 text-slate-300">|</span>{micOn ? (destinatarios.length ? `Tu micrófono llega a: ${destinatarios.map(j => j.nombre.split(' ')[0]).join(', ')}` : 'Micrófono encendido · nadie conectado cerca') : 'Micrófono apagado'}{escuchando.length > 0 && <span className="ml-2 text-emerald-700">Habla: {escuchando.map(j => j.nombre.split(' ')[0]).join(', ')}</span>}</div>
+          {entro && <AvisoLlegada nombre={entro} onFin={() => setEntro(null)} />}
+        </div>
+        {cercanos.length > 0 && <div aria-label="Personas cercanas" className="flex gap-2 overflow-x-auto">{cercanos.map(j => <div key={j.id} className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-xs"><span className="font-semibold text-slate-700">{j.nombre.split(' ')[0]}</span><span className={j.conexion === 'error' ? 'text-amber-700' : 'text-slate-500'}>{j.conexion === 'conectado' ? (j.nivel > .08 ? 'Hablando' : j.mic ? 'Micro encendido' : 'Micro apagado') : j.conexion === 'error' ? 'Sin conexión' : 'Conectando…'}</span><button aria-label={`Llamar a ${j.nombre}`} disabled={!!llamadaSaliente || !!privada} onClick={() => llamarA(j.id)} className="rounded-lg bg-slate-100 px-2 py-1 disabled:opacity-40">Llamar</button><button aria-label={`Hablar en privado con ${j.nombre}`} disabled={!!llamadaSaliente || !!privada} onClick={() => invitarPrivada(j.id)} className="rounded-lg bg-violet-50 px-2 py-1 text-violet-700 disabled:opacity-40">Privado</button>{j.conexion === 'error' && <button onClick={reintentarAudio} className="underline">Reintentar</button>}</div>)}</div>}
+        {llamada && <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-violet-50 px-3 py-2 text-sm"><Phone size={17} /><span>{llamada.nombre} {llamada.privada ? 'te invita a una llamada privada' : 'quiere hablar contigo'}</span><button onClick={() => { const i = aceptarLlamada(); if (i && !i.privada) irCon(i.de) }} className="rounded-lg bg-violet-600 px-3 py-2 font-semibold text-white">{llamada.privada ? 'Aceptar llamada' : 'Acercarme'}</button><button onClick={rechazarLlamada} className="rounded-lg border px-3 py-2">Ahora no</button></div>}
+        {llamadaSaliente && <div role="status" className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs">Esperando respuesta de {listaUI.find(j => j.id === llamadaSaliente.para)?.nombre ?? 'tu compañero'}…<button onClick={cancelarLlamada} className="ml-auto rounded-lg border px-3 py-1.5">Cancelar invitación</button></div>}
+        {error && <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-2">{[['gerencia', 'Gerencia'], ['lounge', 'Lounge'], ['juntas', 'Juntas'], ['diseno', 'Ideas']].map(([id, label]) =>
+          <button key={id} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-violet-100" onClick={() => irAZona(id)}>Ir a {label}</button>)}
+          {sentadoUI && <button className="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700" onClick={levantarse}>Levantarse</button>}
+        </div>
+      </div>
+{objetoActivo && <button onClick={() => router.push(objetoActivo.href)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">{objetoActivo.icono} {objetoActivo.titulo} <kbd>X</kbd></button>}        </div>
       {/* ===== Barra inferior ===== */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-2 rounded-2xl bg-white/95 shadow-xl backdrop-blur border border-black/5 max-w-[95vw] overflow-x-auto">
+      <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 border-t border-slate-100 pt-2">
         <BotonBarra activo={micOn} onClick={alternarMic} title={micOn ? 'Silenciar micrófono' : 'Activar micrófono'}
           on={<Mic className="w-5 h-5" />} off={<MicOff className="w-5 h-5" />} />
         <BotonBarra activo={camOn} onClick={alternarCam} title={camOn ? 'Apagar cámara' : 'Encender cámara'}
@@ -452,120 +543,13 @@ function OficinaMapa() {
           className="w-10 h-10 rounded-xl hover:bg-black/5 inline-flex items-center justify-center shrink-0"><Palette className="w-5 h-5" /></button>
         <button onClick={() => setPanelAbierto((v) => !v)} title="Quién está en la oficina"
           className="h-10 px-3 rounded-xl hover:bg-black/5 inline-flex items-center gap-1.5 text-[13px] font-bold shrink-0">
-          <Users className="w-5 h-5" /> {listaUI.length + 1}
+          <Users className="w-5 h-5" /> Equipo · {listaUI.length + 1}
         </button>
         <button onClick={salirManual} title="Salir de la oficina"
           className="w-10 h-10 rounded-xl hover:bg-red-50 text-black/50 hover:text-red-600 inline-flex items-center justify-center shrink-0"><LogOut className="w-5 h-5" /></button>
       </div>
 
-      {/* ===== Panel de personas ===== */}
-      {panelAbierto && (
-        <aside className="absolute top-16 right-3 w-[252px] max-h-[calc(100%-260px)] overflow-y-auto rounded-2xl bg-white/97 shadow-xl backdrop-blur border border-black/5 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-black/45">En la oficina</span>
-            <button onClick={() => setPanelAbierto(false)} className="w-6 h-6 rounded-lg hover:bg-black/5 inline-flex items-center justify-center"><X className="w-3.5 h-3.5" /></button>
-          </div>
-
-          <div className="flex items-center gap-2 p-2 rounded-xl mb-1" style={{ background: '#7170ff12' }}>
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ESTADO_COLOR[estado] }} />
-            <span className="text-[13px] font-bold truncate flex-1">{nombre}</span>
-            <span className="text-[10.5px] text-black/40">tú</span>
-          </div>
-          <select value={estado} onChange={(e) => setEstado(e.target.value as EstadoUsuario)}
-            className="w-full h-8 px-2 mb-2 rounded-lg border text-[12px] bg-white outline-none">
-            {(Object.keys(ESTADO_LABEL) as EstadoUsuario[]).map((s) => (
-              <option key={s} value={s}>{ESTADO_LABEL[s]}</option>
-            ))}
-          </select>
-
-          {listaUI.length === 0 ? (
-            <p className="text-[12px] text-black/45 py-2">
-              Nadie más conectado. Cuando entre alguien del equipo, lo verás caminando por acá. 👋
-            </p>
-          ) : listaUI.map((j) => (
-            <div key={j.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-black/[0.03] group">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ESTADO_COLOR[j.estado] }} />
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold truncate">{j.nombre}{j.spot ? ' 📢' : ''}{j.pantalla ? ' 🖥' : ''}</div>
-                <div className="text-[10.5px] text-black/40 truncate">
-                  {j.gain > 0.5 ? '🔊 Te escucha' : j.gain > 0.05 ? '🔉 Lejitos' : j.zona ? `En ${ZONAS.find((z) => z.id === j.zona)?.nombre}` : 'Lejos'}
-                </div>
-              </div>
-              <button onClick={() => irCon(j.id)} title={`Ir con ${j.nombre}`}
-                className="w-7 h-7 rounded-lg hover:bg-black/10 inline-flex items-center justify-center opacity-0 group-hover:opacity-100"><MapPin className="w-3.5 h-3.5" /></button>
-              <button onClick={() => { invitarPrivada(j.id); toast.success(`Conversación privada con ${j.nombre}`) }} title={`Hablar en privado con ${j.nombre}`}
-                className="w-7 h-7 rounded-lg hover:bg-black/10 inline-flex items-center justify-center opacity-0 group-hover:opacity-100"><Lock className="w-3.5 h-3.5" /></button>
-              <button onClick={() => { llamarA(j.id); toast.success(`Le avisamos a ${j.nombre}`) }} title={`Llamar a ${j.nombre}`}
-                className="w-7 h-7 rounded-lg hover:bg-black/10 inline-flex items-center justify-center opacity-0 group-hover:opacity-100"><Phone className="w-3.5 h-3.5" /></button>
-            </div>
-          ))}
-
-          {/* Escritorios: cada uno reclama el suyo y puede volver a él. */}
-          <div className="mt-3 pt-2.5 border-t">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-black/45 mb-1.5">Escritorios</div>
-            <div className="flex flex-wrap gap-1">
-              {MUEBLES.filter((m) => m.tipo === 'escritorio' && m.label).map((m) => {
-                const dueno = duenos.find((d) => d.escritorio === m.label)
-                const mio = dueno?.userId === yoId
-                return (
-                  <button key={m.label} onClick={() => tomarEscritorio(m.label!)}
-                    title={dueno?.nombre ? `De ${dueno.nombre} — tócalo para quedártelo` : 'Libre — tócalo para reclamarlo'}
-                    className="h-7 px-2 rounded-lg text-[11px] font-semibold border"
-                    style={mio ? { background: '#7170ff', color: '#fff', borderColor: '#7170ff' }
-                      : dueno ? { borderColor: 'rgba(0,0,0,0.12)', color: '#6b7280' }
-                      : { borderColor: '#43d69f66', color: '#15803d' }}>
-                    {m.label}{dueno && !mio ? ` · ${dueno.nombre?.split(' ')[0]}` : ''}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="mt-3 pt-2.5 border-t text-[11px] text-black/45 leading-relaxed">
-            <b>Clic</b> caminar (rodea obstáculos) · <b>WASD</b> moverte · <b>Shift</b> correr<br />
-            Quieto en una silla = <b>sentarte</b> · <b>G</b> fantasma · <b>1-7</b> emotes · <b>X</b> usar objeto
-          </div>
-        </aside>
-      )}
-
-      {llamada && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white shadow-2xl border">
-          {llamada.sala ? <Lock className="w-5 h-5 text-[#f59e0b]" /> : <Phone className="w-5 h-5 text-[#7170ff]" />}
-          <span className="text-[14px] font-bold">
-            {llamada.nombre} {llamada.sala ? 'quiere hablar en privado' : 'quiere hablar contigo'}
-          </span>
-          <button onClick={() => {
-            if (llamada.sala) { invitarPrivada(llamada.de) }
-            irCon(llamada.de); setLlamada(null)
-          }}
-            className="h-9 px-3.5 rounded-xl text-white font-bold text-[13px]" style={{ background: '#7170ff' }}>
-            {llamada.sala ? 'Aceptar' : `Ir con ${llamada.nombre.split(' ')[0]}`}
-          </button>
-          <button onClick={() => setLlamada(null)} className="w-9 h-9 rounded-xl hover:bg-black/5 inline-flex items-center justify-center"><X className="w-4 h-4" /></button>
-        </div>
-      )}
-
-      {cercanos.length > 0 && (
-        <div className="absolute bottom-20 left-3 px-3 py-2 rounded-xl bg-white/95 shadow-lg backdrop-blur border border-black/5 text-[12px]">
-          <span className="font-bold">🔊 Hablando con:</span> {cercanos.map((c) => c.nombre.split(' ')[0]).join(', ')}
-        </div>
-      )}
-
-      {error && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[12.5px] font-semibold">{error}</div>
-      )}
-
-      {/* Aviso de que alguien llegó a la oficina */}
-      {entro && <AvisoLlegada nombre={entro} onFin={() => setEntro(null)} />}
-
-      {/* Sin TURN, un porcentaje del equipo no va a conectar y hoy fallaba
-          en silencio. Solo se lo mostramos a quien puede arreglarlo. */}
-      {!HAY_TURN && (
-        <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
-          <AlertTriangle className="w-3.5 h-3.5" /> Sin servidor TURN: en algunas redes no conecta
-        </div>
-      )}
-
+      </footer>
       {editorAbierto && (
         <EditorAvatar avatar={avatar} nombre={nombre}
           onGuardar={async (a) => { const ok = await guardarAvatar(a); if (ok) { setEditorAbierto(false); toast.success('Avatar guardado') } return ok }}
@@ -627,12 +611,14 @@ function BurbujaVideo({ remoto, alpha, gain, fijado }: {
 
 /* Avisito "X llegó a la oficina" — se va solo a los 4 segundos. */
 function AvisoLlegada({ nombre, onFin }: { nombre: string; onFin: () => void }) {
+  const done = useRef(onFin)
+  useEffect(() => { done.current = onFin }, [onFin])
   useEffect(() => {
-    const t = setTimeout(onFin, 4000)
+    const t = setTimeout(() => done.current(), 4000)
     return () => clearTimeout(t)
-  }, [nombre, onFin])
+  }, [nombre])
   return (
-    <div className="absolute top-16 left-3 px-3.5 py-2 rounded-xl bg-white/95 shadow-lg backdrop-blur border border-black/5 text-[12.5px] font-semibold">
+    <div className="truncate text-xs text-slate-500">
       👋 <b>{nombre}</b> llegó a la oficina
     </div>
   )

@@ -96,7 +96,9 @@ export class MezcladorOficina {
     const t = this.ctx.currentTime
     const g = Math.max(0, Math.min(1, gain))
     try {
-      n.gain.gain.setTargetAtTime(g, t, 0.08)
+      n.gain.gain.cancelScheduledValues(t)
+      if (g === 0) n.gain.gain.setValueAtTime(0, t)
+      else n.gain.gain.setTargetAtTime(g, t, 0.08)
       if (n.pan) n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.12)
     } catch { /* noop */ }
   }
