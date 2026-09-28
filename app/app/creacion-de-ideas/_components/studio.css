@@ -1245,3 +1245,12 @@
     scroll-behavior: auto !important;
   }
 }
+/* Keep the guided controls above the app's persistent Office/chat dock. */
+.cs-step-footer {
+  padding-bottom: 76px;
+}
+@media (max-width: 700px) {
+  .cs-step-footer {
+    padding-bottom: max(88px, env(safe-area-inset-bottom));
+  }
+}

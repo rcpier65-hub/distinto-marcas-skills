@@ -35,3 +35,5 @@ El equipo restringido solo puede navegar y guardar dentro de `marcas.drive_url`.
 - Prueba transaccional revertida contra PostgreSQL: CAS de revisiones, RPC idempotente, marca de publicación, restricciones anon/authenticated.
 - Verificación del XML del DOCX generado: contiene estrategia, plano/acción, audio y requerimientos consolidados.
 - El guardado real en Drive solo puede probarse después de otorgar el consentimiento de Drive; la descarga no depende de esa autorización.
+
+Prueba con la sesión real en producción (28-sep-2026): creación y edición de una tanda de Manrique, guardado del guion, tres sugerencias de IA, aplicación de una sugerencia, elección de plano y campos de producción. Word descargado y XML inspeccionado: contiene el contenido guardado, plano, diálogo, texto, requerimientos y estado BORRADOR. Se confirmó el mensaje de consentimiento pendiente de Drive. La tanda «Prueba del estudio · 2 guiones» queda como ejemplo sin aprobación ni envío a Publicaciones.
