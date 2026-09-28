@@ -149,3 +149,23 @@ test("Registra una estimación sin cobrar dos veces los tokens de entrada en cac
     0.7125,
   );
 });
+
+test("Una respuesta con relleno inválido fuera de la etapa no descarta cinco ideas válidas", () => {
+  const raw = {
+    suggestions: Array.from({ length: 5 }, (_, i) => ({
+      title: `Ruta ${i}`,
+      reason: "Un giro de la idea",
+      patch: {
+        title: `Video ${i}`,
+        idea: `Idea ${i}`,
+        scenes: [{ seconds: 0, purpose: "" }],
+        awareness: 0,
+        status: "listo",
+      },
+    })),
+  };
+  const parsed = parseSuggestions(raw, 1);
+  assert.equal(parsed.length, 5);
+  assert.ok(!("scenes" in parsed[0].patch));
+  assert.ok(!("awareness" in parsed[0].patch));
+});

@@ -52,7 +52,17 @@ export function parseSuggestions(value: unknown, step: number): Suggestion[] {
           z.object({
             title: z.string().trim().min(1).max(160),
             reason: z.string().trim().min(1).max(600),
-            patch: patchSchema,
+            patch: z.preprocess(
+              (value) =>
+                value && typeof value === "object" && !Array.isArray(value)
+                  ? Object.fromEntries(
+                      Object.entries(value).filter(([key]) =>
+                        fields.includes(key),
+                      ),
+                    )
+                  : value,
+              patchSchema,
+            ),
           }),
         )
         .length(5),
@@ -253,4 +263,72 @@ export function estimateGenerationCost(usage: unknown): number | null {
       1000000
     ).toFixed(8),
   );
+}
+
+/** Provider-side strict schema prevents full-script placeholders in a single-step response. */
+export function generationJSONSchema(kind: "suggest" | "assess", step: number) {
+  const object = (properties: Record<string, unknown>) => ({
+    type: "object",
+    properties,
+    required: Object.keys(properties),
+    additionalProperties: false,
+  });
+  const string = { type: "string" };
+  if (kind === "assess")
+    return object({
+      summary: string,
+      items: {
+        type: "array",
+        minItems: 6,
+        maxItems: 6,
+        items: object({
+          criterion: { type: "integer", enum: [0, 1, 2, 3, 4, 5] },
+          status: {
+            type: "string",
+            enum: ["cumple", "mejorar", "sin_contexto"],
+          },
+          reason: string,
+          improvement: string,
+        }),
+      },
+    });
+  const fields: readonly string[] = stageFields[step];
+  if (!fields) throw new Error("Etapa inválida");
+  const properties = Object.fromEntries(
+    fields.map((key) => [
+      key,
+      key === "awareness"
+        ? { type: "integer", enum: [1, 2, 3, 4, 5] }
+        : key === "scenes"
+          ? {
+              type: "array",
+              minItems: 3,
+              maxItems: 8,
+              items: object({
+                seconds: { type: "integer", minimum: 1, maximum: 120 },
+                shot: string,
+                visual: string,
+                audio: string,
+                text: string,
+                purpose: {
+                  type: "string",
+                  enum: ["Gancho", "Desarrollo", "Prueba", "Payoff", "CTA"],
+                },
+              }),
+            }
+          : string,
+    ]),
+  );
+  return object({
+    suggestions: {
+      type: "array",
+      minItems: 5,
+      maxItems: 5,
+      items: object({
+        title: string,
+        reason: string,
+        patch: object(properties),
+      }),
+    },
+  });
 }

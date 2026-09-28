@@ -18,10 +18,11 @@ import {
   creativeContent,
   creativeContextKey,
   estimateGenerationCost,
+  generationJSONSchema,
 } from "./ai-contract";
 import { StudioError, type Actor } from "./server";
 const MODEL = "gpt-4o-mini";
-const VERSION = "creative-copilot-2";
+const VERSION = "creative-copilot-3";
 export type CreativeAIInput = {
   kind: "suggest" | "assess";
   step: number;
@@ -172,7 +173,14 @@ export async function generateCreative(
         temperature: input.kind === "assess" ? 0.2 : 0.85,
         max_tokens:
           input.kind === "assess" ? 2200 : input.step === 5 ? 11000 : 5500,
-        response_format: { type: "json_object" },
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: `creative_${input.kind}_${input.step}`,
+            strict: true,
+            schema: generationJSONSchema(input.kind, input.step),
+          },
+        },
         messages: [
           { role: "system", content: systemPrompt(input) },
           { role: "user", content: JSON.stringify(safeInput) },
@@ -212,7 +220,8 @@ export async function generateCreative(
       .eq("id", id);
     if (error) throw new Error("save_error");
     return { ...result, generationId: id, cached: false };
-  } catch {
+  } catch (e) {
+    console.error("[creative-ai]", id, e instanceof Error ? e.name : "unknown");
     await a.db
       .from("creative_generations")
       .update({
