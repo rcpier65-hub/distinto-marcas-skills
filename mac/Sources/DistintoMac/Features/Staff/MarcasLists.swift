@@ -92,11 +92,11 @@ struct NuevaMarcaView: View {
             subtitle: "El alta sigue en el dashboard web",
             webPath: "/dashboard?nueva=1",
             webLabel: "Nueva marca",
-            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando marcas…",
+            showWebTool: true,
             onRefresh: reload
         ) {
             Text("Nombre, emoji y color se cargan en Distinto web. Acá ves las marcas que ya existen.")
@@ -154,12 +154,12 @@ struct GrillaListView: View {
             subtitle: subtitle,
             webPath: "/grilla/\(slug)",
             webLabel: "Lienzo",
-            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando grilla…",
             maxWidth: 1200,
+            showWebTool: true,
             onRefresh: reload
         ) {
             if let response {

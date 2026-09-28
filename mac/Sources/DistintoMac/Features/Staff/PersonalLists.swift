@@ -12,12 +12,12 @@ struct HabitosListView: View {
             subtitle: subtitle,
             webPath: "/habitos",
             webLabel: "Nuevo hábito",
-            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando hábitos…",
             maxWidth: 980,
+            showWebTool: true,
             onRefresh: reload
         ) {
             if let response {
@@ -386,12 +386,12 @@ struct EquipoListView: View {
             subtitle: subtitle,
             webPath: "/equipo",
             webLabel: "Alta de miembro",
-            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando equipo…",
             maxWidth: 1000,
+            showWebTool: true,
             onRefresh: reload
         ) {
             if let response {
@@ -491,11 +491,11 @@ struct SettingsListView: View {
             subtitle: "Cuenta, integraciones y marcas",
             webPath: "/settings",
             webLabel: "Conectar",
-            showWebTool: true,
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando ajustes…",
+            showWebTool: true,
             onRefresh: reload
         ) {
             if let response {
