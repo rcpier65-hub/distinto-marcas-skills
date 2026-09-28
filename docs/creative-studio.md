@@ -11,6 +11,9 @@ Ruta: `/creacion-de-ideas`. Sustituye el iframe anterior, que se conserva como a
 5. El copiloto propone cinco alternativas al entrar a cada etapa con un objetivo/idea disponible. Permite explorar cinco más, refinar lo escrito, aplicar/deshacer y recuperar generaciones. El checklist se evalúa automáticamente tras una pausa de escritura; cada criterio muestra cumple, por mejorar o falta contexto con evidencia y ajuste concreto. La revisión final de marca sigue siendo humana.
 6. Marcar el guion revisado; crear una copia en Publicaciones. La creación es idempotente y respeta permisos de edición. Las revisiones futuras no pisan el guion de la publicación.
 7. Descargar el Word completo o seleccionar una carpeta de Google Drive. Los borradores se identifican como tales en el documento.
+8. El icono de papelera junto a cada guion pide confirmación y libera su cupo Ads/orgánico. «Eliminados» permite recuperarlo completo mientras exista cupo; si ya se usó, se puede ampliar la tanda. Se conservan los vínculos de Publicaciones y el historial de IA.
+
+Recuperación de guiones: migración aditiva `20260928_creative_script_recovery.sql`. `creative_batches.deleted_scripts` queda separado de `data` para que el guardado de clientes anteriores no borre la papelera. Eliminar/recuperar modifica ambos campos en una sola escritura con comparación de revisión y los mismos permisos de marca. La UI guarda primero el borrador y bloquea actualizaciones de IA durante la operación. Los guiones eliminados no se exportan ni consumen cupos. Pruebas: contenido/ID/orden al recuperar, cupos por tipo, IDs ajenos/repetidos y conservación de otros eliminados; prueba transaccional en PostgreSQL con rollback, revisión obsoleta rechazada y permisos directos denegados.
 
 ## Persistencia y permisos
 

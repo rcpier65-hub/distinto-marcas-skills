@@ -18,6 +18,7 @@ import {
 } from "@/lib/creative-studio/model";
 import { readWebsite } from "@/lib/creative-studio/web-source";
 import { generateCreative } from "@/lib/creative-studio/ai";
+import { changeScriptLifecycle } from "@/lib/creative-studio/script-lifecycle";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -146,6 +147,8 @@ export async function POST(req: Request) {
         "assess",
         "publish",
         "settings",
+        "delete-script",
+        "restore-script",
       ])
       .parse(body.action);
     if (action === "profile") {
@@ -234,6 +237,42 @@ export async function POST(req: Request) {
       }
     }
     const batch = await batchAccess(a, body.batchId);
+    if (action === "delete-script" || action === "restore-script") {
+      const scriptId = z.string().uuid().parse(body.scriptId);
+      const revision = z.number().int().positive().parse(body.revision);
+      if (revision !== batch.revision)
+        throw new StudioError(
+          "La tanda cambió. Recarga antes de eliminar o recuperar un guion.",
+          409,
+        );
+      let changes;
+      try {
+        changes = changeScriptLifecycle(batch, scriptId, action);
+      } catch (e) {
+        throw new StudioError(
+          e instanceof Error ? e.message : "No se pudo cambiar el guion",
+        );
+      }
+      const r = await a.db
+        .from("creative_batches")
+        .update({
+          ...changes,
+          revision: revision + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", batch.id)
+        .eq("revision", revision)
+        .select()
+        .maybeSingle();
+      if (r.error) throw r.error;
+      if (!r.data)
+        throw new StudioError(
+          "Otra persona editó esta tanda. Recarga antes de reintentar.",
+          409,
+        );
+      // Publication links and AI history remain intact for restoration.
+      return Response.json(r.data);
+    }
     if (action === "settings") {
       const name = z.string().trim().min(1).max(160).parse(body.name);
       const recordingId = z
@@ -278,6 +317,16 @@ export async function POST(req: Request) {
     }
     if (action === "save") {
       const data = batchDataSchema.parse(body.data);
+      const deletedIds = new Set(
+        (batch.deleted_scripts ?? []).map(
+          (item: { script: { id: string } }) => item.script.id,
+        ),
+      );
+      if (data.scripts.some((s) => deletedIds.has(s.id)))
+        throw new StudioError(
+          "Este borrador incluye un guion eliminado. Recupéralo desde Eliminados antes de editarlo.",
+          409,
+        );
       const revision = z.number().int().positive().parse(body.revision);
       const r = await a.db
         .from("creative_batches")

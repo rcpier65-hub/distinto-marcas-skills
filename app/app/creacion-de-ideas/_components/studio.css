@@ -666,6 +666,76 @@
   height: 27px;
   width: 27px;
 }
+.cs-script-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.cs-script-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.cs-script-list .cs-delete-script {
+  flex: 0 0 32px;
+  width: 32px;
+  min-height: 36px;
+  padding: 7px;
+  justify-content: center;
+  color: #9b8296;
+}
+.cs-script-list .cs-delete-script:hover {
+  color: #b52a47;
+  background: #fff0f3;
+  border-color: #f4ccd6;
+}
+.cs-root .cs-deleted-link {
+  margin-top: 12px;
+  font-size: 10px;
+  color: #8b799e;
+  border-color: transparent;
+}
+.cs-delete-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  line-height: 1.6;
+}
+.cs-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.cs-root .cs-delete-confirm {
+  background: #bd3656;
+  border-color: #bd3656;
+  color: white;
+}
+.cs-root .cs-delete-confirm:hover {
+  background: #a62a47;
+}
+.cs-deleted-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--cs-line);
+  border-radius: 12px;
+}
+.cs-deleted-item strong {
+  overflow-wrap: anywhere;
+}
+.cs-deleted-item small {
+  display: block;
+  color: var(--cs-muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.cs-deleted-item button {
+  flex-shrink: 0;
+}
 .cs-add-scripts {
   display: flex;
   flex-direction: column;

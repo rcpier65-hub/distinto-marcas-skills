@@ -25,6 +25,7 @@ import {
   FileText,
   GripVertical,
   Save,
+  Trash2,
 } from "lucide-react";
 import {
   type Brand,
@@ -242,13 +243,14 @@ export default function CreativeStudio() {
     [notice, setNotice] = useState(""),
     [saved, setSaved] = useState("Guardado"),
     [modal, setModal] = useState<
-      "brand" | "batch" | "batch-edit" | "export" | "history" | null
+      "brand" | "batch" | "batch-edit" | "export" | "history" | "deleted" | null
     >(null),
     [manager, setManager] = useState(false),
     [userId, setUserId] = useState(""),
     [legacy, setLegacy] = useState<unknown[]>([]),
     [recovery, setRecovery] = useState<Batch | null>(null);
   const [undo, setUndo] = useState<Script | null>(null),
+    [deleteTarget, setDeleteTarget] = useState<Script | null>(null),
     [showAside, setShowAside] = useState(false),
     [showBrands, setShowBrands] = useState(false);
   const batchRef = useRef<Batch | null>(null),
@@ -257,8 +259,15 @@ export default function CreativeStudio() {
     blocked = useRef(false),
     loadId = useRef(0),
     uid = useRef("");
+  const changingScript = useRef(false);
   const script = batch?.data.scripts.find((s) => s.id === scriptId);
   const closeModal = useCallback(() => setModal(null), []);
+  const closeDelete = useCallback(() => {
+    if (!changingScript.current) setDeleteTarget(null);
+  }, []);
+  const closeDeleted = useCallback(() => {
+    if (!changingScript.current) setModal(null);
+  }, []);
   const syncBatch = (b: Batch | null) => {
     batchRef.current = b;
     setBatch(b);
@@ -329,7 +338,7 @@ export default function CreativeStudio() {
     [],
   );
   const editBatch = (fn: (b: Batch) => Batch) => {
-    if (!batchRef.current) return;
+    if (!batchRef.current || changingScript.current) return;
     const next = fn(batchRef.current);
     syncBatch(next);
     dirty.current = true;
@@ -379,7 +388,7 @@ export default function CreativeStudio() {
   }, [batch, persist]);
   useEffect(() => {
     const leave = (e: BeforeUnloadEvent) => {
-      if (dirty.current || saving.current) {
+      if (dirty.current || saving.current || changingScript.current) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -495,7 +504,62 @@ export default function CreativeStudio() {
     setStage(0);
     setUndo(null);
   };
-  const aiEnabled = !loading && !recovery && !blocked.current;
+  const changeScript = async (
+    id: string,
+    action: "delete-script" | "restore-script",
+  ) => {
+    if (changingScript.current || recovery || blocked.current) return;
+    changingScript.current = true;
+    try {
+      const current = await persist();
+      if (!current) return;
+      const fresh: Batch = await api("", {
+        action,
+        batchId: current.id,
+        scriptId: id,
+        revision: current.revision,
+      });
+      syncBatch(fresh);
+      dirty.current = false;
+      setBrandData((d) =>
+        d
+          ? {
+              ...d,
+              batches: d.batches.map((b) => (b.id === fresh.id ? fresh : b)),
+            }
+          : d,
+      );
+      try {
+        localStorage.removeItem(`studio-draft-${uid.current}-${fresh.id}`);
+      } catch {
+        /* Server copy is saved. */
+      }
+      setSaved("Guardado");
+      setUndo(null);
+      if (action === "restore-script") {
+        setScriptId(id);
+        setStage(0);
+      } else if (scriptId === id) {
+        setScriptId(fresh.data.scripts[0]?.id || "");
+        setStage(0);
+      }
+      setDeleteTarget(null);
+      setModal(null);
+      setNotice(
+        action === "delete-script"
+          ? "Guion eliminado. Ya puedes crear otro o recuperarlo desde Eliminados."
+          : "Guion recuperado con su contenido e historial.",
+      );
+    } finally {
+      changingScript.current = false;
+    }
+  };
+  const aiEnabled =
+    !loading &&
+    !recovery &&
+    !blocked.current &&
+    !deleteTarget &&
+    modal !== "deleted";
   const ai = useCreativeAI({
     batch,
     script,
@@ -1405,30 +1469,44 @@ export default function CreativeStudio() {
           <p className="cs-helper">Un guion a la vez, todos aquí.</p>
           <div className="cs-script-list">
             {batch?.data.scripts.map((s, i) => (
-              <button
-                key={s.id}
-                className={scriptId === s.id ? "active" : ""}
-                onClick={() => {
-                  setScriptId(s.id);
-                  selectStage(s.status === "listo" ? 8 : 0);
-                  setShowAside(false);
-                }}
-              >
-                <span className="cs-number">
-                  {s.status === "listo" ? (
-                    <Check size={15} />
-                  ) : (
-                    String(i + 1).padStart(2, "0")
-                  )}
-                </span>
-                <span>
-                  <strong>{s.title || "Nueva idea"}</strong>
-                  <small>
-                    {s.type === "ads" ? "Ads" : "Orgánico"} ·{" "}
-                    {s.status === "listo" ? "Revisado" : "En creación"}
-                  </small>
-                </span>
-              </button>
+              <div key={s.id} className="cs-script-row">
+                <button
+                  disabled={busy}
+                  className={scriptId === s.id ? "active" : ""}
+                  onClick={() => {
+                    setScriptId(s.id);
+                    selectStage(s.status === "listo" ? 8 : 0);
+                    setShowAside(false);
+                  }}
+                >
+                  <span className="cs-number">
+                    {s.status === "listo" ? (
+                      <Check size={15} />
+                    ) : (
+                      String(i + 1).padStart(2, "0")
+                    )}
+                  </span>
+                  <span>
+                    <strong>{s.title || "Nueva idea"}</strong>
+                    <small>
+                      {s.type === "ads" ? "Ads" : "Orgánico"} ·{" "}
+                      {s.status === "listo" ? "Revisado" : "En creación"}
+                    </small>
+                  </span>
+                </button>
+                <button
+                  className="cs-delete-script"
+                  aria-label={`Eliminar guion: ${s.title || "Nueva idea"}`}
+                  title="Eliminar guion"
+                  disabled={busy || !!recovery || blocked.current}
+                  onClick={() => {
+                    setError("");
+                    setDeleteTarget(s);
+                  }}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             ))}
           </div>
           {batch && (
@@ -1453,6 +1531,19 @@ export default function CreativeStudio() {
               )}
             </div>
           )}
+          {!!batch?.deleted_scripts?.length && (
+            <button
+              className="cs-deleted-link"
+              disabled={busy}
+              onClick={() => {
+                setError("");
+                setModal("deleted");
+              }}
+            >
+              <RotateCcw size={14} /> Eliminados ({batch.deleted_scripts.length}
+              )
+            </button>
+          )}
           <CreativeChecklist ai={ai} script={script} enabled={aiEnabled} />
           {brand && (
             <button
@@ -1472,6 +1563,86 @@ export default function CreativeStudio() {
           )}
         </aside>
       </div>
+      {deleteTarget && (
+        <Dialog title="Eliminar guion" onClose={closeDelete}>
+          <div className="cs-delete-dialog">
+            <p>
+              ¿Quieres eliminar{" "}
+              <strong>“{deleteTarget.title || "Nueva idea"}”</strong> de esta
+              tanda?
+            </p>
+            <p className="cs-helper">
+              Se liberará un cupo para crear otro guion. Podrás recuperar este
+              desde Eliminados.
+            </p>
+            {brandData?.links.some(
+              (link) =>
+                link.batch_id === batch?.id &&
+                link.script_id === deleteTarget.id,
+            ) && (
+              <p className="cs-helper">
+                El contenido vinculado en Publicaciones se conservará.
+              </p>
+            )}
+            {error && (
+              <p role="alert" className="cs-danger">
+                {error}
+              </p>
+            )}
+            <div className="cs-dialog-actions">
+              <button disabled={busy} onClick={closeDelete}>
+                Cancelar
+              </button>
+              <button
+                className="cs-delete-confirm"
+                disabled={busy}
+                onClick={() =>
+                  run(() => changeScript(deleteTarget.id, "delete-script"))
+                }
+              >
+                <Trash2 size={16} /> {busy ? "Eliminando…" : "Eliminar guion"}
+              </button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      {modal === "deleted" && batch && (
+        <Dialog title="Guiones eliminados" onClose={closeDeleted}>
+          <div className="cs-delete-dialog">
+            <p className="cs-helper">
+              Recupera un guion para seguir trabajando. Necesitas un cupo de su
+              tipo en esta tanda.
+            </p>
+            {error && (
+              <p role="alert" className="cs-danger">
+                {error}
+              </p>
+            )}
+            {[...(batch.deleted_scripts ?? [])]
+              .reverse()
+              .map(({ script: removed, deletedAt }) => (
+                <div className="cs-deleted-item" key={removed.id}>
+                  <div>
+                    <strong>{removed.title || "Nueva idea"}</strong>
+                    <small>
+                      {removed.type === "ads" ? "Ads" : "Orgánico"} · Eliminado
+                      el {new Date(deletedAt).toLocaleDateString("es-PE")}
+                    </small>
+                  </div>
+                  <button
+                    disabled={busy || !!recovery || blocked.current}
+                    aria-label={`Recuperar guion: ${removed.title || "Nueva idea"}`}
+                    onClick={() =>
+                      run(() => changeScript(removed.id, "restore-script"))
+                    }
+                  >
+                    <RotateCcw size={15} /> Recuperar
+                  </button>
+                </div>
+              ))}
+          </div>
+        </Dialog>
+      )}
       {modal === "brand" && brand && brandData && (
         <BrandDialog
           brand={brand}

@@ -118,12 +118,18 @@ export const batchDataSchema = z
         });
   });
 export type BatchData = z.infer<typeof batchDataSchema>;
+export type DeletedScript = {
+  script: Script;
+  deletedAt: string;
+  position: number;
+};
 export type Batch = {
   id: string;
   marca_id: string;
   name: string;
   recording_id: string | null;
   data: BatchData;
+  deleted_scripts?: DeletedScript[];
   revision: number;
   updated_at: string;
 };
