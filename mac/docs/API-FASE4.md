@@ -73,6 +73,12 @@ Las claves de dispositivo se siguen creando en la web (Perfil → Kairos). Este 
 
 Misma visibilidad que `/soporte`: director, o usuario sin `team_member`, ve el equipo (máx. 300). El resto ve solo los suyos. No hay ficha por reporte: `link` abre `/soporte`.
 
+## `POST /api/v1/soporte`
+
+Misma alta que el formulario de `/soporte` (`insertarReporteSoporte` / `crearReporte`). Body: `{ "tipo": "falla"|"pedido"|"consulta", "descripcion": "…" }`. Sin capturas (esas siguen en la web). Alcance `owner`.
+
+Tomar o resolver usa el mismo body con `{ "id", "accion": "tomar"|"resolver", "nota"? }` y la misma puerta que la web (director, o usuario sin fila de equipo).
+
 ```json
 {
   "ok": true,

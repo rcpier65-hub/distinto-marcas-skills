@@ -22,6 +22,8 @@ struct NativeDetail: Identifiable {
     var eyebrow: String?
     var fields: [DetailField]
     let webPath: String
+    var showsWebLink = false
+    var webLinkTitle = "Abrir en la web"
     var primaryTitle: String?
     var onPrimary: (() async throws -> Void)?
 
@@ -99,14 +101,16 @@ struct NativeDetailView: View {
             Divider().overlay(DistintoTokens.ColorToken.borderSubtle)
 
             HStack(spacing: 12) {
-                Button {
-                    openURL(AppConfig.webURL(detail.webPath))
-                } label: {
-                    Label("Abrir en la web", systemImage: "arrow.up.right")
-                        .font(.system(size: DistintoTokens.Typography.sm, weight: .semibold))
+                if detail.showsWebLink {
+                    Button {
+                        openURL(AppConfig.webURL(detail.webPath))
+                    } label: {
+                        Label(detail.webLinkTitle, systemImage: "arrow.up.right")
+                            .font(.system(size: DistintoTokens.Typography.sm, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(DistintoTokens.ColorToken.accent)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(DistintoTokens.ColorToken.accent)
                 Spacer()
                 if let title = detail.primaryTitle {
                     Button {
@@ -173,6 +177,7 @@ extension View {
 struct HabitoToggleResponse: Codable, Equatable {
     let ok: Bool
     let completado: Bool
+    let today: String
 }
 
 struct TareaCompletarResponse: Codable, Equatable {

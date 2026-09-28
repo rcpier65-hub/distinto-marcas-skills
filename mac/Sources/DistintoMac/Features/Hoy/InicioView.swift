@@ -5,6 +5,9 @@ import SwiftUI
 struct InicioView: View {
     @EnvironmentObject private var appState: AppState
     @State private var filtro: Filtro = .todas
+    @State private var habitos: HabitosResponse?
+    @State private var habitosError: String?
+    @State private var togglingHabito: String?
 
     private enum Filtro: String, CaseIterable, Identifiable {
         case todas
@@ -35,40 +38,265 @@ struct InicioView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                if let error = appState.tareasError, appState.tareasHoy != nil {
-                    TareasErrorBanner(message: error)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 28) {
+                    mainColumn
+                        .frame(maxWidth: 720, alignment: .leading)
+                    if showsRail {
+                        rail
+                            .frame(width: 300)
+                    }
                 }
-                bodyContent
+                VStack(alignment: .leading, spacing: 28) {
+                    mainColumn
+                    if showsRail { rail }
+                }
             }
-            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: 1080, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)
             .padding(.vertical, 28)
         }
         .background(DistintoTokens.ColorToken.bgBase)
+        .task { await loadHabitos() }
+    }
+
+    private var mainColumn: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            header
+            if let error = appState.tareasError, appState.tareasHoy != nil {
+                TareasErrorBanner(message: error)
+            }
+            bodyContent
+        }
+    }
+
+    private var showsRail: Bool {
+        let trabajo = appState.tareasHoy?.trabajoHoy.isEmpty == false
+        let pendientes = appState.tareasHoy?.pendientes.isEmpty == false
+        let habits = habitos?.habitos.isEmpty == false
+        return trabajo || pendientes || habits || habitosError != nil
+    }
+
+    private var rail: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let items = appState.tareasHoy?.trabajoHoy, !items.isEmpty {
+                railCard(title: "Tu trabajo", count: items.count) {
+                    ForEach(items) { item in
+                        trabajoRow(item)
+                    }
+                }
+            }
+            if let items = appState.tareasHoy?.pendientes, !items.isEmpty {
+                railCard(title: "Pendientes rápidos", count: items.count) {
+                    ForEach(items) { item in
+                        pendienteRow(item)
+                    }
+                }
+            }
+            if let habitos {
+                railCard(title: "Hábitos de hoy", count: habitos.completados) {
+                    if habitos.habitos.isEmpty {
+                        Text("Sin hábitos activos.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                    } else {
+                        ForEach(habitos.habitos) { habito in
+                            habitoRow(habito)
+                        }
+                    }
+                }
+            }
+            if let habitosError {
+                Text(habitosError)
+                    .font(.system(size: 12))
+                    .foregroundStyle(DistintoTokens.ColorToken.danger)
+            }
+        }
+    }
+
+    private func railCard<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                Spacer()
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+            }
+            content()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .distintoCard(radius: 16)
+    }
+
+    private func trabajoRow(_ item: TrabajoHoyItem) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle()
+                .fill(Color(hexString: item.marcaColor) ?? DistintoTokens.ColorToken.accent)
+                .frame(width: 8, height: 8)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.nombre)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    .lineLimit(2)
+                Text("\(item.marca) · \(item.meta)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+            Text(item.moduloLabel)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(DistintoTokens.ColorToken.accent)
+        }
+    }
+
+    private func pendienteRow(_ item: PendienteRapido) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle()
+                .fill(TareaPalette.priorityColor(item.prioridad))
+                .frame(width: 8, height: 8)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.titulo)
+                    .font(.system(size: 13))
+                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    .lineLimit(2)
+                Text(item.categoria)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(TareaPalette.chip(for: item.categoria).foreground)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func habitoRow(_ habito: HabitoFila) -> some View {
+        Button {
+            Task { await toggle(habito) }
+        } label: {
+            HStack(spacing: 8) {
+                Text(habito.icono)
+                    .frame(width: 22)
+                Text(habito.nombre)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if togglingHabito == habito.id {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: habito.completadoHoy ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(habito.completadoHoy ? DistintoTokens.ColorToken.success : DistintoTokens.ColorToken.textQuaternary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!habito.aplicaHoy || togglingHabito != nil)
+        .opacity(habito.aplicaHoy ? 1 : 0.45)
+    }
+
+    private func loadHabitos() async {
+        guard let token = appState.accessToken else { return }
+        do {
+            habitos = try await appState.api.fetchHabitos(accessToken: token)
+            habitosError = nil
+        } catch {
+            if ModuleLoad.isCancellation(error) { return }
+            habitosError = error.localizedDescription
+        }
+    }
+
+    private func toggle(_ habito: HabitoFila) async {
+        guard habito.aplicaHoy, let token = appState.accessToken else { return }
+        togglingHabito = habito.id
+        defer { togglingHabito = nil }
+        do {
+            _ = try await appState.api.toggleHabito(accessToken: token, id: habito.id)
+            habitos = try await appState.api.fetchHabitos(accessToken: token)
+            habitosError = nil
+        } catch {
+            habitosError = error.localizedDescription
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .center, spacing: 16) {
+                UserAvatar(initial: String(nombre.prefix(1)), size: 64)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(LimaFormat.greeting(name: appState.session?.displayName ?? ""))
-                        .font(.system(size: DistintoTokens.Typography.xxl, weight: .semibold))
+                    Text(LimaFormat.greeting(name: nombre))
+                        .font(.system(size: 28, weight: .semibold))
                         .tracking(-0.4)
-                        .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
-                    Text(subtitle)
-                        .font(.system(size: DistintoTokens.Typography.sm))
-                        .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                        .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    Text(bienvenida)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(hex: 0x6B7280))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
                 RefreshButton()
+            }
+            HStack(spacing: 8) {
+                acceso("Tareas", .tareas)
+                acceso("Calendario", .calendario)
+                acceso("Soporte", .soporte)
+                acceso("Hábitos", .habitos)
+                Spacer(minLength: 0)
+            }
+            if let frase = appState.tareasHoy?.frase {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("“\(frase.texto)”")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(DistintoTokens.ColorToken.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text([frase.autor, frase.contexto].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.system(size: 12))
+                        .foregroundStyle(DistintoTokens.ColorToken.accent)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DistintoTokens.ColorToken.accent.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             if appState.tareasHoy != nil {
                 filtros
             }
         }
+    }
+
+    private var nombre: String {
+        appState.perfil?.perfil.nombreVisible ?? appState.session?.displayName ?? ""
+    }
+
+    private var bienvenida: String {
+        let rol = appState.perfil?.perfil.cargo
+            ?? appState.perfil?.perfil.rolVisible
+            ?? "equipo"
+        return "Bienvenido a tu espacio en Distinto Agencia. Tu rol: \(rol)."
+    }
+
+    private func acceso(_ title: String, _ route: AppRoute) -> some View {
+        Button {
+            appState.select(route)
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(DistintoTokens.ColorToken.ink)
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(DistintoTokens.ColorToken.borderDefault, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private var subtitle: String {

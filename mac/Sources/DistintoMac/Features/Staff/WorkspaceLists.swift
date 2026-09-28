@@ -6,49 +6,29 @@ struct EditorListView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var detail: NativeDetail?
+    @State private var filtro = "Por editar"
+    @State private var busqueda = ""
 
     var body: some View {
         ModuleScreen(
             title: "Editor",
             subtitle: subtitle,
             webPath: "/editor",
-            webLabel: "Abrir editor",
+            webLabel: "Abrir guion",
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando cola de edición…",
+            maxWidth: 1200,
             onRefresh: reload
         ) {
             if let response {
-                conteos(response.conteos)
-                if response.piezas.isEmpty {
-                    ModuleEmptyState(title: "Cola vacía", message: "No hay piezas en edición, aprobación o programación.")
+                metricas(response.conteos)
+                filtros
+                if filtradas(response.piezas).isEmpty {
+                    ModuleEmptyState(title: "Nada en este filtro", message: "Prueba otro estado o limpia la búsqueda.")
                 } else {
-                    ForEach(response.piezas) { pieza in
-                        let chip = StaffChip.estado(pieza.estado)
-                        ModuleRowButton(
-                            title: pieza.nombre,
-                            detail: detalle(pieza),
-                            trailing: pieza.fecha.map { LimaFormat.shortDate($0) },
-                            emoji: pieza.marca?.emoji,
-                            chip: chip.0,
-                            chipColor: chip.1
-                        ) {
-                            detail = NativeDetail(
-                                id: pieza.id,
-                                title: pieza.nombre,
-                                eyebrow: "Editor",
-                                fields: DetailRows.make([
-                                    ("Estado", StaffChip.estado(pieza.estado).0),
-                                    ("Marca", pieza.marca?.nombre),
-                                    ("Editor", pieza.editorNombre),
-                                    ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) }),
-                                    ("Plataformas", pieza.plataformas.joined(separator: ", "))
-                                ]),
-                                webPath: "/editor"
-                            )
-                        }
-                    }
+                    tabla(filtradas(response.piezas))
                 }
             }
         }
@@ -56,38 +36,138 @@ struct EditorListView: View {
         .task { await load() }
     }
 
-    private var subtitle: String {
-        guard let response else { return "Piezas en la cola de edición" }
-        return "\(response.total) en cola"
-    }
-
-    private func detalle(_ pieza: EditorPieza) -> String {
-        [pieza.marca?.nombre, pieza.editorNombre, pieza.plataformas.joined(separator: " · ")]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-            .joined(separator: " · ")
-    }
-
-    private func conteos(_ conteos: EditorConteos) -> some View {
+    private var filtros: some View {
         HStack(spacing: 8) {
-            conteo("Editar", conteos.editar, Color(hex: 0x7C3AED))
-            conteo("Aprobar", conteos.aprobar, Color(hex: 0xD97706))
-            conteo("Programar", conteos.programar, Color(hex: 0x2563EB))
+            ViewModeBar(titles: ["Por editar", "Aprobar", "Programar", "Publicar", "Todas"], selection: filtro) { filtro = $0 }
+            TextField("Buscar pieza o marca", text: $busqueda)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .frame(maxWidth: 220)
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(DistintoTokens.ColorToken.borderDefault, lineWidth: 1)
+                )
+            Spacer(minLength: 0)
         }
     }
 
-    private func conteo(_ label: String, _ value: Int, _ color: Color) -> some View {
+    private func filtradas(_ piezas: [EditorPieza]) -> [EditorPieza] {
+        let clave: String
+        switch filtro {
+        case "Aprobar": clave = "aprobar"
+        case "Programar": clave = "programar"
+        case "Publicar": clave = "publicar"
+        case "Todas": clave = "todas"
+        case "Por editar": clave = "editar"
+        default: clave = "editar"
+        }
+        return piezas.filter { pieza in
+            let pasaEstado = clave == "todas" || pieza.estado == clave
+            let q = busqueda.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let pasaTexto = q.isEmpty
+                || pieza.nombre.lowercased().contains(q)
+                || (pieza.marca?.nombre.lowercased().contains(q) ?? false)
+            return pasaEstado && pasaTexto
+        }
+    }
+
+    private func tabla(_ piezas: [EditorPieza]) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("Pieza").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Marca").frame(width: 120, alignment: .leading)
+                Text("Estado").frame(width: 96, alignment: .leading)
+                Text("Editor").frame(width: 110, alignment: .leading)
+                Text("Fecha").frame(width: 88, alignment: .leading)
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Color(hex: 0xF8F8FA))
+            ForEach(piezas) { pieza in
+                let chip = StaffChip.estado(pieza.estado)
+                Button {
+                    detail = NativeDetail(
+                        id: pieza.id,
+                        title: pieza.nombre,
+                        eyebrow: "Editor",
+                        fields: DetailRows.make([
+                            ("Estado", chip.0),
+                            ("Marca", pieza.marca?.nombre),
+                            ("Editor", pieza.editorNombre),
+                            ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) }),
+                            ("Plataformas", pieza.plataformas.joined(separator: ", "))
+                        ]),
+                        webPath: "/editor",
+                        showsWebLink: true,
+                        webLinkTitle: "Abrir guion"
+                    )
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(pieza.nombre)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DistintoTokens.ColorToken.ink)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(pieza.marca?.nombre ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                            .lineLimit(1)
+                            .frame(width: 120, alignment: .leading)
+                        StatusChip(label: chip.0, color: chip.1)
+                            .frame(width: 96, alignment: .leading)
+                        Text(pieza.editorNombre ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                            .lineLimit(1)
+                            .frame(width: 110, alignment: .leading)
+                        Text(pieza.fecha.map { LimaFormat.shortDate($0) } ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                            .frame(width: 88, alignment: .leading)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(DistintoTokens.ColorToken.borderSubtle)
+            }
+        }
+        .distintoCard(radius: 12)
+    }
+
+    private func metricas(_ conteos: EditorConteos) -> some View {
+        HStack(spacing: 8) {
+            metrica("Por editar", conteos.editar, Color(hex: 0x7C3AED))
+            metrica("Aprobar", conteos.aprobar, Color(hex: 0xD97706))
+            metrica("Programar", conteos.programar, Color(hex: 0x2563EB))
+            metrica("Publicar", conteos.publicar, Color(hex: 0x0891B2))
+        }
+    }
+
+    private func metrica(_ label: String, _ value: Int, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(value)")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: DistintoTokens.Typography.xs))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .distintoCard(radius: 12)
+    }
+
+    private var subtitle: String {
+        guard let response else { return "Cola de edición" }
+        return "\(response.total) en cola · filtro \(filtro)"
     }
 
     private func reload() { Task { await load(force: true) } }
@@ -105,20 +185,23 @@ struct DisenoListView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var detail: NativeDetail?
+    @State private var modo = "Tabla"
 
     var body: some View {
         ModuleScreen(
             title: "Diseño",
             subtitle: subtitle,
             webPath: "/diseno",
-            webLabel: "Abrir diseño",
+            webLabel: "Abrir pieza",
             loading: loading,
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando tablero de diseño…",
+            maxWidth: 1200,
             onRefresh: reload
         ) {
             if let response {
+                ViewModeBar(titles: ["Tabla", "Kanban"], selection: modo) { modo = $0 }
                 if response.migracionPendiente {
                     Text("Falta la marca de tareas de diseño en la base.")
                         .font(.system(size: DistintoTokens.Typography.sm))
@@ -126,35 +209,111 @@ struct DisenoListView: View {
                 }
                 if response.piezas.isEmpty {
                     ModuleEmptyState(title: "Sin tareas", message: "No hay piezas marcadas para diseño.")
+                } else if modo == "Tabla" {
+                    tablaDiseno(response.piezas)
                 } else {
-                    ForEach(response.piezas) { pieza in
-                        let chip = StaffChip.estado(pieza.estado)
-                        ModuleRowButton(
-                            title: pieza.nombre,
-                            detail: pieza.marca?.nombre,
-                            trailing: pieza.fecha.map { LimaFormat.shortDate($0) },
-                            emoji: pieza.marca?.emoji,
-                            chip: chip.0,
-                            chipColor: chip.1
-                        ) {
-                            detail = NativeDetail(
-                                id: pieza.id,
-                                title: pieza.nombre,
-                                eyebrow: "Diseño",
-                                fields: DetailRows.make([
-                                    ("Estado", StaffChip.estado(pieza.estado).0),
-                                    ("Marca", pieza.marca?.nombre),
-                                    ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) })
-                                ]),
-                                webPath: NativeDetail.path(from: pieza.link, fallback: "/diseno/\(pieza.id)")
-                            )
-                        }
-                    }
+                    disenoBoard(response.piezas)
                 }
             }
         }
         .nativeDetail($detail)
         .task { await load() }
+    }
+
+    private func tablaDiseno(_ piezas: [DisenoPieza]) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("Proyecto").frame(width: 140, alignment: .leading)
+                Text("Tarea").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Fecha").frame(width: 100, alignment: .leading)
+                Text("Estado").frame(width: 110, alignment: .leading)
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Color(hex: 0xF8F8FA))
+            ForEach(piezas) { pieza in
+                let chip = StaffChip.estado(pieza.estado)
+                Button {
+                    abrir(pieza)
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(pieza.marca?.nombre ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                            .lineLimit(1)
+                            .frame(width: 140, alignment: .leading)
+                        Text(pieza.nombre)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DistintoTokens.ColorToken.ink)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(pieza.fecha.map { LimaFormat.shortDate($0) } ?? "—")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                            .frame(width: 100, alignment: .leading)
+                        StatusChip(label: chip.0, color: chip.1)
+                            .frame(width: 110, alignment: .leading)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(DistintoTokens.ColorToken.borderSubtle)
+            }
+        }
+        .distintoCard(radius: 12)
+    }
+
+    private func abrir(_ pieza: DisenoPieza) {
+        let chip = StaffChip.estado(pieza.estado)
+        detail = NativeDetail(
+            id: pieza.id,
+            title: pieza.nombre,
+            eyebrow: "Diseño",
+            fields: DetailRows.make([
+                ("Estado", chip.0),
+                ("Marca", pieza.marca?.nombre),
+                ("Fecha", pieza.fecha.map { LimaFormat.shortDate($0) })
+            ]),
+            webPath: NativeDetail.path(from: pieza.link, fallback: "/diseno/\(pieza.id)"),
+            showsWebLink: true,
+            webLinkTitle: "Abrir pieza"
+        )
+    }
+
+    private func disenoBoard(_ piezas: [DisenoPieza]) -> some View {
+        let order = ["sin_empezar", "en_progreso", "pausada", "listo", "enviado", "archivado"]
+        let grouped = Dictionary(grouping: piezas, by: \.estado)
+        let keys = order
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(keys, id: \.self) { key in
+                    let chip = StaffChip.estado(key)
+                    let items = grouped[key] ?? []
+                    KanbanLane(title: chip.0, tint: chip.1, count: items.count) {
+                        ForEach(items) { pieza in
+                            Button {
+                                abrir(pieza)
+                            } label: {
+                                PiezaMiniCard(
+                                    title: pieza.nombre,
+                                    subtitle: [pieza.marca?.emoji, pieza.marca?.nombre, pieza.fecha.map { LimaFormat.shortDate($0) }]
+                                        .compactMap { $0 }
+                                        .joined(separator: " · "),
+                                    emoji: pieza.marca?.emoji,
+                                    tint: chip.1
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var subtitle: String {
@@ -188,6 +347,7 @@ struct HistoriasListView: View {
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando historias…",
+            maxWidth: 1200,
             onRefresh: reload
         ) {
             if let response {
@@ -199,32 +359,7 @@ struct HistoriasListView: View {
                             : "No hay historias planificadas."
                     )
                 } else {
-                    ForEach(response.historias) { historia in
-                        let chip = StaffChip.estado(historia.estado)
-                        ModuleRowButton(
-                            title: historia.titulo,
-                            detail: detalle(historia),
-                            trailing: historia.fecha.map { LimaFormat.shortDate($0) },
-                            emoji: historia.marca?.emoji,
-                            chip: chip.0,
-                            chipColor: chip.1
-                        ) {
-                            detail = NativeDetail(
-                                id: historia.id,
-                                title: historia.titulo,
-                                eyebrow: "Historias",
-                                fields: DetailRows.make([
-                                    ("Estado", chip.0),
-                                    ("Marca", historia.marca?.nombre),
-                                    ("Fecha", historia.fecha.map { LimaFormat.shortDate($0) }),
-                                    ("Hora", historia.hora),
-                                    ("Plataformas", historia.plataformas.joined(separator: ", ")),
-                                    ("Nota", historia.nota)
-                                ]),
-                                webPath: "/historias"
-                            )
-                        }
-                    }
+                    historiasBoard(response.historias)
                 }
             }
         }
@@ -235,6 +370,50 @@ struct HistoriasListView: View {
     private var subtitle: String {
         guard let response else { return "Planificador de historias" }
         return "\(response.total) historias · \(LimaFormat.longDate(response.hoy))"
+    }
+
+    private func historiasBoard(_ items: [HistoriaFila]) -> some View {
+        let fechas = Array(Set(items.map { $0.fecha ?? "sin-fecha" })).sorted()
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(fechas, id: \.self) { fecha in
+                    let dayItems = items.filter { ($0.fecha ?? "sin-fecha") == fecha }
+                    KanbanLane(
+                        title: fecha == "sin-fecha" ? "Sin fecha" : LimaFormat.weekdayShort(fecha) + " " + LimaFormat.dayOfMonth(fecha),
+                        tint: DistintoTokens.ColorToken.accent,
+                        count: dayItems.count
+                    ) {
+                        ForEach(dayItems) { historia in
+                            let chip = StaffChip.estado(historia.estado)
+                            Button {
+                                detail = NativeDetail(
+                                    id: historia.id,
+                                    title: historia.titulo,
+                                    eyebrow: "Historias",
+                                    fields: DetailRows.make([
+                                        ("Estado", chip.0),
+                                        ("Marca", historia.marca?.nombre),
+                                        ("Fecha", historia.fecha.map { LimaFormat.shortDate($0) }),
+                                        ("Hora", historia.hora),
+                                        ("Plataformas", historia.plataformas.joined(separator: ", ")),
+                                        ("Nota", historia.nota)
+                                    ]),
+                                    webPath: "/historias"
+                                )
+                            } label: {
+                                PiezaMiniCard(
+                                    title: historia.titulo,
+                                    subtitle: detalle(historia),
+                                    emoji: historia.marca?.emoji,
+                                    tint: chip.1
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func detalle(_ historia: HistoriaFila) -> String {
@@ -270,6 +449,7 @@ struct InfluencersListView: View {
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando influencers…",
+            maxWidth: 1200,
             onRefresh: reload
         ) {
             if let response {
@@ -284,30 +464,7 @@ struct InfluencersListView: View {
                             : "Esta marca todavía no tiene pedidos."
                     )
                 } else {
-                    ForEach(response.pedidos) { pedido in
-                        let chip = StaffChip.estado(pedido.estado)
-                        ModuleRowButton(
-                            title: pedido.nombre.flatMap { $0.isEmpty ? nil : $0 } ?? "@\(pedido.usuarioIg)",
-                            detail: detalle(pedido),
-                            chip: chip.0,
-                            chipColor: chip.1
-                        ) {
-                            detail = NativeDetail(
-                                id: pedido.id,
-                                title: pedido.nombre.flatMap { $0.isEmpty ? nil : $0 } ?? "@\(pedido.usuarioIg)",
-                                eyebrow: "Influencers",
-                                fields: DetailRows.make([
-                                    ("Usuario", "@\(pedido.usuarioIg)"),
-                                    ("Estado", chip.0),
-                                    ("Teléfono", pedido.telefono),
-                                    ("Productos", pedido.productos.joined(separator: ", ")),
-                                    ("Video", pedido.videoUrl),
-                                    ("Notas", pedido.notas)
-                                ]),
-                                webPath: webPath
-                            )
-                        }
-                    }
+                    influencersBoard(response.pedidos)
                 }
             }
         }
@@ -324,6 +481,47 @@ struct InfluencersListView: View {
         guard let response else { return "Pedidos por marca" }
         let nombre = response.marca?.nombre ?? "Sin marca activa"
         return "\(nombre) · \(response.total) pedidos"
+    }
+
+    private func influencersBoard(_ pedidos: [InfluencerPedido]) -> some View {
+        let grouped = Dictionary(grouping: pedidos, by: \.estado)
+        let keys = grouped.keys.sorted()
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(keys, id: \.self) { key in
+                    let chip = StaffChip.estado(key)
+                    let items = grouped[key] ?? []
+                    KanbanLane(title: chip.0, tint: chip.1, count: items.count) {
+                        ForEach(items) { pedido in
+                            Button {
+                                detail = NativeDetail(
+                                    id: pedido.id,
+                                    title: pedido.nombre.flatMap { $0.isEmpty ? nil : $0 } ?? "@\(pedido.usuarioIg)",
+                                    eyebrow: "Influencers",
+                                    fields: DetailRows.make([
+                                        ("Usuario", "@\(pedido.usuarioIg)"),
+                                        ("Estado", chip.0),
+                                        ("Teléfono", pedido.telefono),
+                                        ("Productos", pedido.productos.joined(separator: ", ")),
+                                        ("Video", pedido.videoUrl),
+                                        ("Notas", pedido.notas)
+                                    ]),
+                                    webPath: webPath
+                                )
+                            } label: {
+                                PiezaMiniCard(
+                                    title: pedido.nombre.flatMap { $0.isEmpty ? nil : $0 } ?? "@\(pedido.usuarioIg)",
+                                    subtitle: detalle(pedido),
+                                    emoji: nil,
+                                    tint: chip.1
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func detalle(_ pedido: InfluencerPedido) -> String {
@@ -384,6 +582,7 @@ struct PlanesListView: View {
             error: error,
             loaded: response != nil,
             loadingMessage: "Cargando planes…",
+            maxWidth: 1100,
             onRefresh: reload
         ) {
             if let response {
@@ -403,28 +602,56 @@ struct PlanesListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .distintoCard(radius: 12)
                 }
-                ForEach(response.planes) { plan in
-                    ModuleRowButton(
-                        title: plan.nombre,
-                        detail: [plan.aplica, plan.minimo].compactMap { $0 }.joined(separator: " · "),
-                        trailing: plan.precioLabel,
-                        chip: categoria(plan.categoria),
-                        chipColor: DistintoTokens.ColorToken.accent
-                    ) {
-                        detail = NativeDetail(
-                            id: plan.id,
-                            title: plan.nombre,
-                            eyebrow: categoria(plan.categoria),
-                            fields: DetailRows.make([
-                                ("Precio", plan.precioLabel),
-                                ("Periodo", plan.periodo),
-                                ("Mínimo", plan.minimo),
-                                ("Aplica", plan.aplica),
-                                ("Incluye", plan.incluye.joined(separator: "\n")),
-                                ("No incluye", plan.noIncluye.joined(separator: "\n"))
-                            ]),
-                            webPath: "/planes"
-                        )
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 12)], spacing: 12) {
+                    ForEach(response.planes) { plan in
+                        Button {
+                            detail = NativeDetail(
+                                id: plan.id,
+                                title: plan.nombre,
+                                eyebrow: categoria(plan.categoria),
+                                fields: DetailRows.make([
+                                    ("Precio", plan.precioLabel),
+                                    ("Periodo", plan.periodo),
+                                    ("Mínimo", plan.minimo),
+                                    ("Aplica", plan.aplica),
+                                    ("Incluye", plan.incluye.joined(separator: "\n")),
+                                    ("No incluye", plan.noIncluye.joined(separator: "\n"))
+                                ]),
+                                webPath: "/planes"
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(categoria(plan.categoria).uppercased())
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(DistintoTokens.ColorToken.accent)
+                                Text(plan.nombre)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                                    .multilineTextAlignment(.leading)
+                                Text(plan.precioLabel)
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
+                                Text(plan.periodo)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                                if !plan.incluye.isEmpty {
+                                    Text(plan.incluye.prefix(3).joined(separator: " · "))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(DistintoTokens.ColorToken.textSecondary)
+                                        .lineLimit(3)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+                            .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(plan.destacado ? DistintoTokens.ColorToken.accent : DistintoTokens.ColorToken.cardBorder, lineWidth: plan.destacado ? 2 : 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -448,5 +675,45 @@ struct PlanesListView: View {
         await ModuleLoad.fetch(appState: appState, loading: $loading, error: $error, loaded: response != nil, force: force) {
             response = try await appState.api.fetchPlanes(accessToken: $0)
         }
+    }
+}
+
+private struct PiezaMiniCard: View {
+    let title: String
+    let subtitle: String
+    let emoji: String?
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
+                if let emoji {
+                    Text(emoji)
+                }
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DistintoTokens.ColorToken.ink)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+            }
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(tint).frame(width: 3)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(DistintoTokens.ColorToken.cardBorder, lineWidth: 1)
+        )
     }
 }

@@ -8,6 +8,9 @@ struct PublicacionesListView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var filtro: Filtro = .proximas
+    @State private var vista = "Listado"
+    @State private var monthOffset = 0
+    @State private var weekOffset = 0
 
     private enum Filtro: String, CaseIterable, Identifiable {
         case proximas
@@ -37,7 +40,7 @@ struct PublicacionesListView: View {
                 }
                 bodyContent
             }
-            .frame(maxWidth: 980, alignment: .leading)
+            .frame(maxWidth: 1120, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
@@ -58,7 +61,7 @@ struct PublicacionesListView: View {
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
             Spacer(minLength: 8)
-            WebHandoffButton(title: "Abrir en la web", path: "/publicaciones")
+            ViewModeBar(titles: ["Listado", "Semana", "Mes"], selection: vista) { vista = $0 }
             ModuleRefreshButton(loading: loading, action: reload)
         }
     }
@@ -69,7 +72,63 @@ struct PublicacionesListView: View {
         return "\(response.total) \(noun) · \(LimaFormat.shortDate(response.desde)) – \(LimaFormat.shortDate(response.hasta))"
     }
 
+    @ViewBuilder
     private var filtros: some View {
+        if vista == "Mes" {
+            monthNav
+        } else if vista == "Semana" {
+            weekNav
+        } else {
+            listFilters
+        }
+    }
+
+    private var weekNav: some View {
+        HStack(spacing: 8) {
+            navButton("chevron.left") { weekOffset -= 1 }
+            Text(LimaFormat.weekRange(offset: weekOffset).label)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(minWidth: 160)
+            navButton("chevron.right") { weekOffset += 1 }
+            if weekOffset != 0 {
+                Button("Hoy") { weekOffset = 0 }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DistintoTokens.ColorToken.accent)
+            }
+            Spacer()
+        }
+    }
+
+    private var monthNav: some View {
+        HStack(spacing: 8) {
+            navButton("chevron.left") { monthOffset -= 1 }
+            Text(LimaFormat.monthGrid(offset: monthOffset).label)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(minWidth: 140)
+            navButton("chevron.right") { monthOffset += 1 }
+            if monthOffset != 0 {
+                Button("Hoy") { monthOffset = 0 }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DistintoTokens.ColorToken.accent)
+            }
+            Spacer()
+        }
+    }
+
+    private func navButton(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 26, height: 26)
+                .background(Color.white)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(DistintoTokens.ColorToken.borderDefault, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var listFilters: some View {
         HStack(spacing: 4) {
             ForEach(Filtro.allCases) { item in
                 let active = filtro == item
@@ -104,60 +163,132 @@ struct PublicacionesListView: View {
             } else {
                 ModuleLoadingBlock(message: "Cargando publicaciones…")
             }
+        } else if vista == "Mes" {
+            calendario
+        } else if vista == "Semana" {
+            semana
         } else if days.isEmpty {
             ModuleEmptyState(
                 title: "Sin publicaciones",
-                message: "No hay piezas en este rango. Prueba otro filtro o abre el calendario en la web."
+                message: "No hay piezas en este rango. Prueba otro filtro o abre el calendario."
             )
         } else {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                ForEach(days, id: \.fecha) { day in
-                    daySection(day.fecha, items: day.items)
+            VStack(spacing: 0) {
+                tableHeader
+                ForEach(visible) { item in
+                    PublicacionRow(item: item) { open(item) }
+                    Divider().overlay(DistintoTokens.ColorToken.borderSubtle)
                 }
+            }
+            .distintoCard(radius: 12)
+        }
+    }
+
+    private var tableHeader: some View {
+        HStack(spacing: 12) {
+            Text("Fecha").frame(width: 108, alignment: .leading)
+            Text("Marca").frame(width: 120, alignment: .leading)
+            Text("Pieza").frame(maxWidth: .infinity, alignment: .leading)
+            Text("Tipo").frame(width: 64, alignment: .leading)
+            Text("Estado").frame(width: 96, alignment: .leading)
+        }
+        .font(.system(size: 10, weight: .bold))
+        .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+        .textCase(.uppercase)
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .background(Color(hex: 0xF8F8FA))
+    }
+
+    private var semana: some View {
+        let days = LimaFormat.weekRange(offset: weekOffset).days
+        let hoy = response?.hoy ?? LimaFormat.todayYMD()
+        return DistintoWeekBoard(days: days, hoy: hoy) { day in
+            ForEach(pubs(on: day)) { item in
+                Button {
+                    open(item)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.titulo)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DistintoTokens.ColorToken.ink)
+                            .lineLimit(2)
+                        Text(item.estadoChip.label)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(item.estadoChip.color)
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background((item.marca?.colorValue ?? DistintoTokens.ColorToken.accent).opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    private func daySection(_ fecha: String, items: [PublicacionItem]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(LimaFormat.weekdayDate(fecha))
-                    .font(.system(size: DistintoTokens.Typography.sm, weight: .semibold))
-                    .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
-                if fecha == response?.hoy {
-                    Text("Hoy")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(DistintoTokens.ColorToken.accent)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(DistintoTokens.ColorToken.accentBg)
-                        .clipShape(Capsule())
+    private var calendario: some View {
+        let grid = LimaFormat.monthGrid(offset: monthOffset)
+        let outside = (response?.publicaciones ?? []).filter { item in
+            !grid.weeks.flatMap { $0 }.contains { $0.ymd == item.fecha && $0.inMonth }
+        }.count
+        return VStack(alignment: .leading, spacing: 8) {
+            DistintoMonthGrid(weeks: grid.weeks, hoy: response?.hoy ?? LimaFormat.todayYMD()) { day in
+                VStack(alignment: .leading, spacing: 3) {
+                    DayNumberLabel(day: day, hoy: response?.hoy ?? "")
+                    ForEach(pubs(on: day.ymd).prefix(3)) { item in
+                        Button {
+                            open(item)
+                        } label: {
+                            Text(item.titulo)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(item.marca?.colorValue ?? DistintoTokens.ColorToken.ink)
+                                .lineLimit(1)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background((item.marca?.colorValue ?? DistintoTokens.ColorToken.accent).opacity(0.14))
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if pubs(on: day.ymd).count > 3 {
+                        Text("+\(pubs(on: day.ymd).count - 3)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
+                    }
                 }
-                Spacer()
-                Text("\(items.count)")
-                    .font(.system(size: DistintoTokens.Typography.xs))
+                .padding(6)
+            }
+            if outside > 0 {
+                Text("\(outside) fuera de este mes. Están en Listado.")
+                    .font(.system(size: 12))
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
-            .padding(.top, 4)
-            ForEach(items) { item in
-                PublicacionRow(item: item) {
-                    detail = NativeDetail(
-                        id: item.id,
-                        title: item.titulo,
-                        eyebrow: item.marca?.nombre ?? "Publicación",
-                        fields: DetailRows.make([
-                            ("Fecha", LimaFormat.weekdayDate(item.fecha)),
-                            ("Hora", item.hora),
-                            ("Estado", item.estadoChip.label),
-                            ("Tipo", item.tipoLabel),
-                            ("Plataformas", item.plataformas.joined(separator: ", ")),
-                            ("Editor", item.editor)
-                        ]),
-                        webPath: NativeDetail.path(from: item.link, fallback: "/publicaciones/\(item.id)")
-                    )
-                }
-            }
         }
+    }
+
+    private func pubs(on ymd: String) -> [PublicacionItem] {
+        (response?.publicaciones ?? []).filter { $0.fecha == ymd }
+    }
+
+    private func open(_ item: PublicacionItem) {
+        detail = NativeDetail(
+            id: item.id,
+            title: item.titulo,
+            eyebrow: item.marca?.nombre ?? "Publicación",
+            fields: DetailRows.make([
+                ("Fecha", LimaFormat.weekdayDate(item.fecha)),
+                ("Hora", item.hora),
+                ("Estado", item.estadoChip.label),
+                ("Tipo", item.tipoLabel),
+                ("Plataformas", item.plataformas.joined(separator: ", ")),
+                ("Editor", item.editor)
+            ]),
+            webPath: NativeDetail.path(from: item.link, fallback: "/publicaciones/\(item.id)"),
+            showsWebLink: true,
+            webLinkTitle: "Abrir pieza"
+        )
     }
 
     private var days: [(fecha: String, items: [PublicacionItem])] {

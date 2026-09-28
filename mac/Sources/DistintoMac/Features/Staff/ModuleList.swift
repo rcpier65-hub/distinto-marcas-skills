@@ -9,6 +9,8 @@ struct ModuleScreen<Content: View>: View {
     let error: String?
     let loaded: Bool
     let loadingMessage: String
+    var maxWidth: CGFloat = 860
+    var showWebTool = false
     let onRefresh: () -> Void
     @ViewBuilder var content: () -> Content
 
@@ -25,7 +27,9 @@ struct ModuleScreen<Content: View>: View {
                             .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
                     }
                     Spacer(minLength: 8)
-                    WebHandoffButton(title: webLabel, path: webPath)
+                    if showWebTool {
+                        WebHandoffButton(title: webLabel, path: webPath)
+                    }
                     ModuleRefreshButton(loading: loading, action: onRefresh)
                 }
                 if let error, loaded {
@@ -39,7 +43,7 @@ struct ModuleScreen<Content: View>: View {
                     ModuleLoadingBlock(message: loadingMessage)
                 }
             }
-            .frame(maxWidth: 860, alignment: .leading)
+            .frame(maxWidth: maxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28)
             .padding(.vertical, 24)

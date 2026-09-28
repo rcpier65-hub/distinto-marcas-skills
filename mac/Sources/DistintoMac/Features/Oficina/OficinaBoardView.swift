@@ -33,12 +33,12 @@ struct OficinaBoardView: View {
                 Text("Oficina")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(DistintoTokens.ColorToken.textPrimary)
-                Text("Escritorios del equipo. Entrar a caminar sigue en la web.")
+                Text("Escritorios, salas y atajos del equipo.")
                     .font(.system(size: DistintoTokens.Typography.sm))
                     .foregroundStyle(DistintoTokens.ColorToken.textTertiary)
             }
             Spacer(minLength: 8)
-            WebHandoffButton(title: "Entrar a la oficina", path: "/oficina")
+            WebHandoffButton(title: "Caminar", path: "/oficina")
             ModuleRefreshButton(loading: loading, action: reload)
         }
     }

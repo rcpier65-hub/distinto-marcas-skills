@@ -17,7 +17,7 @@ struct NotasListView: View {
                 }
                 bodyContent
             }
-            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: 1040, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
@@ -45,8 +45,8 @@ struct NotasListView: View {
 
     private var subtitle: String {
         guard let response else { return "Transcribe, anota y pregunta" }
-        if response.veTodo { return "Notas del equipo · toca una para abrirla" }
-        return "Tus notas · toca una para abrirla"
+        if response.veTodo { return "Notas del equipo" }
+        return "Tus notas y reuniones"
     }
 
     @ViewBuilder
@@ -58,8 +58,18 @@ struct NotasListView: View {
                 ModuleLoadingBlock(message: "Cargando notas…")
             }
         } else if let response {
-            proximas(response.proximas)
-            recientes(response)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    proximas(response.proximas)
+                        .frame(width: 360)
+                    recientes(response)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                VStack(alignment: .leading, spacing: 22) {
+                    proximas(response.proximas)
+                    recientes(response)
+                }
+            }
         }
     }
 
@@ -159,7 +169,9 @@ struct NotasListView: View {
                                         ("Autor", nota.autorNombre),
                                         ("Resumen", nota.preview)
                                     ]),
-                                    webPath: NativeDetail.path(from: nota.link, fallback: "/notas-reuniones/\(nota.id)")
+                                    webPath: NativeDetail.path(from: nota.link, fallback: "/notas-reuniones/\(nota.id)"),
+                                    showsWebLink: true,
+                                    webLinkTitle: "Abrir nota"
                                 )
                             }
                         }
