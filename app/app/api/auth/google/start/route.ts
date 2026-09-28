@@ -5,39 +5,75 @@
 //
 // Requiere sesión user (solo alguien logueado puede conectar el calendar).
 
-import { NextResponse } from 'next/server'
-import { requireUser } from '@/lib/auth/get-user'
-import { buildAuthUrl } from '@/lib/integrations/google-calendar'
+import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth/get-user";
+import {
+  studioActor,
+  apiError,
+  StudioError,
+} from "@/lib/creative-studio/server";
+import { buildAuthUrl } from "@/lib/integrations/google-calendar";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   // Solo usuarios logueados pueden iniciar la conexión
   try {
-    await requireUser()
+    await requireUser();
   } catch {
-    return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_APP_URL ?? 'https://distinto-app.vercel.app'))
+    return NextResponse.redirect(
+      new URL(
+        "/login",
+        process.env.NEXT_PUBLIC_APP_URL ?? "https://distinto-app.vercel.app",
+      ),
+    );
   }
 
   /* ¿A qué vista volver al terminar? El botón manda ?from=/grabaciones/calendario
      (u otra ruta interna). Solo aceptamos paths internos ('/x', nunca '//x')
      para no abrir un open-redirect. Default: /grabaciones. */
-  const from = new URL(request.url).searchParams.get('from')
-  const retorno = from && from.startsWith('/') && !from.startsWith('//') ? from : '/grabaciones'
+  const from = new URL(request.url).searchParams.get("from");
+  const retorno =
+    from && from.startsWith("/") && !from.startsWith("//")
+      ? from
+      : "/grabaciones";
 
   // state anti-CSRF: random, guardado en cookie httpOnly para validar en callback
-  const state = crypto.randomUUID()
-  const url = buildAuthUrl(state)
+  const drive = new URL(request.url).searchParams.get("drive") === "1";
+  if (drive) {
+    try {
+      const actor = await studioActor(request);
+      if (!actor.manager)
+        throw new StudioError(
+          "Solo un administrador puede conectar el Drive de la agencia",
+          403,
+        );
+    } catch (e) {
+      return apiError(e);
+    }
+  }
+  const state = crypto.randomUUID();
+  const url = buildAuthUrl(state, drive);
   if (!url) {
     return NextResponse.json(
-      { ok: false, error: 'GOOGLE_OAUTH_CLIENT_ID/SECRET no configurados en Vercel env vars' },
+      {
+        ok: false,
+        error:
+          "GOOGLE_OAUTH_CLIENT_ID/SECRET no configurados en Vercel env vars",
+      },
       { status: 500 },
-    )
+    );
   }
 
-  const res = NextResponse.redirect(url)
-  const cookieOpts = { httpOnly: true, secure: true, sameSite: 'lax' as const, maxAge: 600, path: '/' }
-  res.cookies.set('g_oauth_state', state, cookieOpts)
-  res.cookies.set('g_oauth_return', retorno, cookieOpts)
-  return res
+  const res = NextResponse.redirect(url);
+  const cookieOpts = {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax" as const,
+    maxAge: 600,
+    path: "/",
+  };
+  res.cookies.set("g_oauth_state", state, cookieOpts);
+  res.cookies.set("g_oauth_return", retorno, cookieOpts);
+  return res;
 }
