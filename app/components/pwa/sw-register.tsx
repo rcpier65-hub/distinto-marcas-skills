@@ -20,7 +20,7 @@ export function SwRegister() {
     /* Esperamos al 'load' para no competir con el TTI inicial */
     const onLoad = () => {
       navigator.serviceWorker
-        .register('/sw.js', { scope: '/' })
+        .register('/sw.js', { scope: '/', updateViaCache: 'none' })
         .catch((err) => {
           /* No tirar — la app funciona sin SW. */
           // eslint-disable-next-line no-console

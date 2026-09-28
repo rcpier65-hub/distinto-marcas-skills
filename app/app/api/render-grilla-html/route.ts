@@ -60,7 +60,7 @@ export async function GET(request: Request) {
   const html = buildGrillaHtml({ slug, logoUrl, agencyLogoUrl, datePill, dateSub, cardsHtml })
 
   return new NextResponse(html, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Distinto-Grilla': '1' },
   })
 }
 

@@ -1,7 +1,8 @@
 /* Service Worker mínimo para Distinto PWA.
  *
  * Estrategia:
- *  - Network-first para HTML/data (siempre fresco si hay red)
+ *  - Network-only para APIs, iframes y datos de Next
+ *  - Network-first para documentos, sin sustituirlos por otra página
  *  - Cache-first para assets estáticos (Next.js /_next/static/*)
  *
  * Pedro pidió poder instalar la app en Mac. El SW no es estrictamente
@@ -12,7 +13,8 @@
 /* v2 (24-sep-2026): se descartan las cachés viejas, que podían tener guardado
    un CSS/JS FALLIDO (404 en pleno cambio de versión) → la app salía sin
    estilos ("pantalla en blanco con letras") hasta borrar la caché. */
-const CACHE_VERSION = 'distinto-v2'
+// v3: purgar HTML que pudo guardarse bajo URLs de imágenes o APIs.
+const CACHE_VERSION = 'distinto-v3'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 
 const STATIC_ASSETS = [
@@ -40,9 +42,8 @@ self.addEventListener('activate', (event) => {
           .filter((k) => k.startsWith('distinto-') && !k.startsWith(CACHE_VERSION))
           .map((k) => caches.delete(k))
       )
-    )
+    ).then(() => self.clients.claim())
   )
-  self.clients.claim()
 })
 
 /* El cliente (auto-update.tsx) puede pedir al SW en espera que se active YA
@@ -59,6 +60,12 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url)
   /* Solo manejamos mismo origen — no interceptar Supabase / OpenAI / etc. */
   if (url.origin !== self.location.origin) return
+
+  // Una API nunca puede recibir el HTML de Inicio como respuesta de respaldo.
+  // También excluimos las peticiones RSC/iframe y las que piden no almacenar.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/') ||
+      req.headers.get('rsc') === '1' || url.searchParams.has('_rsc') ||
+      req.destination === 'iframe' || req.cache === 'no-store') return
 
   /* Assets estáticos de Next (con hash en el nombre) → cache-first */
   if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
@@ -78,23 +85,26 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  /* HTML/data → network-first con fallback al cache si está offline */
+  // Imágenes, fetch de datos y otros recursos siguen su petición original.
+  if (req.mode !== 'navigate' || req.destination !== 'document') return
+
+  /* Documentos: como respaldo solo vale la misma URL. */
   event.respondWith(
     fetch(req)
       .then((res) => {
         /* Guardamos la copia en cache solo para HTML */
-        if (res.ok && res.headers.get('content-type')?.includes('text/html')) {
+        if (res.ok && !res.redirected && res.headers.get('content-type')?.includes('text/html') &&
+            !/no-store|private/i.test(res.headers.get('cache-control') || '')) {
           const copy = res.clone()
           caches.open(STATIC_CACHE).then((c) => c.put(req, copy))
         }
         return res
       })
       .catch(() =>
-        caches.match(req).then((cached) =>
-          cached ||
-          /* Fallback final: el index si no hay nada */
-          caches.match('/inicio')
-        )
+        caches.open(STATIC_CACHE).then((cache) => cache.match(req)).then((cached) => cached || new Response(
+          '<!DOCTYPE html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexión · Distinto</title><body style="font:16px system-ui;padding:40px;color:#334155;background:#f1f5f9"><h1>Sin conexión</h1><p>No pudimos cargar esta página. Revisa tu conexión y vuelve a intentar.</p><a href="">Reintentar</a></body></html>',
+          { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } }
+        ))
       )
   )
 })
