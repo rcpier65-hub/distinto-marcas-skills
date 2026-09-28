@@ -12,13 +12,15 @@
 // (el alcance owner también vale).
 
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
 import { deviceScopeAllows, jsonApiError, resolveV1Actor } from '@/lib/api/auth'
-import { TAREAS_READ_SCOPE } from '@/lib/api/device-key-scopes'
+import { OWNER_SCOPE, TAREAS_READ_SCOPE } from '@/lib/api/device-key-scopes'
 import { cargarMiembroV1 } from '@/lib/api/miembro-v1'
 import { cargarPendientesInicio, cargarTrabajoDeHoy } from '@/lib/hoy/trabajo-de-hoy'
 import { cargarTareasParaHoy } from '@/lib/hoy/tareas-hoy'
 import { hoyLima } from '@/lib/fechas/hoy'
+import { cerrarSesion } from '@/lib/tareas/tiempo'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
@@ -158,4 +160,71 @@ export async function GET(request: Request) {
     pendientes: pend,
     tareas,
   })
+}
+
+// POST /api/v1/tareas  { id, completada?: boolean }
+// Misma marca de hecha que completarTarea en /tareas: dueño de la fila,
+// quien la creó, o rol director. La clave dst_live_ necesita alcance owner.
+export async function POST(request: Request) {
+  const auth = await resolveV1Actor(request)
+  if ('response' in auth) return auth.response
+  if (!deviceScopeAllows(auth.actor, OWNER_SCOPE)) {
+    return jsonApiError(
+      'La clave de dispositivo no tiene alcance owner. Ampliá el alcance a owner (el token dst_live_ no cambia) o creá una clave nueva.',
+      403,
+    )
+  }
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return jsonApiError('JSON inválido', 400)
+  }
+  if (!body || typeof body !== 'object') return jsonApiError('JSON inválido', 400)
+  const id = 'id' in body && typeof body.id === 'string' ? body.id.trim() : ''
+  if (!UUID_RE.test(id)) return jsonApiError('id no es un uuid', 400)
+  const completada = 'completada' in body && typeof body.completada === 'boolean' ? body.completada : true
+
+  const cargado = await cargarMiembroV1(auth.actor)
+  if ('response' in cargado) return cargado.response
+  const miembro = cargado.miembro
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let service: any
+  try {
+    service = createServiceClient()
+  } catch {
+    return jsonApiError('Falta SUPABASE_SERVICE_ROLE_KEY', 500)
+  }
+
+  const { data: tarea, error: readError } = await service
+    .from('tareas')
+    .select('id, team_member_id, created_by')
+    .eq('id', id)
+    .maybeSingle()
+  if (readError) return jsonApiError(readError.message, 500)
+  if (!tarea) return jsonApiError('Tarea no encontrada', 404)
+
+  const esDirector = miembro.rolBase === 'director'
+  const puede =
+    esDirector ||
+    tarea.team_member_id === miembro.teamMemberId ||
+    tarea.created_by === miembro.teamMemberId
+  if (!puede) return jsonApiError('Esta tarea no es tuya', 403)
+
+  if (completada) await cerrarSesion(service, id, 'terminada')
+  const { error } = await service
+    .from('tareas')
+    .update({
+      completada,
+      completada_at: completada ? new Date().toISOString() : null,
+      focus_lane: completada ? null : undefined,
+    })
+    .eq('id', id)
+  if (error) return jsonApiError(error.message, 500)
+
+  revalidatePath('/tareas')
+  revalidatePath('/inicio')
+  return NextResponse.json({ ok: true, id, completada })
 }
