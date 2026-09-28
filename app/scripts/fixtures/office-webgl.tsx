@@ -37,7 +37,7 @@ async function run() {
     check(gl2.isContextLost(), 'Salir libera el contexto gráfico anterior')
     const original = HTMLCanvasElement.prototype.getContext
     // Simula WebGL deshabilitado solo dentro de este fixture; conserva Canvas2D.
-    HTMLCanvasElement.prototype.getContext = function(type: string, ...args: unknown[]) {
+    HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, ...args: unknown[]) {
       if (type === 'webgl2') return null
       return Reflect.apply(original, this, [type, ...args])
     } as typeof original
