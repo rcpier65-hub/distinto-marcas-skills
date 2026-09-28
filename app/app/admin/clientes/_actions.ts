@@ -6,6 +6,9 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { enviarPushAClientesDeMarca } from '@/lib/push/send'
+import { after } from 'next/server'
+import { sincronizarCalendario } from '@/lib/calendario/gcal-sync'
+import { deleteCalendarEvent } from '@/lib/integrations/google-calendar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
@@ -232,6 +235,8 @@ export async function crearReunion(input: {
     notas: (input.notas ?? '').trim() || null,
   })
   if (error) return { ok: false, error: error.message }
+  /* La reunión pasa a Google Calendar al instante (en segundo plano). */
+  after(() => sincronizarCalendario({ forzar: true }).catch((e) => console.error('[gcal-sync]', e)))
   await enviarPushAClientesDeMarca(input.marcaId, {
     title: '📅 Nueva reunión agendada',
     body: titulo,
@@ -248,8 +253,17 @@ export async function eliminarReunion(id: string): Promise<Result> {
   await requireUser()
   if (!(await puedeGestionarClientes())) return { ok: false, error: 'No tienes permiso' }
   const service = createServiceClient() as Service
+  /* Si tenía evento en Google Calendar, también se borra allá. */
+  const { data: reu } = await service.from('marca_reuniones').select('google_event_id').eq('id', id).maybeSingle()
   const { error } = await service.from('marca_reuniones').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
+  if (reu?.google_event_id) {
+    const eventId = reu.google_event_id as string
+    after(async () => {
+      const d = await deleteCalendarEvent(eventId)
+      if (!d.ok) console.error('[gcal] eliminarReunion: no se pudo borrar en Google:', d.error)
+    })
+  }
   revalidatePath('/admin/clientes')
   revalidatePath('/cliente')
   return { ok: true }

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { after } from 'next/server'
+import { debeIntentarSync, sincronizarCalendario } from '@/lib/calendario/gcal-sync'
 import { Inter_Tight, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
@@ -90,6 +92,12 @@ export default async function RootLayout({
   ])
   /* Email del usuario logueado — indicador de sesión activa en el sidebar. */
   const emailActivo: string | null = user?.email ?? null
+
+  /* Sincronización Calendario → Google Calendar en segundo plano mientras el
+     equipo usa la app (máx. cada 2 min, no frena la página). Pedro 24-sep-2026. */
+  if (user && !cliente && debeIntentarSync()) {
+    after(() => sincronizarCalendario().catch((e) => console.error('[gcal-sync]', e)))
+  }
 
   /* Reducimos los permisos a un objeto simple serializable para pasarlo
      al client component AppShell. Si no hay miembro asociado (admin/

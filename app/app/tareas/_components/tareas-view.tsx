@@ -16,17 +16,21 @@ import {
   PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core'
-import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2 } from 'lucide-react'
+import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2, MoreHorizontal, Play, Pause, CalendarDays } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane } from '../_actions'
-import { setEstadoTarea, setFechasTarea } from '../_plan-actions'
+import { iniciarTarea, pausarTarea, setEstadoTarea, setFechasTarea } from '../_plan-actions'
 import { Gantt, CalendarioTareas, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { type EstadoTarea } from '@/lib/tareas/pro-types'
 
 /* Info de PLAN por tarea (estado + fechas) — viene del server como mapa
    aparte para no tocar el SELECT compartido de tareas. */
-export type PlanInfo = { estado: EstadoTarea; fechaInicio: string | null; fechaEntrega: string | null }
+export type PlanInfo = {
+  estado: EstadoTarea; fechaInicio: string | null; fechaEntrega: string | null
+  /* Cronómetro: sesión corriendo desde (null = parado) y total acumulado. */
+  enProcesoDesde?: string | null; tiempoSeg?: number
+}
 
 const LANE_META: Record<FocusLane, { label: string; color: string; Icon: typeof Bot }> = {
   ia: { label: 'Focus IA', color: '#8E24AA', Icon: Bot },
@@ -672,6 +676,10 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
 }
 
 /* ============================ Card ============================ */
+/* Card de tarea — Pedro 24-sep-2026: "los botones hazlos profesionales" +
+   cronómetro "en proceso" que se guarda al terminar (para métricas).
+   Fila 1: responsable · ✓ Lista · ⋯ (mover, archivar, eliminar)
+   Fila 2: ▶ Iniciar / ⏸ 12:34 (corriendo) / ▶ Reanudar · 12m · fecha */
 function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio }: {
   tarea: Tarea; esCEO: boolean; otras: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
@@ -681,96 +689,134 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, p
   const [menu, setMenu] = useState(false)
   const [nueva, setNueva] = useState('')
   const cardRef = useRef<HTMLDivElement>(null)
+  const eliminar = () => {
+    if (confirm(`¿Eliminar esta tarea?\n\n"${tarea.texto.slice(0, 60)}${tarea.texto.length > 60 ? '…' : ''}"`)) { onDelete(tarea.id); setMenu(false) }
+  }
 
   return (
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1, position: 'relative' }}>
-      <div ref={cardRef} style={{ background: tarea.color, borderRadius: 8, padding: '6px 8px', color: '#fff' }}>
+      <div ref={cardRef} style={{ background: tarea.color, borderRadius: 10, padding: '8px 9px 7px', color: '#fff', boxShadow: '0 1px 2px rgba(15,23,42,0.08)' }}>
         {/* zona arrastrable = el texto */}
-        <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 11.5, lineHeight: 1.3, cursor: 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
+        <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 12, fontWeight: 500, lineHeight: 1.35, cursor: 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
           {tarea.texto}
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
           {esCEO && tarea.teamMemberNombre && (
-            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, background: 'rgba(255,255,255,0.22)', padding: '1px 5px', borderRadius: 4 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, background: 'rgba(255,255,255,0.2)', padding: '2px 7px', borderRadius: 999 }}>
               {tarea.teamMemberNombre.split(' ')[0]}
             </span>
           )}
           <div style={{ flex: 1 }} />
-          <button onClick={() => setMenu((v) => !v)} title="Mover de columna" style={iconBtn}>
-            <ArrowRight size={12} strokeWidth={2.4} />
+          <button onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Marcar como lista (guarda el tiempo)"
+            style={{ ...btnCard, width: 'auto', padding: '0 8px', gap: 4, background: 'rgba(255,255,255,0.95)', color: '#0f172a' }}>
+            <Check size={12} strokeWidth={3} /> <span style={{ fontSize: 10.5, fontWeight: 700 }}>Lista</span>
           </button>
-          <button onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Completar" style={iconBtn}>
-            <Check size={12} strokeWidth={2.6} />
-          </button>
-          {/* Eliminar directo (Pedro/Lorena 25-jul-2026: "a veces me confundo y ya
-              no las puedo sacar"). Botón visible con confirmación, además del que
-              vive en el menú de mover. */}
-          <button
-            onClick={() => { if (confirm(`¿Eliminar esta tarea?\n\n"${tarea.texto.slice(0, 60)}${tarea.texto.length > 60 ? '…' : ''}"`)) onDelete(tarea.id) }}
-            title="Eliminar tarea"
-            style={iconBtn}
-          >
-            <Trash2 size={12} strokeWidth={2.2} />
+          <button onClick={() => setMenu((v) => !v)} title="Más opciones" style={btnCard}>
+            <MoreHorizontal size={14} strokeWidth={2.4} />
           </button>
         </div>
-        {/* Estado + fecha de entrega (Plan) — dentro de la card oficial. */}
+        {/* Cronómetro + fecha de entrega */}
         <PlanChips tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} />
       </div>
       {menu && (
-        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.14)', padding: 6, minWidth: 170 }}>
-          <div style={{ fontSize: 10.5, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, padding: '2px 6px 4px' }}>Mover a</div>
+        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 12px 32px rgba(15,23,42,0.16)', padding: 6, minWidth: 190 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, padding: '3px 8px 5px' }}>
+            <ArrowRight size={11} /> Mover a
+          </div>
           {otras.map((c) => (
             <button key={c} onClick={() => { onMover(tarea.id, c); setMenu(false) }} style={menuItem}>{c}</button>
           ))}
-          <form onSubmit={(e) => { e.preventDefault(); if (nueva.trim()) { onMover(tarea.id, nueva.trim()); setNueva(''); setMenu(false) } }} style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-            <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Nueva…" style={{ flex: 1, fontSize: 12, padding: '5px 7px', border: '1px solid #e5e7eb', borderRadius: 7, outline: 'none' }} />
-            <button type="submit" style={{ ...iconBtn, color: '#16a34a', background: '#f0fdf4' }}><Plus size={14} /></button>
+          <form onSubmit={(e) => { e.preventDefault(); if (nueva.trim()) { onMover(tarea.id, nueva.trim()); setNueva(''); setMenu(false) } }} style={{ display: 'flex', gap: 4, margin: '4px 2px 2px' }}>
+            <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Nueva columna…" style={{ flex: 1, fontSize: 12, padding: '6px 8px', border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }} />
+            <button type="submit" title="Crear y mover" style={{ ...iconBtn, width: 28, height: 28, borderRadius: 8, color: '#16a34a', background: '#f0fdf4' }}><Plus size={14} /></button>
           </form>
-          <button onClick={() => { if (confirm(`¿Eliminar esta tarea?\n\n"${tarea.texto.slice(0, 60)}${tarea.texto.length > 60 ? '…' : ''}"`)) { onDelete(tarea.id); setMenu(false) } }} style={{ ...menuItem, color: '#dc2626', marginTop: 2 }}>🗑️ Eliminar</button>
+          <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
+          <button onClick={eliminar} style={{ ...menuItem, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Trash2 size={13} /> Eliminar tarea
+          </button>
         </div>
       )}
     </div>
   )
 }
 
-/* Estado + fecha de entrega dentro de la card oficial (Pedro 31-ago-2026).
-   Estado cicla al toque: ○ sin empezar → ◐ en proceso → ▣ archivado.
-   La fecha abre inputs inline (inicio opcional → entrega). */
-const PLAN_ESTADO_UI: Record<EstadoTarea, { label: string; bg: string; fg: string; icon: string }> = {
-  sin_empezar: { label: 'Sin empezar', bg: 'rgba(255,255,255,0.22)', fg: '#fff', icon: '○' },
-  en_proceso:  { label: 'En proceso',  bg: '#fbbf24', fg: '#78350f', icon: '◐' },
-  archivado:   { label: 'Archivado',   bg: 'rgba(17,24,39,0.4)', fg: '#fff', icon: '▣' },
+/* Botón redondeado sobre la card de color. */
+const btnCard: React.CSSProperties = {
+  height: 24, width: 24, borderRadius: 7, border: 'none', cursor: 'pointer',
+  background: 'rgba(255,255,255,0.2)', color: '#fff',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
 }
-const PLAN_SIGUIENTE: Record<EstadoTarea, EstadoTarea> = {
-  sin_empezar: 'en_proceso', en_proceso: 'archivado', archivado: 'sin_empezar',
+const chipCard: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 8px', borderRadius: 999,
+  border: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
 }
+
 function fmtFechaCorta(ymd: string): string {
   try { return new Date(ymd + 'T12:00:00-05:00').toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short' }) } catch { return ymd }
+}
+/* 754 s → "12:34"; 3723 s → "1:02:03". */
+function fmtReloj(seg: number): string {
+  const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`
+}
+/* 754 s → "12m"; 3723 s → "1h 2m". */
+function fmtCorto(seg: number): string {
+  const h = Math.floor(seg / 3600), m = Math.round((seg % 3600) / 60)
+  return h ? `${h}h ${m}m` : `${Math.max(1, m)}m`
+}
+
+/* Segundero en vivo: total guardado + lo que va de la sesión actual. */
+function useSegundos(desde: string | null, acumulado: number): number {
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    if (!desde) return
+    const t = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [desde])
+  return acumulado + (desde ? Math.max(0, Math.round((ahora - new Date(desde).getTime()) / 1000)) : 0)
 }
 
 function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
   tareaId: string; planInfo?: PlanInfo; hoy?: string; onCambio?: () => void
 }) {
   const [estado, setEstado] = useState<EstadoTarea>(planInfo?.estado ?? 'sin_empezar')
-  useEffect(() => { setEstado(planInfo?.estado ?? 'sin_empezar') }, [planInfo?.estado])
+  const [desde, setDesde] = useState<string | null>(planInfo?.enProcesoDesde ?? null)
+  const [acumulado, setAcumulado] = useState(planInfo?.tiempoSeg ?? 0)
   const [editFechas, setEditFechas] = useState(false)
   const [fi, setFi] = useState('')
   const [fe, setFe] = useState('')
   const [cargando, setCargando] = useState(false)
+  const segundos = useSegundos(desde, acumulado)
 
-  const ui = PLAN_ESTADO_UI[estado]
   const fechaEntrega = planInfo?.fechaEntrega ?? null
   const fechaInicio = planInfo?.fechaInicio ?? null
   const vencida = !!(fechaEntrega && hoy && fechaEntrega < hoy && estado !== 'archivado')
+  const corriendo = estado === 'en_proceso' && !!desde
 
-  async function ciclar() {
+  async function iniciar() {
     if (cargando) return
-    const nuevo = PLAN_SIGUIENTE[estado]
-    setEstado(nuevo)  // optimista
+    const antes = { estado, desde }
+    setEstado('en_proceso'); setDesde(new Date().toISOString())  // optimista
     setCargando(true)
-    const r = await setEstadoTarea(tareaId, nuevo)
+    const r = await iniciarTarea(tareaId)
     setCargando(false)
-    if (!r.ok) { setEstado(estado); toast.error(r.error); return }
+    if (!r.ok) { setEstado(antes.estado); setDesde(antes.desde); toast.error(r.error); return }
+    onCambio?.()
+  }
+  async function pausar() {
+    if (cargando || !desde) return
+    const antes = desde
+    setAcumulado(segundos); setDesde(null)  // optimista
+    setCargando(true)
+    const r = await pausarTarea(tareaId)
+    setCargando(false)
+    if (!r.ok) { setDesde(antes); toast.error(r.error); return }
+    onCambio?.()
+  }
+  async function desarchivar() {
+    setEstado('sin_empezar')
+    const r = await setEstadoTarea(tareaId, 'sin_empezar')
+    if (!r.ok) { setEstado('archivado'); toast.error(r.error); return }
     onCambio?.()
   }
 
@@ -784,31 +830,38 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-      <button type="button" onClick={ciclar} disabled={cargando} title="Cambiar estado (toca para avanzar)"
-        style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 6px', borderRadius: 5, border: 'none', background: ui.bg, color: ui.fg, cursor: 'pointer' }}>
-        {ui.icon} {ui.label}
-      </button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+      {estado === 'archivado' ? (
+        <button type="button" onClick={desarchivar} title="Archivada — toca para reactivarla" style={{ ...chipCard, background: 'rgba(17,24,39,0.35)', color: '#fff' }}>
+          <Archive size={11} /> Archivada
+        </button>
+      ) : corriendo ? (
+        <button type="button" onClick={pausar} disabled={cargando} title="En proceso — toca para pausar el cronómetro"
+          style={{ ...chipCard, background: '#fbbf24', color: '#78350f', fontVariantNumeric: 'tabular-nums', boxShadow: '0 0 0 2px rgba(251,191,36,0.35)' }}>
+          <Pause size={11} fill="currentColor" /> {fmtReloj(segundos)}
+        </button>
+      ) : (
+        <button type="button" onClick={iniciar} disabled={cargando}
+          title={segundos > 0 ? 'En pausa — toca para seguir contando' : 'Empezar (inicia el cronómetro)'}
+          style={{ ...chipCard, background: estado === 'en_proceso' ? 'rgba(251,191,36,0.9)' : 'rgba(255,255,255,0.95)', color: estado === 'en_proceso' ? '#78350f' : '#0f172a' }}>
+          <Play size={11} fill="currentColor" /> {segundos > 0 ? `Reanudar · ${fmtCorto(segundos)}` : 'Iniciar'}
+        </button>
+      )}
       {!editFechas ? (
         <button type="button"
           onClick={() => { setFi(fechaInicio ?? ''); setFe(fechaEntrega ?? ''); setEditFechas(true) }}
           title="Fecha de entrega (o rango inicio–entrega)"
-          style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 6px', borderRadius: 5, border: 'none', background: vencida ? '#111827' : 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer' }}>
-          📅 {fechaEntrega ? `${fechaInicio ? fmtFechaCorta(fechaInicio) + '→' : ''}${fmtFechaCorta(fechaEntrega)}${vencida ? ' ⚠' : ''}` : 'fecha'}
+          style={{ ...chipCard, background: vencida ? '#111827' : 'rgba(255,255,255,0.2)', color: '#fff' }}>
+          <CalendarDays size={11} /> {fechaEntrega ? `${fechaInicio ? fmtFechaCorta(fechaInicio) + ' → ' : ''}${fmtFechaCorta(fechaEntrega)}${vencida ? ' · vencida' : ''}` : 'Fecha'}
         </button>
       ) : (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-          {/* Blanco sobre la card de color (Pedro 31-ago-2026: "no se distingue
-              la fecha"). colorScheme dark pinta también el iconito 📅 nativo
-              y el dd/mm/aaaa en claro. */}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           <input type="date" value={fi} onChange={(e) => setFi(e.target.value)} title="Inicio (opcional)"
-            style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 6, border: '1px solid rgba(255,255,255,0.4)', padding: '2px 5px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
+            style={{ fontSize: 10, fontWeight: 600, borderRadius: 7, border: '1px solid rgba(255,255,255,0.45)', padding: '2px 6px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
           <input type="date" value={fe} onChange={(e) => setFe(e.target.value)} title="Entrega"
-            style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 6, border: '1px solid rgba(255,255,255,0.4)', padding: '2px 5px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
-          <button type="button" onClick={guardarFechas} disabled={cargando}
-            style={{ fontSize: 8.5, fontWeight: 700, border: 'none', borderRadius: 5, padding: '1px 6px', background: '#10b981', color: '#fff', cursor: 'pointer' }}>✓</button>
-          <button type="button" onClick={() => setEditFechas(false)}
-            style={{ fontSize: 8.5, border: 'none', borderRadius: 5, padding: '1px 5px', background: 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer' }}>✕</button>
+            style={{ fontSize: 10, fontWeight: 600, borderRadius: 7, border: '1px solid rgba(255,255,255,0.45)', padding: '2px 6px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
+          <button type="button" onClick={guardarFechas} disabled={cargando} title="Guardar" style={{ ...btnCard, width: 22, height: 22, background: '#10b981' }}><Check size={12} strokeWidth={3} /></button>
+          <button type="button" onClick={() => setEditFechas(false)} title="Cancelar" style={{ ...btnCard, width: 22, height: 22 }}><X size={12} /></button>
         </span>
       )}
     </div>

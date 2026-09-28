@@ -14,47 +14,25 @@
 // que la Routine sepa que debe responder con guardrails extra (o
 // derivar SIEMPRE a DM hasta que el operador cargue datos).
 //
-// Auth de lectura:
-//   - Bearer CRON_SECRET — rutinas de servidor (sin filtro de marcas_acceso).
-//   - Bearer JWT o dst_live_ con alcance owner — misma visibilidad que la sesión.
-//     Nay no necesita CRON_SECRET.
-// Escritura (PATCH y PUT): solo JWT o dst_live_ owner, con permiso de director/owner.
-// No devuelve tokens de Metricool.
+// Auth: Bearer <CRON_SECRET> en header Authorization.
 
 import { NextResponse } from 'next/server'
-import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { MarcaFactsRow } from '@/lib/types/database'
-import {
-  apiJsonError,
-  denyMarcaAcceso,
-  puedeEscribirMarcaFacts,
-  requireSessionMember,
-  type SessionMember,
-} from '@/lib/api/session-member'
-import { upsertMarcaFacts } from '@/lib/api/marca-facts-write'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
 
-type RouteParams = { params: Promise<{ slug: string }> }
-
-type FactsGate =
-  | { ok: true; mode: 'cron' }
-  | { ok: true; mode: 'member'; member: SessionMember }
-
-async function authorizeFactsRead(request: Request): Promise<FactsGate | { response: NextResponse }> {
-  const header = request.headers.get('authorization')
-  const cron = process.env.CRON_SECRET
-  if (cron && header === `Bearer ${cron}`) return { ok: true, mode: 'cron' }
-  const auth = await requireSessionMember(request)
-  if ('response' in auth) return auth
-  return { ok: true, mode: 'member', member: auth.member }
+function unauthorized() {
+  return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 }
 
+type RouteParams = { params: Promise<{ slug: string }> }
+
 export async function GET(request: Request, { params }: RouteParams) {
-  const gate = await authorizeFactsRead(request)
-  if ('response' in gate) return gate.response
+  // ----- Auth -----
+  const auth = request.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) return unauthorized()
 
   const { slug } = await params
   if (!slug) {
@@ -76,10 +54,6 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
   if (!marca) {
     return NextResponse.json({ ok: false, error: `marca '${slug}' no existe` }, { status: 404 })
-  }
-  if (gate.mode === 'member') {
-    const denied = denyMarcaAcceso(gate.member, marca.id)
-    if (denied) return denied
   }
 
   // ----- 2. Lookup facts por marca_id (puede no existir aún) -----
@@ -152,50 +126,4 @@ export async function GET(request: Request, { params }: RouteParams) {
       `en /settings → Datos canon.`
     ),
   })
-}
-
-async function writeFacts(request: Request, { params }: RouteParams) {
-  const auth = await requireSessionMember(request)
-  if ('response' in auth) return auth.response
-  if (!puedeEscribirMarcaFacts(auth.member)) {
-    return apiJsonError('Solo director u owner puede editar los datos canon de la marca', 403)
-  }
-
-  const { slug } = await params
-  if (!slug) return apiJsonError('missing slug', 400)
-
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return apiJsonError('Body JSON inválido', 400)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = createServiceClient() as any
-  const { data: marca, error: errM } = await service
-    .from('marcas')
-    .select('id, nombre')
-    .eq('slug', slug)
-    .maybeSingle()
-  if (errM) return apiJsonError(errM.message, 500)
-  if (!marca) return apiJsonError(`marca '${slug}' no existe`, 404)
-
-  const denied = denyMarcaAcceso(auth.member, marca.id)
-  if (denied) return denied
-
-  const nombre = typeof marca.nombre === 'string' && marca.nombre.trim() ? marca.nombre.trim() : slug
-  const saved = await upsertMarcaFacts(service, marca.id, nombre, body)
-  if (!saved.ok) return apiJsonError(saved.error, saved.status)
-
-  revalidatePath('/settings')
-  return NextResponse.json({ ok: true, has_facts: saved.hasFacts, facts: saved.facts })
-}
-
-export async function PATCH(request: Request, ctx: RouteParams) {
-  return writeFacts(request, ctx)
-}
-
-export async function PUT(request: Request, ctx: RouteParams) {
-  return writeFacts(request, ctx)
 }

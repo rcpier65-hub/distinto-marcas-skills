@@ -22,6 +22,10 @@ import { CommandPalette } from './CommandPalette'
 import { RealtimeBridge } from '@/lib/realtime/realtime-bridge'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 import { NotificationBell } from './NotificationBell'
+import { ChatFlotante } from './ChatFlotante'
+import { SonidosBridge } from './SonidosBridge'
+import { AvisoReunion } from './AvisoReunion'
+import { OficinaProvider } from '@/app/oficina/_contexto'
 import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
@@ -115,7 +119,8 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
   const pageTitle = getPageTitle(pathname)
 
   return (
-    <>
+    /* La oficina vive en toda la app: cambiar de módulo no te saca. */
+    <OficinaProvider>
       <RealtimeBridge />
 
       {/* ============== TOPBAR MOBILE ==============
@@ -177,6 +182,12 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
-    </>
+
+      {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
+      <ChatFlotante />
+      <SonidosBridge />
+      {/* "¿Transcribimos?" cuando empieza una reunión (estilo Granola). */}
+      <AvisoReunion />
+    </OficinaProvider>
   )
 }

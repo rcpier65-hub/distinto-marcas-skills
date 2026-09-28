@@ -61,6 +61,9 @@ export async function getProximasSemana(): Promise<ProximaItem[]> {
     const gcal = await listCalendarEvents(hoy, hasta)
     for (const ev of gcal) {
       if (ev.allDay || !ev.hora) continue
+      /* Publicaciones (📣) y fechas importantes (⭐) viven en Google pero no
+         son reuniones: fuera de «Próximas». */
+      if (/^(📣|⭐)/u.test(ev.summary)) continue
       const startsAt = `${ev.fecha}T${ev.hora}:00-05:00`
       const key = `gc:${ev.id}`
       if (seen.has(key)) continue

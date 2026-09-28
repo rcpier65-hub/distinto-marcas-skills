@@ -529,3 +529,43 @@ export async function eliminarTareaClientePortal(id: string): Promise<Ok> {
   revalidatePath('/cliente'); revalidatePath('/tareas')
   return { ok: true }
 }
+
+/* El CLIENTE publica él mismo: descargó el video/portada, copió el texto, lo
+   subió a sus redes y toca "Ya lo publiqué" (opcional: links). Queda como
+   Publicado para todo el equipo y se avisa a Erick + Lorena. Pedro 24-sep-2026:
+   "quiero que el cliente mismo pueda publicar". */
+export async function marcarPublicadoCliente(
+  pubId: string,
+  links: { instagram?: string | null; tiktok?: string | null } = {},
+): Promise<Ok> {
+  const user = await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+  const service = createServiceClient() as Service
+  const { data: pub } = await service.from('publicaciones').select('id, nombre, marca_id, publicado_at').eq('id', pubId).maybeSingle()
+  if (!pub) return { ok: false, error: 'Publicación no encontrada' }
+  if (pub.marca_id !== cliente.marcaId) return { ok: false, error: 'Esa publicación no es de tu marca' }
+  if (pub.publicado_at) return { ok: true }
+
+  const limpio = (u: string | null | undefined) => {
+    const v = (u ?? '').trim()
+    return /^https?:\/\/\S+$/i.test(v) ? v.slice(0, 500) : null
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const update: any = { estado: 'publicado', publicado_at: new Date().toISOString(), updated_by: user.id }
+  const ig = limpio(links.instagram), tt = limpio(links.tiktok)
+  if (ig) update.link_instagram = ig
+  if (tt) update.link_tiktok = tt
+  const { error } = await service.from('publicaciones').update(update).eq('id', pubId)
+  if (error) return { ok: false, error: error.message }
+
+  await enviarPushAMiembros(['lorena', 'erick'], {
+    title: `📣 ${cliente.marcaNombre} publicó un video`,
+    body: `${cliente.nombre ? cliente.nombre + ' — ' : ''}${pub.nombre ?? ''} · lo publicó el cliente`,
+    url: `/publicaciones/${pubId}`,
+    tag: `pub-cliente-${pubId}`,
+  })
+  revalidatePath('/cliente')
+  revalidatePath('/publicaciones')
+  return { ok: true }
+}

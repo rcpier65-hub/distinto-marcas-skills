@@ -16,7 +16,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { VistaAgenda } from './rango-nav'
-import { vincularEventoGcal, editarReunionCal, eliminarReunionCal } from '../_actions'
+import { vincularEventoGcal, editarReunionCal, eliminarReunionCal, editarEventoGoogle, moverPublicacion, moverFechaImportante } from '../_actions'
+import { updateGrabacionFecha } from '../../_actions'
+import { GrillaHoras, sePuedeMover, type Movimiento } from './grilla-horas'
+import { EventoModal } from './evento-modal'
+import { CalendarDays, Megaphone, Palette, Star, Users, Video, type LucideIcon } from 'lucide-react'
+import { guardarFiltrosCalendario, type FiltrosCalendario } from './filtros'
 
 export type AgendaEvento = {
   id: string
@@ -34,6 +39,9 @@ export type AgendaEvento = {
   videosGrabados: number | null
   href?: string | null     // link interno (ej. tarea de diseño)
   duracionMin?: number | null  // eventos GCal: duración real (para vincular)
+  /* Evento que vive solo en Google (agendado allá) aunque se muestre como
+     grabación/reunión: se ofrece Vincular, no las acciones de la app. */
+  origenGoogle?: boolean
 }
 
 type MarcaLite = { slug: string; nombre: string; emoji: string | null; color: string }
@@ -47,6 +55,7 @@ type Props = {
   hoy: string              // YYYY-MM-DD en Lima (calculado server-side)
   esDirector: boolean      // habilita vincular/editar/eliminar
   marcasTodas: MarcaOpcion[]  // todas las marcas (para el selector de vincular)
+  filtrosIniciales: FiltrosCalendario  // chips + marca guardados (cookie)
 }
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -92,13 +101,20 @@ function buildMonthGrid(monthStartStr: string): (string | null)[] {
   return cells
 }
 
-const TIPO_META: Record<AgendaEvento['tipo'], { label: string; icon: string }> = {
-  grabacion:   { label: 'Grabaciones',   icon: '🎥' },
-  reunion:     { label: 'Reuniones',     icon: '🤝' },
-  publicacion: { label: 'Publicaciones', icon: '📣' },
-  fecha:       { label: 'Fechas importantes', icon: '⭐' },
-  diseno:      { label: 'Diseño',        icon: '🎨' },
-  gcal:        { label: 'Google Calendar', icon: '🟦' },
+/* Íconos de línea (lucide) en vez de emojis — Pedro 24-sep-2026: "esos
+   íconos hazlos profesionales". */
+const TIPO_META: Record<AgendaEvento['tipo'], { label: string; singular: string; Icon: LucideIcon }> = {
+  grabacion:   { label: 'Grabaciones',        singular: 'Grabación',        Icon: Video },
+  reunion:     { label: 'Reuniones',          singular: 'Reunión',          Icon: Users },
+  publicacion: { label: 'Publicaciones',      singular: 'Publicación',      Icon: Megaphone },
+  fecha:       { label: 'Fechas importantes', singular: 'Fecha importante', Icon: Star },
+  diseno:      { label: 'Diseño',             singular: 'Diseño',           Icon: Palette },
+  gcal:        { label: 'Google Calendar',    singular: 'Google Calendar',  Icon: CalendarDays },
+}
+
+function TipoIcono({ t, size = 13 }: { t: AgendaEvento['tipo']; size?: number }) {
+  const { Icon } = TIPO_META[t]
+  return <Icon size={size} strokeWidth={2} aria-hidden style={{ flexShrink: 0, display: 'inline-block', verticalAlign: '-0.15em' }} />
 }
 
 /* Sugerir la marca de un evento de GCal por su título (ej. "Reunión Centro
@@ -117,14 +133,61 @@ function sugerirMarca(titulo: string, marcas: MarcaOpcion[]): string {
   return mejor
 }
 
-export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas }: Props) {
-  /* ⭐ Fechas importantes arranca APAGADO — solo si se prende salen (Pedro:
-     "como sugerencia"). El resto, prendido. */
-  const [tipos, setTipos] = useState<Record<AgendaEvento['tipo'], boolean>>({
-    grabacion: true, reunion: true, publicacion: true, fecha: false, diseno: true, gcal: true,
-  })
-  const [marcaFiltro, setMarcaFiltro] = useState<string>('todas')
+export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas, filtrosIniciales }: Props) {
+  /* Por defecto solo 🎥 Grabaciones y 🤝 Reuniones (Pedro 24-sep-2026). Lo
+     que el usuario elija se guarda (cookie) y se mantiene al cambiar de
+     semana/mes o volver a entrar. */
+  const [tipos, setTipos] = useState<Record<AgendaEvento['tipo'], boolean>>(filtrosIniciales.tipos)
+  const [marcaFiltro, setMarcaFiltroState] = useState<string>(filtrosIniciales.marca)
   const [diaSel, setDiaSel] = useState<string | null>(null)
+  const [eventoSel, setEventoSel] = useState<AgendaEvento | null>(null)
+  /* Vista mes: arrastrar un evento a otro día. */
+  const [arrastrandoMes, setArrastrandoMes] = useState<AgendaEvento | null>(null)
+  const [diaDestino, setDiaDestino] = useState<string | null>(null)
+  const router = useRouter()
+  /* Cambios hechos arrastrando, aplicados al instante (optimista) mientras se
+     guardan; si falla, se revierten. */
+  /* Solo se aplica mientras el server siga mandando la posición ANTERIOR: en
+     cuanto llega la versión guardada, el cambio optimista deja de aplicar. */
+  const [movidos, setMovidos] = useState<Record<string, { m: Movimiento; fecha: string; hora: string | null }>>({})
+  const clave = (e: AgendaEvento) => `${e.tipo}-${e.id}`
+  const eventosVivos = useMemo(() => eventos.map((e) => {
+    const o = movidos[clave(e)]
+    return o && o.fecha === e.fecha && o.hora === e.hora
+      ? { ...e, fecha: o.m.fecha, hora: o.m.hora, duracionMin: o.m.duracionMin }
+      : e
+  }), [eventos, movidos])
+
+  async function mover(e: AgendaEvento, m: Movimiento) {
+    const k = clave(e)
+    const original = eventos.find((x) => clave(x) === k)
+    setMovidos((cur) => ({ ...cur, [k]: { m, fecha: original?.fecha ?? e.fecha, hora: original?.hora ?? e.hora } }))
+    const esGoogle = e.tipo === 'gcal' || !!e.origenGoogle
+    let r: { ok: true; gcalError?: string } | { ok: false; error: string }
+    if (esGoogle) r = await editarEventoGoogle(e.id, { titulo: e.titulo, fecha: m.fecha, hora: m.hora, duracionMin: m.duracionMin })
+    else if (e.tipo === 'reunion') r = await editarReunionCal(e.id, { fecha: m.fecha, hora: m.hora ?? '09:00', duracionMin: m.hora ? m.duracionMin : null })
+    else if (e.tipo === 'grabacion') {
+      const g = await updateGrabacionFecha(e.id, m.fecha, m.hora, m.hora ? m.duracionMin : null)
+      r = g.ok ? { ok: true, gcalError: g.gcalError } : g
+    }
+    else if (e.tipo === 'publicacion') r = await moverPublicacion(e.id, m.fecha)
+    else if (e.tipo === 'fecha') r = await moverFechaImportante(e.id, m.fecha)
+    else r = { ok: false, error: 'Este evento no se puede mover desde el calendario.' }
+
+    if (!r.ok) {
+      setMovidos((cur) => { const n = { ...cur }; delete n[k]; return n })
+      toast.error(r.error)
+      return
+    }
+    if (r.gcalError) toast.warning(`Movido en la app, pero Google Calendar falló (${r.gcalError}).`, { duration: 8000 })
+    else toast.success('Movido · sincronizado con Google Calendar')
+    router.refresh()
+  }
+
+  function setMarcaFiltro(m: string) {
+    setMarcaFiltroState(m)
+    guardarFiltrosCalendario({ tipos, marca: m })
+  }
 
   const counts = useMemo(() => ({
     grabacion:   eventos.filter((e) => e.tipo === 'grabacion').length,
@@ -135,14 +198,14 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
     gcal:        eventos.filter((e) => e.tipo === 'gcal').length,
   }), [eventos])
 
-  const filtrados = useMemo(() => eventos.filter((e) => {
+  const filtrados = useMemo(() => eventosVivos.filter((e) => {
     if (!tipos[e.tipo]) return false
     if (marcaFiltro !== 'todas') {
       // Los eventos GCal no tienen marca — con filtro de marca activo se ocultan.
       if (e.marcaSlug !== marcaFiltro) return false
     }
     return true
-  }), [eventos, tipos, marcaFiltro])
+  }), [eventosVivos, tipos, marcaFiltro])
 
   const porDia = useMemo(() => {
     const map = new Map<string, AgendaEvento[]>()
@@ -159,7 +222,9 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
   }, [filtrados])
 
   function toggleTipo(t: AgendaEvento['tipo']) {
-    setTipos((cur) => ({ ...cur, [t]: !cur[t] }))
+    const nuevos = { ...tipos, [t]: !tipos[t] }
+    setTipos(nuevos)
+    guardarFiltrosCalendario({ tipos: nuevos, marca: marcaFiltro })
   }
 
   const diasSemana = useMemo(
@@ -169,11 +234,13 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
 
   return (
     <div className="space-y-3">
+      {eventoSel && <EventoModal e={eventoSel} esDirector={esDirector} onCerrar={() => setEventoSel(null)} />}
+
       {/* ===== Filtros ===== */}
       <div className="flex items-center gap-2 flex-wrap">
         {(Object.keys(TIPO_META) as AgendaEvento['tipo'][]).map((t) => {
           // GCal, Publicaciones, Fechas y Diseño solo aparecen si hay eventos de ese tipo
-          if ((t === 'gcal' || t === 'diseno' || t === 'publicacion' || t === 'fecha') && counts[t] === 0) return null
+          if ((t === 'gcal' || t === 'diseno' || t === 'publicacion' || t === 'fecha') && counts[t] === 0 && !tipos[t]) return null
           const on = tipos[t]
           return (
             <button
@@ -187,7 +254,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
               }`}
               title={on ? 'Ocultar' : 'Mostrar'}
             >
-              <span>{TIPO_META[t].icon}</span>
+              <TipoIcono t={t} size={14} />
               {TIPO_META[t].label}
               <span className={`text-[11px] px-1.5 rounded-full ${on ? 'bg-[#7170ff]/15' : 'bg-muted'}`}>{counts[t]}</span>
             </button>
@@ -197,7 +264,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
         {/* Gestionar fechas importantes — solo cuando el chip ⭐ está prendido */}
         {tipos.fecha && counts.fecha > 0 && (
           <Link href="/fechas-importantes" className="text-[11.5px] text-muted-foreground underline hover:text-foreground">
-            ⭐ gestionar
+            <Star size={12} style={{ display: 'inline', verticalAlign: '-0.1em' }} /> gestionar
           </Link>
         )}
 
@@ -242,7 +309,15 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
                     key={dayStr}
                     type="button"
                     onClick={() => setDiaSel(selected ? null : dayStr)}
-                    className={`min-h-[112px] border-r border-b border-border p-1.5 text-left hover:bg-muted/20 transition-colors flex flex-col gap-1 ${isWeekend ? 'bg-muted/5' : ''} ${selected ? 'ring-2 ring-inset ring-[#7170ff]' : ''}`}
+                    onDragOver={(ev) => { if (esDirector && arrastrandoMes) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move' } }}
+                    onDragEnter={() => { if (esDirector && arrastrandoMes) setDiaDestino(dayStr) }}
+                    onDrop={(ev) => {
+                      ev.preventDefault()
+                      const e = arrastrandoMes
+                      setArrastrandoMes(null); setDiaDestino(null)
+                      if (e && e.fecha !== dayStr) void mover(e, { fecha: dayStr, hora: e.hora, duracionMin: e.duracionMin ?? 60 })
+                    }}
+                    className={`${diaDestino === dayStr && arrastrandoMes ? 'bg-[#7170ff]/10 ' : ''}min-h-[112px] border-r border-b border-border p-1.5 text-left hover:bg-muted/20 transition-colors flex flex-col gap-1 ${isWeekend ? 'bg-muted/5' : ''} ${selected ? 'ring-2 ring-inset ring-[#7170ff]' : ''}`}
                     title="Ver el detalle de este día"
                   >
                     <span
@@ -254,7 +329,22 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
                     </span>
 
                     <div className="flex flex-col gap-0.5 w-full">
-                      {events.slice(0, 4).map((e) => <EventoChip key={`${e.tipo}-${e.id}`} e={e} />)}
+                      {events.slice(0, 4).map((e) => (
+                        <div
+                          key={`${e.tipo}-${e.id}`}
+                          role="button"
+                          tabIndex={0}
+                          draggable={esDirector && sePuedeMover(e)}
+                          onDragStart={(ev) => { ev.stopPropagation(); ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', e.id); setArrastrandoMes(e) }}
+                          onDragEnd={() => { setArrastrandoMes(null); setDiaDestino(null) }}
+                          style={{ cursor: esDirector && sePuedeMover(e) ? 'grab' : 'pointer' }}
+                          onClick={(ev) => { ev.stopPropagation(); setEventoSel(e) }}
+                          onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setEventoSel(e) } }}
+                          title="Ver / editar"
+                        >
+                          <EventoChip e={e} />
+                        </div>
+                      ))}
                       {events.length > 4 && (
                         <div className="text-[9px] text-muted-foreground pl-1">+{events.length - 4} más</div>
                       )}
@@ -267,50 +357,19 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
         </div>
       )}
 
-      {/* ===== VISTA SEMANA (default) ===== */}
+      {/* ===== VISTA SEMANA (default): grilla de horas estilo Google Calendar ===== */}
       {vista === 'semana' && (
         <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="min-w-[760px] border border-border rounded-xl overflow-hidden bg-card grid grid-cols-7">
-            {diasSemana.map((dayStr, i) => {
-              const events = porDia.get(dayStr) ?? []
-              const isToday = dayStr === hoy
-              const dow = new Date(dayStr + 'T12:00:00Z').getUTCDay()
-              const isWeekend = dow === 0 || dow === 6
-
-              return (
-                <div key={dayStr} className={`min-h-[380px] border-r border-border last:border-r-0 flex flex-col ${isWeekend ? 'bg-muted/5' : ''}`}>
-                  {/* Header del día */}
-                  <button
-                    type="button"
-                    onClick={() => setDiaSel(diaSel === dayStr ? null : dayStr)}
-                    className={`px-2 py-2 text-center border-b border-border hover:bg-muted/20 ${isToday ? 'bg-[#7170ff]/8' : 'bg-muted/30'}`}
-                    title="Ver el detalle de este día"
-                  >
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{DIAS_SEMANA[i]}</div>
-                    <div className={`mx-auto mt-0.5 w-7 h-7 rounded-full inline-flex items-center justify-center text-sm ${
-                      isToday ? 'bg-[#7170ff] text-white font-bold' : 'text-foreground'
-                    }`}>
-                      {parseInt(dayStr.slice(8), 10)}
-                    </div>
-                  </button>
-
-                  {/* Eventos del día */}
-                  <div className="p-1.5 flex flex-col gap-1.5">
-                    {events.length === 0 && (
-                      <div className="text-[10px] text-muted-foreground/60 text-center pt-4">—</div>
-                    )}
-                    {events.map((e) => <EventoCardSemana key={`${e.tipo}-${e.id}`} e={e} />)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <GrillaHoras dias={diasSemana} eventos={filtrados} hoy={hoy} puedeEditar={esDirector} onAbrir={setEventoSel} onMover={mover} />
         </div>
       )}
 
       {/* ===== VISTA DÍA ===== */}
       {vista === 'dia' && (
-        <DetalleDia dia={desde} eventos={porDia.get(desde) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} />
+        <div className="space-y-3">
+          <GrillaHoras dias={[desde]} eventos={filtrados} hoy={hoy} puedeEditar={esDirector} onAbrir={setEventoSel} onMover={mover} />
+          <DetalleDia dia={desde} eventos={porDia.get(desde) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} onAbrir={setEventoSel} />
+        </div>
       )}
 
       {/* ===== Leyenda de marcas ===== */}
@@ -322,28 +381,33 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
               {m.emoji} {m.nombre}
             </span>
           ))}
-          <span className="inline-flex items-center gap-1.5">🎥 grabación · 🤝 reunión{counts.publicacion > 0 ? ' · 📣 publicación' : ''}{counts.gcal > 0 ? ' · 🟦 Google Calendar' : ''}</span>
+          <span className="inline-flex items-center gap-3">
+            {(['grabacion', 'reunion', ...(counts.publicacion > 0 ? ['publicacion'] : []), ...(counts.gcal > 0 ? ['gcal'] : [])] as AgendaEvento['tipo'][]).map((t) => (
+              <span key={t} className="inline-flex items-center gap-1"><TipoIcono t={t} size={12} /> {TIPO_META[t].singular.toLowerCase()}</span>
+            ))}
+          </span>
         </div>
       )}
 
       {/* ===== Panel del día seleccionado (vistas mes y semana) ===== */}
       {vista !== 'dia' && diaSel && (
-        <DetalleDia dia={diaSel} eventos={porDia.get(diaSel) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} onCerrar={() => setDiaSel(null)} />
+        <DetalleDia dia={diaSel} eventos={porDia.get(diaSel) ?? []} hoy={hoy} esDirector={esDirector} marcasTodas={marcasTodas} onCerrar={() => setDiaSel(null)} onAbrir={setEventoSel} />
       )}
     </div>
   )
 }
 
 /* ===== Panel de detalle de UN día (vista día + panel de mes/semana) ===== */
-function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
+function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar, onAbrir }: {
   dia: string; eventos: AgendaEvento[]; hoy: string
   esDirector: boolean; marcasTodas: MarcaOpcion[]; onCerrar?: () => void
+  onAbrir: (e: AgendaEvento) => void
 }) {
   return (
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-[15px] font-bold capitalize">
-          📅 {fechaLarga(dia)}{dia === hoy ? ' · HOY' : ''}
+          <CalendarDays size={16} style={{ display: 'inline', verticalAlign: '-0.15em', marginRight: 6 }} />{fechaLarga(dia)}{dia === hoy ? ' · HOY' : ''}
         </h3>
         <div className="flex items-center gap-2">
           <Link
@@ -376,9 +440,10 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
                   {e.hora ? hora12(e.hora) : 'Todo el día'}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className={`text-[14px] font-semibold ${cancelado ? 'line-through' : ''}`}>
-                    {TIPO_META[e.tipo].icon} {e.titulo}
-                  </div>
+                  <button type="button" onClick={() => onAbrir(e)} title="Ver / editar"
+                    className={`text-left text-[14px] font-semibold hover:underline ${cancelado ? 'line-through' : ''}`}>
+                    <TipoIcono t={e.tipo} size={14} /> {e.titulo}
+                  </button>
                   <div className="mt-0.5 flex items-center gap-2 flex-wrap text-[12px] text-muted-foreground">
                     {e.marcaNombre && (
                       <span className="inline-flex items-center gap-1">
@@ -392,10 +457,10 @@ function DetalleDia({ dia, eventos, hoy, esDirector, marcasTodas, onCerrar }: {
                   {e.notas && <p className="mt-1 text-[12.5px] text-muted-foreground line-clamp-2">{e.notas}</p>}
 
                   {/* Acciones por tipo (solo directores donde aplica) */}
-                  {e.tipo === 'gcal' && esDirector && (
+                  {(e.tipo === 'gcal' || e.origenGoogle) && esDirector && (
                     <VincularGcal e={e} marcasTodas={marcasTodas} />
                   )}
-                  {e.tipo === 'reunion' && esDirector && (
+                  {e.tipo === 'reunion' && !e.origenGoogle && esDirector && (
                     <ReunionAcciones e={e} />
                   )}
                 </div>
@@ -518,7 +583,7 @@ function VincularGcal({ e, marcasTodas }: { e: AgendaEvento; marcasTodas: MarcaO
         {(['reunion', 'grabacion'] as const).map((t) => (
           <button key={t} type="button" onClick={() => setTipo(t)}
             className={`h-8 px-2.5 text-[11.5px] font-medium ${tipo === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground'}`}>
-            {t === 'reunion' ? '🤝 Reunión' : '🎥 Grabación'}
+            <TipoIcono t={t} size={12} /> {t === 'reunion' ? 'Reunión' : 'Grabación'}
           </button>
         ))}
       </div>
@@ -598,39 +663,6 @@ function ReunionAcciones({ e }: { e: AgendaEvento }) {
   )
 }
 
-/* Card de evento en la VISTA SEMANA — más grande que el chip del mes:
-   hora arriba, título completo, borde izquierdo con el color de la marca. */
-function EventoCardSemana({ e }: { e: AgendaEvento }) {
-  const cancelado = CANCELADO.has((e.estado ?? '').toLowerCase())
-  const cumplido = e.estado === 'cumplida' || e.estado === 'realizada'
-  const bg = e.tipo === 'grabacion' ? e.color : e.tipo === 'reunion' ? '#ede9fe' : e.tipo === 'publicacion' ? '#ffe4e6' : e.tipo === 'fecha' ? '#fef9c3' : e.tipo === 'diseno' ? '#fef3c7' : '#eff6ff'
-  const fg = e.tipo === 'grabacion' ? '#fff' : e.tipo === 'reunion' ? '#5b21b6' : e.tipo === 'publicacion' ? '#be123c' : e.tipo === 'fecha' ? '#a16207' : e.tipo === 'diseno' ? '#92400e' : '#1d4ed8'
-
-  const card = (
-    <div
-      className={`rounded-md px-1.5 py-1 text-left w-full ${cancelado ? 'opacity-50' : ''} ${cumplido ? 'ring-1 ring-emerald-300' : ''}`}
-      style={{ background: bg, color: fg, borderLeft: e.tipo !== 'grabacion' ? `3px solid ${e.color}` : undefined }}
-      title={`${TIPO_META[e.tipo].icon} ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
-    >
-      <div className="text-[10px] font-bold" style={{ opacity: 0.85 }}>
-        {e.hora ? hora12(e.hora) : 'Todo el día'} {TIPO_META[e.tipo].icon}
-      </div>
-      <div className={`text-[11px] font-medium leading-tight ${cancelado ? 'line-through' : ''}`} style={{ wordBreak: 'break-word' }}>
-        {e.tipo === 'grabacion' ? (e.marcaNombre ?? e.titulo) : e.titulo}
-      </div>
-    </div>
-  )
-
-  // Con Meet: la card entera abre la llamada. Con href interno: abre la tarea.
-  if (e.meetLink && !cancelado) {
-    return <a href={e.meetLink} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>{card}</a>
-  }
-  if (e.href) {
-    return <Link href={e.href} style={{ textDecoration: 'none' }}>{card}</Link>
-  }
-  return card
-}
-
 /* Chip compacto dentro de la celda del día (vista MES). Grabación = sólido con
    color de marca; reunión = violeta claro con borde de marca; GCal = azul suave. */
 function EventoChip({ e }: { e: AgendaEvento }) {
@@ -641,8 +673,8 @@ function EventoChip({ e }: { e: AgendaEvento }) {
 
   if (e.tipo === 'grabacion') {
     return (
-      <div className={base + extra + ' text-white'} style={{ background: e.color }} title={`🎥 ${e.titulo}`}>
-        🎥 {hora}{e.marcaNombre ?? e.titulo}
+      <div className={base + extra + ' text-white'} style={{ background: e.color }} title={`Grabación: ${e.titulo}`}>
+        <TipoIcono t="grabacion" size={10} /> {hora}{e.marcaNombre ?? e.titulo}
       </div>
     )
   }
@@ -651,9 +683,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#ede9fe', color: '#5b21b6', borderLeft: `3px solid ${e.color}` }}
-        title={`🤝 ${e.titulo}`}
+        title={`Reunión: ${e.titulo}`}
       >
-        🤝 {hora}{e.titulo}
+        <TipoIcono t="reunion" size={10} /> {hora}{e.titulo}
       </div>
     )
   }
@@ -662,9 +694,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#ffe4e6', color: '#be123c', borderLeft: `3px solid ${e.color}` }}
-        title={`📣 ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
+        title={`Publicación: ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
       >
-        📣 {hora}{e.titulo}
+        <TipoIcono t="publicacion" size={10} /> {hora}{e.titulo}
       </div>
     )
   }
@@ -673,9 +705,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#fef9c3', color: '#a16207', borderLeft: `3px solid ${e.color}` }}
-        title={`⭐ ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
+        title={`Fecha importante: ${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}`}
       >
-        ⭐ {e.titulo}
+        <TipoIcono t="fecha" size={10} /> {e.titulo}
       </div>
     )
   }
@@ -684,9 +716,9 @@ function EventoChip({ e }: { e: AgendaEvento }) {
       <div
         className={base + extra}
         style={{ background: '#fef3c7', color: '#92400e', borderLeft: `3px solid ${e.color}` }}
-        title={`🎨 ${e.titulo}`}
+        title={`Diseño: ${e.titulo}`}
       >
-        🎨 {hora}{e.titulo}
+        <TipoIcono t="diseno" size={10} /> {hora}{e.titulo}
       </div>
     )
   }

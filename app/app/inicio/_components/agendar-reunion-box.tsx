@@ -7,9 +7,9 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { CalendarClock, Mic, MicOff, Send, Check, X, Video, Users, Loader2 } from 'lucide-react'
+import { CalendarClock, Mic, MicOff, Send, Check, X, Video, Users, Loader2, Clapperboard, Handshake } from 'lucide-react'
 import { useDictado } from '@/lib/hooks/use-dictado'
-import { interpretarAgenda, agendarReunion, type AgendaPreview } from '../_agenda-actions'
+import { interpretarAgenda, agendarReunion, agendarGrabacion, type AgendaPreview } from '../_agenda-actions'
 
 type PreviewOk = Extract<AgendaPreview, { ok: true }>
 
@@ -54,6 +54,18 @@ export function AgendarReunionBox() {
   /* Asunto EDITABLE: es lo que el cliente ve en la invitación de Google.
      Pedro 31-ago-2026: "el asunto no puedo cambiarlo, debería poder". */
   const [tituloEdit, setTituloEdit] = useState('')
+  /* Lo que se entendió de la frase, corregible en la tarjeta (Pedro
+     24-sep-2026: grabaciones + elegir marca si no la dijo). */
+  const [tipo, setTipo] = useState<'reunion' | 'grabacion'>('reunion')
+  const [marcaId, setMarcaId] = useState('')
+  const [fecha, setFecha] = useState('')
+  const [hora, setHora] = useState('')
+  const [duracion, setDuracion] = useState(45)
+
+  const marca = preview?.marcas.find((m) => m.id === marcaId) ?? null
+  const tituloDefault = tipo === 'grabacion'
+    ? `Grabación – ${marca?.nombre ?? 'marca'}`
+    : `Reunión con ${marca?.nombre ?? 'la marca'}`
 
   const { soportado: vozOk, grabando, parcial, alternar } = useDictado({
     onFinal: (frag) => setTexto((cur) => (cur ? cur + ' ' : '') + frag),
@@ -66,7 +78,10 @@ export function AgendarReunionBox() {
     setInterpretando(true)
     const r = await interpretarAgenda(t)
     setInterpretando(false)
-    if (r.ok) { setPreview(r); setCorreoManual(''); setStaffSel({}); setExtras([]); setExtraVal(''); setTituloEdit(r.titulo) }
+    if (r.ok) {
+      setPreview(r); setCorreoManual(''); setStaffSel({}); setExtras([]); setExtraVal(''); setTituloEdit(r.titulo)
+      setTipo(r.tipo); setMarcaId(r.marcaId ?? ''); setFecha(r.fecha ?? ''); setHora(r.hora ?? ''); setDuracion(r.durationMin)
+    }
     else toast.error(r.error)
   }
 
@@ -79,26 +94,39 @@ export function AgendarReunionBox() {
   }
 
   async function confirmar() {
-    if (!preview || agendando) return
+    if (!preview || !marca || agendando) return
+    if (!fecha || !hora) { toast.error('Falta la fecha o la hora.'); return }
+    const titulo = tituloEdit.trim() || tituloDefault
+    const staff = STAFF_DISTINTO.filter((s) => staffSel[s.email]).map((s) => s.email)
+    setAgendando(true)
+
+    if (tipo === 'grabacion') {
+      /* La grabación ya invita sola a los correos de la marca; acá sumamos
+         staff y correos extra. */
+      const r = await agendarGrabacion({ marcaSlug: marca.slug, fecha, hora, durationMin: duracion, titulo, invitados: [...staff, ...extras] })
+      setAgendando(false)
+      if (r.ok) { toast.success('✅ Grabación agendada (también en Google Calendar).'); setPreview(null); setTexto('') }
+      else toast.error(r.error)
+      return
+    }
+
     // Correos del CLIENTE: los de la marca, o el que se escribió a mano.
-    const correosCliente = preview.correos.length > 0
-      ? preview.correos
+    const correosCliente = marca.correos.length > 0
+      ? marca.correos
       : correoManual.split(/[,;\s]+/).map((c) => c.trim()).filter((c) => /@.+\./.test(c))
     // + staff seleccionado + correos libres. Todo recibe la invitación,
     // pero en la marca solo se guardan los del cliente (correosGuardar).
-    const staff = STAFF_DISTINTO.filter((s) => staffSel[s.email]).map((s) => s.email)
     const correos = [...new Set([...correosCliente, ...staff, ...extras].map((c) => c.toLowerCase()))]
-    setAgendando(true)
     const r = await agendarReunion({
-      marcaId: preview.marcaId,
-      marcaNombre: preview.marcaNombre,
-      fecha: preview.fecha,
-      hora: preview.hora,
-      durationMin: preview.durationMin,
-      titulo: tituloEdit.trim() || preview.titulo,
+      marcaId: marca.id,
+      marcaNombre: marca.nombre,
+      fecha,
+      hora,
+      durationMin: duracion,
+      titulo,
       correos,
       correosGuardar: correosCliente,
-      guardarCorreos: preview.correos.length === 0 && guardarCorreo && correosCliente.length > 0,
+      guardarCorreos: marca.correos.length === 0 && guardarCorreo && correosCliente.length > 0,
     })
     setAgendando(false)
     if (r.ok) {
@@ -111,7 +139,8 @@ export function AgendarReunionBox() {
     }
   }
 
-  const sinCorreo = !!preview && preview.correos.length === 0
+  const sinCorreo = tipo === 'reunion' && !!marca && marca.correos.length === 0
+  const listo = !!marca && !!fecha && !!hora
 
   return (
     <section className="rounded-2xl border bg-card p-4 sm:p-5" style={{ borderColor: 'rgba(113,112,255,0.25)' }}>
@@ -120,8 +149,8 @@ export function AgendarReunionBox() {
           <CalendarClock className="w-5 h-5 text-white" />
         </span>
         <div>
-          <h3 className="text-[15px] font-bold leading-tight">Agendar reunión</h3>
-          <p className="text-[12px] text-muted-foreground">Dilo en una frase y yo agendo + mando la invitación.</p>
+          <h3 className="text-[15px] font-bold leading-tight">Agendar reunión o grabación</h3>
+          <p className="text-[12px] text-muted-foreground">Dilo en una frase y yo lo agendo en el calendario y en Google.</p>
         </div>
       </div>
 
@@ -132,7 +161,7 @@ export function AgendarReunionBox() {
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); interpretar() } }}
-              placeholder='Ej: "agenda para Manrique mañana 10am"'
+              placeholder='Ej: "grabación con Kintu el 10 de octubre a las 11am"'
               disabled={interpretando}
               className="flex-1 min-w-0 bg-transparent outline-none text-[14px] px-1.5"
             />
@@ -160,34 +189,74 @@ export function AgendarReunionBox() {
         <div className="mt-3 rounded-xl border p-3.5" style={{ borderColor: '#c7d2fe', background: '#f5f3ff' }}>
           {/* Asunto editable: tal cual quede acá le llega al cliente en la
               invitación de Google. */}
+          {/* Tipo: Reunión / Grabación */}
+          <div className="flex items-center gap-1.5 mb-2.5">
+            {([['reunion', 'Reunión', Handshake], ['grabacion', 'Grabación', Clapperboard]] as const).map(([id, label, Icon]) => (
+              <button key={id} type="button"
+                onClick={() => { setTipo(id); setDuracion((d) => (id === 'grabacion' && d === 45 ? 120 : id === 'reunion' && d === 120 ? 45 : d)) }}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12.5px] font-semibold transition-colors"
+                style={tipo === id
+                  ? { background: '#7c3aed', color: '#fff', border: '1px solid #7c3aed' }
+                  : { background: '#fff', color: '#6b7280', border: '1px solid #e5e7eb' }}>
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Marca (obligatoria) */}
+          <div className="flex items-center gap-2 mb-2.5">
+            <select value={marcaId} onChange={(e) => setMarcaId(e.target.value)}
+              className="flex-1 min-w-0 h-9 rounded-lg border bg-white px-2.5 text-[13.5px] font-medium outline-none focus:ring-2 focus:ring-[#7170ff]/40"
+              style={{ borderColor: marca ? '#ddd6fe' : '#f59e0b' }}>
+              <option value="">{marca ? '' : '¿De qué marca? Elige…'}</option>
+              {preview.marcas.map((m) => <option key={m.id} value={m.id}>{m.emoji ? `${m.emoji} ` : ''}{m.nombre}</option>)}
+            </select>
+          </div>
+
           <div className="flex items-center gap-2">
-            <span className="text-[15px]">{preview.marcaEmoji ?? '📌'}</span>
             <input
               value={tituloEdit}
               onChange={(e) => setTituloEdit(e.target.value)}
               maxLength={120}
               className="flex-1 min-w-0 text-[15px] font-extrabold bg-white rounded-lg border px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#7170ff]/40"
               style={{ borderColor: '#ddd6fe' }}
-              placeholder="Asunto de la reunión"
+              placeholder={tituloDefault}
               title="Este asunto es el que verá el cliente en la invitación — puedes editarlo"
             />
           </div>
-          <p className="mt-1 text-[11px] text-muted-foreground">✏️ Puedes editar el asunto — así llegará en la invitación.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Puedes editar el asunto — así llegará en la invitación.</p>
           <div className="mt-2 space-y-1.5 text-[13.5px]">
-            <div className="flex items-center gap-2"><CalendarClock className="w-4 h-4 shrink-0 text-[#6d28d9]" /> <span className="capitalize">{fechaBonita(preview.fecha)}</span> · <b>{horaBonita(preview.hora)}</b> <span className="text-muted-foreground">({preview.durationMin} min)</span></div>
-            <div className="flex items-center gap-2"><Video className="w-4 h-4 shrink-0 text-[#6d28d9]" /> Con link de Google Meet</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <CalendarClock className="w-4 h-4 shrink-0 text-[#6d28d9]" />
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                className="h-9 rounded-lg border bg-white px-2 text-[13px] outline-none focus:ring-2 focus:ring-[#7170ff]/40" style={{ borderColor: fecha ? '#ddd6fe' : '#f59e0b' }} />
+              <input type="time" value={hora} onChange={(e) => setHora(e.target.value)}
+                className="h-9 rounded-lg border bg-white px-2 text-[13px] outline-none focus:ring-2 focus:ring-[#7170ff]/40" style={{ borderColor: hora ? '#ddd6fe' : '#f59e0b' }} />
+              <select value={duracion} onChange={(e) => setDuracion(Number(e.target.value))}
+                className="h-9 rounded-lg border bg-white px-2 text-[13px] outline-none focus:ring-2 focus:ring-[#7170ff]/40" style={{ borderColor: '#ddd6fe' }}>
+                {[...new Set([15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480, duracion])].sort((a, b) => a - b).map((m) => (
+                  <option key={m} value={m}>{m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`}</option>
+                ))}
+              </select>
+            </div>
+            {fecha && hora && (
+              <div className="text-[12.5px] text-muted-foreground pl-6 capitalize">{fechaBonita(fecha)} · {horaBonita(hora)}</div>
+            )}
+            {tipo === 'reunion'
+              ? <div className="flex items-center gap-2"><Video className="w-4 h-4 shrink-0 text-[#6d28d9]" /> Con link de Google Meet</div>
+              : <div className="flex items-center gap-2"><Clapperboard className="w-4 h-4 shrink-0 text-[#6d28d9]" /> Se agrega a Grabaciones{marca ? ` de ${marca.nombre}` : ''} y a Google Calendar{marca && marca.correos.length > 0 ? ` (invita a ${marca.correos.join(', ')})` : ''}</div>}
             {sinCorreo ? (
               <div className="pt-1">
-                <div className="flex items-center gap-2 text-[13px] text-amber-700 font-semibold"><Users className="w-4 h-4 shrink-0" /> {preview.marcaNombre} no tiene correo — escríbelo:</div>
+                <div className="flex items-center gap-2 text-[13px] text-amber-700 font-semibold"><Users className="w-4 h-4 shrink-0" /> {marca?.nombre} no tiene correo — escríbelo:</div>
                 <input value={correoManual} onChange={(e) => setCorreoManual(e.target.value)} placeholder="correo@cliente.com"
                   className="mt-1.5 w-full rounded-lg border bg-white px-3 py-2 text-[13.5px] outline-none focus:ring-2 focus:ring-[#7170ff]/40" />
                 <label className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer">
                   <input type="checkbox" checked={guardarCorreo} onChange={(e) => setGuardarCorreo(e.target.checked)} /> Guardar este correo para la próxima
                 </label>
               </div>
-            ) : (
-              <div className="flex items-start gap-2"><Users className="w-4 h-4 shrink-0 text-[#6d28d9] mt-0.5" /> <span>Invitar a: <b>{preview.correos.join(', ')}</b> <span className="text-muted-foreground">(Google les manda el correo)</span></span></div>
-            )}
+            ) : tipo === 'reunion' && marca ? (
+              <div className="flex items-start gap-2"><Users className="w-4 h-4 shrink-0 text-[#6d28d9] mt-0.5" /> <span>Invitar a: <b>{marca.correos.join(', ')}</b> <span className="text-muted-foreground">(Google les manda el correo)</span></span></div>
+            ) : null}
 
             {/* ===== Invitar también: staff de Distinto + correos libres ===== */}
             <div className="pt-2 border-t" style={{ borderColor: '#ddd6fe' }}>
@@ -232,10 +301,10 @@ export function AgendarReunionBox() {
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <button type="button" onClick={confirmar} disabled={agendando || (sinCorreo && !correoManual.trim() && !Object.values(staffSel).some(Boolean) && extras.length === 0)}
+            <button type="button" onClick={confirmar} disabled={agendando || !listo || (sinCorreo && !correoManual.trim() && !Object.values(staffSel).some(Boolean) && extras.length === 0)}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl font-semibold text-white text-[14px] disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-              {agendando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Confirmar y enviar
+              {agendando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {tipo === 'grabacion' ? 'Agendar grabación' : 'Confirmar y enviar'}
             </button>
             <button type="button" onClick={() => setPreview(null)} disabled={agendando}
               className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl font-semibold border text-[14px] hover:bg-muted">

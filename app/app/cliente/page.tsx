@@ -37,7 +37,7 @@ export default async function ClientePortalPage() {
   const service = createServiceClient() as any
   const hoy = ymdLima(new Date())
 
-  const COLS = `id, nombre, copy, guion, fecha_publicacion, fecha_entrega, estado, estado_tarea, es_tarea_diseno, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url, link_tiktok, link_instagram`
+  const COLS = `id, nombre, copy, guion, fecha_publicacion, fecha_entrega, estado, estado_tarea, es_tarea_diseno, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url, link_tiktok, link_instagram, enlace_musica, video_sin_musica_url`
 
   // Traemos TODAS las publicaciones de la marca (con y sin publicar). El
   // calendario del portal las agrupa por día; la vista lista las separa en
@@ -68,6 +68,8 @@ export default async function ClientePortalPage() {
     redes: normalizeRedes(r.plataformas),
     portada: r.portada_editada_url ?? r.portada_cruda_url ?? null,
     video: r.video_con_musica_url ?? null,
+    enlaceMusica: r.enlace_musica ?? null,
+    videoSinMusica: r.video_sin_musica_url ?? null,
     driveResultado: r.drive_resultado_url ?? null,
     linkTiktok: r.link_tiktok ?? null,
     linkInstagram: r.link_instagram ?? null,
