@@ -1,26 +1,32 @@
 // Local-only integration: real WebRTC transport + production audio policy and sender gate.
 // Synthetic signal. No microphone, no signaling service, no invitations to real users.
 import { decidir, type EstadoAudio } from '../../app/oficina/_audio-grafo'
+import { NegociacionOficina } from '../../app/oficina/_negociacion'
 import { AudioSenderGate } from '../../app/oficina/_audio-sender'
 const out=document.querySelector('pre')!,button=document.querySelector('button')!
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms))
 button.onclick=async()=>{
   button.disabled=true;out.textContent='Comprobando transporte local…'
   const a=new RTCPeerConnection(),b=new RTCPeerConnection(),ctx=new AudioContext()
-  const pendingA:RTCIceCandidate[]=[],pendingB:RTCIceCandidate[]=[]
-  let anchor:HTMLAudioElement|undefined,gate:AudioSenderGate|undefined
+  let negotiationError = false
+  let anchor:HTMLAudioElement|undefined,returnAnchor:HTMLAudioElement|undefined,gate:AudioSenderGate|undefined,returnGate:AudioSenderGate|undefined
   const lines:string[]=[]
   try{
     await ctx.resume()
-    a.onicecandidate=e=>{if(e.candidate){if(b.remoteDescription)void b.addIceCandidate(e.candidate);else pendingB.push(e.candidate)}}
-    b.onicecandidate=e=>{if(e.candidate){if(a.remoteDescription)void a.addIceCandidate(e.candidate);else pendingA.push(e.candidate)}}
-    let received:MediaStream|undefined
+    // Forzar ofertas simultáneas y entregar ICE antes de la descripción.
+    const na=new NegociacionOficina(a,false,sdp=>{setTimeout(()=>void nb.descripcion(sdp),80)},()=>{negotiationError=true})
+    const nb=new NegociacionOficina(b,true,sdp=>{setTimeout(()=>void na.descripcion(sdp),80)},()=>{negotiationError=true})
+    a.onnegotiationneeded=()=>{void na.ofrecer()};b.onnegotiationneeded=()=>{void nb.ofrecer()}
+    a.onicecandidate=e=>{if(e.candidate)void nb.candidato(e.candidate.toJSON())}
+    b.onicecandidate=e=>{if(e.candidate)void na.candidato(e.candidate.toJSON())}
+    let received:MediaStream|undefined,receivedA:MediaStream|undefined
+    a.ontrack=e=>{receivedA=e.streams[0]??new MediaStream([e.track])}
     b.ontrack=e=>{received=e.streams[0]??new MediaStream([e.track])}
     const sender=a.addTransceiver('audio',{direction:'sendrecv'}).sender
-    b.addTransceiver('audio',{direction:'sendrecv'})
-    await a.setLocalDescription();await b.setRemoteDescription(a.localDescription!);await b.setLocalDescription();await a.setRemoteDescription(b.localDescription!)
-    for(const c of pendingA)await a.addIceCandidate(c);for(const c of pendingB)await b.addIceCandidate(c)
-    await wait(400)
+    const senderB=b.addTransceiver('audio',{direction:'sendrecv'}).sender
+    for(let i=0;i<50 && (a.connectionState!=='connected'||b.connectionState!=='connected');i++)await wait(100)
+    if(negotiationError || a.connectionState!=='connected'||b.connectionState!=='connected')throw Error('No negoció ambas ofertas')
+    lines.push('PASS · Ofertas simultáneas e ICE antes de la descripción')
     if(!received)throw Error('Sin pista receptora')
     anchor=document.createElement('audio');anchor.srcObject=received;anchor.muted=true;anchor.autoplay=true;await anchor.play()
     const source=ctx.createOscillator(),destination=ctx.createMediaStreamDestination();source.connect(destination);source.start()
@@ -38,6 +44,13 @@ button.onclick=async()=>{
       lines.push(`PASS · ${label} · amplitud ${value.toFixed(4)}`);out.textContent=lines.join('\n')
     }
     await check('Cerca: llega la voz',base,{...base,id:'b',x:1},true)
+    if(!receivedA)throw Error('Sin pista de regreso')
+    returnAnchor=document.createElement('audio');returnAnchor.srcObject=receivedA;returnAnchor.muted=true;await returnAnchor.play()
+    const analyserA=ctx.createAnalyser();ctx.createMediaStreamSource(receivedA).connect(analyserA);analyserA.connect(silence)
+    senderB.setStreams(destination.stream);returnGate=new AudioSenderGate(senderB);returnGate.set(signal,true);await wait(1200)
+    const samplesA=new Float32Array(analyserA.fftSize);analyserA.getFloatTimeDomainData(samplesA)
+    if(Math.max(...samplesA.map(Math.abs))<.02)throw Error('Sin voz de regreso después de resolver ofertas simultáneas')
+    returnGate.set(null,false);lines.push('PASS · Voz de regreso: audio funciona en ambos sentidos')
     await check('Otra mesa: envío cortado',base,{...base,id:'b',x:3},false)
     await check('Se acerca de nuevo: reconecta voz',base,{...base,id:'b',x:1},true)
     await check('Pared: envío cortado',base,{...base,id:'b',x:1,zona:'gerencia'},false)
@@ -45,6 +58,6 @@ button.onclick=async()=>{
     await check('Privada aceptada: llega la voz a su pareja',{...base,privada:'call'},{...base,id:'b',x:20,privada:'call'},true)
     await check('Anuncio lejano: oyente no devuelve su audio',base,{...base,id:'b',x:20,spot:true},false)
     gate.set(null,true);destination.stream.getTracks().forEach(t=>t.stop());source.stop()
-    out.textContent+='\nCOMPLETADO: 7 pruebas; micrófono del dispositivo nunca solicitado.'
-  }catch(e){out.textContent+='\nFAIL: '+String(e)}finally{gate?.dispose();a.close();b.close();if(anchor)anchor.srcObject=null;await ctx.close();button.disabled=false}
+    out.textContent+='\nCOMPLETADO: 9 pruebas; micrófono del dispositivo nunca solicitado.'
+  }catch(e){out.textContent+='\nFAIL: '+String(e)}finally{gate?.dispose();returnGate?.dispose();if(returnAnchor)returnAnchor.srcObject=null;a.close();b.close();if(anchor)anchor.srcObject=null;await ctx.close();button.disabled=false}
 }

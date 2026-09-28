@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { MediaSession } from './_media-session'
+import { NegociacionOficina } from './_negociacion'
 import { AudioSenderGate } from './_audio-sender'
 import { InvitacionesOficina, conversacionesVacias, type SenalConversacion } from './_invitaciones'
 import { sonarAviso } from '@/lib/sonido/sonidos'
@@ -119,9 +120,8 @@ type Peer = {
   pc: RTCPeerConnection
   mediaSenders: Map<'audio' | 'video', RTCRtpSender>
   audioGate: AudioSenderGate
-  educado: boolean       // el "educado" cede si los dos ofrecen a la vez
-  ofreciendo: boolean
-  ignorarOferta: boolean
+  negociacion: NegociacionOficina
+  creado: number
 }
 
 export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarConfig) {
@@ -178,6 +178,8 @@ export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarC
 
   const invitaciones = useMemo(() => new InvitacionesOficina(
     () => yoId,
+    // El constructor solo guarda el callback; enviar se ejecuta en eventos, nunca en render.
+    // eslint-disable-next-line react-hooks/refs
     mensaje => enviar({ tipo: 'conversacion', de: yoId, para: mensaje.tipo === 'invitar' ? mensaje.invitacion.para : mensaje.para, mensaje }),
     setConversaciones,
   ), [yoId, enviar])
@@ -210,8 +212,10 @@ export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarC
     /* "Educado" = el de id mayor. Si los dos ofrecen a la vez, el educado se
        hace a un lado y acepta la oferta del otro en vez de chocar. */
     const audioSender = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender
-    const audioGate = new AudioSenderGate(audioSender, () => { fallosPeer.current.set(otroId, Date.now()); cerrarPeer(otroId) })
-    const peer: Peer = { pc, audioGate, mediaSenders: new Map([['audio', audioSender]]), educado: yoId > otroId, ofreciendo: false, ignorarOferta: false }
+    const fallar = () => { fallosPeer.current.set(otroId, Date.now()); cerrarPeer(otroId) }
+    const audioGate = new AudioSenderGate(audioSender, fallar)
+    const negociacion = new NegociacionOficina(pc, yoId > otroId, sdp => enviar({ tipo: sdp.type === 'offer' ? 'oferta' : 'respuesta', de: yoId, para: otroId, sdp }), fallar)
+    const peer: Peer = { pc, audioGate, mediaSenders: new Map([['audio', audioSender]]), negociacion, creado: Date.now() }
     peers.current.set(otroId, peer)
 
     localRef.current?.getVideoTracks().forEach((t) => {
@@ -253,17 +257,7 @@ export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarC
         cerrarPeer(otroId)
       }
     }
-    pc.onnegotiationneeded = async () => {
-      try {
-        peer.ofreciendo = true
-        await pc.setLocalDescription()
-        if (pc.localDescription) {
-          enviar({ tipo: 'oferta', de: yoId, para: otroId, sdp: pc.localDescription })
-        }
-      } catch { /* el próximo ciclo de cercanía reintenta */ } finally {
-        peer.ofreciendo = false
-      }
-    }
+    pc.onnegotiationneeded = () => { void negociacion.ofrecer() }
     return peer
   }, [enviar, yoId, cerrarPeer, puedeEnviar])
 
@@ -460,34 +454,12 @@ export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarC
         } catch { /* sin notificación: queda el sonido y el aviso */ }
         return
       }
-      try {
-        if (s.tipo === 'oferta' || s.tipo === 'respuesta') {
-          const otro = estadoDe(s.de)
-          if (!otro || !debeConectar(yo.current, otro, peers.current.has(s.de))) return
-          const peer = crearPeer(s.de)
-          const desc = new RTCSessionDescription(s.sdp)
-          /* Negociación educada: si llega una oferta mientras yo también
-             estaba ofreciendo, el educado revierte la suya y acepta. */
-          const choque = desc.type === 'offer'
-            && (peer.ofreciendo || peer.pc.signalingState !== 'stable')
-          peer.ignorarOferta = !peer.educado && choque
-          if (peer.ignorarOferta) return
-          if (choque) await peer.pc.setLocalDescription({ type: 'rollback' } as RTCSessionDescriptionInit)
-          await peer.pc.setRemoteDescription(desc)
-          if (desc.type === 'offer') {
-            await peer.pc.setLocalDescription()
-            if (peer.pc.localDescription) {
-              enviar({ tipo: 'respuesta', de: yoId, para: s.de, sdp: peer.pc.localDescription })
-            }
-          }
-        } else if (s.tipo === 'ice') {
-          const peer = peers.current.get(s.de)
-          if (peer) {
-            try { await peer.pc.addIceCandidate(new RTCIceCandidate(s.candidato)) }
-            catch { if (!peer.ignorarOferta) throw new Error('ice') }
-          }
-        }
-      } catch { /* una señal suelta no debe tumbar la oficina */ }
+      const otro = estadoDe(s.de)
+      if (!otro || !debeConectar(yo.current, otro, peers.current.has(s.de))) return
+      if (!peers.current.has(s.de) && Date.now() - (fallosPeer.current.get(s.de) ?? 0) < 10000) return
+      const peer = crearPeer(s.de)
+      if (s.tipo === 'oferta' || s.tipo === 'respuesta') await peer.negociacion.descripcion(s.sdp)
+      else if (s.tipo === 'ice') await peer.negociacion.candidato(s.candidato)
     })
 
     canal.subscribe(async (status) => {
@@ -547,6 +519,10 @@ export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarC
           id: j.id, x: j.tx, y: j.ty, zona: j.zona, privada: j.privada,
           spot: j.spot, ghost: j.ghost, quiet: j.quiet, estado: j.estado,
         }
+        const pending = peers.current.get(j.id)
+        if (pending && pending.pc.connectionState !== 'connected' && ahora - pending.creado > 20000) {
+          fallosPeer.current.set(j.id, ahora); cerrarPeer(j.id)
+        }
         const yaEstaba = peers.current.has(j.id)
         const dec = decidir(mio, suyo, yaEstaba)
         decisiones.current.set(j.id, dec)
@@ -568,7 +544,7 @@ export function useOficinaRealtime(yoId: string, nombre: string, avatar: AvatarC
           cerrarPeer(j.id)
         }
         const pc = peers.current.get(j.id)?.pc
-        j.conexion = pc?.connectionState === 'connected' ? 'conectado' : pc ? 'conectando' : fallosPeer.current.has(j.id) && (dec.gain > 0 || salida.gain > 0) ? 'error' : 'desconectado'
+        j.conexion = pc?.connectionState === 'connected' ? 'conectado' : fallosPeer.current.has(j.id) && (dec.gain > 0 || salida.gain > 0) ? 'error' : pc ? 'conectando' : 'desconectado'
       }
 
       setListaUI(Array.from(jugadores.current.values()).map((j) => ({ ...j })))
