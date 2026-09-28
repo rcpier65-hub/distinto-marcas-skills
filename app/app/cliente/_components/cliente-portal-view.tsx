@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX, ImageOff,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -25,7 +25,7 @@ import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
-import { aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente, eliminarFechaImportanteCliente } from '../_actions'
+import { marcarPublicadoCliente, aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente, eliminarFechaImportanteCliente } from '../_actions'
 import type { MarcaCliente } from '@/lib/cliente/get-cliente'
 import { ClienteRealtime } from './cliente-realtime'
 import { DriveExplorer } from './drive-explorer'
@@ -71,6 +71,10 @@ export type PubCliente = {
   redes: string[]
   portada: string | null
   video: string | null
+  /* Link del sonido de TikTok (lo carga el equipo) y el video sin música,
+     para que el cliente publique con el audio en tendencia. */
+  enlaceMusica?: string | null
+  videoSinMusica?: string | null
   driveResultado: string | null
   linkTiktok: string | null
   linkInstagram: string | null
@@ -208,7 +212,9 @@ function driveThumbUrl(url: string | null, w = 800): string | null {
    del video/diseño en Drive. Se usa igual en las cards y en las filas de la
    lista para que ambas muestren la imagen del video. Pedro 17-jul-2026. */
 function portadaDe(p: PubCliente): string | null {
-  return urlOk(p.portada) ?? driveThumbUrl(p.video) ?? driveThumbUrl(p.driveResultado)
+  /* La portada suele ser un LINK de Drive (no una imagen): usamos su
+     miniatura. Pedro 24-sep-2026: "la portada que está en Drive". */
+  return driveThumbUrl(p.portada, 400) ?? urlOk(p.portada) ?? driveThumbUrl(p.video) ?? driveThumbUrl(p.driveResultado)
 }
 /* Video servido por NUESTRA app (/api/video/ID), que lo trae de Drive por
    detrás. Drive NO le entrega el MP4 a un <video> del navegador desde otro
@@ -372,10 +378,9 @@ export function ClientePortalView({
   const [dzBuscar, setDzBuscar] = useState('')
   const [dzDesde, setDzDesde] = useState('')
   const [dzHasta, setDzHasta] = useState('')
-  /* Modo del calendario. Arranca en SEMANA (Pedro 31-ago-2026: "cuando ingreso
-     primera vez a calendario siempre debe mostrarse la vista semanal"). La
-     LISTA ahora también vive aquí como un modo más del calendario. */
-  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes' | 'lista'>('semana')
+  /* Modo del calendario. Arranca en LISTA (Pedro 24-sep-2026: "la primera
+     vista del portal siempre debe ser la lista, no la semana"). */
+  const [calMode, setCalMode] = useState<'dia' | 'semana' | 'mes' | 'lista'>('lista')
   /* Presentación de la pestaña LISTA: cuadrícula (cards) o lista (filas).
      Toggle en la esquina de la vista Lista, estilo Assets. Pedro 17-jul-2026. */
   const [listaFmt, setListaFmt] = useState<'grid' | 'lista'>('grid')
@@ -568,6 +573,61 @@ export function ClientePortalView({
       else { toast.success('📅 Fecha actualizada. Ya le avisamos al equipo.'); router.refresh() }
     })
   }
+
+  /* RECORDAR dónde se quedó el cliente (Pedro 24-sep-2026: "puse descargar y
+     volvió al inicio"). Guardamos sección, modo, día/semana/mes, video abierto
+     y scroll; si vuelve dentro de 2 horas, lo dejamos donde estaba. Si pasó más
+     tiempo, arranca limpio en la Lista. */
+  const LS_PORTAL = `portal-cliente:${marcaId}`
+  const restaurado = useRef(false)
+  const modalIdRestaurar = useRef<string | null>(null)
+  useEffect(() => {
+    if (restaurado.current) return
+    restaurado.current = true
+    const qs = new URLSearchParams(window.location.search)
+    if (qs.get('reunion') || qs.get('obs') || qs.get('pub')) return
+    try {
+      const raw = localStorage.getItem(LS_PORTAL)
+      const e = raw ? JSON.parse(raw) : null
+      if (!e || Date.now() - (e.t ?? 0) > 2 * 3600_000) return
+      if (e.vista) setVista(e.vista)
+      if (e.calMode) setCalMode(e.calMode)
+      if (e.listaFmt) setListaFmt(e.listaFmt)
+      if (e.sel) setSel(e.sel)
+      if (e.weekStart) setWeekStart(e.weekStart)
+      if (e.ym) setYm(e.ym)
+      modalIdRestaurar.current = e.modalId ?? null
+      const y = Number(e.scroll) || 0
+      if (y > 0) setTimeout(() => window.scrollTo({ top: y }), 120)
+    } catch { /* sin almacenamiento: arranca en la Lista */ }
+  }, [LS_PORTAL])
+  useEffect(() => {
+    const id = modalIdRestaurar.current
+    if (!id) return
+    const p = pubs.find((x) => x.id === id)
+    if (p) { modalIdRestaurar.current = null; setModalPub(p) }
+  }, [pubs])
+  useEffect(() => {
+    const guardar = () => {
+      try {
+        localStorage.setItem(LS_PORTAL, JSON.stringify({
+          t: Date.now(), vista, calMode, listaFmt, sel, weekStart, ym, modalId: modalPub?.id ?? null, scroll: window.scrollY,
+        }))
+      } catch { /* modo privado */ }
+    }
+    guardar()
+    let t: ReturnType<typeof setTimeout> | null = null
+    const alScroll = () => { if (t) clearTimeout(t); t = setTimeout(guardar, 250) }
+    window.addEventListener('scroll', alScroll, { passive: true })
+    window.addEventListener('pagehide', guardar)
+    document.addEventListener('visibilitychange', guardar)
+    return () => {
+      if (t) clearTimeout(t)
+      window.removeEventListener('scroll', alScroll)
+      window.removeEventListener('pagehide', guardar)
+      document.removeEventListener('visibilitychange', guardar)
+    }
+  }, [LS_PORTAL, vista, calMode, listaFmt, sel, weekStart, ym, modalPub])
 
   /* Deep-link: si el cliente entra desde la notificación push (/cliente?pub=ID),
      abrimos directo esa publicación para que vea el video recién subido y sus
@@ -2020,7 +2080,7 @@ function FilaCompacta({ p, color, badge, proceso, onClick }: {
     <button onClick={onClick}
       className="w-full text-left rounded-2xl bg-card p-3 border flex items-center gap-3 transition-shadow hover:shadow-md"
       style={{ borderLeft: `5px solid ${color}` }}>
-      <Thumb portada={portadaDe(p)} color={color} kind={dis ? 'diseno' : 'video'} size={54} />
+      <span className="order-last lg:order-first shrink-0"><Thumb portada={portadaDe(p)} color={color} kind={dis ? 'diseno' : 'video'} size={58} sinPortada /></span>
       <div className="flex-1 min-w-0">
         <div className="text-[15px] font-bold truncate">{p.titulo}</div>
         <div className="text-[12px] text-muted-foreground mt-0.5 truncate flex items-center gap-1">
@@ -2061,7 +2121,7 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
      iframe de Drive queda solo de respaldo (salía cortado y con controles
      gigantes). La portada es un fotograma REAL del video. Pedro 15-jul-2026. */
   const videoDirecto = videoAppUrl(p.video) ?? videoAppUrl(p.driveResultado)
-  const portadaReal = urlOk(p.portada) ?? driveThumbUrl(p.video) ?? driveThumbUrl(p.driveResultado)
+  const portadaReal = portadaDe(p)
 
   /* CORRECCIONES: el cliente marca el segundo del video (currentTime del <video>)
      y escribe qué corregir; puede añadir varias y enviarlas todas al equipo.
@@ -2094,7 +2154,8 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
     <div className="rounded-2xl bg-card overflow-hidden border transition-shadow hover:shadow-md" style={{ borderLeft: `5px solid ${color}` }}>
       <button onClick={onToggle} className="w-full flex items-center gap-3 p-3 text-left">
         {/* Portada = fotograma real del video (antes salía el cuadro de color). */}
-        <Thumb portada={portadaReal} color={color} kind={dis ? 'diseno' : 'video'} size={54} />
+        {/* Portada: a la DERECHA en celular (Pedro 24-sep-2026), a la izquierda en PC. */}
+        <span className="order-last lg:order-first shrink-0"><Thumb portada={portadaReal} color={color} kind={dis ? 'diseno' : 'video'} size={58} sinPortada /></span>
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-bold truncate">{p.titulo}</div>
           <div className="text-[12px] text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
@@ -2105,7 +2166,7 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
           </div>
         </div>
         {aprobado && <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full" style={{ background: 'rgba(22,163,74,0.14)', color: '#15803d' }}><ThumbsUp className="w-3 h-3" /> Aprobado</span>}
-        <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-5 h-5 text-muted-foreground shrink-0 order-last lg:order-none transition-transform ${abierto ? 'rotate-180' : ''}`} />
       </button>
 
       {abierto && (
@@ -2215,7 +2276,7 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
                 guarde como .mp4 con el nombre de la publicación (antes bajaba
                 un archivo sin extensión que el celular tomaba por .html). */}
             {videoDirecto && (
-              <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download
+              <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-[13px] font-bold text-white" style={{ background: color }}>
                 <Download className="w-4 h-4" /> Descargar en alta calidad
               </a>
@@ -2246,6 +2307,11 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
               </span>
             )}
           </div>
+
+          {/* PUBLICARLO TÚ MISMO: descargar, copiar el texto y marcarlo publicado. */}
+          {!publicada && hayContenido && !modoCorr && (
+            <PublicarTuMismo p={p} color={color} videoDirecto={videoDirecto ?? null} />
+          )}
 
           {/* Panel de CORRECCIONES por segundo del video (Pedro 5-ago-2026). */}
           {modoCorr && (
@@ -2285,6 +2351,107 @@ function PubCard({ p, color, publicada, abierto, onToggle, aprobado, aprobandoAh
   )
 }
 
+/* Panel "Publícalo tú": el cliente baja el video y la portada, copia el texto,
+   lo sube a sus redes y marca "Ya lo publiqué" (con links opcionales).
+   Pedro 24-sep-2026: "quiero que el cliente mismo pueda publicar". */
+function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: string; videoDirecto: string | null }) {
+  const router = useRouter()
+  const [abierto, setAbierto] = useState(false)
+  const [ig, setIg] = useState('')
+  const [tt, setTt] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const videoSinMusica = videoAppUrl(p.videoSinMusica ?? null)
+  const portada = urlOk(p.portada)
+  const portadaDescarga = portada ? (driveId(portada) ? `https://drive.google.com/uc?export=download&id=${driveId(portada)}` : portada) : null
+  async function marcar() {
+    setEnviando(true)
+    const r = await marcarPublicadoCliente(p.id, { instagram: ig, tiktok: tt })
+    setEnviando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    toast.success('¡Listo! Quedó como publicado y el equipo ya lo sabe 🎉')
+    setAbierto(false)
+    router.refresh()
+  }
+  return (
+    <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: `${color}44`, background: `${color}08` }}>
+      <div className="flex items-center gap-2">
+        <Upload className="w-4 h-4 shrink-0" style={{ color }} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-extrabold" style={{ color }}>Publícalo tú mismo</div>
+          <div className="text-[11.5px] text-muted-foreground">Descarga el video y la portada, copia el texto y súbelo a tus redes.</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Descargar CON o SIN música: sin música para ponerle el audio de
+            TikTok (Pedro 24-sep-2026). */}
+        {videoDirecto && (
+          <a href={`${videoDirecto}?dl=1&name=${encodeURIComponent(p.titulo)}`} download target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: color }}>
+            <Download className="w-3.5 h-3.5" /> Con música
+          </a>
+        )}
+        {videoSinMusica ? (
+          <a href={`${videoSinMusica}?dl=1&name=${encodeURIComponent(p.titulo + ' sin musica')}`} download target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
+            <VolumeX className="w-3.5 h-3.5" /> Sin música
+          </a>
+        ) : videoDirecto ? (
+          <span title="El equipo todavía no subió la versión sin música"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12px] font-semibold border border-dashed text-muted-foreground">
+            <VolumeX className="w-3.5 h-3.5" /> Sin música: pronto
+          </span>
+        ) : null}
+        {portadaDescarga && (
+          <a href={portadaDescarga} target="_blank" rel="noopener noreferrer" download
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
+            <ImageIcon className="w-3.5 h-3.5" /> Portada
+          </a>
+        )}
+        {p.copy && <span className="-mt-2"><CopiarTextoBtn texto={p.copy} color={color} /></span>}
+      </div>
+      {urlOk(p.enlaceMusica ?? null) && (
+        <div className="rounded-lg border bg-card p-2.5 space-y-2">
+          <div className="flex items-center gap-2">
+            <Music2 className="w-4 h-4 shrink-0" style={{ color }} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12.5px] font-bold">Música para TikTok</div>
+              <div className="text-[11px] text-muted-foreground">Abre el sonido en TikTok, toca <b>“Usar este sonido”</b> y sube el video <b>sin música</b>.</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a href={urlOk(p.enlaceMusica ?? null)!} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold text-white" style={{ background: '#111' }}>
+              <Music2 className="w-3.5 h-3.5" /> Abrir música en TikTok <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      )}
+      {!abierto ? (
+        <button type="button" onClick={() => setAbierto(true)}
+          className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl text-white font-bold text-[14px]"
+          style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', boxShadow: '0 6px 16px -6px rgba(99,102,241,0.6)' }}>
+          <CheckCircle2 className="w-4 h-4" /> Ya lo publiqué
+        </button>
+      ) : (
+        <div className="space-y-2 rounded-lg border bg-card p-2.5">
+          <div className="text-[11.5px] text-muted-foreground">Pega los links si quieres (opcional), así el equipo lo ve directo:</div>
+          <input value={ig} onChange={(e) => setIg(e.target.value)} placeholder="Link de Instagram (opcional)" inputMode="url"
+            className="w-full h-10 px-3 rounded-lg border bg-background text-[13px] focus:outline-none focus:ring-2 focus:ring-black/10" />
+          <input value={tt} onChange={(e) => setTt(e.target.value)} placeholder="Link de TikTok (opcional)" inputMode="url"
+            className="w-full h-10 px-3 rounded-lg border bg-background text-[13px] focus:outline-none focus:ring-2 focus:ring-black/10" />
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setAbierto(false)} className="flex-1 h-10 rounded-xl font-bold text-[13px] border hover:bg-muted transition-colors">Cancelar</button>
+            <button type="button" onClick={marcar} disabled={enviando}
+              className="flex-1 h-10 rounded-xl font-bold text-[13px] text-white disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }}>
+              {enviando ? 'Guardando…' : 'Marcar como publicado'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* Miniatura de una pieza. Si hay portada real la muestra; si no, cae a un
    cuadrito con el color de la marca y el ICONO del sistema (lucide) según el
    tipo — claqueta para video, paleta para diseño. Pedro 24-jul-2026: "usa los
@@ -2315,7 +2482,7 @@ function DisenoCard({ p, onClick }: { p: PubCliente; onClick: () => void }) {
   )
 }
 
-function Thumb({ portada, color, kind = 'video', size, big }: { portada: string | null; color: string; kind?: 'video' | 'diseno'; size?: number; big?: boolean }) {
+function Thumb({ portada, color, kind = 'video', size, big, sinPortada }: { portada: string | null; color: string; kind?: 'video' | 'diseno'; size?: number; big?: boolean; sinPortada?: boolean }) {
   const [failed, setFailed] = useState(false)
   const url = urlOk(portada)
   const dim = big ? undefined : size ?? 54
@@ -2325,6 +2492,15 @@ function Thumb({ portada, color, kind = 'video', size, big }: { portada: string 
       <div className="rounded-xl overflow-hidden shrink-0" style={wrap}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="" onError={() => setFailed(true)} className="w-full h-full object-cover" />
+      </div>
+    )
+  }
+  /* Sin portada: iconito gris "sin portada" (lista del cliente). */
+  if (sinPortada && !big) {
+    return (
+      <div className="rounded-xl shrink-0 flex flex-col items-center justify-center gap-0.5 border border-dashed bg-muted/40 text-muted-foreground" style={wrap} title="Sin portada">
+        <ImageOff style={{ width: Math.round((size ?? 54) * 0.36), height: Math.round((size ?? 54) * 0.36) }} strokeWidth={1.75} />
+        <span className="text-[8.5px] font-semibold leading-none">Sin portada</span>
       </div>
     )
   }

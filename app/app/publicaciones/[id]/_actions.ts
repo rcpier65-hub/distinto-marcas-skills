@@ -15,7 +15,8 @@ import {
   type UpdatePublicacionInput,
 } from './update-publicacion'
 
-export type { UpdatePublicacionInput }
+// Keep imported types private: the server-action transform can register a
+// type-only re-export as a runtime action (production error 2488802915).
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 

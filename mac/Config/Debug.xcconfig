@@ -1,2 +1,0 @@
-#include "Secrets.xcconfig"
-SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG

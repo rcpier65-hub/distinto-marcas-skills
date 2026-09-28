@@ -10,8 +10,12 @@
 // para que la UI le pida al usuario completarlos. Pedro 25-ago-2026.
 
 import { ymdLima } from '@/lib/fechas/hoy'
+import { fechaExplicita, fechaValida } from './fecha-explicita'
 
 export type AgendaParsed = {
+  /* 'grabacion' si la frase habla de grabar ("grabación el 10 de octubre").
+     Pedro 24-sep-2026. */
+  tipo: 'reunion' | 'grabacion'
   marcaSlug: string | null
   fecha: string | null   // YYYY-MM-DD (Lima)
   hora: string | null    // HH:MM (24h)
@@ -23,18 +27,18 @@ type MarcaLite = { slug: string; nombre: string }
 
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
-function hoyLimaDate(): { ymd: string; dow: number } {
-  const ymd = ymdLima(new Date())
+function hoyLimaDate(now: Date): { ymd: string; dow: number } {
+  const ymd = ymdLima(now)
   const [y, m, d] = ymd.split('-').map(Number)
   const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()
   return { ymd, dow }
 }
 
 /* ============== OPENAI (preferido) ============== */
-async function parseConOpenAI(texto: string, marcas: MarcaLite[]): Promise<AgendaParsed | null> {
+async function parseConOpenAI(texto: string, marcas: MarcaLite[], now: Date): Promise<AgendaParsed | null> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
-  const { ymd, dow } = hoyLimaDate()
+  const { ymd, dow } = hoyLimaDate(now)
   const listaMarcas = marcas.map((m) => `${m.slug} — ${m.nombre}`).join('\n')
   const sistema = `Interpretas órdenes para AGENDAR REUNIONES de una agencia de marketing en Lima (zona America/Lima).
 HOY es ${ymd} (${DIAS[dow]}).
@@ -49,7 +53,7 @@ Devuelve SOLO JSON válido con esta estructura exacta:
   "durationMin": número en minutos (default 45),
   "titulo": "asunto PROFESIONAL de la reunión. Si el usuario menciona el MOTIVO/TEMA, inclúyelo SIEMPRE, ej. 'agenda reunión vid natur para revisión de la web' → 'Revisión de la web · Vid Natur'. Sin motivo → 'Reunión con {nombre de la marca}'"
 }
-Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el martes' = el PRÓXIMO martes. NUNCA descartes el motivo de la reunión si el usuario lo dijo. Responde SOLO el JSON.`
+Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). Una fecha explícita con día y mes SIEMPRE tiene prioridad sobre el día de la semana: 'jueves 01 de octubre' significa 1 de octubre, nunca el jueves más cercano. Sin año, usa la próxima ocurrencia de ese día y mes; respeta el año si está escrito. Solo 'el martes' SIN fecha explícita = el PRÓXIMO martes. NUNCA descartes el motivo de la reunión si el usuario lo dijo. Responde SOLO el JSON.`
 
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -71,8 +75,9 @@ Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el mar
     const p = JSON.parse(content) as Partial<AgendaParsed>
     const slug = typeof p.marcaSlug === 'string' && marcas.some((m) => m.slug === p.marcaSlug) ? p.marcaSlug : null
     return {
+      tipo: 'reunion',
       marcaSlug: slug,
-      fecha: /^\d{4}-\d{2}-\d{2}$/.test(String(p.fecha)) ? String(p.fecha) : null,
+      fecha: fechaValida(String(p.fecha)) ? String(p.fecha) : null,
       hora: /^\d{1,2}:\d{2}$/.test(String(p.hora)) ? String(p.hora).padStart(5, '0') : null,
       durationMin: Number.isFinite(p.durationMin as number) && (p.durationMin as number) > 0 ? Math.round(p.durationMin as number) : 45,
       titulo: (p.titulo ? String(p.titulo) : 'Reunión').trim().slice(0, 90),
@@ -84,7 +89,7 @@ Reglas: NO inventes fecha ni hora si el usuario no las dijo (deja null). 'el mar
 }
 
 /* ============== FALLBACK HEURÍSTICO ============== */
-function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
+function parseFallback(texto: string, marcas: MarcaLite[], now: Date): AgendaParsed {
   const t = texto.toLowerCase()
   // Marca: match por primera palabra significativa del nombre o el slug.
   const marca = marcas.find((m) => {
@@ -93,7 +98,7 @@ function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
     return t.includes(m.slug.toLowerCase()) || primeras.some((w) => t.includes(w))
   })
   // Fecha: hoy / mañana / pasado mañana / día de la semana.
-  const { ymd, dow } = hoyLimaDate()
+  const { ymd, dow } = hoyLimaDate(now)
   const [y, mo, d] = ymd.split('-').map(Number)
   const addDays = (n: number) => {
     const dt = new Date(Date.UTC(y, mo - 1, d + n, 12))
@@ -124,6 +129,7 @@ function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
     hora = `${String(h).padStart(2, '0')}:00`
   }
   return {
+    tipo: 'reunion',
     marcaSlug: marca?.slug ?? null,
     fecha,
     hora,
@@ -132,16 +138,56 @@ function parseFallback(texto: string, marcas: MarcaLite[]): AgendaParsed {
   }
 }
 
-export async function parseAgenda(texto: string, marcas: MarcaLite[]): Promise<AgendaParsed> {
-  const ia = await parseConOpenAI(texto, marcas)
-  if (ia && ia.marcaSlug && ia.fecha && ia.hora) return ia
+/* ¿Pide una GRABACIÓN (no una reunión)? "grabación", "grabar", "rodaje",
+   "sesión de fotos/video". Si también dice "reunión", manda reunión. */
+export function esGrabacion(texto: string): boolean {
+  const t = texto.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  if (/\breuni(on|ones)\b/.test(t)) return false
+  return /grabaci|\bgrabar|\bgrabamos|\brodaje|sesion de (fotos|video)/.test(t)
+}
+
+/* Duración por RANGO de horas en la frase ("de 10 a 12", "desde las 10am
+   hasta las 2pm", "de 9:30 a 11"). Se calcula en código, no con la IA (Pedro
+   26-sep-2026: "pongo de 10 a tal hora y no refleja la cantidad de horas").
+   Exige "de/desde" antes de la primera hora para no confundir "el 10 a las
+   11" (día 10, 11 am) con un rango. */
+export function duracionPorRango(texto: string, horaInicio: string | null): number | null {
+  const m = texto.match(/\b(?:de|desde)\s+(?:las?\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?|am|pm)?\s*(?:a|hasta|-|–)\s*(?:las?\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?|am|pm)?/i)
+  if (!m) return null
+  const suf = (x?: string) => (x ? (/p/i.test(x) ? 'pm' : 'am') : null)
+  const aMin = (h: number, mi: number, s: 'am' | 'pm' | null) => {
+    let hh = h
+    if (s === 'pm' && hh < 12) hh += 12
+    if (s === 'am' && hh === 12) hh = 0
+    return hh * 60 + mi
+  }
+  let ini = horaInicio && /^\d{1,2}:\d{2}$/.test(horaInicio)
+    ? Number(horaInicio.split(':')[0]) * 60 + Number(horaInicio.split(':')[1])
+    : aMin(Number(m[1]), Number(m[2] ?? 0), suf(m[3]))
+  if (!horaInicio && !m[3] && ini < 7 * 60) ini += 12 * 60   // "de 3 a 5" → tarde
+  let fin = aMin(Number(m[4]), Number(m[5] ?? 0), suf(m[6]))
+  if (!m[6]) { while (fin <= ini && fin < 24 * 60) fin += 12 * 60 }   // "de 10 a 2" → 2 pm
+  const dur = fin - ini
+  return dur > 0 && dur <= 12 * 60 ? dur : null
+}
+
+export async function parseAgenda(texto: string, marcas: MarcaLite[], now = new Date()): Promise<AgendaParsed> {
+  const explicita = fechaExplicita(texto, ymdLima(now))
+  const ia = await parseConOpenAI(texto, marcas, now)
   // Si la IA no resolvió todo (o no hay key), completamos con el fallback.
-  const fb = parseFallback(texto, marcas)
+  const fb = parseFallback(texto, marcas, now)
+  const tipo = esGrabacion(texto) ? 'grabacion' : 'reunion'
+  const hora = ia?.hora ?? fb.hora
+  const rango = duracionPorRango(texto, hora)
   return {
+    tipo,
     marcaSlug: ia?.marcaSlug ?? fb.marcaSlug,
-    fecha: ia?.fecha ?? fb.fecha,
-    hora: ia?.hora ?? fb.hora,
-    durationMin: ia?.durationMin ?? fb.durationMin,
+    // An invalid explicit date must ask for clarification, never become "Thursday".
+    fecha: explicita.encontrada ? explicita.fecha : ia?.fecha ?? fb.fecha,
+    hora,
+    // 1) Rango en la frase ("de 10 a 12") manda. 2) Grabación: 2 h por defecto
+    // (reunión, 45 min) salvo que la frase diga una duración ("1 hora", "90 min").
+    durationMin: rango ?? (tipo === 'grabacion' && !(ia && /\b(\d+)\s*(h|hora|min)/i.test(texto)) ? 120 : ia?.durationMin ?? fb.durationMin),
     titulo: ia?.titulo ?? fb.titulo,
   }
 }

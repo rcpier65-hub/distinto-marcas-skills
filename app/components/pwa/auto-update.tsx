@@ -33,6 +33,30 @@ export function AutoUpdate() {
   const pendiente = useRef(false)
   const recargando = useRef(false)
 
+  /* RED DE SEGURIDAD: si la página cargó SIN estilos (el CSS no llegó o la
+     caché tenía uno roto — le pasó a Lorena el 24-sep-2026), borramos la caché
+     de la app y recargamos UNA vez. Sin estilos, el <body> conserva el margen
+     de 8px del navegador (Tailwind lo pone en 0). */
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      const sinEstilos = getComputedStyle(document.body).marginTop === '8px'
+      if (!sinEstilos) return
+      try {
+        const ultimo = Number(sessionStorage.getItem('reintento-estilos') || 0)
+        if (Date.now() - ultimo < 60_000) return   // ya lo intentamos hace poco
+        sessionStorage.setItem('reintento-estilos', String(Date.now()))
+      } catch { /* sin sessionStorage: igual reintentamos */ }
+      try {
+        if (typeof caches !== 'undefined') {
+          const keys = await caches.keys()
+          await Promise.all(keys.filter((k) => k.startsWith('distinto-')).map((k) => caches.delete(k)))
+        }
+      } catch { /* nada */ }
+      window.location.reload()
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     // En local (o si no se inyectó el id) no auto-recargamos.
     if (!CURRENT || CURRENT === 'dev') return

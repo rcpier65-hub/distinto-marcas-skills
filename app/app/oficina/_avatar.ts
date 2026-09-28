@@ -73,10 +73,13 @@ export function dibujarAvatar(
   dir: Direccion,
   caminando: boolean,
   paso: number,
-  opts: { fantasma?: boolean; hablando?: boolean } = {},
+  opts: { fantasma?: boolean; hablando?: boolean; sentado?: boolean } = {},
 ) {
+  /* Sentado: el cuerpo baja un poco (queda sobre la silla) y las piernas van
+     dobladas hacia adelante. */
+  const sentado = !!opts.sentado && !caminando
   const bob = caminando ? Math.sin(paso * 0.35) * 1.6 : 0
-  const y = cy + bob
+  const y = cy + bob + (sentado ? 4 : 0)
 
   ctx.save()
   if (opts.fantasma) ctx.globalAlpha = 0.45
@@ -96,11 +99,18 @@ export function dibujarAvatar(
     ctx.stroke()
   }
 
-  // Piernas (alternan al caminar)
+  // Piernas (alternan al caminar; dobladas si está sentado)
   const swing = caminando ? Math.sin(paso * 0.35) * 3 : 0
   ctx.fillStyle = '#3d4257'
-  ctx.fillRect(cx - 5, y - 9, 4, 9 + swing)
-  ctx.fillRect(cx + 1, y - 9, 4, 9 - swing)
+  if (sentado) {
+    if (dir === 's') { ctx.fillRect(cx - 5, y - 9, 4, 6); ctx.fillRect(cx + 1, y - 9, 4, 6) }
+    else if (dir === 'e') ctx.fillRect(cx - 2, y - 10, 10, 4)
+    else if (dir === 'o') ctx.fillRect(cx - 8, y - 10, 10, 4)
+    /* de espaldas (mirando al escritorio) no se ven las piernas */
+  } else {
+    ctx.fillRect(cx - 5, y - 9, 4, 9 + swing)
+    ctx.fillRect(cx + 1, y - 9, 4, 9 - swing)
+  }
 
   // Cuerpo / ropa
   ctx.fillStyle = cfg.ropa

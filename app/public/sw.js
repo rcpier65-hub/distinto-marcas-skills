@@ -9,7 +9,10 @@
  * algunos browsers (Safari macOS) muestran el icono más opaco en el
  * dock. Con SW + manifest se ve como app nativa. */
 
-const CACHE_VERSION = 'distinto-v1'
+/* v2 (24-sep-2026): se descartan las cachés viejas, que podían tener guardado
+   un CSS/JS FALLIDO (404 en pleno cambio de versión) → la app salía sin
+   estilos ("pantalla en blanco con letras") hasta borrar la caché. */
+const CACHE_VERSION = 'distinto-v2'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 
 const STATIC_ASSETS = [
@@ -63,8 +66,11 @@ self.addEventListener('fetch', (event) => {
       caches.match(req).then((cached) =>
         cached ||
         fetch(req).then((res) => {
-          const copy = res.clone()
-          caches.open(STATIC_CACHE).then((c) => c.put(req, copy))
+          /* Solo guardamos respuestas BUENAS: nunca un 404/500. */
+          if (res.ok) {
+            const copy = res.clone()
+            caches.open(STATIC_CACHE).then((c) => c.put(req, copy))
+          }
           return res
         })
       )
@@ -106,11 +112,18 @@ self.addEventListener('push', (event) => {
     icon: data.icon || '/icons/icon-192.png',
     badge: '/favicon-32.png',
     vibrate: [200, 100, 200],
+    /* Con sonido del sistema (celular y Mac). */
+    silent: false,
     tag: data.tag || undefined,
     renotify: !!data.tag,
     data: { url: data.url || '/publicaciones/publicar-hoy' },
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  /* Avisar a las ventanas abiertas de la app para que suenen (SonidosBridge).
+     Pedro 24-sep-2026: "quiero que suene cuando llega una notificación". */
+  const avisarVentanas = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+    for (const w of wins) w.postMessage({ type: 'push-recibido', tag: data.tag || null })
+  })
+  event.waitUntil(Promise.all([self.registration.showNotification(title, options), avisarVentanas]))
 })
 
 self.addEventListener('notificationclick', (event) => {

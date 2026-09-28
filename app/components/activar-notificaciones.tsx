@@ -82,21 +82,29 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
       await navigator.serviceWorker.register('/sw.js')
       // Usamos la registración ACTIVA (más confiable para push que la que
       // devuelve register(), que puede estar todavía instalándose).
-      const reg = await navigator.serviceWorker.ready
+      let reg = await navigator.serviceWorker.ready
       // Reusar la suscripción existente si ya hay una (evita InvalidStateError
       // en PC cuando ya se había suscrito antes).
       let sub = await reg.pushManager.getSubscription()
       if (!sub) {
-        const opts: PushSubscriptionOptionsInit = { userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource }
-        try {
-          sub = await reg.pushManager.subscribe(opts)
-        } catch (err) {
-          // AbortError en Safari/macOS suele ser transitorio (servicio de push
-          // de Apple rechaza el primer intento) → esperamos y reintentamos 1 vez.
-          if ((err as Error)?.name === 'AbortError') {
-            await new Promise((r) => setTimeout(r, 1200))
+        const opts: PushSubscriptionOptionsInit = { userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid.trim()) as BufferSource }
+        /* AbortError en Safari/macOS (app del Dock): el servicio de push de
+           Apple rechaza el intento. Suele destrabarse reintentando con espera
+           y, si no, reiniciando el service worker desde cero (queda un
+           registro "trabado" de un intento anterior). Pedro 24-sep-2026. */
+        for (let intento = 1; ; intento++) {
+          try {
             sub = await reg.pushManager.subscribe(opts)
-          } else throw err
+            break
+          } catch (err) {
+            if ((err as Error)?.name !== 'AbortError' || intento >= 3) throw err
+            await new Promise((r) => setTimeout(r, 1500 * intento))
+            if (intento === 2) {
+              for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister()
+              await navigator.serviceWorker.register('/sw.js')
+              reg = await navigator.serviceWorker.ready
+            }
+          }
         }
       }
       const j = sub.toJSON()
@@ -117,7 +125,10 @@ export function ActivarNotificaciones({ className }: { className?: string }) {
       } else if (nombre === 'NotAllowedError') {
         toast.error('Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador para este sitio.')
       } else if (nombre === 'AbortError') {
-        toast.error('El sistema no pudo registrar el push (AbortError). En Mac: verifica que macOS y Safari estén actualizados, y que "Distinto" tenga permiso en Ajustes del Sistema → Notificaciones. Vuelve a intentar; si sigue, instálala con Chrome.', { duration: 9000 })
+        /* El permiso SÍ quedó concedido: mientras la app esté abierta (aunque
+           minimizada) los avisos del chat igual salen y suenan. Solo falta el
+           aviso con la app cerrada. */
+        toast.error('Safari no pudo conectarse al servicio de avisos de Apple. Mientras la app esté abierta (aunque esté minimizada) igual te llegan los avisos del chat con sonido. Para recibirlos con la app cerrada: Ajustes del Sistema → Notificaciones → "Distinto" activado, y vuelve a intentar; si sigue, instala la app con Chrome.', { duration: 12000 })
       } else {
         toast.error(`No se pudo activar${nombre ? ` (${nombre})` : ''}. Prueba con Chrome, Edge o Safari actualizado.`)
       }

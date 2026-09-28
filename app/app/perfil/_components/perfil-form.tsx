@@ -11,17 +11,13 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { actualizarMiPerfil, subirAvatar } from '../_actions'
 import type { TeamMember } from '@/lib/team/types'
-import { DeviceKeysCard, type DeviceKeyListItem } from './device-keys-card'
 
 type Props = {
   member: TeamMember
   rolNombre: string
-  deviceKeys: DeviceKeyListItem[]
-  deviceKeysError: string | null
-  canIssueOwner: boolean
 }
 
-export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysError, canIssueOwner }: Props) {
+export function PerfilForm({ member: initial, rolNombre }: Props) {
   const router = useRouter()
   const [member, setMember] = useState(initial)
   const [pending, startTransition] = useTransition()
@@ -210,7 +206,7 @@ export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysE
                 placeholder={rolNombre}
                 style={fieldStyle}
               />
-              <Hint>Si lo dejas vacío, se muestra &quot;{rolNombre}&quot;.</Hint>
+              <Hint>Si lo dejas vacío, se muestra "{rolNombre}".</Hint>
             </Campo>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Campo label="Cumpleaños">
@@ -288,10 +284,6 @@ export function PerfilForm({ member: initial, rolNombre, deviceKeys, deviceKeysE
               {pending ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          <DeviceKeysCard initialKeys={deviceKeys} initialError={deviceKeysError} canIssueOwner={canIssueOwner} />
         </div>
       </div>
     </main>

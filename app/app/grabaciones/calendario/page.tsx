@@ -8,10 +8,14 @@
 // Fuentes de eventos:
 //   1. Tabla `grabaciones` (con hora_planeada) — color por marca
 //   2. Tabla `marca_reuniones` (agendadas con clientes, con link de Meet)
-//   3. Google Calendar de Pedro (lectura) — lo agendado FUERA de la app
+//   3. Google Calendar de la agencia (lectura) — lo agendado FUERA de la app
 //      (dedup: se saltan los eventos que la propia app creó)
+//
+// La escritura hacia Google la hace lib/calendario/gcal-sync.ts (automática).
 
 import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { ArrowUpRight, CalendarDays, CalendarRange, Globe, List } from 'lucide-react'
 import { requireUser } from '@/lib/auth/get-user'
 import { ensureAccesoModulo, getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -20,7 +24,11 @@ import { listGrabaciones } from '../_actions'
 import { GoogleCalendarConnect } from '../_components/gcal-connect'
 import { AgendarReunionBox } from '@/app/inicio/_components/agendar-reunion-box'
 import { AgendaCalendar, type AgendaEvento } from './_components/agenda-calendar'
+import { COOKIE_FILTROS_CAL, leerFiltrosCalendario } from './_components/filtros'
 import { RangoNav, type VistaAgenda } from './_components/rango-nav'
+
+/* Color de las reservas de clientes desde la web (naranja). */
+const COLOR_RESERVA_WEB = '#f97316'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +50,31 @@ function tsALima(iso: string): { ymd: string; hm: string } {
   return { ymd, hm }
 }
 
+/* Marca de un evento de Google por su título: la que tenga más palabras de
+   su nombre/slug (de 4+ letras) presentes. Misma idea que sugerirMarca del
+   calendario (VincularGcal). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function marcaPorTitulo(titulo: string, marcas: any[]): any | null {
+  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  const t = norm(titulo)
+  let mejor = null
+  let mejorScore = 0
+  for (const m of marcas) {
+    const palabras = [...norm(String(m.nombre ?? '')).split(/\s+/), ...String(m.slug ?? '').split('-')].filter((w) => w.length > 3)
+    const score = new Set(palabras.filter((w) => t.includes(w))).size
+    if (score > mejorScore) { mejorScore = score; mejor = m }
+  }
+  return mejor
+}
+
 export default async function GrabacionesCalendarioPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
   await ensureAccesoModulo('publicaciones')
   const sp = await searchParams
+
+  /* Filtros del calendario guardados (chips + marca): se mantienen al cambiar
+     de semana/mes y al volver a entrar. Pedro 24-sep-2026. */
+  const filtrosGuardados = leerFiltrosCalendario((await cookies()).get(COOKIE_FILTROS_CAL)?.value)
 
   /* Vista: Día / Semana / Mes — SEMANA por defecto al abrir (Pedro
      31-ago-2026: "siempre semanalmente debe mostrar el calendario"). */
@@ -95,13 +124,14 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   const permisos = await getCurrentMemberPermisos()
   const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
 
-  /* Todo en paralelo — incluida la lectura del Google Calendar de Pedro
-     (solo directores; devuelve [] sola si no está conectado). */
+  /* Todo en paralelo — incluida la lectura del Google Calendar de la agencia.
+     Todo el equipo ve lo agendado directo en Google (Pedro 24-sep-2026; antes
+     solo directores). Devuelve [] sola si no está conectado. */
   const [grabRes, marcasRes, gcalStatus, gcalEvents] = await Promise.all([
     listGrabaciones(desde, hasta),
     service.from('marcas').select('id, slug, nombre, emoji_marca, color_calendario'),
     getGoogleCalendarStatus(),
-    esDirector ? listCalendarEvents(desde, hasta) : Promise.resolve([]),
+    listCalendarEvents(desde, hasta),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,7 +142,8 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let reunionesRows: any[] = []
   try {
-    const COLS = ['id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id',
+    const COLS = ['id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id, duracion_min',
+                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id',
                   'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado',
                   'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas']
     for (const cols of COLS) {
@@ -123,7 +154,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
         .order('fecha_hora', { ascending: true })
       if (!r.error) { reunionesRows = r.data ?? []; break }
-      if (!/estado|google_event_id|schema cache|42703/i.test(r.error.message ?? '')) break
+      if (!/estado|google_event_id|duracion_min|schema cache|42703/i.test(r.error.message ?? '')) break
     }
   } catch { /* sin reuniones */ }
 
@@ -180,6 +211,12 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     return `${ymd}|${normTitulo(String(r.titulo ?? ''))}`
   }))
 
+  /* Duración real: la guardada en la app o, si falta (eventos viejos), la
+     del evento en Google. Así el bloque mide lo que dura (10 a 2 = 4 h). */
+  const durGoogle = new Map(gcalEvents.map((ev) => [ev.id, ev.durationMin]))
+  const durDe = (propia: number | null | undefined, gid: string | null | undefined) =>
+    (propia && propia > 0 ? propia : null) ?? (gid ? durGoogle.get(gid) ?? null : null)
+
   for (const g of grabRows) {
     const marca = marcasById.get(g.marca_id)
     eventos.push({
@@ -196,6 +233,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: null,
       notas: g.notas,
       videosGrabados: g.videos_grabados,
+      duracionMin: durDe(g.duracion_min, g.google_event_id),
     })
   }
 
@@ -217,6 +255,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       meetLink: esLink ? r.lugar_enlace : null,
       notas: r.notas ?? (r.modalidad === 'presencial' && r.lugar_enlace && !esLink ? `Lugar: ${r.lugar_enlace}` : null),
       videosGrabados: null,
+      duracionMin: durDe(r.duracion_min, r.google_event_id),
     })
   }
 
@@ -284,22 +323,40 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
     if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
     if (ev.summary.startsWith('🎬')) continue
     if (ev.summary.startsWith('📣')) continue
+    if (ev.summary.startsWith('⭐')) continue  // fechas importantes (lib/calendario/gcal-sync)
     if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
     if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
+    /* Grabaciones y reuniones agendadas DIRECTO en Google (ej. "GRABACION
+       LOZANO") se muestran como grabación/reunión, con la marca adivinada por
+       el título — Pedro 24-sep-2026: "tiene grabación el viernes y no sale
+       como grabaciones". Siguen siendo de Google: se pueden Vincular. */
+    const tipoGoogle = /grabaci|grabar|rodaje/i.test(ev.summary) ? 'grabacion' as const
+      /* Reunión: por el título (reunión, revisión, diagnóstico, llamada,
+         sesión…) o porque tiene enlace de Meet. Pedro 24-sep-2026: el
+         "Diagnóstico Distinto" que reservaron por la web salía en Google
+         pero no en la app (caía en el filtro "Google Calendar", apagado). */
+      : (/reuni|revisi|diagn[oó]stic|llamada|sesi[oó]n|meeting|call\b|entrevista|onboarding|kick.?off/i.test(ev.summary) || !!ev.meetLink) ? 'reunion' as const
+      : 'gcal' as const
+    /* Reservas desde la WEB (distintostudio.com → "Diagnóstico Distinto · …"):
+       son clientes nuevos, van en NARANJA para distinguirlas (Pedro 24-sep-2026). */
+    const esReservaWeb = /^diagn[oó]stico distinto/i.test(ev.summary.trim())
+    const marcaG = tipoGoogle !== 'gcal' && !esReservaWeb ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
+    if (marcaG && marcasPermitidas && !marcasPermitidas.has(marcaG.id)) continue
     eventos.push({
       id: ev.id,
-      tipo: 'gcal',
+      tipo: tipoGoogle,
+      origenGoogle: true,
       fecha: ev.fecha,
       hora: ev.hora,
       titulo: ev.summary,
-      marcaSlug: null,
-      marcaNombre: null,
-      marcaEmoji: null,
-      color: '#3b82f6',
+      marcaSlug: marcaG?.slug ?? null,
+      marcaNombre: marcaG?.nombre ?? null,
+      marcaEmoji: marcaG?.emoji_marca ?? null,
+      color: esReservaWeb ? COLOR_RESERVA_WEB : marcaG?.color_calendario ?? (tipoGoogle === 'grabacion' ? '#6366F1' : '#3b82f6'),
       estado: null,
       meetLink: ev.meetLink,
       videosGrabados: null,
-      notas: null,
+      notas: esReservaWeb ? '🌐 Cliente nuevo · reservó desde la web (distintostudio.com)' : tipoGoogle !== 'gcal' ? 'Agendado en Google Calendar' : null,
       duracionMin: ev.durationMin,
     })
   }
@@ -326,12 +383,28 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       {/* HEADER */}
       <header className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold mb-1">📅 Calendario</h1>
+          <h1 className="text-3xl font-bold mb-1 flex items-center gap-3">
+            <span
+              className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, #7170ff, #ba41f7)', boxShadow: '0 6px 16px -6px rgba(113,112,255,0.6)' }}
+            >
+              <CalendarDays className="w-5 h-5" strokeWidth={2.2} />
+            </span>
+            Calendario
+          </h1>
           <p className="text-sm text-muted-foreground capitalize">
             {rangoLabel} · {nGrab} grabaciones · {nReu} reuniones
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {esDirector && (
+            <Link
+              href="/grabaciones/calendario/reservas"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-card text-[13px] font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              <Globe className="w-4 h-4 text-[#7170ff]" /> Reservas de la web <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground" />
+            </Link>
+          )}
           <GoogleCalendarConnect connected={gcalStatus.connected} email={gcalStatus.email} />
           <RangoNav vista={vista} desde={desde} />
         </div>
@@ -341,15 +414,15 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       <nav className="flex items-center gap-1 border-b border-border">
         <Link
           href="/grabaciones/calendario"
-          className="px-3 py-2 text-sm font-medium border-b-2 border-primary text-foreground"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 border-[#ba41f7] text-foreground"
         >
-          📅 Calendario
+          <CalendarRange className="w-4 h-4" /> Calendario
         </Link>
         <Link
           href="/grabaciones"
-          className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground"
         >
-          📋 Por marca
+          <List className="w-4 h-4" /> Por marca
         </Link>
       </nav>
 
@@ -375,6 +448,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         marcas={marcasMes}
         hoy={hoyLima}
         esDirector={esDirector}
+        filtrosIniciales={filtrosGuardados}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         marcasTodas={((marcasRes.data ?? []) as any[]).map((m) => ({ id: m.id as string, slug: m.slug as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))}
       />
