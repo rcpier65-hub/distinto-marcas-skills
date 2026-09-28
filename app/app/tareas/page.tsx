@@ -12,6 +12,7 @@ import type { Tarea } from '@/lib/tareas/types'
 import { TareasView, type PlanInfo } from './_components/tareas-view'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { ESTADOS_TAREA } from '@/lib/tareas/pro-types'
+import { esDuenoDelTablero } from '@/lib/tareas/dueno'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +31,7 @@ export default async function TareasPage() {
      ve el tablero completo del equipo. TODOS los demás —incluido Erick, que es
      director-administrador— ven SOLO sus propias tareas. Las tareas son
      personales; si se asigna a alguien, esa persona la ve en su tablero. */
-  const esOwner = !tm || (tm?.nombre ?? '').trim().toLowerCase() === 'pedro'
+  const esOwner = esDuenoDelTablero(!tm, tm?.nombre)
   /* Solo Erick: al completar una tarea le preguntamos QUÉ DÍA la hizo, para que
      su reporte semanal la ubique en el día correcto (a veces marca hoy algo que
      hizo el lunes). Comparamos por primer nombre. Pedro 26-ago-2026. */

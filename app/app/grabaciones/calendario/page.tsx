@@ -18,17 +18,12 @@ import { cookies } from 'next/headers'
 import { ArrowUpRight, CalendarDays, CalendarRange, Globe, List } from 'lucide-react'
 import { requireUser } from '@/lib/auth/get-user'
 import { ensureAccesoModulo, getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
-import { createServiceClient } from '@/lib/supabase/service'
-import { getGoogleCalendarStatus, listCalendarEvents } from '@/lib/integrations/google-calendar'
-import { listGrabaciones } from '../_actions'
+import { cargarAgendaCalendario } from '@/lib/calendario/cargar-agenda'
 import { GoogleCalendarConnect } from '../_components/gcal-connect'
 import { AgendarReunionBox } from '@/app/inicio/_components/agendar-reunion-box'
-import { AgendaCalendar, type AgendaEvento } from './_components/agenda-calendar'
+import { AgendaCalendar } from './_components/agenda-calendar'
 import { COOKIE_FILTROS_CAL, leerFiltrosCalendario } from './_components/filtros'
 import { RangoNav, type VistaAgenda } from './_components/rango-nav'
-
-/* Color de las reservas de clientes desde la web (naranja). */
-const COLOR_RESERVA_WEB = '#f97316'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,31 +35,6 @@ function addDias(ymd: string, n: number): string {
   const d = new Date(ymd + 'T12:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
-}
-
-/* Fecha/hora Lima desde un timestamptz ISO (marca_reuniones.fecha_hora). */
-function tsALima(iso: string): { ymd: string; hm: string } {
-  const d = new Date(iso)
-  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
-  const hm = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
-  return { ymd, hm }
-}
-
-/* Marca de un evento de Google por su título: la que tenga más palabras de
-   su nombre/slug (de 4+ letras) presentes. Misma idea que sugerirMarca del
-   calendario (VincularGcal). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function marcaPorTitulo(titulo: string, marcas: any[]): any | null {
-  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
-  const t = norm(titulo)
-  let mejor = null
-  let mejorScore = 0
-  for (const m of marcas) {
-    const palabras = [...norm(String(m.nombre ?? '')).split(/\s+/), ...String(m.slug ?? '').split('-')].filter((w) => w.length > 3)
-    const score = new Set(palabras.filter((w) => t.includes(w))).size
-    if (score > mejorScore) { mejorScore = score; mejor = m }
-  }
-  return mejor
 }
 
 export default async function GrabacionesCalendarioPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -117,263 +87,20 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         ? `semana del ${fmtCorto(desde)} al ${fmtCorto(hasta)}`
         : `${MESES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = createServiceClient() as any
-
   /* Solo directores ven el asistente agendador (la action igual valida server-side). */
   const permisos = await getCurrentMemberPermisos()
   const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
 
-  /* Todo en paralelo — incluida la lectura del Google Calendar de la agencia.
-     Todo el equipo ve lo agendado directo en Google (Pedro 24-sep-2026; antes
-     solo directores). Devuelve [] sola si no está conectado. */
-  const [grabRes, marcasRes, gcalStatus, gcalEvents] = await Promise.all([
-    listGrabaciones(desde, hasta),
-    service.from('marcas').select('id, slug, nombre, emoji_marca, color_calendario'),
-    getGoogleCalendarStatus(),
-    listCalendarEvents(desde, hasta),
-  ])
+  /* Mismo armado que GET /api/v1/grabaciones/calendario. */
+  const agenda = await cargarAgendaCalendario({
+    desde,
+    hasta,
+    marcasAcceso: permisos?.marcasAcceso ?? null,
+  })
+  const eventos = agenda.eventos
+  const marcasMes = agenda.marcasMes
+  const gcalStatus = agenda.gcal
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const marcasById = new Map<string, any>(((marcasRes.data ?? []) as any[]).map((m) => [m.id as string, m]))
-
-  /* Reuniones del mes (rango sobre timestamptz, en horario Lima). Defensivo:
-     si la tabla/columna no existe todavía, la vista sigue sin reuniones. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let reunionesRows: any[] = []
-  try {
-    const COLS = ['id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id, duracion_min',
-                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado, google_event_id',
-                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas, estado',
-                  'id, marca_id, titulo, fecha_hora, modalidad, lugar_enlace, notas']
-    for (const cols of COLS) {
-      const r = await service
-        .from('marca_reuniones')
-        .select(cols)
-        .gte('fecha_hora', `${desde}T00:00:00-05:00`)
-        .lte('fecha_hora', `${hasta}T23:59:59-05:00`)
-        .order('fecha_hora', { ascending: true })
-      if (!r.error) { reunionesRows = r.data ?? []; break }
-      if (!/estado|google_event_id|duracion_min|schema cache|42703/i.test(r.error.message ?? '')) break
-    }
-  } catch { /* sin reuniones */ }
-
-  /* Las tareas de diseño NO salen acá por sí solas — Pedro 31-ago-2026: "el
-     calendario es solo para grabaciones y reuniones, no para una tarea sin
-     día ni hora". Una tarea entra al calendario únicamente cuando se le
-     agenda su reunión de revisión (aparece como 🤝 vía marca_reuniones). */
-
-  /* PUBLICACIONES sincronizadas con Google Calendar (gcal_pub_event_id) —
-     filtro 📣 propio, prendible/apagable (Pedro 31-ago-2026). Ventana fija
-     de publicación 6–8 pm. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pubsRows: any[] = []
-  try {
-    const r = await service
-      .from('publicaciones')
-      .select('id, nombre, marca_id, fecha_publicacion, gcal_pub_event_id')
-      .not('gcal_pub_event_id', 'is', null)
-      .gte('fecha_publicacion', desde)
-      .lte('fecha_publicacion', hasta)
-      .order('fecha_publicacion', { ascending: true })
-      .limit(200)
-    if (!r.error) pubsRows = r.data ?? []
-  } catch { /* sin publicaciones sincronizadas */ }
-
-  /* ===== Unificar todo en AgendaEvento[] ===== */
-  /* Miembros con acceso restringido a ciertas marcas solo ven los eventos de
-     SUS marcas (mismo criterio que el sidebar). marcasAcceso null = todas. */
-  const marcasPermitidas = permisos?.marcasAcceso ? new Set(permisos.marcasAcceso) : null
-  const eventos: AgendaEvento[] = []
-  const grabRows = (grabRes.ok ? grabRes.rows : []).filter((g) => !marcasPermitidas || marcasPermitidas.has(g.marca_id))
-  reunionesRows = reunionesRows.filter((r) => !marcasPermitidas || marcasPermitidas.has(r.marca_id))
-  pubsRows = pubsRows.filter((p) => !marcasPermitidas || marcasPermitidas.has(p.marca_id))
-  const idsDeLaApp = new Set([
-    ...grabRows.map((g) => g.google_event_id),
-    ...reunionesRows.map((r) => r.google_event_id),
-    ...pubsRows.map((p) => p.gcal_pub_event_id),
-  ].filter(Boolean) as string[])
-  /* Dedup robusto de reuniones vs GCal: link de Meet (sobrevive a renombres
-     en Google) y clave fecha|hora. Un evento 📌 SIN fila espejo en
-     marca_reuniones (insert fallido) NO se salta — se muestra como evento
-     de Google en vez de desaparecer del calendario. */
-  const meetsDeReuniones = new Set(reunionesRows.map((r) => r.lugar_enlace).filter(Boolean) as string[])
-  const clavesReuniones = new Set(reunionesRows.map((r) => {
-    const { ymd, hm } = tsALima(r.fecha_hora)
-    return `${ymd}|${hm}`
-  }))
-  /* Dedup extra por título+fecha: cubre reuniones VINCULADAS en modo
-     degradado (sin google_event_id guardado) — el evento GCal no tiene 📌
-     ni Meet, pero comparte título y día con la reunión del sistema. */
-  const normTitulo = (s: string) => s.replace(/^[📌🎬🎥🤝]\s*/u, '').trim().toLowerCase()
-  const titulosReuniones = new Set(reunionesRows.map((r) => {
-    const { ymd } = tsALima(r.fecha_hora)
-    return `${ymd}|${normTitulo(String(r.titulo ?? ''))}`
-  }))
-
-  /* Duración real: la guardada en la app o, si falta (eventos viejos), la
-     del evento en Google. Así el bloque mide lo que dura (10 a 2 = 4 h). */
-  const durGoogle = new Map(gcalEvents.map((ev) => [ev.id, ev.durationMin]))
-  const durDe = (propia: number | null | undefined, gid: string | null | undefined) =>
-    (propia && propia > 0 ? propia : null) ?? (gid ? durGoogle.get(gid) ?? null : null)
-
-  for (const g of grabRows) {
-    const marca = marcasById.get(g.marca_id)
-    eventos.push({
-      id: g.id,
-      tipo: 'grabacion',
-      fecha: g.fecha_planeada,
-      hora: g.hora_planeada ? g.hora_planeada.slice(0, 5) : null,
-      titulo: `Grabación · ${g.marca_nombre}`,
-      marcaSlug: g.marca_slug,
-      marcaNombre: g.marca_nombre,
-      marcaEmoji: g.marca_emoji,
-      color: marca?.color_calendario ?? '#6366F1',
-      estado: g.estado,
-      meetLink: null,
-      notas: g.notas,
-      videosGrabados: g.videos_grabados,
-      duracionMin: durDe(g.duracion_min, g.google_event_id),
-    })
-  }
-
-  for (const r of reunionesRows) {
-    const marca = marcasById.get(r.marca_id)
-    const { ymd, hm } = tsALima(r.fecha_hora)
-    const esLink = typeof r.lugar_enlace === 'string' && /^https?:\/\//.test(r.lugar_enlace)
-    eventos.push({
-      id: r.id,
-      tipo: 'reunion',
-      fecha: ymd,
-      hora: hm,
-      titulo: r.titulo || `Reunión${marca ? ` con ${marca.nombre}` : ''}`,
-      marcaSlug: marca?.slug ?? null,
-      marcaNombre: marca?.nombre ?? null,
-      marcaEmoji: marca?.emoji_marca ?? null,
-      color: marca?.color_calendario ?? '#7c3aed',
-      estado: r.estado ?? 'agendada',
-      meetLink: esLink ? r.lugar_enlace : null,
-      notas: r.notas ?? (r.modalidad === 'presencial' && r.lugar_enlace && !esLink ? `Lugar: ${r.lugar_enlace}` : null),
-      videosGrabados: null,
-      duracionMin: durDe(r.duracion_min, r.google_event_id),
-    })
-  }
-
-  for (const p of pubsRows) {
-    const marca = marcasById.get(p.marca_id)
-    eventos.push({
-      id: p.id,
-      tipo: 'publicacion',
-      fecha: p.fecha_publicacion,
-      hora: '18:00',
-      titulo: p.nombre ?? 'Publicación',
-      marcaSlug: marca?.slug ?? null,
-      marcaNombre: marca?.nombre ?? null,
-      marcaEmoji: marca?.emoji_marca ?? null,
-      color: marca?.color_calendario ?? '#e11d48',
-      estado: null,
-      meetLink: null,
-      notas: 'Ventana de publicación 6–8 pm',
-      videosGrabados: null,
-      href: `/publicaciones/${p.id}`,
-    })
-  }
-
-  /* FECHAS IMPORTANTES — chip ⭐ APAGADO por defecto (salen como sugerencia
-     solo si se prende). Pedro 31-ago-2026: el módulo dejó el menú y vive
-     aquí; se gestionan en /fechas-importantes. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let fechasRows: any[] = []
-  try {
-    const r = await service
-      .from('fechas_importantes')
-      .select('id, marca_id, titulo, fecha, nota, categoria')
-      .gte('fecha', desde)
-      .lte('fecha', hasta)
-      .order('fecha', { ascending: true })
-      .limit(200)
-    if (!r.error) fechasRows = r.data ?? []
-  } catch { /* sin fechas importantes */ }
-  fechasRows = fechasRows.filter((f) => !marcasPermitidas || !f.marca_id || marcasPermitidas.has(f.marca_id))
-
-  for (const f of fechasRows) {
-    const marca = f.marca_id ? marcasById.get(f.marca_id) : null
-    eventos.push({
-      id: f.id,
-      tipo: 'fecha',
-      fecha: f.fecha,
-      hora: null,
-      titulo: f.titulo ?? 'Fecha importante',
-      marcaSlug: marca?.slug ?? null,
-      marcaNombre: marca?.nombre ?? null,
-      marcaEmoji: marca?.emoji_marca ?? null,
-      color: marca?.color_calendario ?? '#f59e0b',
-      estado: null,
-      meetLink: null,
-      notas: [f.categoria, f.nota].filter(Boolean).join(' · ') || null,
-      videosGrabados: null,
-      href: '/fechas-importantes',
-    })
-  }
-
-  /* GCal externo: saltar lo que la app misma creó (grabaciones por event_id;
-     reuniones por el prefijo 📌 con el que la app titula sus eventos). */
-  for (const ev of gcalEvents) {
-    if (idsDeLaApp.has(ev.id)) continue
-    if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
-    if (ev.summary.startsWith('🎬')) continue
-    if (ev.summary.startsWith('📣')) continue
-    if (ev.summary.startsWith('⭐')) continue  // fechas importantes (lib/calendario/gcal-sync)
-    if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
-    if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
-    /* Grabaciones y reuniones agendadas DIRECTO en Google (ej. "GRABACION
-       LOZANO") se muestran como grabación/reunión, con la marca adivinada por
-       el título — Pedro 24-sep-2026: "tiene grabación el viernes y no sale
-       como grabaciones". Siguen siendo de Google: se pueden Vincular. */
-    const tipoGoogle = /grabaci|grabar|rodaje/i.test(ev.summary) ? 'grabacion' as const
-      /* Reunión: por el título (reunión, revisión, diagnóstico, llamada,
-         sesión…) o porque tiene enlace de Meet. Pedro 24-sep-2026: el
-         "Diagnóstico Distinto" que reservaron por la web salía en Google
-         pero no en la app (caía en el filtro "Google Calendar", apagado). */
-      : (/reuni|revisi|diagn[oó]stic|llamada|sesi[oó]n|meeting|call\b|entrevista|onboarding|kick.?off/i.test(ev.summary) || !!ev.meetLink) ? 'reunion' as const
-      : 'gcal' as const
-    /* Reservas desde la WEB (distintostudio.com → "Diagnóstico Distinto · …"):
-       son clientes nuevos, van en NARANJA para distinguirlas (Pedro 24-sep-2026). */
-    const esReservaWeb = /^diagn[oó]stico distinto/i.test(ev.summary.trim())
-    const marcaG = tipoGoogle !== 'gcal' && !esReservaWeb ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
-    if (marcaG && marcasPermitidas && !marcasPermitidas.has(marcaG.id)) continue
-    eventos.push({
-      id: ev.id,
-      tipo: tipoGoogle,
-      origenGoogle: true,
-      fecha: ev.fecha,
-      hora: ev.hora,
-      titulo: ev.summary,
-      marcaSlug: marcaG?.slug ?? null,
-      marcaNombre: marcaG?.nombre ?? null,
-      marcaEmoji: marcaG?.emoji_marca ?? null,
-      color: esReservaWeb ? COLOR_RESERVA_WEB : marcaG?.color_calendario ?? (tipoGoogle === 'grabacion' ? '#6366F1' : '#3b82f6'),
-      estado: null,
-      meetLink: ev.meetLink,
-      videosGrabados: null,
-      notas: esReservaWeb ? '🌐 Cliente nuevo · reservó desde la web (distintostudio.com)' : tipoGoogle !== 'gcal' ? 'Agendado en Google Calendar' : null,
-      duracionMin: ev.durationMin,
-    })
-  }
-
-  /* Marcas para filtro + leyenda: solo las presentes en el mes. */
-  const marcasMes = Array.from(
-    new Map(
-      eventos
-        .filter((e) => e.marcaSlug)
-        .map((e) => [e.marcaSlug as string, {
-          slug: e.marcaSlug as string,
-          nombre: e.marcaNombre ?? '',
-          emoji: e.marcaEmoji,
-          color: e.color,
-        }]),
-    ).values(),
-  ).sort((a, b) => a.nombre.localeCompare(b.nombre))
 
   const nGrab = eventos.filter((e) => e.tipo === 'grabacion').length
   const nReu = eventos.filter((e) => e.tipo === 'reunion').length
@@ -431,9 +158,9 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
           invitación + recordatorio. */}
       {esDirector && <AgendarReunionBox />}
 
-      {grabRes.ok === false && (
+      {agenda.grabError && (
         <div className="p-4 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-          ⚠️ {grabRes.error}
+          ⚠️ {agenda.grabError}
         </div>
       )}
 
@@ -449,8 +176,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         hoy={hoyLima}
         esDirector={esDirector}
         filtrosIniciales={filtrosGuardados}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        marcasTodas={((marcasRes.data ?? []) as any[]).map((m) => ({ id: m.id as string, slug: m.slug as string, nombre: m.nombre as string, emoji: (m.emoji_marca ?? null) as string | null }))}
+        marcasTodas={agenda.marcasTodas}
       />
 
       <p className="text-xs text-muted-foreground text-center">
