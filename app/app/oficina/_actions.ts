@@ -11,7 +11,7 @@ import { guardarAvatarDb, reclamarEscritorioDb, leerPerfilesDb, type PerfilOfici
 
 type Ok = { ok: true } | { ok: false; error: string }
 
-const CLAVES = ['piel', 'pelo', 'peinado', 'ropa', 'accesorio'] as const
+import { avatarValido, normalizarAvatar } from './_avatar'
 
 async function miNombre(): Promise<string> {
   try {
@@ -24,14 +24,8 @@ async function miNombre(): Promise<string> {
 
 export async function guardarAvatarOficina(avatar: Record<string, string>): Promise<Ok> {
   const user = await requireUser()
-  /* Solo dejamos pasar las 5 claves conocidas y como texto corto: esto lo
-     manda el navegador, no se confía en la forma. */
-  const limpio: Record<string, string> = {}
-  for (const k of CLAVES) {
-    const v = avatar?.[k]
-    if (typeof v === 'string' && v.length <= 24) limpio[k] = v
-  }
-  if (Object.keys(limpio).length !== CLAVES.length) return { ok: false, error: 'Avatar incompleto' }
+  if (!avatarValido(avatar)) return { ok: false, error: 'Avatar inválido' }
+  const limpio = normalizarAvatar(avatar)
   try {
     await guardarAvatarDb(user.id, await miNombre(), limpio)
     return { ok: true }

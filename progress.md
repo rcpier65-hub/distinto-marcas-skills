@@ -13,3 +13,12 @@ Original prompt: Corregir permisos/estado del micrófono y persistencia de Ofici
 - CUA con sesión real: al entrar mic apagado; cambio 2D/3D; Inicio muestra mini-Oficina y 2 presentes; regreso conserva sesión; Ir a mi escritorio rodea obstáculos y termina Sentado. Sin errores JS.
 - Alcance visual: humanos estilizados/procedurales, no fotorrealismo tipo GTA. Falta prueba de conversación real entre dos equipos/redes; producción muestra TURN no configurado.
 - Prueba WebRTC local en navegador (audio sintético, sin hardware): PASS al replicar el ancla audio de MezcladorOficina; conexión inicial sin micro, recepción y reemplazo/liberación. Fixture reproducible app/scripts/fixtures/office-rtc.html. El primer intento sin ancla recibió paquetes pero WebKit no decodificaba; el mezclador real ya incluye esa ancla.
+
+## Revisión solicitada: oficina moderna, asientos y personalización
+- Retirada toda la vista 2D (render, canvas auxiliar, minimapa y editor de sprites). WebGL fallido ofrece reintentar 3D conservando la conexión.
+- Dos mesas compartidas para seis puestos + escritorio de gerencia Pedro; siete identidades de escritorio preservadas. Sillas explícitamente vinculadas y centradas.
+- Un único modelo de 28 asientos para dibujo, picking, colisión y navegación. Sillones accesibles con respaldo bloqueado y plazas transitables; controles Ir a zona y Levantarse.
+- Suelos continuos por zona, contorno de color, vidrio con menos marcos, mesas redondeadas, sillas ergonómicas, luz y marca oficial.
+- Rig humano compartido con el editor: rodillas/codos articulados, ciclo proporcional a distancia, giro y sentada interpolados. Personalización: hombre/mujer/neutro, tres caras, ocho peinados, ojos/piel/pelo, prendas/pantalón/accesorios/barba. Campos nuevos opcionales para avatares antiguos.
+- Guardado del avatar validado y confirmado en servidor antes del mensaje de éxito; sin migraciones.
+- Pruebas: 28 destinos alcanzables y rutas sin rozar obstáculos (radio .32); todas las sillas centradas, gerencia, 24 combinaciones cuerpo/peinado y pose sentada; audio previo sin regresiones; build local y TypeScript correctos. CUA local confirma recorrido al sillón, postura y editor 3D sin errores JS.

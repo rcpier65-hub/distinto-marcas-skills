@@ -7,7 +7,7 @@
 // · Sillas: si te quedas quieto sobre una silla, te sientas mirando hacia
 //   donde apunta la silla (hacia el escritorio).
 
-import { MAPA_W, MAPA_H, MUEBLES } from './_mapa'
+import { MAPA_W, MAPA_H, ASIENTOS } from './_mapa'
 import type { Direccion } from './_avatar'
 
 export type Punto = { x: number; y: number }
@@ -132,18 +132,12 @@ function lineaLibre(grid: Uint8Array, a: Punto, b: Punto): boolean {
 /* ===================== Sillas ===================== */
 export type Silla = { x: number; y: number; dir: Direccion }
 
-export const SILLAS: Silla[] = MUEBLES
-  .filter((m) => m.tipo === 'silla')
-  .map((m) => ({ x: m.x + 0.5, y: m.y + 0.5, dir: (m.dir ?? 's') as Direccion }))
+export const SILLAS = ASIENTOS
 
-/** Silla sobre la que estoy parado (a menos de ~media casilla). */
 export function sillaEn(x: number, y: number): Silla | null {
-  return SILLAS.find((s) => Math.abs(s.x - x) < 0.5 && Math.abs(s.y - y) < 0.5) ?? null
+  return SILLAS.find(s => Math.hypot(s.x - x, s.y - y) < .24) ?? null
 }
 
-/** La silla del escritorio con ese label (justo debajo del escritorio). */
 export function sillaDeEscritorio(label: string): Silla | null {
-  const e = MUEBLES.find((m) => m.tipo === 'escritorio' && m.label === label)
-  if (!e) return null
-  return SILLAS.find((s) => s.x > e.x && s.x < e.x + e.w && Math.abs(s.y - (e.y + e.h + 0.5)) < 0.6) ?? null
+  return SILLAS.find(s => s.puesto === label) ?? null
 }

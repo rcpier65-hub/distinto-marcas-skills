@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 import { Building2, Mic, MicOff, LogOut } from 'lucide-react'
 import { usarOficina } from './_usar-oficina'
 import { avatarPorNombre, avatarValido, type AvatarConfig, type Direccion } from './_avatar'
-import { SPAWN, zonaDe } from './_mapa'
+import { SPAWN, zonaDe, construirColisiones, esSolido } from './_mapa'
 import { actividadOficina, datosOficina, guardarAvatarOficina } from './_actions'
 import type { Punto } from './_camino'
 
@@ -89,7 +89,7 @@ type Datos = NonNullable<Awaited<ReturnType<typeof datosOficina>>>
 type Valor = ReturnType<typeof usarOficina> & {
   datos: Datos
   avatar: AvatarConfig
-  guardarAvatar: (a: AvatarConfig) => void
+  guardarAvatar: (a: AvatarConfig) => Promise<boolean>
   duenos: PerfilLite[]
   setDuenos: React.Dispatch<React.SetStateAction<PerfilLite[]>>
   entrarManual: () => Promise<void>
@@ -129,7 +129,7 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
       try {
         const raw = localStorage.getItem(LS_POS)
         const p = raw ? JSON.parse(raw) : null
-        if (typeof p?.x === 'number' && typeof p?.y === 'number') motor.pos = { x: p.x, y: p.y }
+        if (typeof p?.x === 'number' && typeof p?.y === 'number' && !esSolido(construirColisiones(), p.x, p.y)) motor.pos = { x: p.x, y: p.y }
       } catch { /* recepción */ }
     }).catch(() => {})
     return () => { vivo = false }
@@ -138,10 +138,14 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
   const of = usarOficina(datos?.yoId ?? '', datos?.nombre ?? '', avatar)
   const { entrado, entrar, salir, publicarPos, avanzar, reanudarAudio } = of
 
-  const guardarAvatar = useCallback((a: AvatarConfig) => {
-    setAvatar(a)
-    try { localStorage.setItem(LS_AVATAR, JSON.stringify(a)) } catch { /* modo privado */ }
-    void guardarAvatarOficina(a as unknown as Record<string, string>)
+  const guardarAvatar = useCallback(async (a: AvatarConfig) => {
+    try {
+      const result = await guardarAvatarOficina(a as unknown as Record<string, string>)
+      if (!result.ok) { toast.error(result.error); return false }
+      setAvatar(a)
+      try { localStorage.setItem(LS_AVATAR, JSON.stringify(a)) } catch { /* almacenamiento opcional */ }
+      return true
+    } catch { toast.error('No se pudo guardar tu avatar. Inténtalo de nuevo.'); return false }
   }, [])
 
   const entrarManual = useCallback(async () => {
