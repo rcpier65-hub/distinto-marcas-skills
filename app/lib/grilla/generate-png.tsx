@@ -5,6 +5,7 @@
 // pixel-perfect. Pasamos: slug, semana, y publicaciones (JSON serializado).
 
 import type { GrillaPublicacion } from '@/lib/integrations/notion'
+import { solicitarGrillaPNG } from './render-response'
 
 export type GrillaData = {
   marca: { slug: string; nombre: string; emoji: string; color: string; logo_url?: string | null }
@@ -52,16 +53,9 @@ export async function generateGrillaPNG(data: GrillaData): Promise<Buffer> {
     throw new Error('CRON_SECRET no configurado — necesario para auth interna entre runtimes')
   }
 
-  const response = await fetch(url, {
+  const bytes = await solicitarGrillaPNG(url, {
     headers: { Authorization: `Bearer ${secret}` },
-    cache: 'no-store',
+    signal: AbortSignal.timeout(65_000),
   })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`render-grilla returned ${response.status}: ${text.slice(0, 200)}`)
-  }
-
-  const arrayBuffer = await response.arrayBuffer()
-  return Buffer.from(arrayBuffer)
+  return Buffer.from(bytes)
 }
