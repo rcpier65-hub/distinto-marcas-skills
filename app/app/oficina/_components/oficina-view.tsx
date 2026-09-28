@@ -22,6 +22,8 @@ import { reclamarEscritorio } from '../_actions'
 import { MUEBLES } from '../_mapa'
 import { useOficina, motor, esDispositivoMovil } from '../_contexto'
 import { buscarCamino, caminoParaAcercarse, sillaDeEscritorio, sillaEn } from '../_camino'
+import { AvisoEscena3D } from './aviso-escena-3d'
+import type { ErrorEscena3D } from './oficina-3d'
 
 const Oficina3D = dynamic(() => import('./oficina-3d'), { ssr: false, loading: () => <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-sm text-slate-500">Cargando la oficina…</div> })
 const EditorAvatar = dynamic(() => import('./editor-avatar'), { ssr: false })
@@ -78,7 +80,8 @@ function OficinaMapa() {
   const [editorAbierto, setEditorAbierto] = useState(false)
   const [entrando, setEntrando] = useState(false)
 
-  const [error3D, setError3D] = useState(false)
+  const [error3D, setError3D] = useState<ErrorEscena3D | null>(null)
+  const [recuperando3D, setRecuperando3D] = useState(false)
   const [escenaKey, setEscenaKey] = useState(0)
   const yaw = useRef(0)
   const colisiones = useMemo(() => construirColisiones(), [])
@@ -102,7 +105,7 @@ function OficinaMapa() {
 
   /* --- Teclado --- */
   useEffect(() => {
-    if (!entrado || editorAbierto || error3D) return
+    if (!entrado || editorAbierto || error3D || recuperando3D) return
     const abajo = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
@@ -129,7 +132,7 @@ function OficinaMapa() {
       window.removeEventListener('keyup', arriba)
       window.removeEventListener('blur', soltarTodo)
     }
-  }, [mandarEmote, router, entrado, editorAbierto, error3D])
+  }, [mandarEmote, router, entrado, editorAbierto, error3D, recuperando3D])
 
   const libre = useCallback((x: number, y: number): boolean => {
     if (motor.ghost) return x > 0.3 && y > 0.3 && x < MAPA_W - 0.3 && y < MAPA_H - 0.3
@@ -148,7 +151,7 @@ function OficinaMapa() {
   useEffect(() => {
     const pressed = teclas.current
     pressed.clear()
-    if (!entrado || editorAbierto || error3D) { motor.mov = false; return }
+    if (!entrado || editorAbierto || error3D || recuperando3D) { motor.mov = false; return }
     if (esSolido(colisiones, motor.pos.x, motor.pos.y)) motor.pos = { x: SPAWN.x + .5, y: SPAWN.y + .5 }
     let raf = 0
     let anterior = performance.now()
@@ -245,7 +248,7 @@ function OficinaMapa() {
     }
     raf = requestAnimationFrame(frame)
     return () => { cancelAnimationFrame(raf); pressed.clear(); motor.mov = false }
-  }, [colisiones, libre, avanzar, jugadores, zonaActual, caminarA, entrado, editorAbierto, error3D])
+  }, [colisiones, libre, avanzar, jugadores, zonaActual, caminarA, entrado, editorAbierto, error3D, recuperando3D])
 
   const levantarse = () => {
     const directions = { n: [0, -1], s: [0, 1], e: [1, 0], o: [-1, 0] }
@@ -395,15 +398,13 @@ function OficinaMapa() {
 
 </>}      <div className="flex min-h-0 flex-1">
         <div data-office-scene className="relative min-w-0 flex-1">
-      {!error3D && <Oficina3D key={escenaKey}
+      {!error3D && <Oficina3D key={escenaKey} compatible={escenaKey > 0}
         personas={() => [{ id: yoId, nombre, x: motor.pos.x, y: motor.pos.y, dir: motor.dir, mov: motor.mov, sentado: motor.sentado, avatar, emote: emoteRef.current?.emoji }, ...Array.from(jugadores.current.values())]}
         caminar={(x, y) => { motor.guia = null; if (!caminarA(x, y)) toast('No hay camino hasta ese lugar.') }}
         orientar={angle => { yaw.current = angle }} destino={() => motor.camino.at(-1) ?? null}
-        fallar={() => setError3D(true)} />}
-      {error3D && <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-100 text-slate-600">
-        <p>No se pudo iniciar la vista 3D. Tu conexión de Oficina sigue abierta.</p>
-        <button className="rounded-xl bg-violet-600 px-5 py-3 text-white" onClick={() => { setEscenaKey(k => k + 1); setError3D(false) }}>Reintentar vista 3D</button>
-      </div>}
+        recuperar={setRecuperando3D} fallar={setError3D} />}
+      {recuperando3D && !error3D && <div role="status" className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-100/90 text-sm text-slate-600"><Loader2 className="h-4 w-4 animate-spin" /> Recuperando la vista 3D…</div>}
+      {error3D && <AvisoEscena3D error={error3D} reintentar={() => { setEscenaKey(k => k + 1); setRecuperando3D(false); setError3D(null) }} />}
       {/* ===== Pantalla compartida en grande ===== */}
       {pantallaGrande && (() => {
         const r = pantallasRemotas.find((p) => p.id === pantallaGrande)

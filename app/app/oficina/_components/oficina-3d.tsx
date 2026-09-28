@@ -7,7 +7,8 @@ import { crearPersonaje, animarPersonaje, liberarPersonaje, type Personaje, type
 import type { AvatarConfig } from '../_avatar'
 
 export type Persona3D = PosePersona & { id: string; nombre: string; avatar: AvatarConfig; emote?: string | null }
-type Props = { personas: () => Persona3D[]; caminar: (x: number, y: number) => void; fallar: () => void; orientar: (yaw: number) => void; destino: () => { x: number; y: number } | null }
+export type ErrorEscena3D = 'no-disponible' | 'interrumpida'
+type Props = { personas: () => Persona3D[]; caminar: (x: number, y: number) => void; fallar: (motivo: ErrorEscena3D) => void; recuperar: (activo: boolean) => void; compatible?: boolean; orientar: (yaw: number) => void; destino: () => { x: number; y: number } | null }
 
 /** Solo dibuja: la conexión y la captura siguen en el proveedor global. */
 export default function Oficina3D(props: Props) {
@@ -15,10 +16,11 @@ export default function Oficina3D(props: Props) {
   useEffect(() => { latest.current = props }, [props])
   useEffect(() => {
     const el = host.current!
+    const compatible = latest.current.compatible
     let renderer: T.WebGLRenderer
-    try { renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }) }
-    catch { latest.current.fallar(); return }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.shadowMap.enabled = true
+    try { renderer = new T.WebGLRenderer({ antialias: !compatible, powerPreference: 'default' }) }
+    catch { latest.current.fallar('no-disponible'); return }
+    renderer.setPixelRatio(compatible ? 1 : Math.min(devicePixelRatio, 1.5)); renderer.shadowMap.enabled = !compatible
     renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1
     el.appendChild(renderer.domElement)
     renderer.domElement.setAttribute('aria-label', 'Oficina 3D. Clic en un asiento para caminar y sentarte. WASD: caminar. Arrastra: girar. Rueda: zoom.')
@@ -26,7 +28,7 @@ export default function Oficina3D(props: Props) {
     const scene = new T.Scene(); scene.background = new T.Color('#e9eef1'); scene.fog = new T.Fog('#e9eef1', 50, 95)
     scene.add(new T.HemisphereLight('#f1faff', '#9aa8ad', 2))
     const sun = new T.DirectionalLight('#fff4dd', 2.8); sun.position.set(8, 25, 14); sun.target.position.set(20, 0, 13)
-    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.normalBias = .025; sun.shadow.radius = 3
+    sun.castShadow = !compatible; sun.shadow.mapSize.set(1024, 1024); sun.shadow.normalBias = .025; sun.shadow.radius = 3
     Object.assign(sun.shadow.camera, { left: -29, right: 29, top: 24, bottom: -24, far: 80 }); scene.add(sun, sun.target)
     const camera = new T.PerspectiveCamera(47, 1, .1, 100)
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -55,13 +57,29 @@ export default function Oficina3D(props: Props) {
       if (seat) latest.current.caminar(seat.x, seat.y)
       else if (ray.ray.intersectPlane(plane, hit)) latest.current.caminar(hit.x, hit.z)
     }
-    const lost = (e: Event) => { e.preventDefault(); latest.current.fallar() }
-    renderer.domElement.addEventListener('pointerdown', pointerDown); renderer.domElement.addEventListener('pointerup', pointerUp); renderer.domElement.addEventListener('webglcontextlost', lost)
+    let contextLost = false, restoreTimer: ReturnType<typeof setTimeout> | undefined
+    const lost = (e: Event) => {
+      e.preventDefault()
+      contextLost = true
+      latest.current.recuperar(true)
+      clearTimeout(restoreTimer)
+      // Conservar canvas y recursos permite que Three.js restaure el contexto.
+      // Desmontarlos aquí convertía una interrupción temporal en un fallo definitivo.
+      restoreTimer = setTimeout(() => latest.current.fallar('interrumpida'), 8000)
+    }
+    const restored = () => {
+      clearTimeout(restoreTimer)
+      renderer.setPixelRatio(1); renderer.shadowMap.enabled = false
+      contextLost = false
+      latest.current.recuperar(false)
+    }
+    renderer.domElement.addEventListener('pointerdown', pointerDown); renderer.domElement.addEventListener('pointerup', pointerUp)
+    renderer.domElement.addEventListener('webglcontextlost', lost); renderer.domElement.addEventListener('webglcontextrestored', restored)
     const resize = new ResizeObserver(() => { const w = el.clientWidth, h = el.clientHeight; if (w && h) { camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h) } }); resize.observe(el)
     let raf = 0, last = performance.now(), initialized = false
     function frame(now: number) {
       raf = requestAnimationFrame(frame)
-      if (document.hidden) { last = now; return }
+      if (document.hidden || contextLost) { last = now; return }
       const dt = Math.min((now - last) / 1000, .05); last = now
       const people = latest.current.personas(), ids = new Set(people.map(p => p.id))
       rigs.forEach((r, id) => { if (!ids.has(id)) { remove(r); rigs.delete(id) } })
@@ -84,10 +102,14 @@ export default function Oficina3D(props: Props) {
     }
     raf = requestAnimationFrame(frame)
     return () => {
+      clearTimeout(restoreTimer)
       cancelAnimationFrame(raf); resize.disconnect(); controls.dispose(); interior.dispose(); rigs.forEach(remove)
-      targetGeometry.dispose(); targetMaterial.dispose()
+      targetGeometry.dispose(); targetMaterial.dispose(); sun.shadow.dispose()
       renderer.domElement.removeEventListener('pointerdown', pointerDown); renderer.domElement.removeEventListener('pointerup', pointerUp); renderer.domElement.removeEventListener('webglcontextlost', lost)
-      renderer.dispose(); renderer.domElement.remove()
+      renderer.domElement.removeEventListener('webglcontextrestored', restored)
+      renderer.dispose()
+      if (!renderer.getContext().isContextLost()) renderer.forceContextLoss()
+      renderer.domElement.remove()
     }
   }, [])
   return <div ref={host} className="absolute inset-0" />

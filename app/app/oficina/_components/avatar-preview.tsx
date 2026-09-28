@@ -31,7 +31,11 @@ export default function AvatarPreview({ avatar }: { avatar: AvatarConfig }) {
       controls.update(); renderer.render(scene, camera)
     }
     raf = requestAnimationFrame(frame)
-    return () => { cancelAnimationFrame(raf); resize.disconnect(); controls.dispose(); liberarPersonaje(rig); renderer.dispose(); renderer.domElement.remove() }
+    return () => {
+      cancelAnimationFrame(raf); resize.disconnect(); controls.dispose(); liberarPersonaje(rig); renderer.dispose()
+      if (!renderer.getContext().isContextLost()) renderer.forceContextLoss()
+      renderer.domElement.remove()
+    }
   }, [])
   return <div ref={host} className="h-72 w-full rounded-3xl bg-gradient-to-b from-slate-100 to-white" />
 }
