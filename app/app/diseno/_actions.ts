@@ -14,6 +14,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { hoyLima } from '@/lib/fechas/hoy'
 import type { SubEstadoDiseno } from '@/lib/diseno/types'
+import { idDeSolicitudDiseno, insertarDisenoUnaVez } from '@/lib/diseno/create-task'
 
 type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -277,6 +278,8 @@ export async function obtenerCorreosDeMarca(slug: string): Promise<{
  * fecha_diseno y fecha_entrega pueden ser null al inicio.
  */
 export async function crearDisenoTask(args: {
+  solicitudId?: string
+  paraHoy?: boolean
   nombre: string
   descripcion?: string | null
   fechaDiseno?: string | null
@@ -286,10 +289,7 @@ export async function crearDisenoTask(args: {
      auto-llenen los invitados al crear la reunión de revisión).
      Si no se elige marca, default 'interno'. */
   marcaSlug?: string
-  /* Pedro: 'que se puedan seleccionar más de una marca cuando se hace
-     diseño'. Si vienen N slugs adicionales, creamos N publicaciones
-     extra con la misma config pero distinta marca. Útil para la misma
-     pieza (ej. 'Saludo Día de la Madre') replicada en varias marcas. */
+  /* Marcas adicionales: etiquetas de una sola tarea, sin crear copias. */
   marcasExtras?: string[]
   // Modo "para publicar"
   esParaPublicar: boolean
@@ -311,6 +311,9 @@ export async function crearDisenoTask(args: {
 
   const nombre = args.nombre.trim()
   if (!nombre) return { ok: false, error: 'Falta nombre de la tarea' }
+  let id: string
+  try { id = idDeSolicitudDiseno(user.id, args.solicitudId) }
+  catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Solicitud inválida' } }
 
   /* Resolvemos marca_id:
      - Si esParaPublicar=true → requiere marcaSlug obligatorio
@@ -339,6 +342,7 @@ export async function crearDisenoTask(args: {
   }
 
   const insert: Record<string, unknown> = {
+    id,
     marca_id: marca.id,
     nombre,
     /* Estado SIEMPRE 'disenar' — el ENUM estado_publicacion no tiene
@@ -369,6 +373,7 @@ export async function crearDisenoTask(args: {
     disenado: false,
     video_aprobado: false,
     fecha_diseno: args.fechaDiseno ?? null,
+    fecha_marcada_para_disenar: args.paraHoy ? hoyLima() : null,
     fecha_publicacion: args.esParaPublicar ? args.fechaPublicacion ?? null : null,
     fecha_edicion: args.esParaPublicar ? args.fechaEdicion ?? null : null,
     created_by: user.id,
@@ -401,31 +406,17 @@ export async function crearDisenoTask(args: {
     if (idsExtras.length > 0) insert.marcas_extra = idsExtras
   }
 
-  let { data, error } = await service
-    .from('publicaciones')
-    .insert(insert)
-    .select('id')
-    .single()
+  const { data, error } = await insertarDisenoUnaVez(service, insert)
 
-  if (error && (error.code === '42703' || /descripcion|fecha_entrega|reunion_hora|invitados_emails|marcas_extra/i.test(error.message ?? ''))) {
-    delete insert.descripcion
-    delete insert.fecha_entrega
-    delete insert.reunion_hora
-    delete insert.invitados_emails
-    delete insert.marcas_extra  // columna marcas_extra pendiente de migración
-    const retry = await service.from('publicaciones').insert(insert).select('id').single()
-    data = retry.data; error = retry.error
-  }
-
-  if (error) {
+  if (error || !data) {
     console.error('[crearDisenoTask] error:', error)
-    return { ok: false, error: error.message }
+    return { ok: false, error: error?.message ?? 'No se pudo guardar la tarea. Vuelve a intentar.' }
   }
 
   /* Las marcas extra ya quedaron etiquetadas en marcas_extra de ESTA tarea
      (arriba, antes del insert). extrasCreadas = cuántas etiquetas se guardaron.
      Si el insert cayó al fallback (columna pendiente), no se guardaron. */
-  const extrasCreadas = ('marcas_extra' in insert) ? idsExtras.length : 0
+  const extrasCreadas = 'marcas_extra' in data && Array.isArray(data.marcas_extra) ? data.marcas_extra.length : 0
 
   /* Refresco TODAS las vistas afectadas. Si es para publicar, la
      tarea aparecerá en el calendario principal y la tabla — pedro

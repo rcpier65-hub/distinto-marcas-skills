@@ -14,7 +14,7 @@
  *   - Quitado: Diseñador, Publicación, Portada lista, Diseñado
  */
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MarcaSelect } from '@/components/marca-select'
@@ -349,7 +349,7 @@ export function DisenoView({
      "limpia" sería router.refresh(), pero genera flash; el optimistic
      update se siente mejor. */
   function onTareaCreada(nueva: DisenoEntry) {
-    setEntries((cur) => [nueva, ...cur])
+    setEntries((cur) => cur.some((entry) => entry.id === nueva.id) ? cur : [nueva, ...cur])
     toast.success(`Tarea creada: ${nueva.nombreTarea}`)
     setModalOpen(false)
   }
@@ -1202,10 +1202,13 @@ function NuevaTareaModal({
      acá también, no solo en el detalle). Pedro 14-jul-2026. */
   const [paraHoy, setParaHoy] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const submitEnCurso = useRef(false)
+  const solicitudId = useRef<string | null>(null)
 
   /* Cierre seguro: si hay algo escrito, confirma antes de descartar (evita
      perder la tarea por error). Sin contenido, cierra directo. */
   function pedirCerrar() {
+    if (submitEnCurso.current) return
     const hayContenido = nombre.trim() || descripcion.trim() || marcasExtras.size > 0
     if (hayContenido && !window.confirm('¿Descartar esta tarea? Se perderá lo que escribiste.')) return
     onClose()
@@ -1231,6 +1234,7 @@ function NuevaTareaModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitEnCurso.current) return
     if (!nombre.trim()) { toast.error('Falta nombre'); return }
     if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
     if (esParaPublicar && !fechaPublicacion) { toast.error('Falta fecha de publicación'); return }
@@ -1246,71 +1250,79 @@ function NuevaTareaModal({
           .filter((s) => /@.+\./.test(s))
       : []
 
+    submitEnCurso.current = true
     setSubmitting(true)
-    const r = await crearDisenoTask({
-      nombre: nombre.trim(),
-      descripcion: descripcion.trim() || null,
-      fechaDiseno: fechaDiseno || null,
-      fechaEntrega: fechaEntrega || null,
-      /* Marca siempre se manda (incluso para tareas no publicables).
-         Si está vacío y NO es para publicar, el server default a "interno". */
-      marcaSlug: marcaSlug || undefined,
-      marcasExtras: Array.from(marcasExtras),
-      esParaPublicar,
-      fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
-      fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
-      horaReunion: agregarReunion ? horaReunion : null,
-      invitadosEmails: agregarReunion ? invitados : null,
-    })
-    setSubmitting(false)
-    if (!r.ok) { toast.error(r.error); return }
+    try {
+      // Conservar esta clave si la respuesta se pierde y se vuelve a intentar.
+      solicitudId.current ??= crypto.randomUUID()
+      const r = await crearDisenoTask({
+        solicitudId: solicitudId.current,
+        paraHoy,
+        nombre: nombre.trim(),
+        descripcion: descripcion.trim() || null,
+        fechaDiseno: fechaDiseno || null,
+        fechaEntrega: fechaEntrega || null,
+        /* Marca siempre se manda (incluso para tareas no publicables).
+           Si está vacío y NO es para publicar, el server default a "interno". */
+        marcaSlug: marcaSlug || undefined,
+        marcasExtras: Array.from(marcasExtras),
+        esParaPublicar,
+        fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
+        fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
+        horaReunion: agregarReunion ? horaReunion : null,
+        invitadosEmails: agregarReunion ? invitados : null,
+      })
+      if (!r.ok) { toast.error(r.error); return }
 
-    /* Si marcó "para hoy", la anclamos a la lista de hoy de Aylin. */
-    if (paraHoy && r.data?.id) { try { await marcarParaDisenarHoy(r.data.id) } catch { /* noop */ } }
+      /* Una sola tarea etiquetada con varias marcas (no copias). */
+      if (r.data!.extrasCreadas > 0) {
+        toast.success(`Tarea etiquetada en ${r.data!.extrasCreadas + 1} marcas`)
+      }
 
-    /* Una sola tarea etiquetada con varias marcas (no copias). */
-    if (r.data!.extrasCreadas > 0) {
-      toast.success(`Tarea etiquetada en ${r.data!.extrasCreadas + 1} marcas`)
+      /* Optimistic update: la tarea con la marca principal + las etiquetas extra. */
+      const marca = marcaSlug ? marcas.find((m) => m.slug === marcaSlug) : null
+      const principalTag = {
+        slug: marca?.slug ?? 'interno',
+        nombre: marca?.nombre ?? 'Distinto · Interno',
+        color: marca?.color ?? '#a78bfa',
+        emoji: marca?.emoji ?? null,
+      }
+      const extrasTags = Array.from(marcasExtras)
+        .map((slug) => marcas.find((m) => m.slug === slug))
+        .filter(Boolean)
+        .map((m) => ({ slug: m!.slug, nombre: m!.nombre, color: m!.color, emoji: m!.emoji ?? null }))
+      onCreated({
+        id: r.data!.id,
+        marcaSlug: marca?.slug ?? 'interno',
+        marcaNombre: marca?.nombre ?? 'Distinto · Interno',
+        marcaColor: marca?.color ?? '#a78bfa',
+        marcaEmoji: marca?.emoji ?? null,
+        marcasTags: [principalTag, ...extrasTags],
+        esInterno: !marca,
+        nombreTarea: nombre.trim(),
+        descripcion: descripcion.trim() || null,
+        fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
+        fechaDiseno: fechaDiseno || null,
+        fechaEntrega: fechaEntrega || null,
+        /* Mismo estado que usamos en el insert del server action */
+        estado: 'disenar',
+        subEstado: 'sin_empezar',
+        plataformas: [],
+        tipoContenido: [],
+        /* Si marcó "Trabajar HOY", reflejamos la fecha de hoy (Lima) en la copia
+           local — igual que lo guardado en la creación de la tarea. Antes
+           estaba fijo en null → la tarea no aparecía en "Mi trabajo HOY" hasta
+           recargar. Ese era el bug que reportó Aylin. */
+        fechaMarcadaParaDisenar: paraHoy ? hoyLima() : null,
+        startedAt: null,
+        archivedAt: null,
+      })
+    } catch {
+      toast.error('No pudimos confirmar el guardado. Reintenta: se recuperará la misma tarea sin duplicarla.')
+    } finally {
+      submitEnCurso.current = false
+      setSubmitting(false)
     }
-
-    /* Optimistic update: la tarea con la marca principal + las etiquetas extra. */
-    const marca = marcaSlug ? marcas.find((m) => m.slug === marcaSlug) : null
-    const principalTag = {
-      slug: marca?.slug ?? 'interno',
-      nombre: marca?.nombre ?? 'Distinto · Interno',
-      color: marca?.color ?? '#a78bfa',
-      emoji: marca?.emoji ?? null,
-    }
-    const extrasTags = Array.from(marcasExtras)
-      .map((slug) => marcas.find((m) => m.slug === slug))
-      .filter(Boolean)
-      .map((m) => ({ slug: m!.slug, nombre: m!.nombre, color: m!.color, emoji: m!.emoji ?? null }))
-    onCreated({
-      id: r.data!.id,
-      marcaSlug: marca?.slug ?? 'interno',
-      marcaNombre: marca?.nombre ?? 'Distinto · Interno',
-      marcaColor: marca?.color ?? '#a78bfa',
-      marcaEmoji: marca?.emoji ?? null,
-      marcasTags: [principalTag, ...extrasTags],
-      esInterno: !marca,
-      nombreTarea: nombre.trim(),
-      descripcion: descripcion.trim() || null,
-      fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
-      fechaDiseno: fechaDiseno || null,
-      fechaEntrega: fechaEntrega || null,
-      /* Mismo estado que usamos en el insert del server action */
-      estado: 'disenar',
-      subEstado: 'sin_empezar',
-      plataformas: [],
-      tipoContenido: [],
-      /* Si marcó "Trabajar HOY", reflejamos la fecha de hoy (Lima) en la copia
-         local — igual que lo que ya guardó marcarParaDisenarHoy en la BD. Antes
-         estaba fijo en null → la tarea no aparecía en "Mi trabajo HOY" hasta
-         recargar. Ese era el bug que reportó Aylin. */
-      fechaMarcadaParaDisenar: paraHoy ? hoyLima() : null,
-      startedAt: null,
-      archivedAt: null,
-    })
   }
 
   /* Common props para inputs de fecha/hora: el onFocus llama showPicker()
@@ -1366,16 +1378,17 @@ function NuevaTareaModal({
           <h2 style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0 }}>
             Nueva tarea de diseño
           </h2>
-          <button type="button" onClick={pedirCerrar} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4 }}>
+          <button type="button" onClick={pedirCerrar} disabled={submitting} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4 }}>
             ✕
           </button>
         </div>
 
         {/* BODY scrolleable — TODO el contenido del form va acá */}
-        <div style={{
+        <fieldset disabled={submitting} style={{
           flex: 1,
           overflowY: 'auto',
           padding: '16px 24px',
+          border: 0, margin: 0, minWidth: 0,
           display: 'flex', flexDirection: 'column', gap: 14,
         }}>
 
@@ -1409,8 +1422,7 @@ function NuevaTareaModal({
 
         {/* Pedro: 'que se puedan seleccionar más de una marca cuando se
             hace diseño'. Si Ailyn elige una marca principal, debajo
-            aparece la opción de replicar en otras marcas (chips
-            toggleables). Se crea una tarea por cada marca seleccionada. */}
+            aparecen etiquetas de otras marcas para la misma tarea. */}
         {marcaSlug && marcaSlug !== 'interno' && marcas.length > 1 && (
           <div style={{ marginTop: 6 }}>
             <div style={{
@@ -1676,7 +1688,7 @@ function NuevaTareaModal({
           </div>
         )}
 
-        </div>{/* fin BODY scrolleable */}
+        </fieldset>{/* fin BODY scrolleable */}
 
         {/* FOOTER fijo con los botones — siempre visible incluso
             cuando el body tiene mucho contenido. */}
@@ -1688,7 +1700,7 @@ function NuevaTareaModal({
           flexShrink: 0,
         }}>
           <button
-            type="button" onClick={pedirCerrar}
+            type="button" onClick={pedirCerrar} disabled={submitting}
             style={{
               padding: '8px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
               background: 'transparent', color: 'var(--mk-text-secondary)',
