@@ -16,7 +16,7 @@ const TABS: { id: PlanCategoria | 'all'; label: string }[] = [
   { id: 'adicional', label: 'Adicionales' },
 ]
 
-function PlanCard({ plan }: { plan: PlanItem }) {
+function PlanCard({ plan, onUsePlan }: { plan: PlanItem; onUsePlan?: (id: string) => void }) {
   return (
     <article
       style={{
@@ -99,11 +99,12 @@ function PlanCard({ plan }: { plan: PlanItem }) {
           ))}
         </div>
       )}
+      {onUsePlan && <button type="button" onClick={() => onUsePlan(plan.id)} style={{ marginTop: 'auto' }}>Usar en una propuesta →</button>}
     </article>
   )
 }
 
-export function PlanesView() {
+export function PlanesView({ onUsePlan }: { onUsePlan?: (id: string) => void }) {
   const [tab, setTab] = useState<PlanCategoria | 'all'>('all')
 
   const items = useMemo(() => {
@@ -175,7 +176,7 @@ export function PlanesView() {
         }}
       >
         {items.map((p) => (
-          <PlanCard key={p.id} plan={p} />
+          <PlanCard key={p.id} plan={p} onUsePlan={onUsePlan} />
         ))}
       </div>
     </div>

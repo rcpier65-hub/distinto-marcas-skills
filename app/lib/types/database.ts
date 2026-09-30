@@ -579,6 +579,12 @@ export type MarcaFactsUpdate = Partial<Omit<MarcaFactsRow, 'marca_id' | 'created
 export interface Database {
   public: {
     Tables: {
+      propuestas_comerciales: {
+        Row: { id: string; numero: number; created_by: string; data: Json; revision: number; created_at: string; updated_at: string }
+        Insert: { id: string; created_by: string; data: Json; revision?: number; created_at?: string; updated_at?: string }
+        Update: { data?: Json; revision?: number; updated_at?: string }
+        Relationships: []
+      }
       marcas: {
         Row: MarcaRow
         Insert: MarcaInsert
