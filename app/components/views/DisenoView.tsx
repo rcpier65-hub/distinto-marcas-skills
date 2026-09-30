@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron } from 'lucide-react'
+import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron, Sparkles as IcoMagia, Loader2 as IcoCargando, Clock as IcoReloj } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MarcaSelect } from '@/components/marca-select'
@@ -28,6 +28,7 @@ import {
   archivarTarea,
   crearDisenoTask,
   obtenerCorreosDeMarca,
+  interpretarReunionEntrega, agendarReunionEntrega,
 } from '@/app/diseno/_actions'
 import {
   type DisenoEntry,
@@ -1199,6 +1200,29 @@ function NuevaTareaModal({
   const esParaPublicar = tipo !== null && tipo !== 'interno'
   const [redes, setRedes] = useState<string[]>(['Instagram', 'Facebook'])
   const [verMasMarcas, setVerMasMarcas] = useState(false)
+  /* Reunión de ENTREGA (Pedro 30-sep-2026): se escribe en una frase como en el
+     calendario ("el viernes 2 de octubre a las 11am") y se agenda al crear. */
+  const [reunionTexto, setReunionTexto] = useState('')
+  const [reunionFecha, setReunionFecha] = useState('')
+  const [reunionHora, setReunionHora] = useState('')
+  const [reunionDur, setReunionDur] = useState(45)
+  const [reunionTituloManual, setReunionTituloManual] = useState<string | null>(null)
+  const [interpretando, setInterpretando] = useState(false)
+  const marcaElegida = marcaSlug && marcaSlug !== 'interno' ? marcas.find((m) => m.slug === marcaSlug) ?? null : null
+  const reunionTituloAuto = `Diseño ${marcaElegida?.nombre ?? 'Distinto'}${nombre.trim() ? ` · ${nombre.trim()}` : ''}`
+  const reunionTitulo = reunionTituloManual ?? reunionTituloAuto
+  async function entenderReunion() {
+    if (!reunionTexto.trim() || interpretando) return
+    setInterpretando(true)
+    const r = await interpretarReunionEntrega(reunionTexto)
+    setInterpretando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    if (r.fecha) setReunionFecha(r.fecha)
+    if (r.hora) setReunionHora(r.hora)
+    setReunionDur(r.durationMin)
+    if (!r.fecha) toast('No entendí la fecha, elígela abajo.')
+    else if (!r.hora) toast('Falta la hora: ponla abajo.')
+  }
   const [fechaPublicacion, setFechaPublicacion] = useState('')
   const [fechaEdicion, setFechaEdicion] = useState('')
   /* Reunión de revisión opcional */
@@ -1247,7 +1271,9 @@ function NuevaTareaModal({
     if (esParaPublicar && redes.length === 0) { toast.error('Elige al menos una red'); return }
     if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
     if (esParaPublicar && !fechaPublicacion) { toast.error('Falta fecha de publicación'); return }
-    if (agregarReunion && !horaReunion) { toast.error('Falta hora de reunión'); return }
+    if (tipo === 'interno' && !fechaEntrega) { toast.error('Falta la fecha de entrega de diseño'); return }
+    if (agregarReunion && !reunionFecha) { toast.error('Falta la fecha de la reunión de entrega'); return }
+    if (agregarReunion && !reunionHora) { toast.error('Falta la hora de la reunión de entrega'); return }
 
     /* Parse invitados — soporta separadores comunes: coma, salto de
        línea, punto y coma. Filtra strings que parezcan email válido
@@ -1280,10 +1306,20 @@ function NuevaTareaModal({
         esParaPublicar,
         fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
         fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
-        horaReunion: agregarReunion ? horaReunion : null,
-        invitadosEmails: agregarReunion ? invitados : null,
+        /* La reunión de entrega se agenda aparte (abajo), como en el calendario. */
+        horaReunion: null,
+        invitadosEmails: null,
       })
       if (!r.ok) { toast.error(r.error); return }
+
+      if (agregarReunion) {
+        const rr = await agendarReunionEntrega({
+          marcaSlug: marcaSlug || null, titulo: reunionTitulo, fecha: reunionFecha, hora: reunionHora,
+          durationMin: reunionDur, invitados,
+        })
+        if (rr.ok) toast.success(`Reunión de entrega agendada${rr.meetLink ? ' con Meet' : ''} · ${reunionTitulo}`)
+        else toast.error(`La tarea se creó, pero la reunión no: ${rr.error}`)
+      }
 
       /* Una sola tarea etiquetada con varias marcas (no copias). */
       if (r.data!.extrasCreadas > 0) {
@@ -1389,7 +1425,10 @@ function NuevaTareaModal({
         </div>
 
         {/* BODY */}
-        <fieldset disabled={submitting} style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 8px', border: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {/* El DIV es el que se desliza (un <fieldset> no scrollea bien dentro
+            de un flex en Chrome/Safari — por eso no se podía deslizar). */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
+        <fieldset disabled={submitting} style={{ padding: '18px 22px 16px', border: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
 
           {/* 1 · Tipo */}
           <Seccion titulo="Tipo de diseño">
@@ -1506,7 +1545,7 @@ function NuevaTareaModal({
                   <input type="date" value={fechaDiseno} onChange={(e) => setFechaDiseno(e.target.value)}
                     onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
                 </Campo>
-                <Campo label="Fecha de entrega">
+                <Campo label={tipo === 'interno' ? 'Fecha de entrega de diseño' : 'Fecha de entrega'} requerido={tipo === 'interno'}>
                   <input type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)}
                     onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
                 </Campo>
@@ -1520,16 +1559,40 @@ function NuevaTareaModal({
               <Opcion activo={paraHoy} onToggle={() => setParaHoy((v) => !v)} color="#7170ff" Icon={IcoHoy}
                 titulo="Trabajar hoy" texto="La agrega a tu lista de hoy." />
               <Opcion activo={agregarReunion} onToggle={() => setAgregarReunion((v) => !v)} color="#10b981" Icon={IcoVideo}
-                titulo="Agendar reunión de revisión" texto="Evento en Google Calendar con enlace de Meet." />
+                titulo="¿Esta entrega necesita reunión?" texto="Actívalo si hay que presentar el diseño en una reunión." />
               {agregarReunion && (
-                <div style={{ display: 'grid', gap: 12, padding: 14, borderRadius: 14, background: '#f8fafc', border: '1px solid #eef0f4' }}>
-                  <Campo label="Hora de la reunión" requerido>
-                    <input type="time" value={horaReunion} onChange={(e) => setHoraReunion(e.target.value)}
-                      onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer', maxWidth: 180 }} />
+                <div style={{ display: 'grid', gap: 12, padding: 14, borderRadius: 14, background: '#f6fdf9', border: '1px solid #d1fae5' }}>
+                  {/* Mismo asistente del calendario: una frase y listo. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '4px 4px 4px 12px' }}>
+                    <IcoMagia size={15} color="#10b981" style={{ flexShrink: 0 }} />
+                    <input value={reunionTexto} onChange={(e) => setReunionTexto(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void entenderReunion() } }}
+                      placeholder='Ej: "reunión de entrega el viernes 2 de octubre a las 11am"'
+                      style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', fontSize: 14, fontFamily: 'inherit', background: 'transparent', height: 34, color: '#0f172a' }} />
+                    <button type="button" onClick={() => void entenderReunion()} disabled={interpretando || !reunionTexto.trim()}
+                      style={{ height: 34, padding: '0 14px', borderRadius: 9, border: 'none', background: '#10b981', color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', opacity: interpretando || !reunionTexto.trim() ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {interpretando ? <IcoCargando size={14} className="animate-spin" /> : null} Listo
+                    </button>
+                  </div>
+                  <Campo label="Nombre del evento">
+                    <input value={reunionTitulo} onChange={(e) => setReunionTituloManual(e.target.value)} style={campo} />
                   </Campo>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <Campo label="Fecha" requerido>
+                      <input type="date" value={reunionFecha} onChange={(e) => setReunionFecha(e.target.value)}
+                        onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer', borderColor: reunionFecha ? '#e2e8f0' : '#fcd34d' }} />
+                    </Campo>
+                    <Campo label="Hora" requerido>
+                      <input type="time" value={reunionHora} onChange={(e) => setReunionHora(e.target.value)}
+                        onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer', borderColor: reunionHora ? '#e2e8f0' : '#fcd34d' }} />
+                    </Campo>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <IcoReloj size={13} /> {reunionDur} min · Google Calendar con Meet{marcaElegida ? ` · ${marcaElegida.nombre}` : ''}
+                  </p>
                   <Campo label="Invitados (correos separados por coma)">
                     <textarea value={invitadosInput} onChange={(e) => setInvitadosInput(e.target.value)} rows={2}
-                      placeholder={marcaSlug && marcaSlug !== 'interno' ? 'Se llenan solos con los correos de la marca…' : 'cliente@ejemplo.com, otro@cliente.com'}
+                      placeholder={marcaElegida ? 'Se llenan solos con los correos de la marca…' : 'cliente@ejemplo.com, otro@cliente.com'}
                       style={{ ...campo, height: 'auto', minHeight: 56, padding: '10px 12px', resize: 'vertical' }} />
                   </Campo>
                 </div>
@@ -1537,6 +1600,7 @@ function NuevaTareaModal({
             </Seccion>
           )}
         </fieldset>
+        </div>
 
         {/* FOOTER */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '14px 22px 18px', borderTop: '1px solid #f1f2f6', background: '#fcfcfd', flexShrink: 0 }}>

@@ -440,3 +440,55 @@ export async function crearDisenoTask(args: {
   }
   return { ok: true, data: { id: data.id, extrasCreadas } }
 }
+
+/* ===== Reunión de ENTREGA de un diseño (Pedro 30-sep-2026) =====
+   Desde el modal de nueva tarea: Ailyn escribe "reunión de entrega el viernes
+   2 de octubre a las 11am" y se agenda como en el calendario (Google + Meet),
+   con la marca ya elegida y el título "Diseño <Marca> · <tarea>". Solo para
+   miembros activos del equipo (el asistente del calendario es de directores). */
+async function esMiembroActivo(authUserId: string): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data } = await service.from('team_members').select('id').eq('auth_user_id', authUserId).eq('activo', true).maybeSingle()
+  return !!data
+}
+
+export async function interpretarReunionEntrega(texto: string): Promise<
+  { ok: true; fecha: string | null; hora: string | null; durationMin: number } | { ok: false; error: string }
+> {
+  const user = await requireUser()
+  if (!(await esMiembroActivo(user.id))) return { ok: false, error: 'No autorizado' }
+  const t = (texto ?? '').trim().slice(0, 300)
+  if (!t) return { ok: false, error: 'Escribe cuándo es la reunión. Ej: "el viernes 2 de octubre a las 11am".' }
+  const { parseAgenda } = await import('@/lib/reuniones/parse-agenda')
+  const p = await parseAgenda(t, [])
+  return { ok: true, fecha: p.fecha, hora: p.hora, durationMin: p.durationMin > 0 ? p.durationMin : 45 }
+}
+
+export async function agendarReunionEntrega(input: {
+  marcaSlug: string | null
+  titulo: string
+  fecha: string
+  hora: string
+  durationMin: number
+  invitados: string[]
+}): Promise<{ ok: true; meetLink: string | null } | { ok: false; error: string }> {
+  const user = await requireUser()
+  if (!(await esMiembroActivo(user.id))) return { ok: false, error: 'No autorizado' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: marca } = await service.from('marcas').select('id, nombre').eq('slug', input.marcaSlug || 'interno').maybeSingle()
+  if (!marca) return { ok: false, error: 'No encontré la marca para la reunión.' }
+  const { ejecutarAgendarReunion } = await import('@/lib/calendario/agendar-web')
+  const r = await ejecutarAgendarReunion({
+    marcaId: marca.id,
+    marcaNombre: marca.nombre,
+    fecha: input.fecha,
+    hora: input.hora,
+    durationMin: Math.max(15, Math.min(240, Math.round(input.durationMin || 45))),
+    titulo: (input.titulo || `Diseño ${marca.nombre}`).trim().slice(0, 200),
+    correos: input.invitados ?? [],
+  })
+  if (!r.ok) return r
+  return { ok: true, meetLink: r.meetLink }
+}
