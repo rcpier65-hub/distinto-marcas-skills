@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { esPedroEmail } from '@/lib/planes/catalogo'
-import { PlanesView } from './_components/planes-view'
+import { PropuestasWorkspace } from './_components/propuestas-workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,5 +15,5 @@ export default async function PlanesPage() {
     redirect('/inicio')
   }
 
-  return <PlanesView />
+  return <PropuestasWorkspace userId={user.id} />
 }
