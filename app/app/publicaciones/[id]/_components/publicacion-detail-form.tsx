@@ -6,7 +6,7 @@
 //  - ZONA INFERIOR: checklist a la izquierda bonito + resto a la derecha
 'use client'
 
-import { useState, useTransition, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { useState, useTransition, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -171,7 +171,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         cae a la grilla de la marca como último recurso. */
   const volverParam = searchParams.get('volver')
   const volverFallback = marca?.slug ? `/publicaciones?marca=${marca.slug}` : '/publicaciones'
-  function handleVolver() {
+  async function handleVolver() {
+    /* Primero termina de guardar lo pendiente, así el calendario ya lo muestra. */
+    await guardarAhora()
+    if (guardandoRef.current) await guardandoRef.current
+    router.refresh()
     if (volverParam) { router.push(volverParam); return }
     if (typeof window !== 'undefined' && window.history.length > 1) { router.back(); return }
     router.push(volverFallback)
@@ -409,7 +413,71 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     }, 0)
   }
 
+  /* Lo que se manda al guardar (mismo payload para el botón y el autoguardado). */
+  function armarPayload(f: typeof form) {
+    return {
+      ...f,
+      fecha_publicacion: f.fecha_publicacion || null,
+      fecha_edicion: f.fecha_edicion || null,
+      fecha_diseno: f.fecha_diseno || null,
+      copy: f.copy || null,
+      guion: f.guion || null,
+      frase: f.frase || null,
+      enlace_tomas: f.enlace_tomas || null,
+      enlace_musica: f.enlace_musica || null,
+      portada_cruda_url: f.portada_cruda_url || null,
+      portada_editada_url: f.portada_editada_url || null,
+      drive_resultado_url: f.drive_resultado_url || null,
+      video_sin_musica_url: f.video_sin_musica_url || null,
+      video_con_musica_url: f.video_con_musica_url || null,
+      editor_id: f.editor_id || null,
+      opcion_2: f.opcion_2 || null,
+      notas: f.notas || null,
+    }
+  }
+
+  /* AUTOGUARDADO (Pedro 30-sep-2026: "puse historia, Instagram, Facebook y
+     al volver seguía igual — tiene que guardarse"). Guarda solo 1 s después
+     del último cambio, y también al salir (Volver, cerrar o cambiar de
+     pestaña) si quedó algo pendiente. El botón "Guardar" sigue funcionando. */
+  const [autoEstado, setAutoEstado] = useState<'idle' | 'pendiente' | 'guardando' | 'guardado' | 'error'>('idle')
+  const formRef = useRef(form)
+  const pendienteRef = useRef(false)
+  const primeraRef = useRef(true)
+  const guardandoRef = useRef<Promise<unknown> | null>(null)
+  const guardarAhora = useCallback(async () => {
+    if (!pendienteRef.current) return
+    pendienteRef.current = false
+    setAutoEstado('guardando')
+    const p = updatePublicacion(initial.id, armarPayload(formRef.current))
+    guardandoRef.current = p
+    const r = await p
+    guardandoRef.current = null
+    if (r.ok) setAutoEstado(pendienteRef.current ? 'pendiente' : 'guardado')
+    else { setAutoEstado('error'); toast.error(`No se guardó: ${r.error}`) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial.id])
+  useEffect(() => {
+    formRef.current = form
+    if (primeraRef.current) { primeraRef.current = false; return }
+    pendienteRef.current = true
+    const t = setTimeout(() => { void guardarAhora() }, 1000)
+    return () => clearTimeout(t)
+  }, [form, guardarAhora])
+  useEffect(() => {
+    const alOcultar = () => { if (document.visibilityState === 'hidden') void guardarAhora() }
+    const alSalir = () => { void guardarAhora() }
+    document.addEventListener('visibilitychange', alOcultar)
+    window.addEventListener('pagehide', alSalir)
+    return () => {
+      document.removeEventListener('visibilitychange', alOcultar)
+      window.removeEventListener('pagehide', alSalir)
+      void guardarAhora()   // al navegar a otra pantalla dentro de la app
+    }
+  }, [guardarAhora])
+
   function handleSave() {
+    pendienteRef.current = false
     startTransition(async () => {
       const result = await updatePublicacion(initial.id, {
         ...form,
@@ -1948,6 +2016,11 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         <Button variant="ghost" onClick={handleVolver} className="px-2.5 sm:px-4">
           ← Volver
         </Button>
+        <span className="hidden sm:inline-flex items-center gap-1.5 text-[12px] text-muted-foreground shrink-0" aria-live="polite">
+          {autoEstado === 'guardando' || autoEstado === 'pendiente' ? <>Guardando…</>
+            : autoEstado === 'guardado' ? <><span style={{ color: '#16a34a' }}>✓</span> Guardado</>
+            : autoEstado === 'error' ? <span style={{ color: '#dc2626' }}>No se guardó</span> : null}
+        </span>
         <Button onClick={handleSave} disabled={isPending} className="shrink-0">
           {isPending ? 'Guardando…' : <>💾 Guardar<span className="hidden sm:inline">&nbsp;cambios</span></>}
         </Button>
