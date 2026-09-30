@@ -429,3 +429,30 @@ export async function sincronizarTodoNotion(opts?: {
     }
   }
 }
+
+/* Crear RÁPIDO desde el calendario (Pedro 30-sep-2026: "si estoy en la marca
+   Distribuidora Fitness, al dar + debe abrirse ya la publicación en esa marca
+   y en esa fecha; el formulario sale en vano"). Crea con un nombre provisional
+   y devuelve el id para abrir la ficha, donde se escribe el nombre. */
+export async function crearPublicacionRapida(marcaSlug: string, fecha: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const user = await requireUser()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Fecha inválida' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data: marca } = await service.from('marcas').select('id').eq('slug', marcaSlug).maybeSingle()
+  if (!marca) return { ok: false, error: 'Marca no encontrada' }
+  const { data, error } = await service.from('publicaciones').insert({
+    marca_id: marca.id,
+    nombre: 'Nueva publicación',
+    fecha_publicacion: fecha,
+    estado: 'tareas',
+    plataformas: [],
+    tipo_contenido: [],
+    objetivos: [],
+    created_by: user.id,
+    updated_by: user.id,
+  }).select('id').single()
+  if (error || !data) return { ok: false, error: error?.message ?? 'No se pudo crear' }
+  revalidatePath('/publicaciones')
+  return { ok: true, id: data.id as string }
+}

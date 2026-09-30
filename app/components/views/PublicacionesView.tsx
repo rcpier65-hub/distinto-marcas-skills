@@ -8,11 +8,11 @@
    Default tab: Listado (porque Pedro pidió "listado ayuda a entender mejor").
    Iter 1: read-only. Iter 2: bulk actions + crear/editar inline. */
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Scissors, FileText, Image as ImageIcon, Rocket, Star, X, Clapperboard, CircleFadingPlus, GalleryHorizontalEnd } from 'lucide-react'
 import { toast } from 'sonner'
-import { cambiarFechaPublicacion } from '@/app/publicaciones/_actions'
+import { cambiarFechaPublicacion, crearPublicacionRapida } from '@/app/publicaciones/_actions'
 import { AgregarFechaImportante } from '@/app/publicaciones/_components/agregar-fecha-importante'
 import { eliminarFechaImportante } from '@/app/fechas-importantes/_actions'
 import { categoriaInfo } from '@/lib/fechas/categorias'
@@ -137,8 +137,21 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
      en la celda del día). Pre-llena la fecha, y la marca si hay filtro activo,
      con ?volver= para regresar al calendario. Erick pidió poder crear haciendo
      click en la fecha, sin ir al botón "Nueva publicación" de arriba. */
-  function handleCreateEnFecha(fecha: string) {
+  const creandoRef = useRef(false)
+  async function handleCreateEnFecha(fecha: string) {
     const m = filters.marcaSlug
+    /* Con una marca elegida: se crea YA y se abre la ficha (sin formulario). */
+    if (m && m !== 'todas') {
+      if (creandoRef.current) return
+      creandoRef.current = true
+      const t = toast.loading('Creando publicación…')
+      const r = await crearPublicacionRapida(m, fecha)
+      creandoRef.current = false
+      toast.dismiss(t)
+      if (!r.ok) { toast.error(r.error); return }
+      router.push(`/publicaciones/${r.id}?nuevo=1&volver=${encodeURIComponent(`/publicaciones?marca=${m}`)}`)
+      return
+    }
     const params = new URLSearchParams()
     params.set('fecha', fecha)
     if (m && m !== 'todas') {
@@ -336,8 +349,8 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
           onClick={() => {
             const m = filters.marcaSlug
             if (m && m !== 'todas') {
-              const volver = `/publicaciones?marca=${m}`
-              router.push(`/publicaciones/nueva?marca=${m}&volver=${encodeURIComponent(volver)}`)
+              /* Con marca elegida: crea ya (fecha de hoy) y abre la ficha. */
+              void handleCreateEnFecha(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()))
             } else {
               router.push('/publicaciones/nueva')
             }
@@ -1517,7 +1530,24 @@ function SemanaView({ entries, isMobile = false, onMoveDate, onCreate, fechas = 
                     </div>
                   )
                 ) : (
-                  pubs.map((p) => <PubChip key={p.id} pub={p} variant="full" canDrag={!!onMoveDate && !isMobile} />)
+                  <>
+                    {pubs.map((p) => <PubChip key={p.id} pub={p} variant="full" canDrag={!!onMoveDate && !isMobile} />)}
+                    {/* También en días con publicaciones (p. ej. una historia el
+                        mismo día que el reel). Pedro 30-sep-2026. */}
+                    {onCreate && (
+                      <button type="button" onClick={() => onCreate(k)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                          padding: '7px 6px', marginTop: 2, color: 'var(--mk-text-quaternary)', fontSize: 11,
+                          background: 'transparent', border: '1px dashed var(--mk-border-subtle)',
+                          borderRadius: 'var(--mk-radius-md)', cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#7170ff'; e.currentTarget.style.color = '#7170ff' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--mk-border-subtle)'; e.currentTarget.style.color = 'var(--mk-text-quaternary)' }}>
+                        + Nueva publicación
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

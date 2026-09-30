@@ -364,6 +364,15 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     })
   }
 
+  /* Recién creada desde el calendario (?nuevo=1): el nombre queda
+     seleccionado para escribirlo directo. Pedro 30-sep-2026. */
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('nuevo')) return
+    const el = document.getElementById('pub-nombre') as HTMLInputElement | null
+    el?.focus()
+    el?.select()
+  }, [])
+
   function toggleArrayItem(key: 'plataformas' | 'tipo_contenido' | 'objetivos', value: string) {
     setForm((s) => {
       const arr = s[key]
@@ -719,6 +728,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
             <Badge variant="outline" className="text-xs">{ESTADO_TAREA_LABEL[form.estado_tarea]}</Badge>
           </div>
           <input
+            id="pub-nombre"
             type="text"
             value={form.nombre}
             onChange={(e) => setForm((s) => ({ ...s, nombre: e.target.value }))}

@@ -699,7 +699,7 @@ function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onD
   const { setNodeRef, isOver } = useDroppable({ id: `col:${columna.categoria}` })
   return (
     <section ref={setNodeRef} style={{
-      flex: '0 0 184px', width: 184,
+      flex: '0 0 228px', width: 228,
       borderRadius: 10, padding: 5,
       background: isOver ? `${columna.color}14` : 'transparent',
       transition: 'background 120ms',
@@ -709,7 +709,7 @@ function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onD
         <span style={{ fontSize: 11.5, fontWeight: 700, color: '#111827', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{columna.categoria}</span>
         <span style={{ fontSize: 10.5, color: '#9ca3af', fontWeight: 600 }}>{columna.items.length}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {columna.items.map((t) => (
           <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} readOnly={soloLectura.has(t.id)} otras={todasCategorias.filter((c) => c !== t.categoria)}
             onComplete={onComplete} onDelete={onDelete} onMover={onMover}
@@ -743,36 +743,48 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
 
   return (
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1, position: 'relative' }}>
-      <div ref={cardRef} style={{ background: tarea.color, borderRadius: 10, padding: '8px 9px 7px', color: '#fff', boxShadow: '0 1px 2px rgba(15,23,42,0.08)' }}>
+      <div ref={cardRef} className="mk-tarea-card" style={{
+        background: '#fff', borderRadius: 12, border: '1px solid #eceef3', borderLeft: `3px solid ${tarea.color}`,
+        padding: '10px 11px 9px', color: '#0f172a', boxShadow: '0 1px 2px rgba(15,23,42,0.05)',
+        transition: 'box-shadow 150ms, transform 150ms',
+      }}>
         {/* zona arrastrable = el texto */}
-        <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 12, fontWeight: 500, lineHeight: 1.35, cursor: 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
+        <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.38, color: '#0f172a', cursor: readOnly ? 'default' : 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
           {tarea.texto}
         </p>
         {tarea.traspasadaDeNombre && (
           <div title={tarea.traspasadaAt ? `Traspasada el ${new Date(tarea.traspasadaAt).toLocaleString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Traspasada'}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.22)', padding: '2px 7px', borderRadius: 999 }}>
-            <CornerDownRight size={10} strokeWidth={2.6} /> Traspasada de {tarea.traspasadaDeNombre.split(' ')[0]}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10.5, fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: 999 }}>
+            <CornerDownRight size={11} strokeWidth={2.4} /> de {tarea.traspasadaDeNombre.split(' ')[0].charAt(0) + tarea.traspasadaDeNombre.split(' ')[0].slice(1).toLowerCase()}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
+        {/* Responsable · Lista · ⋯ */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9 }}>
           {esCEO && tarea.teamMemberNombre && (
-            <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, background: 'rgba(255,255,255,0.2)', padding: '2px 7px', borderRadius: 999 }}>
-              {tarea.teamMemberNombre.split(' ')[0]}
+            <span title={tarea.teamMemberNombre} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', background: `${tarea.color}22`, color: tarea.color, fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {tarea.teamMemberNombre.charAt(0).toUpperCase()}
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tarea.teamMemberNombre.split(' ')[0].charAt(0) + tarea.teamMemberNombre.split(' ')[0].slice(1).toLowerCase()}
+              </span>
             </span>
           )}
           <div style={{ flex: 1 }} />
-          {readOnly && <span style={{ fontSize: 10 }}>Solo lectura</span>}
+          {readOnly && <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>Solo lectura</span>}
           <button disabled={readOnly} onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Marcar como lista (guarda el tiempo)"
-            style={{ ...btnCard, width: 'auto', padding: '0 8px', gap: 4, background: 'rgba(255,255,255,0.95)', color: '#0f172a' }}>
-            <Check size={12} strokeWidth={3} /> <span style={{ fontSize: 10.5, fontWeight: 700 }}>Lista</span>
+            className="mk-btn-lista" style={{ ...btnCard, width: 'auto', padding: '0 9px', gap: 4, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
+            <Check size={12} strokeWidth={3} /> <span style={{ fontSize: 11, fontWeight: 700 }}>Lista</span>
           </button>
-          <button disabled={readOnly} onClick={() => setMenu((v) => !v)} title="Más opciones" style={btnCard}>
-            <MoreHorizontal size={14} strokeWidth={2.4} />
+          <button disabled={readOnly} onClick={() => setMenu((v) => !v)} title="Más opciones" className="mk-btn-mas" style={btnCard}>
+            <MoreHorizontal size={15} strokeWidth={2.4} />
           </button>
         </div>
         {/* Cronómetro + fecha de entrega */}
+        <div style={{ height: 1, background: '#f1f3f7', margin: '9px -11px 0' }} />
         <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><PlanChips tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} /></fieldset>
       </div>
+      <style>{'.mk-tarea-card:hover{box-shadow:0 6px 18px rgba(15,23,42,0.08)!important}.mk-btn-lista:hover:not(:disabled){background:#dcfce7!important}.mk-btn-mas:hover:not(:disabled){background:#f1f5f9!important;color:#0f172a!important}@keyframes mkVivo{0%,100%{opacity:1}50%{opacity:.3}}.mk-dot-vivo{animation:mkVivo 1.2s ease-in-out infinite}'}</style>
       {menu && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 12px 32px rgba(15,23,42,0.16)', padding: 6, minWidth: 190 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, padding: '3px 8px 5px' }}>
@@ -815,13 +827,14 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
 
 /* Botón redondeado sobre la card de color. */
 const btnCard: React.CSSProperties = {
-  height: 24, width: 24, borderRadius: 7, border: 'none', cursor: 'pointer',
-  background: 'rgba(255,255,255,0.2)', color: '#fff',
+  height: 26, width: 26, borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
+  background: 'transparent', color: '#94a3b8',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  transition: 'background 120ms, color 120ms',
 }
 const chipCard: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 8px', borderRadius: 999,
-  border: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+  display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 9px', borderRadius: 999,
+  border: '1px solid transparent', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
 }
 
 function fmtFechaCorta(ymd: string): string {
@@ -903,20 +916,21 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
       {estado === 'archivado' ? (
-        <button type="button" onClick={desarchivar} title="Archivada — toca para reactivarla" style={{ ...chipCard, background: 'rgba(17,24,39,0.35)', color: '#fff' }}>
+        <button type="button" onClick={desarchivar} title="Archivada — toca para reactivarla" style={{ ...chipCard, background: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}>
           <Archive size={11} /> Archivada
         </button>
       ) : corriendo ? (
         <button type="button" onClick={pausar} disabled={cargando} title="En proceso — toca para pausar el cronómetro"
-          style={{ ...chipCard, background: '#fbbf24', color: '#78350f', fontVariantNumeric: 'tabular-nums', boxShadow: '0 0 0 2px rgba(251,191,36,0.35)' }}>
+          style={{ ...chipCard, background: '#fef3c7', color: '#92400e', borderColor: '#fcd34d', fontVariantNumeric: 'tabular-nums' }}>
+          <span className="mk-dot-vivo" style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
           <Pause size={11} fill="currentColor" /> {fmtReloj(segundos)}
         </button>
       ) : (
         <button type="button" onClick={iniciar} disabled={cargando}
           title={segundos > 0 ? 'En pausa — toca para seguir contando' : 'Empezar (inicia el cronómetro)'}
-          style={{ ...chipCard, background: estado === 'en_proceso' ? 'rgba(251,191,36,0.9)' : 'rgba(255,255,255,0.95)', color: estado === 'en_proceso' ? '#78350f' : '#0f172a' }}>
+          style={{ ...chipCard, background: estado === 'en_proceso' ? '#fffbeb' : '#f5f3ff', color: estado === 'en_proceso' ? '#b45309' : '#6d5dfc', borderColor: estado === 'en_proceso' ? '#fde68a' : '#ddd6fe' }}>
           <Play size={11} fill="currentColor" /> {segundos > 0 ? `Reanudar · ${fmtCorto(segundos)}` : 'Iniciar'}
         </button>
       )}
@@ -924,17 +938,17 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
         <button type="button"
           onClick={() => { setFi(fechaInicio ?? ''); setFe(fechaEntrega ?? ''); setEditFechas(true) }}
           title="Fecha de entrega (o rango inicio–entrega)"
-          style={{ ...chipCard, background: vencida ? '#111827' : 'rgba(255,255,255,0.2)', color: '#fff' }}>
+          style={{ ...chipCard, background: vencida ? '#fef2f2' : '#f8fafc', color: vencida ? '#dc2626' : '#64748b', borderColor: vencida ? '#fecaca' : '#e2e8f0', fontWeight: 600 }}>
           <CalendarDays size={11} /> {fechaEntrega ? `${fechaInicio ? fmtFechaCorta(fechaInicio) + ' → ' : ''}${fmtFechaCorta(fechaEntrega)}${vencida ? ' · vencida' : ''}` : 'Fecha'}
         </button>
       ) : (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           <input type="date" value={fi} onChange={(e) => setFi(e.target.value)} title="Inicio (opcional)"
-            style={{ fontSize: 10, fontWeight: 600, borderRadius: 7, border: '1px solid rgba(255,255,255,0.45)', padding: '2px 6px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
+            style={{ fontSize: 10, fontWeight: 600, borderRadius: 7, border: '1px solid #e2e8f0', padding: '2px 6px', color: '#0f172a', background: '#fff' }} />
           <input type="date" value={fe} onChange={(e) => setFe(e.target.value)} title="Entrega"
-            style={{ fontSize: 10, fontWeight: 600, borderRadius: 7, border: '1px solid rgba(255,255,255,0.45)', padding: '2px 6px', color: '#fff', background: 'rgba(255,255,255,0.18)', colorScheme: 'dark' }} />
-          <button type="button" onClick={guardarFechas} disabled={cargando} title="Guardar" style={{ ...btnCard, width: 22, height: 22, background: '#10b981' }}><Check size={12} strokeWidth={3} /></button>
-          <button type="button" onClick={() => setEditFechas(false)} title="Cancelar" style={{ ...btnCard, width: 22, height: 22 }}><X size={12} /></button>
+            style={{ fontSize: 10, fontWeight: 600, borderRadius: 7, border: '1px solid #e2e8f0', padding: '2px 6px', color: '#0f172a', background: '#fff' }} />
+          <button type="button" onClick={guardarFechas} disabled={cargando} title="Guardar" style={{ ...btnCard, width: 24, height: 24, background: '#10b981', color: '#fff' }}><Check size={12} strokeWidth={3} /></button>
+          <button type="button" onClick={() => setEditFechas(false)} title="Cancelar" style={{ ...btnCard, width: 24, height: 24, background: '#f1f5f9', color: '#64748b' }}><X size={12} /></button>
         </span>
       )}
     </div>
@@ -943,8 +957,8 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
 
 function CardVisual({ tarea, overlay }: { tarea: Tarea; overlay?: boolean }) {
   return (
-    <div style={{ background: tarea.color, borderRadius: 8, padding: '6px 8px', color: '#fff', width: 172, boxShadow: overlay ? '0 10px 28px rgba(0,0,0,0.28)' : 'none', cursor: 'grabbing' }}>
-      <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.3, wordBreak: 'break-word' }}>{tarea.texto}</p>
+    <div style={{ background: '#fff', border: '1px solid #eceef3', borderLeft: `3px solid ${tarea.color}`, borderRadius: 12, padding: '9px 11px', color: '#0f172a', width: 216, boxShadow: overlay ? '0 14px 32px rgba(15,23,42,0.22)' : 'none', cursor: 'grabbing' }}>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.35, wordBreak: 'break-word' }}>{tarea.texto}</p>
     </div>
   )
 }
