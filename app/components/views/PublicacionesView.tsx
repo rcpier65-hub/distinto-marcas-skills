@@ -861,7 +861,7 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
         borderRight: '1px solid transparent',
         borderBottom: '1px solid transparent',
         borderRadius: 'var(--mk-radius-sm)',
-        cursor: canDrag ? 'grab' : 'pointer',
+        cursor: 'pointer',   /* manito de clic; se puede arrastrar igual (Pedro 30-sep-2026) */
         opacity: dragging ? 0.4 : 1,
         fontFamily: 'inherit',
         color: 'var(--mk-text-secondary)',
