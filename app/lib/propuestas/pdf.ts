@@ -1,5 +1,14 @@
 import chromium from '@sparticuz/chromium-min'
 import puppeteer from 'puppeteer-core'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { proposalHtml } from './document'
+import type { ProposalData } from './model'
+
+export async function proposalPdf(data: ProposalData, number: string) {
+  const logo = await readFile(path.join(process.cwd(), 'public/agencia/distinto-horizontal.svg'))
+  return renderProposalPdf(proposalHtml(data, number, `data:image/svg+xml;base64,${logo.toString('base64')}`))
+}
 
 export async function renderProposalPdf(html: string) {
   chromium.setGraphicsMode = false

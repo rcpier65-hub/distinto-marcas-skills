@@ -8,6 +8,9 @@ import { AGENCY, STANDALONE, commercialWarnings, emptyProposal, excessAdFee, mon
 import { proposalHtml } from '@/lib/propuestas/document'
 import { PlanesView } from './planes-view'
 import styles from './propuestas.module.css'
+import { ProposalTextField as TextField } from './proposal-text-field'
+import { ProposalDelivery, type PreparedDelivery } from './proposal-delivery'
+import { documentKey } from '@/lib/propuestas/delivery'
 
 type Draft = ProposalRecord
 const steps = ['Cliente', 'Servicios', 'Condiciones', 'Vista previa']
@@ -21,9 +24,6 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return <label className={styles.field}><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
-}
-function TextField({ label, value, onChange, multiline = false, hint, maxLength = 2000 }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean; hint?: string; maxLength?: number }) {
-  return <Field label={label} hint={hint}>{multiline ? <textarea value={value} rows={4} maxLength={maxLength} onChange={e => onChange(e.target.value)} /> : <input value={value} maxLength={maxLength} onChange={e => onChange(e.target.value)} />}</Field>
 }
 
 export function PropuestasWorkspace({ userId }: { userId: string }) {
@@ -39,6 +39,7 @@ export function PropuestasWorkspace({ userId }: { userId: string }) {
   const [search, setSearch] = useState('')
   const [template, setTemplate] = useState('sm-integration')
   const [budget, setBudget] = useState(3000)
+  const [prepared, setPrepared] = useState<PreparedDelivery | null>(null)
   const lock = useRef(false)
   const key = `distinto:propuesta:v1:${userId}`
   const dirty = !!draft && JSON.stringify(draft.data) !== saved
@@ -111,9 +112,9 @@ export function PropuestasWorkspace({ userId }: { userId: string }) {
     if (draft.data.currency === 'USD') service.price = null
     update({ services: [...draft.data.services, service] })
   }
-  async function persist(status?: ProposalData['status']) {
+  async function persist(status?: ProposalData['status'], patch: Partial<ProposalData> = {}) {
     if (!draft) throw new Error('No hay propuesta abierta.')
-    const data = { ...draft.data, status: status ?? draft.data.status }
+    const data = { ...draft.data, ...patch, status: status ?? draft.data.status }
     const result = await api<{ proposal: ProposalRecord }>('/api/propuestas', { method: 'PUT', body: JSON.stringify({ id: draft.id, revision: draft.revision, data }) })
     setDraft(result.proposal); setSaved(JSON.stringify(result.proposal.data)); setRecovered(null)
     try { localStorage.removeItem(key) } catch { /* opcional */ }
@@ -125,6 +126,18 @@ export function PropuestasWorkspace({ userId }: { userId: string }) {
     lock.current = true; setBusy(true)
     try { await persist('borrador'); toast.success('Propuesta guardada en la app.') }
     catch (e) { toast.error(e instanceof Error ? e.message : 'No se pudo guardar.') }
+    finally { lock.current = false; setBusy(false) }
+  }
+  async function prepareDelivery(delivery: ProposalData['delivery']) {
+    if (lock.current || !draft) return
+    if (issues.length) { toast.error(issues[0]); return }
+    lock.current = true; setBusy(true)
+    try {
+      const row = await persist('lista', { delivery })
+      const result = await api<{ url: string; expiresAt: string }>('/api/propuestas/compartir', { method: 'POST', body: JSON.stringify({ id: row.id, revision: row.revision }) })
+      setPrepared({ ...result, id: row.id, key: documentKey(row.data) })
+      toast.success('PDF preparado. Elige WhatsApp o correo para revisar el mensaje.')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'No se pudo preparar el envío.') }
     finally { lock.current = false; setBusy(false) }
   }
   async function download() {
@@ -197,6 +210,7 @@ export function PropuestasWorkspace({ userId }: { userId: string }) {
             <section className={styles.panel}><h3>Calculadora de pauta adicional</h3><p className={styles.note}>Regla del catálogo: 10% sobre la inversión mensual que exceda S/ 3,000. El presupuesto de anuncios lo paga el cliente; aquí se calcula únicamente el fee adicional de gestión.</p><div className={styles.addPlan}><Field label="Inversión publicitaria mensual (S/)"><input type="number" min={0} max={10000000} value={budget} onChange={e=>setBudget(Math.max(0,Number(e.target.value)))}/></Field><strong>{money(excessAdFee(budget),'PEN')} / mes</strong><button disabled={draft.data.currency!=='PEN'||excessAdFee(budget)<=0} onClick={()=>{const existing=draft.data.services.find(s=>s.sourceId==='fee-pauta-excedente');const fee:ProposalService={id:existing?.id||crypto.randomUUID(),sourceId:'fee-pauta-excedente',name:'Gestión de pauta sobre excedente',category:'Paid Media',summary:`10% sobre el excedente de S/ 3,000, para una inversión de ${money(budget,'PEN')} al mes.`,scope:'Gestión del presupuesto publicitario adicional al límite del plan contratado.',deliverables:'',exclusions:'Inversión publicitaria: pagada por el cliente directamente a la plataforma.',quantity:1,price:excessAdFee(budget),frequency:'mensual',optional:false};update({services:existing?draft.data.services.map(s=>s.id===existing.id?fee:s):[...draft.data.services,fee]});toast.success('Fee de excedente aplicado una sola vez.')}}>Aplicar fee adicional</button></div></section>
           </>}
           {step===3 && <section className={styles.previewPanel}><div className={styles.previewTitle}><div><h2>Así la verá tu cliente</h2><p>El PDF usa estos mismos contenidos y el logo oficial de Distinto.</p></div><span className={styles.pill}>A4 · PDF</span></div><iframe title="Vista previa de la propuesta" srcDoc={html} sandbox="" className={styles.preview}/></section>}
+          {step===3 && <ProposalDelivery key={draft.id} record={draft} prepared={prepared} busy={busy} update={update} prepare={prepareDelivery}/>}
           <div className={styles.stepActions}><button disabled={step===0} onClick={()=>setStep(s=>s-1)}><ArrowLeft size={16}/> Anterior</button>{step<3?<button className={styles.primary} onClick={()=>setStep(s=>s+1)}>Continuar a {steps[step+1].toLowerCase()} <ArrowRight size={16}/></button>:<button className={styles.primary} onClick={()=>void download()}><FileDown size={16}/> Descargar propuesta</button>}</div>
         </fieldset>
         <aside className={styles.summary}><div className={styles.kicker}>TU PROPUESTA</div><h3>{draft.data.client.name || 'Nuevo cliente'}</h3><p>{draft.data.services.filter(s=>!s.optional).length} servicios incluidos · {draft.data.services.filter(s=>s.optional).length} opcionales</p>{total && <>{([{label:'Mensual',b:total.monthly},{label:'Pago único',b:total.once}]).map(({label,b})=>b.count>0&&<div className={styles.totalBlock} key={label}><small>{label}</small><strong>{b.pending?'Por definir':f(b.total,draft.data)}</strong><dl><dt>Subtotal</dt><dd>{f(b.subtotal,draft.data)}</dd>{b.discount>0&&<><dt>Descuento</dt><dd>−{f(b.discount,draft.data)}</dd></>}{draft.data.tax==='mas_igv'&&<><dt>IGV 18%</dt><dd>{f(b.tax,draft.data)}</dd></>}</dl></div>)}</>}<p className={styles.note}>{draft.data.tax==='mas_igv'?'Totales con IGV.':'Importes sin IGV.'} Los adicionales opcionales no se suman.</p>{warnings.map(w=><div className={styles.warning} key={w}>{w}</div>)}{issues.length>0?<div className={styles.checklist}><b>Antes de exportar</b><ul>{issues.map((v,i)=><li key={i}>{v}</li>)}</ul></div>:<div className={styles.allSet}><CheckCircle2 size={18}/> Lista para generar el PDF</div>}<div className={styles.agency}><b>{AGENCY.name}</b><span>RUC {AGENCY.ruc}</span></div></aside>

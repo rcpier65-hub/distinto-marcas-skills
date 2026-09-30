@@ -17,6 +17,7 @@ export const proposalSchema = z.object({
   objective: text(4000), services: z.array(serviceSchema).max(30),
   monthlyDiscount: amount, onceDiscount: amount,
   payment: text(4000), terms: text(8000), externalCosts: text(4000), team: text(3000),
+  delivery: z.object({ subject: text(180), message: text(1600) }).default({ subject: '', message: '' }),
 })
 export type ProposalData = z.infer<typeof proposalSchema>
 export type ProposalService = z.infer<typeof serviceSchema>
@@ -30,7 +31,7 @@ export function emptyProposal(): ProposalData {
     client: { name: '', contact: '', document: '', email: '', phone: '', industry: '', address: '', coverage: '' },
     objective: '', services: [], monthlyDiscount: 0, onceDiscount: 0,
     payment: '', terms: 'Los alcances y entregables son los descritos en esta propuesta.\nLos servicios adicionales se cotizan y aprueban por separado.\nHorario del equipo: lunes a viernes, de 9:00 a. m. a 5:00 p. m.',
-    externalCosts: '', team: '',
+    externalCosts: '', team: '', delivery: { subject: '', message: '' },
   }
 }
 

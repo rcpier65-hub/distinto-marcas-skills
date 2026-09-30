@@ -5,17 +5,22 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
+import { createHash } from 'node:crypto'
+import { ProposalError } from './errors'
+export { ProposalError } from './errors'
 
 // Esquema acotado: las interfaces antiguas de otras tablas no cumplen el
 // GenericSchema de la versión actual del cliente Supabase.
 type ProposalDatabase = { public: {
   Tables: Pick<Database['public']['Tables'], 'propuestas_comerciales'>
   Views: Record<string, never>
-  Functions: Record<string, never>
+  Functions: { booking_rate_limit: { Args: { p_key: string; p_limit: number; p_seconds: number }; Returns: boolean } }
 } }
 
-export class ProposalError extends Error {
-  constructor(message: string, public status = 400) { super(message) }
+export async function proposalRateLimit(db: SupabaseClient<ProposalDatabase>, userId: string, action: string, limit: number) {
+  const { data, error } = await db.rpc('booking_rate_limit', { p_key: createHash('sha256').update(`proposals:${action}:${userId}`).digest('hex'), p_limit: limit, p_seconds: 60 })
+  if (error) throw new ProposalError('No se pudo comprobar la solicitud. Intenta nuevamente.', 503)
+  if (!data) throw new ProposalError('Hay varias solicitudes en curso. Espera un minuto para continuar.', 429)
 }
 export async function proposalActor(request: Request) {
   const origin = request.headers.get('origin')
