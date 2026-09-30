@@ -18,6 +18,8 @@ import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DisenoDetailForm } from './_components/diseno-detail-form'
+import { EntregablesPanel } from './_components/entregables-panel'
+import type { Entregable } from '../_entregables-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,13 +92,29 @@ export default async function DisenoDetailPage({ params }: PageProps) {
     redirect(`/publicaciones/${id}`)
   }
 
+  /* Entregables (Historias / Posts / Carruseles con varias fechas). */
+  let entregables: Entregable[] = []
+  try {
+    const { data: ents } = await service.from('diseno_entregables')
+      .select('id, orden, titulo, fecha, link, listo_at, publicacion_id').eq('tarea_id', id).order('orden')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    entregables = ((ents ?? []) as any[]).map((r) => ({
+      id: r.id, orden: r.orden, titulo: r.titulo ?? '', fecha: r.fecha ?? null,
+      link: r.link ?? null, listoAt: r.listo_at ?? null, publicacionId: r.publicacion_id ?? null,
+    }))
+  } catch { /* sin tabla todavía */ }
+  const tipoRaw = String((Array.isArray(pub.tipo_contenido) ? pub.tipo_contenido[0] : '') ?? '').toLowerCase()
+  const tipoEntregable = /histor|stor/.test(tipoRaw) ? 'historia' : tipoRaw.includes('carrus') ? 'carrusel' : 'post'
+
   return (
-    <main className="container mx-auto p-6 max-w-3xl">
+    <main className={`container mx-auto p-6 ${entregables.length > 0 ? 'max-w-5xl' : 'max-w-3xl'}`}>
       <nav className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/diseno" className="hover:text-foreground">Diseño</Link>
         <span>/</span>
         <span className="text-foreground font-medium truncate max-w-[260px]">{pub.nombre}</span>
       </nav>
+
+      {entregables.length > 0 && <EntregablesPanel tipo={tipoEntregable} iniciales={entregables} />}
 
       <DisenoDetailForm
         publicacion={{

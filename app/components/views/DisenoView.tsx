@@ -15,10 +15,11 @@
  */
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron, Sparkles as IcoMagia, Loader2 as IcoCargando, Clock as IcoReloj } from 'lucide-react'
+import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron, Sparkles as IcoMagia, Loader2 as IcoCargando, Clock as IcoReloj, ChevronLeft as IcoAnt, ChevronRight as IcoSig, Plus as IcoMas, Link2 as IcoLink, Trash2 as IcoBorrar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MarcaSelect } from '@/components/marca-select'
+import { calendarioMarcaParaDiseno, crearEntregables, type PubCalendario } from '@/app/diseno/_entregables-actions'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import { hoyLima } from '@/lib/fechas/hoy'
 import {
@@ -996,6 +997,14 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, on
           {entry.marcaNombre}
         </span>
         <TipoDisenoChip tipos={entry.tipoContenido} />
+        {entry.entregables && entry.entregables.total > 0 && (
+          <span title={`${entry.entregables.listos} de ${entry.entregables.total} listas`}
+            style={{ fontSize: 9.5, fontWeight: 700, height: 17, padding: '0 6px', borderRadius: 999, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+              color: entry.entregables.listos === entry.entregables.total ? '#15803d' : '#475569',
+              background: entry.entregables.listos === entry.entregables.total ? '#f0fdf4' : '#f1f5f9' }}>
+            {entry.entregables.listos}/{entry.entregables.total}
+          </span>
+        )}
         {/* Etiquetas extra: puntitos de color (una sola tarea, varias marcas). */}
         {entry.marcasTags.length > 1 && (
           <span
@@ -1200,6 +1209,9 @@ function NuevaTareaModal({
   const esParaPublicar = tipo !== null && tipo !== 'interno'
   const [redes, setRedes] = useState<string[]>(['Instagram', 'Facebook'])
   const [verMasMarcas, setVerMasMarcas] = useState(false)
+  /* ENTREGABLES (Post / Carrusel / Historia): días elegidos en el calendario
+     de la marca. Cada uno enlaza la publicación que ya existe o crea una. */
+  const [entregables, setEntregables] = useState<ItemEntregable[]>([])
   /* Reunión de ENTREGA (Pedro 30-sep-2026): se escribe en una frase como en el
      calendario ("el viernes 2 de octubre a las 11am") y se agenda al crear. */
   const [reunionTexto, setReunionTexto] = useState('')
@@ -1223,8 +1235,6 @@ function NuevaTareaModal({
     if (!r.fecha) toast('No entendí la fecha, elígela abajo.')
     else if (!r.hora) toast('Falta la hora: ponla abajo.')
   }
-  const [fechaPublicacion, setFechaPublicacion] = useState('')
-  const [fechaEdicion, setFechaEdicion] = useState('')
   /* Reunión de revisión opcional */
   const [agregarReunion, setAgregarReunion] = useState(false)
   const [horaReunion, setHoraReunion] = useState('')
@@ -1270,7 +1280,7 @@ function NuevaTareaModal({
     if (!nombre.trim()) { toast.error('Falta nombre'); return }
     if (esParaPublicar && redes.length === 0) { toast.error('Elige al menos una red'); return }
     if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
-    if (esParaPublicar && !fechaPublicacion) { toast.error('Falta fecha de publicación'); return }
+    if (esParaPublicar && entregables.length === 0) { toast.error('Elige en el calendario los días que vas a diseñar'); return }
     if (tipo === 'interno' && !fechaEntrega) { toast.error('Falta la fecha de entrega de diseño'); return }
     if (agregarReunion && !reunionFecha) { toast.error('Falta la fecha de la reunión de entrega'); return }
     if (agregarReunion && !reunionHora) { toast.error('Falta la hora de la reunión de entrega'); return }
@@ -1304,13 +1314,24 @@ function NuevaTareaModal({
         tipoDiseno: tipo,
         plataformas: esParaPublicar ? redes : [],
         esParaPublicar,
-        fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
-        fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
+        /* La tarea madre NO va al calendario: van sus entregables (una
+           publicación por día). */
+        fechaPublicacion: null,
+        fechaEdicion: null,
         /* La reunión de entrega se agenda aparte (abajo), como en el calendario. */
         horaReunion: null,
         invitadosEmails: null,
       })
       if (!r.ok) { toast.error(r.error); return }
+
+      if (esParaPublicar && tipo) {
+        const re = await crearEntregables({
+          tareaId: r.data!.id, marcaSlug, tipo, plataformas: redes,
+          items: [...entregables].sort((a, b) => a.fecha.localeCompare(b.fecha))
+            .map((e) => ({ publicacionId: e.publicacionId, fecha: e.fecha, titulo: e.titulo })),
+        })
+        if (!re.ok) toast.error(`La tarea se creó, pero no sus ${tipoInfo?.label.toLowerCase() ?? 'entregables'}: ${re.error}`)
+      }
 
       if (agregarReunion) {
         const rr = await agendarReunionEntrega({
@@ -1348,7 +1369,7 @@ function NuevaTareaModal({
         esInterno: !marca,
         nombreTarea: nombre.trim(),
         descripcion: descripcion.trim() || null,
-        fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
+        fechaPublicacion: null,
         fechaDiseno: fechaDiseno || null,
         fechaEntrega: fechaEntrega || null,
         /* Mismo estado que usamos en el insert del server action */
@@ -1504,20 +1525,21 @@ function NuevaTareaModal({
             )}
           </Seccion>
 
-          {/* 3 · Publicación (solo Post / Carrusel / Historia) */}
+          {/* 3 · Días del calendario (solo Post / Carrusel / Historia) */}
           {esParaPublicar && tipoInfo && (
-            <Seccion titulo="Publicación" acento={tipoInfo.color}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Campo label="Fecha de publicación" requerido>
-                  <input type="date" value={fechaPublicacion} onChange={(e) => setFechaPublicacion(e.target.value)}
-                    onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
-                </Campo>
-                <Campo label="Fecha de edición">
-                  <input type="date" value={fechaEdicion} onChange={(e) => setFechaEdicion(e.target.value)}
-                    onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
-                </Campo>
-              </div>
-              <Campo label="Redes">
+            <Seccion titulo={`${tipoInfo.label === 'Post' ? 'Posts' : tipoInfo.label === 'Carrusel' ? 'Carruseles' : 'Historias'} a diseñar`} acento={tipoInfo.color}>
+              {!marcaElegida ? (
+                <p style={{ margin: 0, fontSize: 13, color: '#64748b', padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
+                  Elige la marca arriba para ver su calendario de publicaciones.
+                </p>
+              ) : (
+                <SelectorEntregables
+                  marcaSlug={marcaElegida.slug} marcaNombre={marcaElegida.nombre}
+                  tipoLabel={tipoInfo.label} color={tipoInfo.color}
+                  items={entregables} onChange={setEntregables}
+                />
+              )}
+              <Campo label="Redes (para las nuevas)">
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {REDES_DISENO.map((r) => {
                     const on = redes.includes(r.key)
@@ -1531,9 +1553,6 @@ function NuevaTareaModal({
                   })}
                 </div>
               </Campo>
-              <p style={{ margin: 0, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <IcoCal size={13} /> Aparecerá en el calendario de publicaciones como <b style={{ color: tipoInfo.color }}>{tipoInfo.label}</b>.
-              </p>
             </Seccion>
           )}
 
@@ -1632,6 +1651,128 @@ function TipoDisenoChip({ tipos }: { tipos: string[] | null | undefined }) {
         fontSize: 9.5, fontWeight: 700, color: t.color, background: `${t.color}14`, border: `1px solid ${t.color}33` }}>
       <t.Icon size={10} strokeWidth={2.4} />{t.label}
     </span>
+  )
+}
+
+/* ===== Selector de días del calendario (entregables) ===== */
+type ItemEntregable = { key: string; fecha: string; publicacionId: string | null; titulo: string }
+
+function lunesDe(ymd: string): string {
+  const d = new Date(ymd + 'T12:00:00Z'); const dow = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - dow); return d.toISOString().slice(0, 10)
+}
+function sumarDias(ymd: string, n: number): string {
+  const d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10)
+}
+function fechaCorta(ymd: string): string {
+  return new Date(ymd + 'T12:00:00Z').toLocaleDateString('es-PE', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '')
+}
+
+function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, onChange }: {
+  marcaSlug: string; marcaNombre: string; tipoLabel: string; color: string
+  items: ItemEntregable[]; onChange: (v: ItemEntregable[]) => void
+}) {
+  const [inicio, setInicio] = useState(() => lunesDe(hoyLima()))
+  const [pubs, setPubs] = useState<PubCalendario[] | null>(null)
+  const [cargando, setCargando] = useState(false)
+  const fin = sumarDias(inicio, 13)
+  useEffect(() => {
+    let vivo = true
+    setCargando(true)
+    calendarioMarcaParaDiseno(marcaSlug, inicio, fin).then((r) => {
+      if (!vivo) return
+      setCargando(false)
+      setPubs(r.ok ? r.pubs : [])
+      if (!r.ok) toast.error(r.error)
+    })
+    return () => { vivo = false }
+  }, [marcaSlug, inicio, fin])
+
+  const dias = Array.from({ length: 14 }, (_, i) => sumarDias(inicio, i))
+  const hoy = hoyLima()
+  const porDia = new Map<string, PubCalendario[]>()
+  for (const p of pubs ?? []) { const a = porDia.get(p.fecha) ?? []; a.push(p); porDia.set(p.fecha, a) }
+  const elegidaPub = new Set(items.map((i) => i.publicacionId).filter(Boolean) as string[])
+
+  function titulo(n: number, fecha: string) { return `${tipoLabel} ${n} · ${marcaNombre} · ${fechaCorta(fecha)}` }
+  function agregarNueva(fecha: string) {
+    onChange([...items, { key: crypto.randomUUID(), fecha, publicacionId: null, titulo: titulo(items.length + 1, fecha) }])
+  }
+  function alternarPub(p: PubCalendario) {
+    if (elegidaPub.has(p.id)) onChange(items.filter((i) => i.publicacionId !== p.id))
+    else onChange([...items, { key: p.id, fecha: p.fecha, publicacionId: p.id, titulo: p.nombre }])
+  }
+  const ordenados = [...items].sort((a, b) => a.fecha.localeCompare(b.fecha))
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{ border: '1px solid #e8eaf0', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid #f1f2f6', background: '#fcfcfd' }}>
+          <button type="button" onClick={() => setInicio(sumarDias(inicio, -7))} aria-label="Semana anterior" className="mk-modal-x"
+            style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><IcoAnt size={16} /></button>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 600, color: '#334155' }}>
+            {fechaCorta(inicio)} – {fechaCorta(fin)}{cargando ? ' · cargando…' : ''}
+          </span>
+          <button type="button" onClick={() => setInicio(sumarDias(inicio, 7))} aria-label="Semana siguiente" className="mk-modal-x"
+            style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><IcoSig size={16} /></button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+          {dias.map((d, idx) => {
+            const lista = porDia.get(d) ?? []
+            const nuevas = items.filter((i) => !i.publicacionId && i.fecha === d).length
+            const pasado = d < hoy
+            return (
+              <div key={d} style={{ minHeight: 86, padding: 5, borderRight: (idx % 7) !== 6 ? '1px solid #f1f2f6' : 'none', borderTop: idx >= 7 ? '1px solid #f1f2f6' : 'none', background: d === hoy ? '#f7f6ff' : pasado ? '#fcfcfd' : '#fff', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: d === hoy ? '#6d5dfc' : '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{new Date(d + 'T12:00:00Z').toLocaleDateString('es-PE', { timeZone: 'UTC', weekday: 'narrow' })} {Number(d.slice(8))}</span>
+                </div>
+                {lista.map((p) => {
+                  const on = elegidaPub.has(p.id)
+                  const bloqueada = p.enlazada && !on
+                  return (
+                    <button key={p.id} type="button" disabled={bloqueada} onClick={() => alternarPub(p)}
+                      title={bloqueada ? `${p.nombre} · ya tiene diseño asignado` : on ? 'Quitar' : `Diseñar: ${p.nombre}`}
+                      style={{ textAlign: 'left', fontSize: 10, fontWeight: 600, lineHeight: 1.25, padding: '3px 5px', borderRadius: 6, cursor: bloqueada ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                        border: `1px solid ${on ? color : '#e8eaf0'}`, background: on ? `${color}14` : '#f8fafc', color: on ? color : bloqueada ? '#cbd5e1' : '#475569',
+                        overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {on && '✓ '}{p.tipo ? `${p.tipo.toLowerCase().includes('stor') || p.tipo.toLowerCase().includes('histor') ? 'Hist' : p.tipo.slice(0, 4)} · ` : ''}{p.nombre}
+                    </button>
+                  )
+                })}
+                {nuevas > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 5px', borderRadius: 6, background: color, color: '#fff' }}>+{nuevas} {tipoLabel.toLowerCase()}</span>
+                )}
+                {!pasado && (
+                  <button type="button" onClick={() => agregarNueva(d)} title={`Nueva ${tipoLabel.toLowerCase()} este día`}
+                    className="mk-dia-mas"
+                    style={{ marginTop: 'auto', height: 20, borderRadius: 6, border: '1px dashed #e2e8f0', background: 'transparent', color: '#94a3b8', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IcoMas size={12} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      <p style={{ margin: 0, fontSize: 11.5, color: '#94a3b8' }}>
+        Toca una publicación que ya creó Lorena para enlazarla, o <b>+</b> para crear una nueva ese día.
+      </p>
+      {ordenados.length > 0 && (
+        <div style={{ display: 'grid', gap: 6 }}>
+          {ordenados.map((it, n) => (
+            <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 10px', borderRadius: 11, border: '1px solid #e8eaf0', background: '#fff' }}>
+              <span style={{ width: 22, height: 22, borderRadius: 7, background: `${color}14`, color, fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{n + 1}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', width: 78, flexShrink: 0 }}>{fechaCorta(it.fecha)}</span>
+              <input value={it.titulo} onChange={(e) => onChange(items.map((x) => x.key === it.key ? { ...x, titulo: e.target.value } : x))}
+                style={{ ...campo, height: 32, fontSize: 13, flex: 1, minWidth: 0 }} />
+              {it.publicacionId && <span title="Enlazada a la publicación que ya existe" style={{ color: '#10b981', display: 'inline-flex' }}><IcoLink size={15} /></span>}
+              <button type="button" onClick={() => onChange(items.filter((x) => x.key !== it.key))} aria-label="Quitar" className="mk-modal-x"
+                style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><IcoBorrar size={14} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

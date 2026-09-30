@@ -34,6 +34,8 @@ export type DisenoEntry = {
   subEstado: SubEstadoDiseno
   plataformas: string[]
   tipoContenido: string[]
+  /* Entregables (historias/posts/carruseles): total y listos. */
+  entregables?: { total: number; listos: number } | null
   fechaMarcadaParaDisenar: string | null  // YYYY-MM-DD del "hoy"
   /* Timeline tracking — para que Pedro vea cuánto duró la tarea
      "en progreso" antes de archivarse o completarse.

@@ -192,6 +192,22 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* Conteo de entregables por tarea (Historia 1/2/3…). */
+  const entregablesPorTarea = new Map<string, { total: number; listos: number }>()
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (allRows as any[]).map((r) => r.id as string)
+    if (ids.length) {
+      const { data: ents } = await service.from('diseno_entregables').select('tarea_id, listo_at').in('tarea_id', ids)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const e of (ents ?? []) as any[]) {
+        const c = entregablesPorTarea.get(e.tarea_id) ?? { total: 0, listos: 0 }
+        c.total++; if (e.listo_at) c.listos++
+        entregablesPorTarea.set(e.tarea_id, c)
+      }
+    }
+  } catch { /* sin tabla todavía */ }
+
   const entries: DisenoEntry[] = allRows.map((r: any) => {
     const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
     const slug = marca?.slug ?? 'unknown'
@@ -219,6 +235,7 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
       subEstado: normalizeSubEstado(r.estado_tarea),
       plataformas: (r.plataformas ?? []).map(abbreviatePlataforma),
       tipoContenido: r.tipo_contenido ?? [],
+      entregables: entregablesPorTarea.get(r.id) ?? null,
       fechaMarcadaParaDisenar: r.fecha_marcada_para_disenar ?? null,
       startedAt: r.started_at ?? null,
       archivedAt: r.archived_at ?? null,

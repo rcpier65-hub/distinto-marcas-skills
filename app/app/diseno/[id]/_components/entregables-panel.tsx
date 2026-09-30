@@ -1,0 +1,175 @@
+'use client'
+
+/* Vista de ENTREGABLES de una tarea de diseño (Pedro 30-sep-2026).
+   Izquierda: una fila por historia/post/carrusel con su fecha, título y link.
+   Derecha: vista previa del seleccionado (vertical para historias).
+   Cada link y cada "Lista" se reflejan en la publicación del calendario. */
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Check, CloudUpload, ExternalLink, Link2, Loader2, CalendarDays, Undo2 } from 'lucide-react'
+import { guardarEntregable, marcarEntregableListo, type Entregable } from '../../_entregables-actions'
+
+const TIPO_UI: Record<string, { label: string; plural: string; color: string; vertical: boolean }> = {
+  historia: { label: 'Historia', plural: 'Historias', color: '#db2777', vertical: true },
+  post: { label: 'Post', plural: 'Posts', color: '#0284c7', vertical: false },
+  carrusel: { label: 'Carrusel', plural: 'Carruseles', color: '#0d9488', vertical: false },
+}
+
+function driveId(url: string | null): string | null {
+  if (!url || !/drive\.google\.com|docs\.google\.com/.test(url)) return null
+  return url.match(/[?&]id=([-\w]+)/)?.[1] ?? url.match(/\/d\/([-\w]+)/)?.[1] ?? null
+}
+function vistaPrevia(link: string | null): string | null {
+  if (!link) return null
+  const id = driveId(link)
+  if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`
+  return /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(link) ? link : null
+}
+function fechaCorta(ymd: string | null): string {
+  if (!ymd) return 'Sin fecha'
+  return new Date(ymd + 'T12:00:00Z').toLocaleDateString('es-PE', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '')
+}
+
+export function EntregablesPanel({ tipo, iniciales }: { tipo: string; iniciales: Entregable[] }) {
+  const router = useRouter()
+  const ui = TIPO_UI[tipo] ?? TIPO_UI.post
+  const [items, setItems] = useState(iniciales)
+  const [selId, setSelId] = useState(iniciales.find((e) => !e.listoAt)?.id ?? iniciales[0]?.id ?? null)
+  const [guardando, setGuardando] = useState<string | null>(null)
+  const sel = items.find((e) => e.id === selId) ?? null
+  const listos = items.filter((e) => e.listoAt).length
+
+  function editarLocal(id: string, patch: Partial<Entregable>) {
+    setItems((cur) => cur.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+  }
+  async function guardar(e: Entregable, patch: { titulo?: string; link?: string | null }) {
+    setGuardando(e.id)
+    const r = await guardarEntregable(e.id, patch)
+    setGuardando(null)
+    if (!r.ok) { toast.error(r.error); return }
+    if (patch.link !== undefined && !patch.link) editarLocal(e.id, { listoAt: null })
+  }
+  async function alternarListo(e: Entregable) {
+    const listo = !e.listoAt
+    if (listo && !e.link) { toast.error('Primero pega el link del diseño'); return }
+    setGuardando(e.id)
+    const r = await marcarEntregableListo(e.id, listo)
+    setGuardando(null)
+    if (!r.ok) { toast.error(r.error); return }
+    editarLocal(e.id, { listoAt: listo ? new Date().toISOString() : null })
+    if (r.todosListos) toast.success(`¡Listo! Las ${items.length} ${ui.plural.toLowerCase()} están terminadas`)
+    else if (listo) {
+      const sig = items.find((x) => x.id !== e.id && !x.listoAt)
+      if (sig) setSelId(sig.id)
+    }
+    router.refresh()
+  }
+
+  const preview = vistaPrevia(sel?.link ?? null)
+
+  return (
+    <section style={{ background: '#fff', border: '1px solid #eceef3', borderRadius: 18, overflow: 'hidden', marginBottom: 20, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid #f1f2f6' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999, background: `${ui.color}14`, color: ui.color, border: `1px solid ${ui.color}33` }}>
+          {ui.plural}
+        </span>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#64748b' }}>
+          {items.length} entregable{items.length === 1 ? '' : 's'} · cada uno es una publicación en el calendario
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{listos} de {items.length} listas</div>
+          <div style={{ width: 130, height: 6, borderRadius: 3, background: '#eef0f4', marginTop: 5, overflow: 'hidden' }}>
+            <div style={{ width: `${items.length ? (listos / items.length) * 100 : 0}%`, height: '100%', background: '#10b981', transition: 'width 250ms' }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mk-entregables-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px' }}>
+        <div style={{ padding: 12, display: 'grid', gap: 8, alignContent: 'start', borderRight: '1px solid #f1f2f6' }}>
+          {items.map((e, n) => {
+            const activo = e.id === selId
+            const thumb = vistaPrevia(e.link)
+            return (
+              <div key={e.id} onClick={() => setSelId(e.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 13, cursor: 'pointer',
+                  border: `1.5px solid ${activo ? ui.color : '#eceef3'}`, background: activo ? `${ui.color}08` : '#fff', transition: 'all 120ms' }}>
+                <div style={{ width: ui.vertical ? 32 : 40, height: ui.vertical ? 56 : 40, borderRadius: 7, flexShrink: 0, overflow: 'hidden',
+                  background: thumb ? '#f1f5f9' : '#f8fafc', border: thumb ? 'none' : '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {thumb ? <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <CloudUpload size={15} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: ui.color }}>{ui.label} {n + 1}</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: 3 }}><CalendarDays size={11} /> {fechaCorta(e.fecha)}</span>
+                    {e.publicacionId && (
+                      <Link href={`/publicaciones/${e.publicacionId}`} onClick={(ev) => ev.stopPropagation()} title="Ver en el calendario de publicaciones"
+                        style={{ marginLeft: 'auto', color: '#94a3b8', display: 'inline-flex' }}><ExternalLink size={12} /></Link>
+                    )}
+                  </div>
+                  <input value={e.titulo} onClick={(ev) => ev.stopPropagation()}
+                    onChange={(ev) => editarLocal(e.id, { titulo: ev.target.value })}
+                    onBlur={(ev) => void guardar(e, { titulo: ev.target.value })}
+                    placeholder="Título"
+                    style={{ height: 30, fontSize: 13, fontWeight: 600, padding: '0 9px', borderRadius: 8, border: '1px solid #e2e8f0', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Link2 size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
+                    <input value={e.link ?? ''} onClick={(ev) => ev.stopPropagation()}
+                      onChange={(ev) => editarLocal(e.id, { link: ev.target.value })}
+                      onBlur={(ev) => void guardar(e, { link: ev.target.value.trim() || null })}
+                      placeholder="Pega el link de Drive del diseño"
+                      style={{ flex: 1, minWidth: 0, height: 30, fontSize: 12.5, padding: '0 9px', borderRadius: 8, border: '1px solid #e2e8f0', outline: 'none', fontFamily: 'inherit', color: '#334155' }} />
+                  </div>
+                </div>
+                <button type="button" onClick={(ev) => { ev.stopPropagation(); void alternarListo(e) }} disabled={guardando === e.id}
+                  title={e.listoAt ? 'Volver a pendiente' : 'Marcar lista'}
+                  style={{ height: 32, padding: '0 11px', borderRadius: 9, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0,
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    border: `1px solid ${e.listoAt ? '#bbf7d0' : '#e2e8f0'}`, background: e.listoAt ? '#f0fdf4' : '#fff', color: e.listoAt ? '#15803d' : '#475569' }}>
+                  {guardando === e.id ? <Loader2 size={13} className="animate-spin" /> : e.listoAt ? <Check size={13} strokeWidth={3} /> : null}
+                  {e.listoAt ? 'Lista' : 'Marcar lista'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ padding: 14, display: 'grid', gap: 10, alignContent: 'start', justifyItems: 'center', background: '#fcfcfd' }}>
+          <div style={{ justifySelf: 'start', fontSize: 12, fontWeight: 600, color: '#64748b' }}>
+            Vista previa{sel ? ` · ${ui.label} ${items.findIndex((x) => x.id === sel.id) + 1}` : ''}
+          </div>
+          <div style={{ width: ui.vertical ? 180 : 220, aspectRatio: ui.vertical ? '9 / 16' : '4 / 5', borderRadius: 16, overflow: 'hidden',
+            background: preview ? '#0f172a' : '#fff', border: preview ? 'none' : '1.5px dashed #cbd5e1',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#94a3b8', textAlign: 'center', padding: preview ? 0 : 16 }}>
+            {preview ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={preview} alt={sel?.titulo ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <>
+                <CloudUpload size={26} />
+                <span style={{ fontSize: 12.5, lineHeight: 1.4 }}>Pega el link de Drive<br />de este diseño a la izquierda</span>
+              </>
+            )}
+          </div>
+          {sel?.link && (
+            <a href={sel.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: '#6d5dfc', display: 'inline-flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+              <ExternalLink size={13} /> Abrir en Drive
+            </a>
+          )}
+          {sel && (
+            <button type="button" onClick={() => void alternarListo(sel)} disabled={guardando === sel.id}
+              style={{ width: ui.vertical ? 180 : 220, height: 38, borderRadius: 11, fontSize: 13.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', border: 'none',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: sel.listoAt ? '#f1f5f9' : 'linear-gradient(135deg,#7170ff,#ba41f7)', color: sel.listoAt ? '#475569' : '#fff' }}>
+              {sel.listoAt ? <><Undo2 size={15} /> Volver a pendiente</> : <><Check size={15} strokeWidth={3} /> Marcar lista</>}
+            </button>
+          )}
+        </div>
+      </div>
+      <style>{'@media (max-width: 720px){.mk-entregables-grid{grid-template-columns:1fr!important}}'}</style>
+    </section>
+  )
+}
