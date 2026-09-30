@@ -97,6 +97,27 @@ export function TareasView({
   const [vistaBoard, setVistaBoard] = useState<'tablero' | 'gantt' | 'cal'>('tablero')
   const [marcaFiltro, setMarcaFiltro] = useState<string>('todas')
   const [verArchivadasPlan, setVerArchivadasPlan] = useState(false)
+  /* RECORDAR los filtros (persona, marca y vista) al salir y volver a Tareas.
+     Lorena 30-sep-2026: "le cambio a mi nombre, me voy a otro apartado y al
+     regresar vuelve a 'Equipo disponible'; casi apago la actividad de
+     alguien". Se guarda por usuario en este dispositivo. */
+  const claveFiltros = `tareas-filtros:${meId ?? 'yo'}`
+  const filtrosRestaurados = useRef(false)
+  useEffect(() => {
+    if (filtrosRestaurados.current) return
+    filtrosRestaurados.current = true
+    try {
+      const f = JSON.parse(localStorage.getItem(claveFiltros) || 'null')
+      if (!f) return
+      if (typeof f.user === 'string' && (f.user === 'todos' || equipo.some((m) => m.id === f.user))) setFiltroUser(f.user)
+      if (typeof f.marca === 'string' && (f.marca === 'todas' || marcas.some((m) => m.slug === f.marca))) setMarcaFiltro(f.marca)
+      if (f.vista === 'tablero' || f.vista === 'gantt' || f.vista === 'cal') setVistaBoard(f.vista)
+    } catch { /* sin almacenamiento: filtros por defecto */ }
+  }, [claveFiltros, equipo, marcas])
+  useEffect(() => {
+    if (!filtrosRestaurados.current) return
+    try { localStorage.setItem(claveFiltros, JSON.stringify({ user: filtroUser, marca: marcaFiltro, vista: vistaBoard })) } catch { /* nada */ }
+  }, [claveFiltros, filtroUser, marcaFiltro, vistaBoard])
   const hoyLima = hoy ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
   const [mesCal, setMesCal] = useState(hoyLima.slice(0, 7))
   /* Animación "vuela al archivo" al completar. */
