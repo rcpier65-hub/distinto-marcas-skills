@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MarcaSelect } from '@/components/marca-select'
@@ -993,6 +994,7 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, on
         }}>
           {entry.marcaNombre}
         </span>
+        <TipoDisenoChip tipos={entry.tipoContenido} />
         {/* Etiquetas extra: puntitos de color (una sola tarea, varias marcas). */}
         {entry.marcasTags.length > 1 && (
           <span
@@ -1191,7 +1193,12 @@ function NuevaTareaModal({
      diseño'. Set de slugs ADICIONALES a la principal. Si Ailyn elige
      marca=Kintu y extras={Manrique, Lozano}, se crean 3 tareas. */
   const [marcasExtras, setMarcasExtras] = useState<Set<string>>(new Set())
-  const [esParaPublicar, setEsParaPublicar] = useState(false)
+  /* Tipo de diseño: Post / Carrusel / Historia se PUBLICAN (van al
+     calendario con su tipo y no se reprograman); Interno no se publica. */
+  const [tipo, setTipo] = useState<TipoDiseno | null>(null)
+  const esParaPublicar = tipo !== null && tipo !== 'interno'
+  const [redes, setRedes] = useState<string[]>(['Instagram', 'Facebook'])
+  const [verMasMarcas, setVerMasMarcas] = useState(false)
   const [fechaPublicacion, setFechaPublicacion] = useState('')
   const [fechaEdicion, setFechaEdicion] = useState('')
   /* Reunión de revisión opcional */
@@ -1235,7 +1242,9 @@ function NuevaTareaModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitEnCurso.current) return
+    if (!tipo) { toast.error('Elige el tipo: Post, Carrusel, Historia o Interno'); return }
     if (!nombre.trim()) { toast.error('Falta nombre'); return }
+    if (esParaPublicar && redes.length === 0) { toast.error('Elige al menos una red'); return }
     if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
     if (esParaPublicar && !fechaPublicacion) { toast.error('Falta fecha de publicación'); return }
     if (agregarReunion && !horaReunion) { toast.error('Falta hora de reunión'); return }
@@ -1266,6 +1275,8 @@ function NuevaTareaModal({
            Si está vacío y NO es para publicar, el server default a "interno". */
         marcaSlug: marcaSlug || undefined,
         marcasExtras: Array.from(marcasExtras),
+        tipoDiseno: tipo,
+        plataformas: esParaPublicar ? redes : [],
         esParaPublicar,
         fechaPublicacion: esParaPublicar ? fechaPublicacion : null,
         fechaEdicion: esParaPublicar ? fechaEdicion || null : null,
@@ -1307,8 +1318,8 @@ function NuevaTareaModal({
         /* Mismo estado que usamos en el insert del server action */
         estado: 'disenar',
         subEstado: 'sin_empezar',
-        plataformas: [],
-        tipoContenido: [],
+        plataformas: esParaPublicar ? redes : [],
+        tipoContenido: [TIPOS_DISENO.find((t) => t.id === tipo)?.valor ?? ''],
         /* Si marcó "Trabajar HOY", reflejamos la fecha de hoy (Lima) en la copia
            local — igual que lo guardado en la creación de la tarea. Antes
            estaba fijo en null → la tarea no aparecía en "Mi trabajo HOY" hasta
@@ -1337,394 +1348,283 @@ function NuevaTareaModal({
     try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.() } catch {}
   }
 
+  const tipoInfo = TIPOS_DISENO.find((t) => t.id === tipo) ?? null
+
   return (
     <div
-      /* NO cerramos al hacer clic en el fondo: Aylin perdía TODA la tarea al
-         tocar afuera por error. Se cierra solo con la ✕ o "Cancelar". Pedro 14-jul. */
+      /* NO cerramos al hacer clic en el fondo: Aylin perdía la tarea al tocar
+         afuera por error. Se cierra con la ✕ o "Cancelar". */
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
-        background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(4px)',
+        background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}
     >
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        /* Modal con 3 zonas: header arriba (fijo), body en el medio
-           (scrolleable cuando el contenido crece), footer abajo (fijo
-           con los botones). Sin esto, cuando Pedro activaba ambos
-           toggles (publicar + reunión), el modal crecía más allá del
-           viewport y los botones quedaban cortados.
-           maxHeight: 90vh deja un margen de 10vh para que se vea el
-           backdrop oscuro alrededor del modal. */
+        className="mk-modal-diseno"
         style={{
-          width: '100%', maxWidth: 540,
-          maxHeight: '90vh',
-          background: 'var(--mk-bg-overlay)',
-          border: '1px solid var(--mk-border-default)',
-          borderRadius: 'var(--mk-radius-lg)',
-          boxShadow: 'var(--mk-shadow-lg)',
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',  /* clip al border-radius */
+          width: '100%', maxWidth: 580, maxHeight: '92vh',
+          background: '#fff', borderRadius: 20,
+          boxShadow: '0 24px 64px rgba(15,23,42,0.22), 0 2px 8px rgba(15,23,42,0.06)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#0f172a',
         }}
       >
-        {/* HEADER fijo */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px 14px',
-          borderBottom: '1px solid var(--mk-border-subtle)',
-          flexShrink: 0,
-        }}>
-          <h2 style={{ fontSize: 'var(--mk-text-base)', fontWeight: 600, color: 'var(--mk-text-primary)', margin: 0 }}>
-            Nueva tarea de diseño
-          </h2>
-          <button type="button" onClick={pedirCerrar} disabled={submitting} style={{ background: 'transparent', border: 'none', color: 'var(--mk-text-tertiary)', cursor: 'pointer', padding: 4 }}>
-            ✕
+        {/* HEADER */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 22px 16px', borderBottom: '1px solid #f1f2f6', flexShrink: 0 }}>
+          <span style={{ width: 38, height: 38, borderRadius: 11, background: 'linear-gradient(135deg,#7170ff,#ba41f7)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 6px 14px -6px rgba(113,112,255,0.7)' }}>
+            <IcoPaleta size={19} strokeWidth={2.2} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, letterSpacing: -0.2 }}>Nueva tarea de diseño</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 12.5, color: '#64748b' }}>
+              {tipoInfo ? tipoInfo.ayuda : 'Primero elige qué tipo de diseño es.'}
+            </p>
+          </div>
+          <button type="button" onClick={pedirCerrar} disabled={submitting} aria-label="Cerrar"
+            className="mk-modal-x" style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IcoX size={18} />
           </button>
         </div>
 
-        {/* BODY scrolleable — TODO el contenido del form va acá */}
-        <fieldset disabled={submitting} style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px 24px',
-          border: 0, margin: 0, minWidth: 0,
-          display: 'flex', flexDirection: 'column', gap: 14,
-        }}>
+        {/* BODY */}
+        <fieldset disabled={submitting} style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 8px', border: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-        <Field label="Nombre de la tarea*">
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej. Banner web Kintu"
-            autoFocus
-            style={inputStyle}
-          />
-        </Field>
+          {/* 1 · Tipo */}
+          <Seccion titulo="Tipo de diseño">
+            <div role="radiogroup" aria-label="Tipo de diseño" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+              {TIPOS_DISENO.map((t) => {
+                const activo = tipo === t.id
+                return (
+                  <button key={t.id} type="button" role="radio" aria-checked={activo} onClick={() => setTipo(t.id)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 6px 10px',
+                      borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', position: 'relative',
+                      background: activo ? `${t.color}0f` : '#fff',
+                      border: `1.5px solid ${activo ? t.color : '#e8eaf0'}`,
+                      boxShadow: activo ? `0 0 0 3px ${t.color}1f` : 'none',
+                      transition: 'all 140ms ease',
+                    }}>
+                    {activo && (
+                      <span style={{ position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: '50%', background: t.color, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <IcoCheck size={10} strokeWidth={3.5} />
+                      </span>
+                    )}
+                    <span style={{ width: 34, height: 34, borderRadius: 10, background: `${t.color}14`, color: t.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <t.Icon size={18} strokeWidth={2.2} />
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: activo ? t.color : '#0f172a' }}>{t.label}</span>
+                    <span style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: 500 }}>{t.id === 'interno' ? 'No se publica' : 'Se publica'}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Seccion>
 
-        <Field label="Descripción">
-          <textarea
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Brief de la tarea. ¿Qué hay que diseñar? ¿Referencias?"
-            rows={3}
-            style={{ ...inputStyle, resize: 'vertical', minHeight: 60, fontFamily: 'inherit' }}
-          />
-        </Field>
-
-        {/* Marca SIEMPRE visible (Pedro pidió poder elegir marca incluso
-            cuando la tarea NO es para publicar). Al elegir, se
-            auto-precargan los correos de cliente como invitados de la
-            reunión (si tiene reunión). */}
-        <Field label="Marca / cliente">
-          <MarcaSelect marcas={marcas} value={marcaSlug} onChange={setMarcaSlug} />
-        </Field>
-
-        {/* Pedro: 'que se puedan seleccionar más de una marca cuando se
-            hace diseño'. Si Ailyn elige una marca principal, debajo
-            aparecen etiquetas de otras marcas para la misma tarea. */}
-        {marcaSlug && marcaSlug !== 'interno' && marcas.length > 1 && (
-          <div style={{ marginTop: 6 }}>
-            <div style={{
-              fontSize: 11, color: '#6b7280', marginBottom: 6,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-            }}>
-              <span>
-                ¿Etiquetar más marcas? <span style={{ color: '#9ca3af' }}>(opcional · una sola tarea)</span>
-              </span>
-              {marcasExtras.size > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setMarcasExtras(new Set())}
-                  style={{
-                    background: 'transparent', border: 'none',
-                    color: '#6b7280', fontSize: 11,
-                    cursor: 'pointer', padding: 0,
-                    textDecoration: 'underline',
-                  }}
-                >
-                  Limpiar
+          {/* 2 · Datos */}
+          <Seccion titulo="Detalle">
+            <Campo label="Nombre de la tarea" requerido>
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)}
+                placeholder={tipo === 'historia' ? 'Ej. Historia promo fin de mes' : tipo === 'carrusel' ? 'Ej. Carrusel 5 beneficios' : tipo === 'interno' ? 'Ej. Presentación para cliente nuevo' : 'Ej. Post lanzamiento producto'}
+                autoFocus style={campo} />
+            </Campo>
+            <Campo label="Descripción / brief">
+              <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
+                placeholder="¿Qué hay que diseñar? Textos, referencias, medidas…" rows={3}
+                style={{ ...campo, height: 'auto', minHeight: 76, padding: '10px 12px', resize: 'vertical', lineHeight: 1.45 }} />
+            </Campo>
+            <Campo label={esParaPublicar ? 'Marca' : 'Marca (opcional)'} requerido={esParaPublicar}>
+              <MarcaSelect marcas={marcas} value={marcaSlug} onChange={setMarcaSlug} />
+            </Campo>
+            {marcaSlug && marcaSlug !== 'interno' && marcas.length > 1 && (
+              <div>
+                <button type="button" onClick={() => setVerMasMarcas((v) => !v)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#6d5dfc', fontFamily: 'inherit' }}>
+                  <IcoChevron size={14} style={{ transform: verMasMarcas ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+                  Etiquetar más marcas{marcasExtras.size > 0 ? ` · ${marcasExtras.size}` : ''}
                 </button>
-              )}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {marcas
-                .filter((m) => m.slug !== marcaSlug && m.slug !== 'interno')
-                .map((m) => {
-                  const checked = marcasExtras.has(m.slug)
-                  return (
-                    <button
-                      key={m.slug}
-                      type="button"
-                      onClick={() => {
-                        setMarcasExtras((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(m.slug)) next.delete(m.slug)
-                          else next.add(m.slug)
-                          return next
-                        })
-                      }}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '5px 11px',
-                        borderRadius: 999,
-                        background: checked ? `${m.color}1a` : '#f9fafb',
-                        border: `1px solid ${checked ? m.color + '66' : '#e5e7eb'}`,
-                        color: checked ? m.color : '#374151',
-                        fontSize: 11.5, fontWeight: 500,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        transition: 'all 120ms',
-                      }}
-                    >
-                      {checked && <span>✓</span>}
-                      {m.emoji && <span style={{ fontSize: 12 }}>{m.emoji}</span>}
-                      <span>{m.nombre}</span>
-                    </button>
-                  )
-                })}
-            </div>
-            {marcasExtras.size > 0 && (
-              <div style={{
-                fontSize: 11, color: '#374151',
-                marginTop: 8, padding: '6px 10px',
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: 8,
-              }}>
-                ✓ Una sola tarea etiquetada en <strong>{marcasExtras.size + 1}</strong> marcas
-                (principal + {marcasExtras.size} más)
+                {verMasMarcas && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {marcas.filter((m) => m.slug !== marcaSlug && m.slug !== 'interno').map((m) => {
+                      const checked = marcasExtras.has(m.slug)
+                      return (
+                        <button key={m.slug} type="button"
+                          onClick={() => setMarcasExtras((prev) => { const n = new Set(prev); if (n.has(m.slug)) n.delete(m.slug); else n.add(m.slug); return n })}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 999, fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            background: checked ? `${m.color}14` : '#f8fafc', border: `1px solid ${checked ? m.color + '66' : '#e8eaf0'}`, color: checked ? m.color : '#475569' }}>
+                          {checked && <IcoCheck size={12} strokeWidth={3} />}
+                          {m.emoji && <span style={{ fontSize: 12 }}>{m.emoji}</span>}
+                          {m.nombre}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
+          </Seccion>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Field label="Fecha de entrega">
-            <input
-              type="date"
-              value={fechaEntrega}
-              onChange={(e) => setFechaEntrega(e.target.value)}
-              onFocus={openPickerOnFocus}
-              onClick={openPickerOnFocus}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            />
-          </Field>
-          <Field label="Fecha de diseño">
-            <input
-              type="date"
-              value={fechaDiseno}
-              onChange={(e) => setFechaDiseno(e.target.value)}
-              onFocus={openPickerOnFocus}
-              onClick={openPickerOnFocus}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            />
-          </Field>
-        </div>
+          {/* 3 · Publicación (solo Post / Carrusel / Historia) */}
+          {esParaPublicar && tipoInfo && (
+            <Seccion titulo="Publicación" acento={tipoInfo.color}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Campo label="Fecha de publicación" requerido>
+                  <input type="date" value={fechaPublicacion} onChange={(e) => setFechaPublicacion(e.target.value)}
+                    onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
+                </Campo>
+                <Campo label="Fecha de edición">
+                  <input type="date" value={fechaEdicion} onChange={(e) => setFechaEdicion(e.target.value)}
+                    onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
+                </Campo>
+              </div>
+              <Campo label="Redes">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {REDES_DISENO.map((r) => {
+                    const on = redes.includes(r.key)
+                    return (
+                      <button key={r.key} type="button" onClick={() => setRedes((cur) => on ? cur.filter((x) => x !== r.key) : [...cur, r.key])}
+                        style={{ height: 34, padding: '0 14px', borderRadius: 999, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          border: `1.5px solid ${on ? r.color : '#e8eaf0'}`, background: on ? `${r.color}12` : '#fff', color: on ? r.color : '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {on && <IcoCheck size={13} strokeWidth={3} />}{r.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Campo>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IcoCal size={13} /> Aparecerá en el calendario de publicaciones como <b style={{ color: tipoInfo.color }}>{tipoInfo.label}</b>.
+              </p>
+            </Seccion>
+          )}
 
-        {/* Toggle "Trabajar HOY" — Aylin lo pidió acá: al crear la tarea la
-            ancla a su lista de hoy (fecha_marcada_para_disenar). */}
-        <div
-          onClick={() => setParaHoy((v) => !v)}
-          style={{
-            padding: 12, borderRadius: 'var(--mk-radius-md)',
-            border: `1px solid ${paraHoy ? '#7c3aed' : 'var(--mk-border-subtle)'}`,
-            background: paraHoy ? 'rgba(124, 58, 237, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-            transition: 'all 120ms ease',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={paraHoy}
-            onChange={(e) => setParaHoy(e.target.checked)}
-            style={{ accentColor: '#7c3aed', width: 14, height: 14 }}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>
-              📅 Trabajar HOY
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
-              La agrega a tu lista de hoy para tenerla a mano.
-            </span>
-          </div>
-        </div>
+          {/* 4 · Plazos del diseño */}
+          {tipo && (
+            <Seccion titulo="Plazos del diseño">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Campo label="Fecha de diseño">
+                  <input type="date" value={fechaDiseno} onChange={(e) => setFechaDiseno(e.target.value)}
+                    onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
+                </Campo>
+                <Campo label="Fecha de entrega">
+                  <input type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)}
+                    onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer' }} />
+                </Campo>
+              </div>
+            </Seccion>
+          )}
 
-        {/* Toggle ¿Es para publicar? — solo aparece si NO es interno
-            (tener marca elegida). Para tareas internas no se publica. */}
-        <div
-          onClick={() => setEsParaPublicar((v) => !v)}
-          style={{
-            padding: 12, borderRadius: 'var(--mk-radius-md)',
-            border: `1px solid ${esParaPublicar ? 'var(--mk-accent)' : 'var(--mk-border-subtle)'}`,
-            background: esParaPublicar ? 'rgba(113, 112, 255, 0.06)' : 'rgba(255, 255, 255, 0.02)',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 10,
-            transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={esParaPublicar}
-            onChange={(e) => setEsParaPublicar(e.target.checked)}
-            style={{ accentColor: 'var(--mk-accent)', width: 14, height: 14 }}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>
-              ¿Es un diseño para publicar?
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
-              Si lo marcas, también se agrega al calendario de publicaciones.
-            </span>
-          </div>
-        </div>
+          {/* 5 · Opciones */}
+          {tipo && (
+            <Seccion titulo="Opciones">
+              <Opcion activo={paraHoy} onToggle={() => setParaHoy((v) => !v)} color="#7170ff" Icon={IcoHoy}
+                titulo="Trabajar hoy" texto="La agrega a tu lista de hoy." />
+              <Opcion activo={agregarReunion} onToggle={() => setAgregarReunion((v) => !v)} color="#10b981" Icon={IcoVideo}
+                titulo="Agendar reunión de revisión" texto="Evento en Google Calendar con enlace de Meet." />
+              {agregarReunion && (
+                <div style={{ display: 'grid', gap: 12, padding: 14, borderRadius: 14, background: '#f8fafc', border: '1px solid #eef0f4' }}>
+                  <Campo label="Hora de la reunión" requerido>
+                    <input type="time" value={horaReunion} onChange={(e) => setHoraReunion(e.target.value)}
+                      onFocus={openPickerOnFocus} onClick={openPickerOnFocus} style={{ ...campo, cursor: 'pointer', maxWidth: 180 }} />
+                  </Campo>
+                  <Campo label="Invitados (correos separados por coma)">
+                    <textarea value={invitadosInput} onChange={(e) => setInvitadosInput(e.target.value)} rows={2}
+                      placeholder={marcaSlug && marcaSlug !== 'interno' ? 'Se llenan solos con los correos de la marca…' : 'cliente@ejemplo.com, otro@cliente.com'}
+                      style={{ ...campo, height: 'auto', minHeight: 56, padding: '10px 12px', resize: 'vertical' }} />
+                  </Campo>
+                </div>
+              )}
+            </Seccion>
+          )}
+        </fieldset>
 
-        {esParaPublicar && (
-          <div style={{
-            display: 'flex', flexDirection: 'column', gap: 10,
-            padding: 12, marginTop: -4,
-            background: 'rgba(167, 139, 250, 0.03)',
-            border: '1px solid rgba(167, 139, 250, 0.20)',
-            borderRadius: 'var(--mk-radius-md)',
-          }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Fecha de publicación*">
-                <input
-                  type="date"
-                  value={fechaPublicacion}
-                  onChange={(e) => setFechaPublicacion(e.target.value)}
-                  onFocus={openPickerOnFocus}
-                  onClick={openPickerOnFocus}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                />
-              </Field>
-              <Field label="Fecha de edición">
-                <input
-                  type="date"
-                  value={fechaEdicion}
-                  onChange={(e) => setFechaEdicion(e.target.value)}
-                  onFocus={openPickerOnFocus}
-                  onClick={openPickerOnFocus}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                />
-              </Field>
-            </div>
-          </div>
-        )}
-
-        {/* Toggle Reunión de revisión */}
-        <div
-          onClick={() => setAgregarReunion((v) => !v)}
-          style={{
-            padding: 12, borderRadius: 'var(--mk-radius-md)',
-            border: `1px solid ${agregarReunion ? '#34d399' : 'var(--mk-border-subtle)'}`,
-            background: agregarReunion ? 'rgba(52, 211, 153, 0.06)' : 'rgba(255, 255, 255, 0.02)',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 10,
-            transition: 'all 120ms ease',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={agregarReunion}
-            onChange={(e) => setAgregarReunion(e.target.checked)}
-            style={{ accentColor: '#34d399', width: 14, height: 14 }}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-primary)', fontWeight: 500 }}>
-              📹 Agendar reunión de revisión
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--mk-text-tertiary)' }}>
-              Genera evento de Google Calendar + link Meet con invitados.
-            </span>
-          </div>
-        </div>
-
-        {agregarReunion && (
-          <div style={{
-            display: 'flex', flexDirection: 'column', gap: 10,
-            padding: 12, marginTop: -4,
-            background: 'rgba(52, 211, 153, 0.03)',
-            border: '1px solid rgba(52, 211, 153, 0.20)',
-            borderRadius: 'var(--mk-radius-md)',
-          }}>
-            <Field label="Hora de la reunión*">
-              <input
-                type="time"
-                value={horaReunion}
-                onChange={(e) => setHoraReunion(e.target.value)}
-                onFocus={openPickerOnFocus}
-                onClick={openPickerOnFocus}
-                style={{ ...inputStyle, cursor: 'pointer' }}
-              />
-            </Field>
-            <Field label="Invitados (correos separados por coma)">
-              <textarea
-                value={invitadosInput}
-                onChange={(e) => setInvitadosInput(e.target.value)}
-                placeholder={
-                  marcaSlug && marcaSlug !== 'interno'
-                    ? 'Auto-llenado con los correos de la marca…'
-                    : 'cliente@ejemplo.com, otrocorreo@cliente.com'
-                }
-                rows={2}
-                style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical', minHeight: 50 }}
-              />
-              <span style={{ fontSize: 10, color: 'var(--mk-text-quaternary)', marginTop: 2 }}>
-                💡 Se cargan automáticamente al elegir marca. Edítalos desde Settings → Marca.
-              </span>
-            </Field>
-            <div style={{
-              padding: '8px 10px', borderRadius: 6,
-              background: 'rgba(167, 139, 250, 0.08)',
-              fontSize: 11, color: 'var(--mk-text-tertiary)',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              ⚠ Sync con Google Calendar en proceso. Por ahora se guarda la reunión y se sincroniza luego automáticamente.
-            </div>
-          </div>
-        )}
-
-        </fieldset>{/* fin BODY scrolleable */}
-
-        {/* FOOTER fijo con los botones — siempre visible incluso
-            cuando el body tiene mucho contenido. */}
-        <div style={{
-          display: 'flex', justifyContent: 'flex-end', gap: 8,
-          padding: '14px 24px 18px',
-          borderTop: '1px solid var(--mk-border-subtle)',
-          background: 'var(--mk-bg-overlay)',
-          flexShrink: 0,
-        }}>
-          <button
-            type="button" onClick={pedirCerrar} disabled={submitting}
-            style={{
-              padding: '8px 14px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
-              background: 'transparent', color: 'var(--mk-text-secondary)',
-              border: '1px solid var(--mk-border-subtle)', borderRadius: 'var(--mk-radius-md)',
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
+        {/* FOOTER */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '14px 22px 18px', borderTop: '1px solid #f1f2f6', background: '#fcfcfd', flexShrink: 0 }}>
+          <button type="button" onClick={pedirCerrar} disabled={submitting}
+            style={{ height: 40, padding: '0 16px', fontSize: 14, fontWeight: 600, background: '#fff', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
             Cancelar
           </button>
-          <button
-            type="submit" disabled={submitting}
-            style={{
-              padding: '8px 18px', fontSize: 'var(--mk-text-sm)', fontWeight: 500,
-              background: 'var(--mk-accent)', color: 'white',
-              border: 'none', borderRadius: 'var(--mk-radius-md)',
-              cursor: submitting ? 'wait' : 'pointer', fontFamily: 'inherit',
-              opacity: submitting ? 0.6 : 1,
-            }}
-          >
-            {submitting ? 'Creando…' : 'Crear tarea'}
+          <button type="submit" disabled={submitting || !tipo}
+            style={{ height: 40, padding: '0 20px', fontSize: 14, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 11, fontFamily: 'inherit',
+              background: 'linear-gradient(135deg,#7170ff,#ba41f7)', boxShadow: '0 8px 18px -8px rgba(113,112,255,0.8)',
+              cursor: submitting ? 'wait' : !tipo ? 'not-allowed' : 'pointer', opacity: submitting || !tipo ? 0.55 : 1 }}>
+            {submitting ? 'Creando…' : tipoInfo ? `Crear ${tipoInfo.label.toLowerCase()}` : 'Crear tarea'}
           </button>
         </div>
+        <style>{'.mk-modal-x:hover{background:#f1f5f9!important;color:#0f172a!important}.mk-modal-diseno input:focus,.mk-modal-diseno textarea:focus{border-color:#7170ff!important;box-shadow:0 0 0 3px rgba(113,112,255,0.15)}@media (max-width:520px){.mk-modal-diseno [role=radiogroup]{grid-template-columns:repeat(2,minmax(0,1fr))!important}}'}</style>
       </form>
     </div>
+  )
+}
+
+/* Tipo del diseño en la tarjeta (Post / Carrusel / Historia / Interno). */
+function TipoDisenoChip({ tipos }: { tipos: string[] | null | undefined }) {
+  const v = (tipos?.[0] ?? '').toLowerCase()
+  const t = TIPOS_DISENO.find((x) => (x.id === 'historia' ? /historia|stor/.test(v) : x.id === 'post' ? v === 'post' : v.includes(x.id)))
+  if (!t) return null
+  return (
+    <span title={t.id === 'interno' ? 'Interno · no se publica' : `${t.label} · se publica`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 17, padding: '0 6px', borderRadius: 999, flexShrink: 0,
+        fontSize: 9.5, fontWeight: 700, color: t.color, background: `${t.color}14`, border: `1px solid ${t.color}33` }}>
+      <t.Icon size={10} strokeWidth={2.4} />{t.label}
+    </span>
+  )
+}
+
+/* ===== Piezas del modal de nueva tarea de diseño ===== */
+type TipoDiseno = 'post' | 'carrusel' | 'historia' | 'interno'
+const TIPOS_DISENO: { id: TipoDiseno; label: string; valor: string; color: string; Icon: typeof IcoPost; ayuda: string }[] = [
+  { id: 'post', label: 'Post', valor: 'POST', color: '#0284c7', Icon: IcoPost, ayuda: 'Se publica: va al calendario de publicaciones como Post.' },
+  { id: 'carrusel', label: 'Carrusel', valor: 'CARRUSEL', color: '#0d9488', Icon: IcoCarrusel, ayuda: 'Se publica: va al calendario de publicaciones como Carrusel.' },
+  { id: 'historia', label: 'Historia', valor: 'HISTORIA', color: '#db2777', Icon: IcoHistoria, ayuda: 'Se publica: va al calendario de publicaciones como Historia.' },
+  { id: 'interno', label: 'Interno', valor: 'INTERNO', color: '#64748b', Icon: IcoInterno, ayuda: 'No se publica: queda solo como tarea de trabajo.' },
+]
+const REDES_DISENO = [
+  { key: 'Instagram', label: 'Instagram', color: '#E1306C' },
+  { key: 'Facebook', label: 'Facebook', color: '#1877F2' },
+  { key: 'Tiktok', label: 'TikTok', color: '#111111' },
+]
+const campo: React.CSSProperties = {
+  width: '100%', height: 40, padding: '0 12px', background: '#fff', color: '#0f172a',
+  border: '1px solid #e2e8f0', borderRadius: 10, fontFamily: 'inherit', fontSize: 14,
+  outline: 'none', colorScheme: 'light', transition: 'border-color 120ms, box-shadow 120ms',
+}
+function Seccion({ titulo, acento, children }: { titulo: string; acento?: string; children: React.ReactNode }) {
+  return (
+    <section style={{ display: 'grid', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: acento ?? '#94a3b8' }}>
+        {titulo}<span style={{ flex: 1, height: 1, background: '#f1f2f6' }} />
+      </div>
+      {children}
+    </section>
+  )
+}
+function Campo({ label, requerido, children }: { label: string; requerido?: boolean; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'grid', gap: 6 }}>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#334155' }}>{label}{requerido && <span style={{ color: '#ba41f7', marginLeft: 3 }}>*</span>}</span>
+      {children}
+    </label>
+  )
+}
+function Opcion({ activo, onToggle, color, Icon, titulo, texto }: {
+  activo: boolean; onToggle: () => void; color: string; Icon: typeof IcoHoy; titulo: string; texto: string
+}) {
+  return (
+    <button type="button" role="switch" aria-checked={activo} onClick={onToggle}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '11px 14px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        background: activo ? `${color}0d` : '#fff', border: `1px solid ${activo ? color + '66' : '#e8eaf0'}`, transition: 'all 140ms' }}>
+      <span style={{ width: 32, height: 32, borderRadius: 9, background: `${color}14`, color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={16} strokeWidth={2.2} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: '#0f172a' }}>{titulo}</span>
+        <span style={{ display: 'block', fontSize: 12, color: '#64748b', marginTop: 1 }}>{texto}</span>
+      </span>
+      <span style={{ width: 36, height: 21, borderRadius: 999, background: activo ? color : '#e2e8f0', position: 'relative', flexShrink: 0, transition: 'background 140ms' }}>
+        <span style={{ position: 'absolute', top: 2.5, left: activo ? 17.5 : 2.5, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 140ms' }} />
+      </span>
+    </button>
   )
 }
 

@@ -291,6 +291,10 @@ export async function crearDisenoTask(args: {
   marcaSlug?: string
   /* Marcas adicionales: etiquetas de una sola tarea, sin crear copias. */
   marcasExtras?: string[]
+  /* Tipo de diseño (Pedro 30-sep-2026): Post / Carrusel / Historia se
+     publican (van al calendario con su tipo); Interno no se publica. */
+  tipoDiseno?: 'post' | 'carrusel' | 'historia' | 'interno'
+  plataformas?: string[]
   // Modo "para publicar"
   esParaPublicar: boolean
   fechaPublicacion?: string | null
@@ -364,8 +368,12 @@ export async function crearDisenoTask(args: {
        automáticamente cuando el sub-estado avance. */
     started_at: null,
     archived_at: null,
-    plataformas: [],
-    tipo_contenido: [],
+    plataformas: args.esParaPublicar
+      ? (args.plataformas ?? []).filter((p) => ['Instagram', 'Facebook', 'Tiktok', 'Youtube'].includes(p))
+      : [],
+    tipo_contenido: args.tipoDiseno
+      ? [({ post: 'POST', carrusel: 'CARRUSEL', historia: 'HISTORIA', interno: 'INTERNO' } as const)[args.tipoDiseno]]
+      : [],
     objetivos: [],
     copy_listo: false,
     musica_lista: false,
