@@ -10,7 +10,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Scissors, FileText, Image as ImageIcon, Rocket, Star, X } from 'lucide-react'
+import { Scissors, FileText, Image as ImageIcon, Rocket, Star, X, Clapperboard, CircleFadingPlus, GalleryHorizontalEnd } from 'lucide-react'
 import { toast } from 'sonner'
 import { cambiarFechaPublicacion } from '@/app/publicaciones/_actions'
 import { AgregarFechaImportante } from '@/app/publicaciones/_components/agregar-fecha-importante'
@@ -915,6 +915,17 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {/* ARRIBA de la hora: tipo (Reel / Historia / Post / Carrusel) y las
+              redes donde sale (Pedro 30-sep-2026). */}
+          {(pub.tipoDefinido || pub.redes.length > 0) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5, marginBottom: 1, borderBottom: '1px solid var(--mk-border-subtle)' }}>
+              {pub.tipoDefinido && <TipoChip tipo={pub.tipo} />}
+              <div style={{ flex: 1 }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {pub.redes.map((r) => <RedIcon key={r} red={r} />)}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{pub.hora}</span>
             {/* Badge marca con color de fondo + borde para identificación rápida */}
@@ -939,13 +950,6 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
               <span className="mk-dot" style={{ background: estadoCfg.color, width: 4, height: 4 }} />
             </span>
           </div>
-          {/* Tipo (Reel / Historia / Post…) + redes ARRIBA (Pedro 30-sep-2026). */}
-          {(pub.tipoDefinido || pub.redes.length > 0) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', rowGap: 3 }}>
-              {pub.tipoDefinido && <TipoChip tipo={pub.tipo} />}
-              {pub.redes.map((r) => <RedIcon key={r} red={r} />)}
-            </div>
-          )}
           {/* TÍTULO del video (bold) — Lorena lo usa para ubicar videos */}
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mk-text-primary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
             {titulo}
@@ -1538,18 +1542,21 @@ function SemanaView({ entries, isMobile = false, onMoveDate, onCreate, fechas = 
    Network icons — diseñados como SVG, no emojis
    ============================================================ */
 
-/* Etiqueta del tipo de contenido en la tarjeta: Reel, Historia, Post… */
-const TIPO_UI: Record<string, { label: string; color: string }> = {
-  reel: { label: 'Reel', color: '#7c3aed' },
-  story: { label: 'Historia', color: '#db2777' },
-  post: { label: 'Post', color: '#0284c7' },
-  carrusel: { label: 'Carrusel', color: '#0d9488' },
-  video: { label: 'Video', color: '#475569' },
+/* Etiqueta del tipo de contenido en la tarjeta (Reel, Historia, Post,
+   Carrusel): pastilla tintada con ícono, mismos colores que la ficha. */
+const TIPO_UI: Record<string, { label: string; color: string; Icon: typeof Clapperboard }> = {
+  reel: { label: 'Reel', color: '#7170ff', Icon: Clapperboard },
+  story: { label: 'Historia', color: '#db2777', Icon: CircleFadingPlus },
+  post: { label: 'Post', color: '#0284c7', Icon: ImageIcon },
+  carrusel: { label: 'Carrusel', color: '#0d9488', Icon: GalleryHorizontalEnd },
+  video: { label: 'Video', color: '#475569', Icon: Clapperboard },
 }
 function TipoChip({ tipo }: { tipo: string }) {
-  const t = TIPO_UI[tipo] ?? { label: tipo, color: '#475569' }
+  const t = TIPO_UI[tipo] ?? { label: tipo, color: '#475569', Icon: Clapperboard }
   return (
-    <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', background: t.color, padding: '1px 6px', borderRadius: 999, lineHeight: 1.5, flexShrink: 0 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 7px 0 6px', borderRadius: 999,
+      fontSize: 10, fontWeight: 700, letterSpacing: 0.2, color: t.color, background: `${t.color}14`, border: `1px solid ${t.color}33`, flexShrink: 0 }}>
+      <t.Icon size={11} strokeWidth={2.4} />
       {t.label}
     </span>
   )
