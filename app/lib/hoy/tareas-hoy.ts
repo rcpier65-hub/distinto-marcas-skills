@@ -7,6 +7,7 @@
 // lado con fecha a fecha_entrega <= hoy.
 
 import 'server-only'
+import { scopeTasks, type TaskAccess } from '@/lib/tareas/access'
 
 export type TareaHoyRow = {
   id: string
@@ -31,6 +32,7 @@ function acotar(q: Service, esOwner: boolean, meId: string | null, memberId: str
 export async function cargarTareasParaHoy(
   service: Service,
   args: {
+    access?: TaskAccess
     esOwner: boolean
     meId: string | null
     /** Si el dueño pide otro miembro. */
@@ -41,11 +43,11 @@ export async function cargarTareasParaHoy(
 ): Promise<{ ok: true; rows: TareaHoyRow[] } | { ok: false; error: string }> {
   const select = 'id, texto, estado, fecha_entrega, marca_slug, categoria'
   let dated = service.from('tareas').select(select).eq('completada', false)
-  dated = acotar(dated, args.esOwner, args.meId, args.memberId)
+  dated = args.access ? scopeTasks(dated, args.access, args.memberId) : acotar(dated, args.esOwner, args.meId, args.memberId)
   dated = args.includeOverdue ? dated.lte('fecha_entrega', args.fecha) : dated.eq('fecha_entrega', args.fecha)
 
   let sinFecha = service.from('tareas').select(select).eq('completada', false).is('fecha_entrega', null)
-  sinFecha = acotar(sinFecha, args.esOwner, args.meId, args.memberId)
+  sinFecha = args.access ? scopeTasks(sinFecha, args.access, args.memberId) : acotar(sinFecha, args.esOwner, args.meId, args.memberId)
 
   const [datedRes, sinFechaRes] = await Promise.all([
     dated.order('fecha_entrega', { ascending: true }).limit(200),

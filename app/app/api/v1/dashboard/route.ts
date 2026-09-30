@@ -9,6 +9,8 @@ import { texto, textoOrNull } from '@/lib/api/mac-json'
 import { apiJsonError, requireSessionMember } from '@/lib/api/session-member'
 import { colorDeMarca } from '@/lib/marcas/branding'
 import { createServiceClient } from '@/lib/supabase/service'
+import { loadTaskAccess } from '@/lib/tareas/access-server'
+import { scopeTasks } from '@/lib/tareas/access'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
@@ -33,9 +35,8 @@ export async function GET(request: Request) {
     .select('id, marca_slug, categoria, team_member_id')
     .eq('completada', false)
     .limit(500)
-  if (!member.esCeo && member.teamMemberId) {
-    tareasQuery = tareasQuery.eq('team_member_id', member.teamMemberId)
-  }
+  const { access } = await loadTaskAccess(service, member.userId)
+  tareasQuery = scopeTasks(tareasQuery, access)
   const tareasRes = await tareasQuery
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

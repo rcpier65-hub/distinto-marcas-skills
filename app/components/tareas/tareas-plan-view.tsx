@@ -282,7 +282,8 @@ export function CardPlan({ t, hoy, puedeEditar, mostrarResponsable, onCambio, ap
 }
 
 /* ===== GANTT — cronograma por fechas, agrupado por responsable ===== */
-export function Gantt({ tareas, hoy, puedeEditar, onCambio }: {
+export function Gantt({ tareas, hoy, puedeEditar, onCambio, soloLecturaIds = [] }: {
+  soloLecturaIds?: string[]
   tareas: TareaPlan[]; hoy: string; puedeEditar: boolean; onCambio: () => void
 }) {
   const conFecha = tareas.filter((t) => t.fechaEntrega)
@@ -322,7 +323,7 @@ export function Gantt({ tareas, hoy, puedeEditar, onCambio }: {
     return (
       <div>
         <Vacio texto="Ninguna tarea tiene fecha de entrega todavía — ponlas desde el Tablero (botón 📅 en cada card) y acá se arma el cronograma." />
-        {sinFecha.length > 0 && <SinFechaLista tareas={sinFecha} hoy={hoy} puedeEditar={puedeEditar} onCambio={onCambio} />}
+        {sinFecha.length > 0 && <SinFechaLista tareas={sinFecha} hoy={hoy} puedeEditar={puedeEditar} soloLecturaIds={soloLecturaIds} onCambio={onCambio} />}
       </div>
     )
   }
@@ -385,12 +386,13 @@ export function Gantt({ tareas, hoy, puedeEditar, onCambio }: {
       <p style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 6 }}>
         Barra = inicio (o creación) → entrega · color = marca/columna · borde negro = vencida · día morado = hoy
       </p>
-      {sinFecha.length > 0 && <SinFechaLista tareas={sinFecha} hoy={hoy} puedeEditar={puedeEditar} onCambio={onCambio} />}
+      {sinFecha.length > 0 && <SinFechaLista tareas={sinFecha} hoy={hoy} puedeEditar={puedeEditar} soloLecturaIds={soloLecturaIds} onCambio={onCambio} />}
     </div>
   )
 }
 
-function SinFechaLista({ tareas, hoy, puedeEditar, onCambio }: {
+function SinFechaLista({ tareas, hoy, puedeEditar, onCambio, soloLecturaIds }: {
+  soloLecturaIds: string[]
   tareas: TareaPlan[]; hoy: string; puedeEditar: boolean; onCambio: () => void
 }) {
   return (
@@ -401,7 +403,7 @@ function SinFechaLista({ tareas, hoy, puedeEditar, onCambio }: {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {tareas.map((t) => (
           <div key={t.id} style={{ maxWidth: 230 }}>
-            <CardPlan t={t} hoy={hoy} puedeEditar={puedeEditar} mostrarResponsable onCambio={onCambio} />
+            <CardPlan t={t} hoy={hoy} puedeEditar={puedeEditar && !soloLecturaIds.includes(t.id)} mostrarResponsable onCambio={onCambio} />
           </div>
         ))}
       </div>

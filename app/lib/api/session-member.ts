@@ -139,6 +139,7 @@ export async function requireSessionMember(
   let puedeGrilla = true
   let puedeMarcas = true
   let puedeEquipo = true
+  let puedeCrearMarcas = rolBase === 'director' || rolBase === 'admin'
 
   if (rolBase) {
     const { data: rol, error: rolError } = await service
@@ -159,6 +160,7 @@ export async function requireSessionMember(
       puedeGrilla = tieneAcceso(permisos, 'grilla')
       puedeMarcas = tieneAcceso(permisos, 'marcas')
       puedeEquipo = tieneAcceso(permisos, 'equipo')
+      puedeCrearMarcas = permisos.marcas?.puede_crear ?? puedeCrearMarcas
     }
   }
 
@@ -192,20 +194,20 @@ export async function requireSessionMember(
       puedeGrilla,
       puedeMarcas,
       puedeEquipo,
-    }),
+    }, puedeCrearMarcas),
   }
 }
 
 type MemberCore = Omit<SessionMember, 'puedeHistorias' | 'puedeGestionarMarcas' | 'esCeo' | 'esPedro'>
 
-function memberPayload(core: MemberCore): SessionMember {
+function memberPayload(core: MemberCore, puedeCrearMarcas?: boolean): SessionMember {
   const owner = !core.esEquipo
   const director = core.rolBase === 'director'
   const admin = core.rolBase === 'admin'
   return {
     ...core,
     puedeHistorias: owner || director || admin || core.puedeDiseno || core.puedePublicaciones,
-    puedeGestionarMarcas: owner || director || admin,
+    puedeGestionarMarcas: puedeCrearMarcas ?? (owner || director || admin),
     esCeo: owner || director,
     esPedro: esPedroEmail(core.email),
   }
