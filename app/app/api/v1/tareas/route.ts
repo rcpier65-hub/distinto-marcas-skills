@@ -21,6 +21,8 @@ import { cargarPendientesInicio, cargarTrabajoDeHoy } from '@/lib/hoy/trabajo-de
 import { cargarTareasParaHoy } from '@/lib/hoy/tareas-hoy'
 import { hoyLima } from '@/lib/fechas/hoy'
 import { cerrarSesion } from '@/lib/tareas/tiempo'
+import { loadTaskAccess } from '@/lib/tareas/access-server'
+import { taskMemberVisible, taskEditable } from '@/lib/tareas/access'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
@@ -74,14 +76,6 @@ export async function GET(request: Request) {
   if ('response' in cargado) return cargado.response
   const miembro = cargado.miembro
 
-  let memberId: string | null = null
-  if (requestedId && requestedId !== miembro.teamMemberId) {
-    if (!miembro.esDueno) {
-      return jsonApiError('No puedes ver tareas de otro miembro', 403)
-    }
-    memberId = requestedId
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let service: any
   try {
@@ -89,6 +83,11 @@ export async function GET(request: Request) {
   } catch {
     return jsonApiError('Falta SUPABASE_SERVICE_ROLE_KEY', 500)
   }
+
+  const { access } = await loadTaskAccess(service, auth.actor.userId)
+  if (!access.active) return jsonApiError('Necesitas una cuenta activa del equipo', 403)
+  if (requestedId && !taskMemberVisible(access, requestedId)) return jsonApiError('No puedes ver tareas de ese miembro', 403)
+  const memberId = requestedId
 
   const nombre = miembro.nombre ?? ''
   const [trabajoHoy, pendientes, tablero] = await Promise.all([
@@ -100,6 +99,7 @@ export async function GET(request: Request) {
     }),
     cargarPendientesInicio(service, memberId ?? miembro.teamMemberId),
     cargarTareasParaHoy(service, {
+      access,
       esOwner: miembro.esDueno,
       meId: miembro.teamMemberId,
       memberId,
@@ -188,7 +188,6 @@ export async function POST(request: Request) {
 
   const cargado = await cargarMiembroV1(auth.actor)
   if ('response' in cargado) return cargado.response
-  const miembro = cargado.miembro
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let service: any
@@ -206,11 +205,8 @@ export async function POST(request: Request) {
   if (readError) return jsonApiError(readError.message, 500)
   if (!tarea) return jsonApiError('Tarea no encontrada', 404)
 
-  const esDirector = miembro.rolBase === 'director'
-  const puede =
-    esDirector ||
-    tarea.team_member_id === miembro.teamMemberId ||
-    tarea.created_by === miembro.teamMemberId
+  const { access } = await loadTaskAccess(service, auth.actor.userId)
+  const puede = taskEditable(access, tarea)
   if (!puede) return jsonApiError('Esta tarea no es tuya', 403)
 
   if (completada) await cerrarSesion(service, id, 'terminada')

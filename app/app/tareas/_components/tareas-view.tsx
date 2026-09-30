@@ -65,11 +65,13 @@ function opcionesDiaHecho(): { iso: string; label: string }[] {
 
 export function TareasView({
   tareasIniciales, completadasIniciales = [], esCEO, meId, equipo, esErick = false,
-  marcas = [], planPorId = {}, hoy,
+  marcas = [], planPorId = {}, hoy, soloLecturaIds = [], equipoLimitado = false,
 }: {
   tareasIniciales: Tarea[]
   completadasIniciales?: Tarea[]
   esCEO: boolean
+  soloLecturaIds?: string[]
+  equipoLimitado?: boolean
   meId: string | null
   equipo: { id: string; nombre: string }[]
   /* Solo Erick: al completar una tarea le preguntamos QUÉ DÍA la hizo, para que
@@ -81,6 +83,7 @@ export function TareasView({
   planPorId?: Record<string, PlanInfo>
   hoy?: string
 }) {
+  const soloLectura = useMemo(() => new Set(soloLecturaIds), [soloLecturaIds])
   const isMobile = useIsMobile()
   const router = useRouter()
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales)
@@ -316,7 +319,7 @@ export function TareasView({
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#111827' }}>Tareas</h1>
           <p style={{ margin: '2px 0 0', fontSize: 11.5, color: '#6b7280' }}>
-            {esCEO ? 'Ves todo el equipo · ' : ''}{activasVis.length} activa{activasVis.length === 1 ? '' : 's'}
+            {esCEO ? (equipoLimitado ? 'Vista del equipo · ' : 'Ves todo el equipo · ') : ''}{activasVis.length} activa{activasVis.length === 1 ? '' : 's'}
             {' · escribe @Nombre para asignar'}
           </p>
         </div>
@@ -372,7 +375,7 @@ export function TareasView({
               onChange={(e) => setFiltroUser(e.target.value)}
               style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 12.5, fontWeight: 600, color: '#374151', cursor: 'pointer' }}
             >
-              <option value="todos">Todo el equipo</option>
+              <option value="todos">{equipoLimitado ? 'Equipo disponible' : 'Todo el equipo'}</option>
               {equipo.map((m) => <option key={m.id} value={m.id}>{m.nombre.split(' ')[0]}</option>)}
             </select>
           </div>
@@ -418,6 +421,7 @@ export function TareasView({
         {(focusModeActive || enFocus.length > 0) && (
           <FocusZona
             enFocus={enFocus}
+            soloLectura={soloLectura}
             focusModeActive={focusModeActive}
             onComplete={onCompletar}
             onRemove={(id) => onSetFocus(id, null)}
@@ -430,7 +434,7 @@ export function TareasView({
             (el header y el composer no se mueven). */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: isMobile ? '8px 12px 140px' : '8px 20px 140px' }}>
           {vistaBoard === 'gantt' ? (
-            <Gantt tareas={planTareas} hoy={hoyLima} puedeEditar onCambio={() => router.refresh()} />
+            <Gantt tareas={planTareas} hoy={hoyLima} puedeEditar soloLecturaIds={soloLecturaIds} onCambio={() => router.refresh()} />
           ) : vistaBoard === 'cal' ? (
             <CalendarioTareas tareas={planTareas} hoy={hoyLima} mes={mesCal} setMes={setMesCal} />
           ) : columnas.length === 0 ? (
@@ -440,7 +444,7 @@ export function TareasView({
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
               {columnas.map((c) => (
-                <Columna key={c.categoria} columna={c} esCEO={esCEO} todasCategorias={todasCategorias}
+                <Columna key={c.categoria} columna={c} esCEO={esCEO} soloLectura={soloLectura} todasCategorias={todasCategorias}
                   onComplete={onCompletar} onDelete={onEliminar} onMover={onMover}
                   plan={planPorId} hoy={hoyLima} onPlanCambio={() => router.refresh()} />
               ))}
@@ -467,6 +471,7 @@ export function TareasView({
         <ArchivoDrawer
           completadas={completadasVis}
           esCEO={esCEO}
+          soloLectura={soloLectura}
           onClose={() => setArchivoOpen(false)}
           onRestaurar={onRestaurar}
         />
@@ -559,7 +564,8 @@ function FlyerEl({ flyer }: { flyer: Flyer }) {
 }
 
 /* ============================ Archivo (historial) ============================ */
-function ArchivoDrawer({ completadas, esCEO, onClose, onRestaurar }: {
+function ArchivoDrawer({ completadas, esCEO, soloLectura, onClose, onRestaurar }: {
+  soloLectura: Set<string>
   completadas: Tarea[]
   esCEO: boolean
   onClose: () => void
@@ -610,7 +616,7 @@ function ArchivoDrawer({ completadas, esCEO, onClose, onRestaurar }: {
                       {t.completadaAt && <span>· {fechaRelativa(t.completadaAt)}</span>}
                     </div>
                   </div>
-                  <button onClick={() => onRestaurar(t.id)} title="Devolver al tablero" style={{ width: 26, height: 26, borderRadius: 7, border: 'none', background: '#fff', color: '#6d28d9', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+                  <button disabled={soloLectura.has(t.id)} onClick={() => onRestaurar(t.id)} title="Devolver al tablero" style={{ width: 26, height: 26, borderRadius: 7, border: 'none', background: '#fff', color: '#6d28d9', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
                     <RotateCcw size={13} strokeWidth={2.2} />
                   </button>
                 </div>
@@ -640,8 +646,9 @@ function fechaRelativa(iso: string): string {
 }
 
 /* ============================ Columna ============================ */
-function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio }: {
+function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio }: {
   columna: { categoria: string; color: string; items: Tarea[] }
+  soloLectura: Set<string>
   esCEO: boolean
   todasCategorias: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void
@@ -666,7 +673,7 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {columna.items.map((t) => (
-          <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} otras={todasCategorias.filter((c) => c !== t.categoria)}
+          <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} readOnly={soloLectura.has(t.id)} otras={todasCategorias.filter((c) => c !== t.categoria)}
             onComplete={onComplete} onDelete={onDelete} onMover={onMover}
             planInfo={plan?.[t.id]} hoy={hoy} onPlanCambio={onPlanCambio} />
         ))}
@@ -680,12 +687,12 @@ function Columna({ columna, esCEO, todasCategorias, onComplete, onDelete, onMove
    cronómetro "en proceso" que se guarda al terminar (para métricas).
    Fila 1: responsable · ✓ Lista · ⋯ (mover, archivar, eliminar)
    Fila 2: ▶ Iniciar / ⏸ 12:34 (corriendo) / ▶ Reanudar · 12m · fecha */
-function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio }: {
-  tarea: Tarea; esCEO: boolean; otras: string[]
+function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio }: {
+  tarea: Tarea; esCEO: boolean; readOnly: boolean; otras: string[]
   onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
   planInfo?: PlanInfo; hoy?: string; onPlanCambio?: () => void
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: tarea.id })
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: tarea.id, disabled: readOnly })
   const [menu, setMenu] = useState(false)
   const [nueva, setNueva] = useState('')
   const cardRef = useRef<HTMLDivElement>(null)
@@ -707,16 +714,17 @@ function CardArrastrable({ tarea, esCEO, otras, onComplete, onDelete, onMover, p
             </span>
           )}
           <div style={{ flex: 1 }} />
-          <button onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Marcar como lista (guarda el tiempo)"
+          {readOnly && <span style={{ fontSize: 10 }}>Solo lectura</span>}
+          <button disabled={readOnly} onClick={() => onComplete(tarea.id, cardRef.current?.getBoundingClientRect())} title="Marcar como lista (guarda el tiempo)"
             style={{ ...btnCard, width: 'auto', padding: '0 8px', gap: 4, background: 'rgba(255,255,255,0.95)', color: '#0f172a' }}>
             <Check size={12} strokeWidth={3} /> <span style={{ fontSize: 10.5, fontWeight: 700 }}>Lista</span>
           </button>
-          <button onClick={() => setMenu((v) => !v)} title="Más opciones" style={btnCard}>
+          <button disabled={readOnly} onClick={() => setMenu((v) => !v)} title="Más opciones" style={btnCard}>
             <MoreHorizontal size={14} strokeWidth={2.4} />
           </button>
         </div>
         {/* Cronómetro + fecha de entrega */}
-        <PlanChips tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} />
+        <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><PlanChips tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} /></fieldset>
       </div>
       {menu && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 12px 32px rgba(15,23,42,0.16)', padding: 6, minWidth: 190 }}>
@@ -877,7 +885,8 @@ function CardVisual({ tarea, overlay }: { tarea: Tarea; overlay?: boolean }) {
 }
 
 /* ============================ Zona Focus ============================ */
-function FocusZona({ enFocus, focusModeActive, onComplete, onRemove }: {
+function FocusZona({ enFocus, soloLectura, focusModeActive, onComplete, onRemove }: {
+  soloLectura: Set<string>
   enFocus: Tarea[]; focusModeActive: boolean; onComplete: (id: string) => void; onRemove: (id: string) => void
 }) {
   const [elapsed, setElapsed] = useState(0)
@@ -913,8 +922,8 @@ function FocusZona({ enFocus, focusModeActive, onComplete, onRemove }: {
                 ) : items.map((t) => (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: focusModeActive ? '#1f2937' : '#f9fafb', borderLeft: `3px solid ${t.color}`, borderRadius: 6, padding: '6px 7px' }}>
                     <span style={{ flex: 1, fontSize: 11.5, color: focusModeActive ? '#fff' : '#111827', lineHeight: 1.3 }}>{t.texto}</span>
-                    <button onClick={() => onComplete(t.id)} title="Completar" style={{ ...iconBtnDark, color: '#34d399' }}><Check size={12} strokeWidth={2.6} /></button>
-                    <button onClick={() => onRemove(t.id)} title="Quitar de focus" style={{ ...iconBtnDark, color: '#9ca3af' }}><X size={12} strokeWidth={2.4} /></button>
+                    <button disabled={soloLectura.has(t.id)} onClick={() => onComplete(t.id)} title="Completar" style={{ ...iconBtnDark, color: '#34d399' }}><Check size={12} strokeWidth={2.6} /></button>
+                    <button disabled={soloLectura.has(t.id)} onClick={() => onRemove(t.id)} title="Quitar de focus" style={{ ...iconBtnDark, color: '#9ca3af' }}><X size={12} strokeWidth={2.4} /></button>
                   </div>
                 ))}
               </div>

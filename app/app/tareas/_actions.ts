@@ -8,25 +8,15 @@ import { cerrarSesion } from '@/lib/tareas/tiempo'
 import { categorizarTarea, limpiarTexto, colorParaCategoria } from '@/lib/tareas/categorizar'
 import { TAREA_SELECT as SELECT, rowToTarea } from '@/lib/tareas/serialize'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
+import { loadTaskAccess, mayEditTask } from '@/lib/tareas/access-server'
+import { scopeTasks, taskAssignable } from '@/lib/tareas/access'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 
-/* Miembro actual + si es CEO (director). Reintenta una vez si la consulta
-   ERRÓ (parpadeo de red/BD): así no devolvemos id=null por un fallo transitorio,
-   que hacía que puedeEditar rechazara la tarea PROPIA del usuario ("Esta tarea
-   no es tuya") y la marca de completada se perdiera. Pedro 12-ago-2026. */
-async function currentMember(service: Service, authUserId: string): Promise<{ id: string | null; esCEO: boolean }> {
-  for (let intento = 0; intento < 2; intento++) {
-    const { data: tm, error } = await service
-      .from('team_members')
-      .select('id, rol_base')
-      .eq('auth_user_id', authUserId)
-      .maybeSingle()
-    if (!error) return { id: tm?.id ?? null, esCEO: tm?.rol_base === 'director' }
-    // error transitorio → reintenta una vez
-  }
-  return { id: null, esCEO: false }
+async function currentMember(service: Service, authUserId: string) {
+  const { access } = await loadTaskAccess(service, authUserId)
+  return { id: access.memberId, access }
 }
 
 function primerNombre(n: string): string {
@@ -48,6 +38,7 @@ export async function crearTareaEnMarca(marcaSlug: string, textoOriginal: string
   if (texto.length > 600) return { ok: false, error: 'Demasiado largo' }
 
   const me = await currentMember(service, user.id)
+  if (!me.access.active || !me.id) return { ok: false, error: 'Necesitas una cuenta activa del equipo.' }
 
   const { data: marca } = await service
     .from('marcas')
@@ -57,7 +48,7 @@ export async function crearTareaEnMarca(marcaSlug: string, textoOriginal: string
   if (!marca) return { ok: false, error: 'Marca no encontrada' }
 
   /* Reusar el color de la columna de esa marca si ya existe. */
-  const { data: existentes } = await service.from('tareas').select('categoria, color')
+  const { data: existentes } = await scopeTasks(service.from('tareas').select('categoria, color'), me.access)
   const colorByCat = new Map<string, string>()
   const usados: string[] = []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,12 +90,13 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
   if (texto.length > 600) return { ok: false, error: 'Demasiado largo' }
 
   const me = await currentMember(service, user.id)
+  if (!me.access.active || !me.id) return { ok: false, error: 'Necesitas una cuenta activa del equipo.' }
 
   /* Miembros activos (para resolver asignación por nombre). */
   const { data: members } = await service.from('team_members').select('id, nombre').eq('activo', true)
 
   /* Categorías + colores existentes (para reusar color por columna). */
-  const { data: existentes } = await service.from('tareas').select('categoria, color')
+  const { data: existentes } = await scopeTasks(service.from('tareas').select('categoria, color'), me.access)
   const colorByCat = new Map<string, string>()
   const usados: string[] = []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -134,7 +126,8 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
      quedaban con el creador y nunca llegaban al asignado). Pedro 12-ago-2026. */
   if (assigneeId) {
     const target = miembros.find((m) => m.id === assigneeId)
-    if (target) ownerId = target.id
+    if (!target || !taskAssignable(me.access, target.id)) return { ok: false, error: 'No puedes asignar tareas a ese miembro.' }
+    ownerId = target.id
   } else {
     // Fallback: @mención dentro del texto (por si alguien la usa).
     const mention = texto.match(/@([\p{L}][\p{L}.]*)/u)
@@ -144,6 +137,7 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
         const nombre = (m.nombre ?? '').toLowerCase().trim()
         return primerNombre(m.nombre) === mname || nombre.replace(/\s+/g, '') === mname || nombre.split(/\s+/).includes(mname)
       })
+      if (target && !taskAssignable(me.access, target.id)) return { ok: false, error: 'No puedes asignar tareas a ese miembro.' }
       if (target) ownerId = target.id
     }
   }
@@ -192,20 +186,7 @@ export async function crearTarea(textoOriginal: string, assigneeId?: string): Pr
   return { ok: true, tarea: rowToTarea(data) }
 }
 
-/* Verifica que el usuario pueda tocar esta tarea (dueño, CREADOR o CEO). */
-async function puedeEditar(service: Service, authUserId: string, tareaId: string): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
-  const me = await currentMember(service, authUserId)
-  const { data: t } = await service.from('tareas').select('team_member_id, created_by').eq('id', tareaId).maybeSingle()
-  if (!t) return { ok: false, error: 'Tarea no encontrada' }
-  /* Puede tocarla: el CEO, el dueño (a quien está asignada), o el CREADOR —
-     aunque la haya asignado a otra persona con una @mención. Fix Pedro 07-jul:
-     Erick creaba tareas que se asignaban a otro (Pedro/Ruth) y luego no las
-     podía borrar ("Esta tarea no es tuya"). */
-  if (me.esCEO || t.team_member_id === me.id || t.created_by === me.id) return { ok: true }
-  return { ok: false, error: 'Esta tarea no es tuya' }
-}
+const puedeEditar = mayEditTask
 
 export async function completarTarea(id: string, completada = true, fechaHecha?: string): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser()
@@ -248,7 +229,8 @@ export async function moverTareaCategoria(id: string, nuevaCategoria: string): P
   const perm = await puedeEditar(service, user.id, id)
   if (!perm.ok) return perm
   /* Reusar color si la categoría ya existe; sino el siguiente libre. */
-  const { data: existentes } = await service.from('tareas').select('categoria, color')
+  const { access } = await loadTaskAccess(service, user.id)
+  const { data: existentes } = await scopeTasks(service.from('tareas').select('categoria, color'), access)
   const colorByCat = new Map<string, string>()
   const usados: string[] = []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

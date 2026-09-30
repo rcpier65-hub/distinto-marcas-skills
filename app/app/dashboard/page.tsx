@@ -5,6 +5,8 @@ import { requireUser } from '@/lib/auth/get-user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { type MarcaCardData, type TareaMarca } from './_components/marca-card'
 import { MarcasGrid } from './_components/marcas-grid'
+import { loadTaskAccess } from '@/lib/tareas/access-server'
+import { scopeTasks, canCreateBrand } from '@/lib/tareas/access'
 import { NuevaMarcaForm } from './_components/nueva-marca-form'
 
 export const dynamic = 'force-dynamic'
@@ -68,16 +70,15 @@ export default async function DashboardPage({
      solo las suyas. Pedro 13-jul. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
-  const { data: tmRow } = await service
-    .from('team_members').select('id, rol_base').eq('auth_user_id', user.id).maybeSingle()
-  const esCEO = tmRow?.rol_base === 'director'
+  const { access, member, permisos } = await loadTaskAccess(service, user.id)
+  const puedeCrearMarca = canCreateBrand(member, permisos)
 
   let qTareas = service
     .from('tareas')
     .select('id, texto, categoria, marca_slug, team_member_id, created_by, miembro:team_members!tareas_team_member_id_fkey(nombre)')
     .eq('completada', false)
     .order('created_at', { ascending: false })
-  if (!esCEO && tmRow?.id) qTareas = qTareas.eq('team_member_id', tmRow.id)
+  qTareas = scopeTasks(qTareas, access)
   const { data: tareasRows } = await qTareas
 
   /* Nombres del equipo para resolver quién creó cada tarea. */
@@ -121,7 +122,7 @@ export default async function DashboardPage({
 
       {/* Botón "+ Nueva marca" (se expande a formulario al abrir) */}
       <div className="mb-6">
-        <NuevaMarcaForm defaultOpen={abrirForm} />
+        {puedeCrearMarca && <NuevaMarcaForm defaultOpen={abrirForm} />}
       </div>
 
       <MarcasGrid cards={cards} tareasPorMarca={tareasPorMarca} />

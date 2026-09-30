@@ -775,7 +775,11 @@ const MODULO_OPCIONES: Record<ModuloPermiso, { acceso: string; extras?: { key: s
                     { key: 'puede_resetear_passwords', label: 'Puede resetear contraseñas' },
                   ] },
   finanzas:     { acceso: 'Ver Finanzas' },
-  marcas:       { acceso: 'Ver Marcas' },
+  marcas:       { acceso: 'Ver Marcas', extras: [{ key: 'puede_crear', label: 'Puede crear marcas' }] },
+  tareas:       { acceso: 'Ver Tareas', extras: [
+    { key: 'ver_equipo', label: 'Puede ver tareas del equipo (respeta exclusiones individuales)' },
+    { key: 'puede_asignar', label: 'Puede asignar tareas a otros' },
+  ] },
 }
 
 function TabPermisos({

@@ -1,9 +1,8 @@
 // app/app/tareas/page.tsx
 //
 // Tablero de tareas estilo "Notas". Columnas dinámicas (categoría = entidad).
-// Las tareas son PERSONALES: cada miembro ve SOLO las suyas. Únicamente el
-// DUEÑO (Pedro) ve el tablero completo del equipo. Pedro 14-jul-2026:
-// "las tareas son personales; Erick no debe ver las de Aylin ni Lorena, etc."
+// Vista personal por defecto; permisos individuales permiten supervisar el
+// equipo con exclusiones aplicadas en el servidor, también al historial.
 
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -12,7 +11,8 @@ import type { Tarea } from '@/lib/tareas/types'
 import { TareasView, type PlanInfo } from './_components/tareas-view'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { ESTADOS_TAREA } from '@/lib/tareas/pro-types'
-import { esDuenoDelTablero } from '@/lib/tareas/dueno'
+import { loadTaskAccess } from '@/lib/tareas/access-server'
+import { scopeTasks, taskAssignable, taskEditable } from '@/lib/tareas/access'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,17 +21,8 @@ export default async function TareasPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
-  const { data: tm } = await service
-    .from('team_members')
-    .select('id, nombre, rol_base')
-    .eq('auth_user_id', user.id)
-    .maybeSingle()
-  const meId: string | null = tm?.id ?? null
-  /* SOLO el DUEÑO (Pedro: sin team_member, o el team_member llamado "Pedro")
-     ve el tablero completo del equipo. TODOS los demás —incluido Erick, que es
-     director-administrador— ven SOLO sus propias tareas. Las tareas son
-     personales; si se asigna a alguien, esa persona la ve en su tablero. */
-  const esOwner = esDuenoDelTablero(!tm, tm?.nombre)
+  const { access, member: tm } = await loadTaskAccess(service, user.id)
+  const meId = access.memberId
   /* Solo Erick: al completar una tarea le preguntamos QUÉ DÍA la hizo, para que
      su reporte semanal la ubique en el día correcto (a veces marca hoy algo que
      hizo el lunes). Comparamos por primer nombre. Pedro 26-ago-2026. */
@@ -42,7 +33,7 @@ export default async function TareasPage() {
     .select(TAREA_SELECT)
     .eq('completada', false)
     .order('created_at', { ascending: false })
-  if (!esOwner && meId) q = q.eq('team_member_id', meId)
+  q = scopeTasks(q, access)
   const { data } = await q
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tareas: Tarea[] = ((data ?? []) as any[]).map(rowToTarea)
@@ -55,7 +46,7 @@ export default async function TareasPage() {
     .eq('completada', true)
     .order('completada_at', { ascending: false, nullsFirst: false })
     .limit(200)
-  if (!esOwner && meId) qc = qc.eq('team_member_id', meId)
+  qc = scopeTasks(qc, access)
   const { data: dataC } = await qc
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
@@ -69,7 +60,7 @@ export default async function TareasPage() {
     .eq('activo', true)
     .order('nombre')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const equipo = ((members ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+  const equipo = ((members ?? []) as any[]).filter((m) => taskAssignable(access, m.id)).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
 
   /* ===== Datos de la vista PLAN (estados + fechas + marcas) — van como
      props del MISMO tablero (Gantt/calendario/filtro por marca inline).
@@ -116,7 +107,9 @@ export default async function TareasPage() {
       <TareasView
         tareasIniciales={tareas}
         completadasIniciales={completadas}
-        esCEO={esOwner}
+        esCEO={access.viewTeam}
+        equipoLimitado={access.excluded.length > 0}
+        soloLecturaIds={[...tareas, ...completadas].filter(t => !taskEditable(access, { team_member_id: t.teamMemberId, created_by: t.createdBy })).map(t => t.id)}
         meId={meId}
         equipo={equipo}
         esErick={esErick}

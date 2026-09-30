@@ -61,7 +61,7 @@ const STORAGE_KEY = 'mk:sidebar:sections'
 export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailActivo, notificaciones = [] }: Props) {
   const esCEO = !permisos || permisos.rolBase === 'director'
   const puedeGestionarMarcas =
-    !permisos || permisos.rolBase === 'director' || permisos.rolBase === 'admin'
+    !permisos || (permisos.modulos.marcas?.puede_crear ?? (permisos.rolBase === 'director' || permisos.rolBase === 'admin'))
   const esPedro =
     (emailActivo ?? permisos?.email ?? '').trim().toLowerCase() === 'pedro@agenciadistinto.com'
   const puede = (modulo: ModuloPermiso): boolean => {

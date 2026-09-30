@@ -17,6 +17,7 @@ export type ModuloPermiso =
   | 'equipo'
   | 'finanzas'
   | 'marcas'  // Vista por marca (/marca/[slug]) — sección "Marcas" del sidebar
+  | 'tareas'
 
 /* Shape de los permisos. Notar que cada módulo es opcional y dentro
    los campos pueden ser undefined: el merge respeta el rol base si
@@ -32,7 +33,8 @@ export type Permisos = {
   settings?: { acceso?: boolean }
   equipo?: { acceso?: boolean; puede_invitar?: boolean; puede_resetear_passwords?: boolean }
   finanzas?: { acceso?: boolean }
-  marcas?: { acceso?: boolean }
+  marcas?: { acceso?: boolean; puede_crear?: boolean }
+  tareas?: { acceso?: boolean; ver_equipo?: boolean; puede_asignar?: boolean; excluir_miembros?: string[] }
 }
 
 export type RolPredefinidoId =
@@ -131,7 +133,7 @@ export function resumenPermisos(permisos: Permisos): {
   const todos: ModuloPermiso[] = [
     'inbox', 'publicaciones', 'editor', 'diseno', 'grilla',
     'comentarios', 'metricas', 'settings', 'equipo', 'finanzas',
-    'marcas',
+    'marcas', 'tareas',
   ]
   const modulosAccesibles = todos.filter((m) => tieneAcceso(permisos, m))
   return { modulosAccesibles, totalModulos: todos.length }
@@ -150,6 +152,7 @@ export const MODULO_LABEL: Record<ModuloPermiso, string> = {
   equipo: 'Mi equipo',
   finanzas: 'Finanzas',
   marcas: 'Marcas',
+  tareas: 'Tareas',
 }
 
 /* Color de chip por rol — alineado con el branding morado/violeta

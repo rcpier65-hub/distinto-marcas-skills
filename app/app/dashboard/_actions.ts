@@ -4,6 +4,8 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { loadTaskAccess } from '@/lib/tareas/access-server'
+import { canCreateBrand } from '@/lib/tareas/access'
 
 /**
  * Convierte un nombre en un slug URL-safe.
@@ -35,9 +37,12 @@ export async function createMarca(input: {
   color?: string
   objetivo?: number
 }): Promise<{ ok: true; slug: string } | { ok: false; error: string }> {
-  await requireUser()
+  const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+
+  const { member, permisos } = await loadTaskAccess(service, user.id)
+  if (!canCreateBrand(member, permisos)) return { ok: false, error: 'No tienes permiso para crear marcas.' }
 
   const nombre = input.nombre?.trim()
   if (!nombre) return { ok: false, error: 'El nombre es obligatorio' }
