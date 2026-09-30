@@ -23,6 +23,7 @@ const ESTADO_VARIANT: Record<EstadoPublicacion, 'default' | 'secondary' | 'outli
   editar: 'secondary',
   disenar: 'secondary',
   disenando: 'secondary',
+  disenado: 'secondary',
   enviado: 'default',
   aprobar: 'default',
   programar: 'default',

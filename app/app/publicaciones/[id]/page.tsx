@@ -82,6 +82,15 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
   const promptGuardado = typeof tonoVoz.prompt_copy === 'string' ? tonoVoz.prompt_copy : ''
   const promptMarca = promptGuardado || promptSeedPorSlug(marca?.slug ?? null) || ''
 
+  /* ¿Esta publicación es un entregable de una tarea de diseño? (Historias /
+     Posts / Carruseles que armó Ailyn). Pedro 30-sep-2026. */
+  let tareaDiseno: { id: string; listo: boolean } | null = null
+  try {
+    const { data: ent } = await service.from('diseno_entregables')
+      .select('tarea_id, listo_at').eq('publicacion_id', pub.id).limit(1).maybeSingle()
+    if (ent) tareaDiseno = { id: ent.tarea_id as string, listo: !!ent.listo_at }
+  } catch { /* sin tabla */ }
+
   return (
     <main className="container mx-auto p-3 sm:p-6 max-w-7xl pb-24">
       <nav className="mb-3 sm:mb-4 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
@@ -113,6 +122,7 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
         marca={marca}
         editores={editores}
         promptMarca={promptMarca}
+        tareaDiseno={tareaDiseno}
       />
 
       {/* GUION TÉCNICO movido adentro del PublicacionDetailForm, debajo

@@ -37,7 +37,7 @@ import {
 } from '@/lib/types/database'
 
 const ESTADOS: EstadoPublicacion[] = [
-  'tareas', 'idear', 'editando', 'editar', 'disenar', 'disenando',
+  'tareas', 'idear', 'editando', 'editar', 'disenar', 'disenando', 'disenado',
   'enviado', 'aprobar', 'programar', 'programar_anuncios', 'archivado',
 ]
 
@@ -156,9 +156,11 @@ type Props = {
   editores: EditorRow[]
   /* Prompt de copy de la marca (guardado o seed). Pedro lo edita acá. */
   promptMarca?: string
+  /* Si es un entregable de una tarea de diseño: la tarea y si ya está lista. */
+  tareaDiseno?: { id: string; listo: boolean } | null
 }
 
-export function PublicacionDetailForm({ publicacion: initial, marca, editores, promptMarca = '' }: Props) {
+export function PublicacionDetailForm({ publicacion: initial, marca, editores, promptMarca = '', tareaDiseno = null }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   /* A dónde vuelve "Volver":
@@ -442,6 +444,10 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
      pestaña) si quedó algo pendiente. El botón "Guardar" sigue funcionando. */
   const [autoEstado, setAutoEstado] = useState<'idle' | 'pendiente' | 'guardando' | 'guardado' | 'error'>('idle')
   const formRef = useRef(form)
+  /* Último estado guardado: el autoguardado manda SOLO lo que cambió, así no
+     pisa lo que otra persona guardó mientras tanto (p. ej. el link de diseño
+     que pega Ailyn mientras Lorena tiene la ficha abierta). */
+  const guardadoRef = useRef(armarPayload(form))
   const pendienteRef = useRef(false)
   const primeraRef = useRef(true)
   const guardandoRef = useRef<Promise<unknown> | null>(null)
@@ -449,7 +455,15 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     if (!pendienteRef.current) return
     pendienteRef.current = false
     setAutoEstado('guardando')
-    const p = updatePublicacion(initial.id, armarPayload(formRef.current))
+    const actual = armarPayload(formRef.current)
+    const previo = guardadoRef.current as Record<string, unknown>
+    const cambios: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(actual)) {
+      if (JSON.stringify(v) !== JSON.stringify(previo[k])) cambios[k] = v
+    }
+    if (Object.keys(cambios).length === 0) { setAutoEstado('guardado'); return }
+    const p = updatePublicacion(initial.id, cambios as Parameters<typeof updatePublicacion>[1])
+    guardadoRef.current = actual
     guardandoRef.current = p
     const r = await p
     guardandoRef.current = null
@@ -478,6 +492,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
 
   function handleSave() {
     pendienteRef.current = false
+    guardadoRef.current = armarPayload(form)
     startTransition(async () => {
       const result = await updatePublicacion(initial.id, {
         ...form,
@@ -1034,6 +1049,16 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   {/* "Para diseño" — opt-in explícito (Pedro 19-jun-2026). Cuando
                       está activo, esta publicación le aparece a Ailyn como tarea
                       en /diseno. Sin esto, NO le aparece (evita la inundación). */}
+                  {tareaDiseno ? (
+                    /* Entregable de una tarea de Ailyn: muestra en qué va y lleva a la tarea. */
+                    <a href={`/diseno/${tareaDiseno.id}`}
+                      className="mt-1.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: tareaDiseno.listo ? '#10b981' : '#ba41f7' }}
+                      title="Ver la tarea de diseño de Ailyn">
+                      <Palette className="w-4 h-4" />
+                      {tareaDiseno.listo ? '✓ Diseñado · ver tarea' : 'Diseñando · Ailyn'}
+                    </a>
+                  ) : (
                   <button
                     type="button"
                     onClick={toggleParaDiseno}
@@ -1049,6 +1074,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                     <Palette className="w-4 h-4" />
                     {paraDiseno ? '✓ En diseño (Ailyn)' : 'Mandar a diseño'}
                   </button>
+                  )}
                 </div>
 
                 {/* Editor */}

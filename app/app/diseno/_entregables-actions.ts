@@ -21,6 +21,10 @@ type Err = { ok: false; error: string }
 
 export type TipoEntregable = 'post' | 'carrusel' | 'historia'
 const VALOR_TIPO: Record<TipoEntregable, string> = { post: 'POST', carrusel: 'CARRUSEL', historia: 'HISTORIA' }
+/* Estados "antes de diseño": si la publicación está en uno de estos, pasa a
+   Diseñando / Diseñado automáticamente. Si ya avanzó (aprobar, programar…),
+   no se toca. */
+const ESTADOS_PREVIOS: (string | undefined)[] = ['tareas', 'idear', 'disenar', 'borrador']
 
 export type PubCalendario = {
   id: string
@@ -122,12 +126,14 @@ export async function crearEntregables(input: {
     let pubId: string | null = null
     if (it.publicacionId) {
       /* ENLAZAR la que Lorena ya creó (solo si es de la misma marca). */
-      const { data: pub } = await service.from('publicaciones').select('id, marca_id, tipo_contenido').eq('id', it.publicacionId).maybeSingle()
+      const { data: pub } = await service.from('publicaciones').select('id, marca_id, tipo_contenido, estado').eq('id', it.publicacionId).maybeSingle()
       if (pub && pub.marca_id === marca.id) {
         pubId = pub.id
-        if (!Array.isArray(pub.tipo_contenido) || pub.tipo_contenido.length === 0) {
-          await service.from('publicaciones').update({ tipo_contenido: [valor], updated_by: user.id }).eq('id', pub.id)
-        }
+        const upd: Record<string, unknown> = { updated_by: user.id }
+        if (!Array.isArray(pub.tipo_contenido) || pub.tipo_contenido.length === 0) upd.tipo_contenido = [valor]
+        /* Queda "Diseñando" mientras Ailyn la trabaja (si aún no avanzó más). */
+        if (ESTADOS_PREVIOS.includes(pub.estado)) upd.estado = 'disenando'
+        await service.from('publicaciones').update(upd).eq('id', pub.id)
       }
     }
     if (!pubId) {
@@ -135,7 +141,7 @@ export async function crearEntregables(input: {
         marca_id: marca.id,
         nombre: titulo,
         fecha_publicacion: it.fecha,
-        estado: 'tareas',
+        estado: 'disenando',
         plataformas,
         tipo_contenido: [valor],
         objetivos: [],
@@ -217,7 +223,13 @@ export async function marcarEntregableListo(id: string, listo: boolean): Promise
   const { error } = await service.from('diseno_entregables').update({ listo_at: listo ? new Date().toISOString() : null }).eq('id', id)
   if (error) return { ok: false, error: error.message }
   if (e.publicacion_id) {
-    await service.from('publicaciones').update({ disenado: listo, portada_lista: listo, updated_by: user.id }).eq('id', e.publicacion_id)
+    /* Estado de la publicación: "Diseñado" al terminar; vuelve a "Diseñando"
+       si se desmarca (solo si no avanzó a otra etapa). */
+    const { data: p } = await service.from('publicaciones').select('estado').eq('id', e.publicacion_id).maybeSingle()
+    const upd: Record<string, unknown> = { disenado: listo, portada_lista: listo, updated_by: user.id }
+    if (listo && (ESTADOS_PREVIOS.includes(p?.estado) || p?.estado === 'disenando')) upd.estado = 'disenado'
+    if (!listo && p?.estado === 'disenado') upd.estado = 'disenando'
+    await service.from('publicaciones').update(upd).eq('id', e.publicacion_id)
   }
   const { data: todos } = await service.from('diseno_entregables').select('listo_at').eq('tarea_id', e.tarea_id)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

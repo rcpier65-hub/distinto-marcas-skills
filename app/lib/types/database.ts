@@ -41,6 +41,7 @@ export type EstadoPublicacion =
   | 'editar'
   | 'disenar'
   | 'disenando'
+  | 'disenado'
   | 'enviado'
   | 'aprobar'
   | 'programar'
@@ -64,6 +65,7 @@ export const ESTADO_PUBLICACION_LABEL: Record<EstadoPublicacion, string> = {
   editar: 'Editar',
   disenar: 'Diseñar',
   disenando: 'Diseñando',
+  disenado: 'Diseñado',
   enviado: 'Enviado',
   aprobar: 'Aprobar',
   programar: 'Programar',
