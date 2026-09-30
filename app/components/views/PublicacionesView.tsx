@@ -939,6 +939,13 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
               <span className="mk-dot" style={{ background: estadoCfg.color, width: 4, height: 4 }} />
             </span>
           </div>
+          {/* Tipo (Reel / Historia / Post…) + redes ARRIBA (Pedro 30-sep-2026). */}
+          {(pub.tipoDefinido || pub.redes.length > 0) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', rowGap: 3 }}>
+              {pub.tipoDefinido && <TipoChip tipo={pub.tipo} />}
+              {pub.redes.map((r) => <RedIcon key={r} red={r} />)}
+            </div>
+          )}
           {/* TÍTULO del video (bold) — Lorena lo usa para ubicar videos */}
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mk-text-primary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
             {titulo}
@@ -953,10 +960,6 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
               CORTEN cuando la columna es angosta (semana) — antes se salían del
               chip y quedaban recortados. Fix Pedro 15-jun-2026. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', rowGap: 4 }}>
-            {pub.redes.map((r) => <RedIcon key={r} red={r} />)}
-            {pub.redes.length > 0 && (
-              <span style={{ width: 1, height: 11, background: 'var(--mk-border-subtle)', flexShrink: 0 }} />
-            )}
             <StatusIcons pub={pub} size={13} />
             {editor && (
               <span style={{ marginLeft: 'auto', width: 14, height: 14, borderRadius: '50%', background: editor.color, color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, flexShrink: 0 }}>
@@ -1534,6 +1537,23 @@ function SemanaView({ entries, isMobile = false, onMoveDate, onCreate, fechas = 
 /* ============================================================
    Network icons — diseñados como SVG, no emojis
    ============================================================ */
+
+/* Etiqueta del tipo de contenido en la tarjeta: Reel, Historia, Post… */
+const TIPO_UI: Record<string, { label: string; color: string }> = {
+  reel: { label: 'Reel', color: '#7c3aed' },
+  story: { label: 'Historia', color: '#db2777' },
+  post: { label: 'Post', color: '#0284c7' },
+  carrusel: { label: 'Carrusel', color: '#0d9488' },
+  video: { label: 'Video', color: '#475569' },
+}
+function TipoChip({ tipo }: { tipo: string }) {
+  const t = TIPO_UI[tipo] ?? { label: tipo, color: '#475569' }
+  return (
+    <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', background: t.color, padding: '1px 6px', borderRadius: 999, lineHeight: 1.5, flexShrink: 0 }}>
+      {t.label}
+    </span>
+  )
+}
 
 function RedIcon({ red }: { red: Red }) {
   const c = RED_CONFIG[red]

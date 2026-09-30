@@ -92,7 +92,15 @@ const PLATAFORMAS = [
   { key: 'Youtube',   Icon: YoutubeIcon,   label: 'YouTube',   brand: '#FF0000' },
 ] as const
 
-const TIPO_OPTS = ['REEL', 'POST', 'CARRUSEL', 'STORY', 'REEL FRASE', 'VIDEO REEL TIKTOK', 'VIDEO']
+const TIPO_OPTS = ['REEL', 'HISTORIA', 'POST', 'CARRUSEL', 'REEL FRASE', 'VIDEO REEL TIKTOK', 'VIDEO']
+/* Selector rápido y visible bajo las plataformas (Pedro 30-sep-2026: "una
+   opción de tipo de contenido historia… para poder diferenciar"). */
+const TIPO_RAPIDO: { valor: string; label: string; match: RegExp }[] = [
+  { valor: 'REEL', label: 'Reel', match: /reel/i },
+  { valor: 'HISTORIA', label: 'Historia', match: /historia|stor/i },
+  { valor: 'POST', label: 'Post', match: /^post$/i },
+  { valor: 'CARRUSEL', label: 'Carrusel', match: /carrus/i },
+]
 const OBJETIVO_OPTS = ['Normal', 'Anuncio', 'Conversión', 'Alcance', 'Engagement']
 
 /**
@@ -829,6 +837,23 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                 <span>Otra</span>
               </button>
             )}
+          </div>
+
+          {/* Tipo de contenido (uno solo): Reel · Historia · Post · Carrusel */}
+          <div className="flex items-center gap-2 flex-wrap mt-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mr-1">Tipo</span>
+            {TIPO_RAPIDO.map((t) => {
+              const activo = t.match.test(form.tipo_contenido[0] ?? '')
+              return (
+                <button key={t.valor} type="button"
+                  onClick={() => setForm((s) => ({ ...s, tipo_contenido: activo ? [] : [t.valor] }))}
+                  className={`h-8 px-3.5 rounded-full text-[13px] font-semibold border transition-colors ${
+                    activo ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                  }`}>
+                  {t.label}
+                </button>
+              )
+            })}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

@@ -30,6 +30,8 @@ export type PublicacionMock = {
   thumbnail: string | null  /* path o null si no hay */
   redes: Red[]
   tipo: TipoContenido
+  /* false = la publicación no tiene tipo cargado (no mostrar etiqueta). */
+  tipoDefinido?: boolean
   estado: EstadoPubMetricool
   editorId: string | null
   editorNombre?: string | null   /* nombre real del editor desde BD (JOIN) */

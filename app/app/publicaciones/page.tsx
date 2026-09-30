@@ -43,7 +43,7 @@ function normalizeTipo(t: string | null | undefined): TipoContenido {
   const v = (t ?? '').toLowerCase()
   if (v.includes('reel')) return 'reel'
   if (v.includes('carrus')) return 'carrusel'
-  if (v.includes('story') || v.includes('storie')) return 'story'
+  if (v.includes('story') || v.includes('storie') || v.includes('historia')) return 'story'
   if (v.includes('video')) return 'video'
   return 'post'
 }
@@ -122,6 +122,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         thumbnail: null,
         redes,
         tipo,
+        tipoDefinido: (r.tipo_contenido ?? []).length > 0,
         estado: normalizeEstadoPub(r.estado),
         editorId: r.editor_id,
         editorNombre: editor?.nombre ?? null,
