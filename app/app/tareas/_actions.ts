@@ -357,3 +357,32 @@ export async function enviarTareaADiseno(id: string): Promise<{ ok: boolean; err
   revalidatePath('/diseno'); revalidatePath('/tareas'); revalidatePath('/inicio')
   return { ok: true, disenoId: nueva.id as string }
 }
+
+/* TRASPASAR una tarea a otra persona (Pedro 30-sep-2026): pasa a ser suya y
+   queda registrado de quién vino ("↪ de Lorena"). Si el cronómetro estaba
+   corriendo se cierra: ese tiempo queda para quien la venía trabajando. */
+export async function traspasarTarea(id: string, nuevoMiembroId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  const perm = await puedeEditar(service, user.id, id)
+  if (!perm.ok) return perm
+  const { access } = await loadTaskAccess(service, user.id)
+  if (!/^[0-9a-f-]{36}$/i.test(nuevoMiembroId) || !taskAssignable(access, nuevoMiembroId)) {
+    return { ok: false, error: 'No puedes pasarle tareas a esa persona.' }
+  }
+  const { data: destino } = await service.from('team_members').select('id').eq('id', nuevoMiembroId).eq('activo', true).maybeSingle()
+  if (!destino) return { ok: false, error: 'Esa persona ya no está en el equipo.' }
+  const { data: actual } = await service.from('tareas').select('team_member_id').eq('id', id).maybeSingle()
+  if (!actual) return { ok: false, error: 'La tarea ya no existe.' }
+  if (actual.team_member_id === nuevoMiembroId) return { ok: true }
+  await cerrarSesion(service, id, 'estado')
+  const { error } = await service.from('tareas').update({
+    team_member_id: nuevoMiembroId,
+    traspasada_de: actual.team_member_id ?? null,
+    traspasada_at: new Date().toISOString(),
+  }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/tareas')
+  revalidatePath('/inicio')
+  return { ok: true }
+}

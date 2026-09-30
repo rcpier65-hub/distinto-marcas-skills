@@ -16,10 +16,10 @@ import {
   PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core'
-import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2, MoreHorizontal, Play, Pause, CalendarDays } from 'lucide-react'
+import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2, MoreHorizontal, Play, Pause, CalendarDays, ArrowRightLeft, CornerDownRight } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
-import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane } from '../_actions'
+import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane, traspasarTarea } from '../_actions'
 import { iniciarTarea, pausarTarea, setEstadoTarea, setFechasTarea } from '../_plan-actions'
 import { Gantt, CalendarioTareas, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { type EstadoTarea } from '@/lib/tareas/pro-types'
@@ -303,6 +303,20 @@ export function TareasView({
     if (!r.ok) { toast.error(r.error ?? 'No se pudo mover'); setTareas(prev) }
   }, [tareas])
 
+  /* Traspasar a otra persona (Pedro 30-sep-2026). Optimista: la tarjeta pasa
+     al nuevo dueño con "↪ de <anterior>"; si falla, se revierte. */
+  const onTraspasar = useCallback(async (id: string, miembroId: string) => {
+    const prev = tareas
+    const nuevo = equipo.find((m) => m.id === miembroId)
+    setTareas((cur) => cur.map((t) => t.id === id
+      ? { ...t, teamMemberId: miembroId, teamMemberNombre: nuevo?.nombre ?? t.teamMemberNombre, traspasadaDeNombre: t.teamMemberNombre, traspasadaAt: new Date().toISOString() }
+      : t))
+    const r = await traspasarTarea(id, miembroId)
+    if (!r.ok) { toast.error(r.error ?? 'No se pudo traspasar'); setTareas(prev); return }
+    toast.success(`Tarea pasada a ${nuevo?.nombre.split(' ')[0] ?? 'otra persona'}`)
+    router.refresh()
+  }, [tareas, equipo, router])
+
   const onSetFocus = useCallback(async (id: string, lane: FocusLane | null) => {
     const prev = tareas
     setTareas((cur) => cur.map((t) => t.id === id ? { ...t, focusLane: lane } : t))
@@ -467,6 +481,7 @@ export function TareasView({
               {columnas.map((c) => (
                 <Columna key={c.categoria} columna={c} esCEO={esCEO} soloLectura={soloLectura} todasCategorias={todasCategorias}
                   onComplete={onCompletar} onDelete={onEliminar} onMover={onMover}
+                  equipo={equipo} onTraspasar={onTraspasar}
                   plan={planPorId} hoy={hoyLima} onPlanCambio={() => router.refresh()} />
               ))}
             </div>
@@ -667,8 +682,10 @@ function fechaRelativa(iso: string): string {
 }
 
 /* ============================ Columna ============================ */
-function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio }: {
+function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio, equipo, onTraspasar }: {
   columna: { categoria: string; color: string; items: Tarea[] }
+  equipo: { id: string; nombre: string }[]
+  onTraspasar: (id: string, miembroId: string) => void
   soloLectura: Set<string>
   esCEO: boolean
   todasCategorias: string[]
@@ -696,6 +713,7 @@ function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onD
         {columna.items.map((t) => (
           <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} readOnly={soloLectura.has(t.id)} otras={todasCategorias.filter((c) => c !== t.categoria)}
             onComplete={onComplete} onDelete={onDelete} onMover={onMover}
+            equipo={equipo} onTraspasar={onTraspasar}
             planInfo={plan?.[t.id]} hoy={hoy} onPlanCambio={onPlanCambio} />
         ))}
       </div>
@@ -708,8 +726,10 @@ function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onD
    cronómetro "en proceso" que se guarda al terminar (para métricas).
    Fila 1: responsable · ✓ Lista · ⋯ (mover, archivar, eliminar)
    Fila 2: ▶ Iniciar / ⏸ 12:34 (corriendo) / ▶ Reanudar · 12m · fecha */
-function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio }: {
+function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio, equipo, onTraspasar }: {
   tarea: Tarea; esCEO: boolean; readOnly: boolean; otras: string[]
+  equipo: { id: string; nombre: string }[]
+  onTraspasar: (id: string, miembroId: string) => void
   onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
   planInfo?: PlanInfo; hoy?: string; onPlanCambio?: () => void
 }) {
@@ -728,6 +748,12 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
         <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 12, fontWeight: 500, lineHeight: 1.35, cursor: 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
           {tarea.texto}
         </p>
+        {tarea.traspasadaDeNombre && (
+          <div title={tarea.traspasadaAt ? `Traspasada el ${new Date(tarea.traspasadaAt).toLocaleString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Traspasada'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.22)', padding: '2px 7px', borderRadius: 999 }}>
+            <CornerDownRight size={10} strokeWidth={2.6} /> Traspasada de {tarea.traspasadaDeNombre.split(' ')[0]}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
           {esCEO && tarea.teamMemberNombre && (
             <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, background: 'rgba(255,255,255,0.2)', padding: '2px 7px', borderRadius: 999 }}>
@@ -759,6 +785,24 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
             <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Nueva columna…" style={{ flex: 1, fontSize: 12, padding: '6px 8px', border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' }} />
             <button type="submit" title="Crear y mover" style={{ ...iconBtn, width: 28, height: 28, borderRadius: 8, color: '#16a34a', background: '#f0fdf4' }}><Plus size={14} /></button>
           </form>
+          {equipo.filter((m) => m.id !== tarea.teamMemberId).length > 0 && (
+            <>
+              <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, padding: '3px 8px 5px' }}>
+                <ArrowRightLeft size={11} /> Pasar a
+              </div>
+              <div style={{ maxHeight: 170, overflowY: 'auto' }}>
+                {equipo.filter((m) => m.id !== tarea.teamMemberId).map((m) => (
+                  <button key={m.id} onClick={() => { onTraspasar(tarea.id, m.id); setMenu(false) }} style={{ ...menuItem, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#ede9fe', color: '#7170ff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {m.nombre.charAt(0).toUpperCase()}
+                    </span>
+                    {m.nombre.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
           <button onClick={eliminar} style={{ ...menuItem, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 7 }}>
             <Trash2 size={13} /> Eliminar tarea

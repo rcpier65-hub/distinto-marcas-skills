@@ -16,4 +16,7 @@ export type Tarea = {
   completadaAt: string | null      // cuándo se marcó lista (para el historial/archivo)
   marcaSlug: string | null         // marca elegida rápido (puente a Diseños)
   disenoId: string | null          // si se mandó a "Diseños para hoy", la publicacion creada
+  /* Traspaso: de quién vino la tarea (Pedro 30-sep-2026). */
+  traspasadaDeNombre?: string | null
+  traspasadaAt?: string | null
 }

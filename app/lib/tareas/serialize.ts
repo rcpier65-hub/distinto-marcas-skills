@@ -1,12 +1,14 @@
 // app/lib/tareas/serialize.ts
 import type { Tarea, FocusLane } from './types'
 
-export const TAREA_SELECT = `id, team_member_id, created_by, texto, categoria, color, completada, completada_at, focus_lane, created_at, marca_slug, diseno_id,
-  miembro:team_members!tareas_team_member_id_fkey(nombre)`
+export const TAREA_SELECT = `id, team_member_id, created_by, texto, categoria, color, completada, completada_at, focus_lane, created_at, marca_slug, diseno_id, traspasada_at,
+  miembro:team_members!tareas_team_member_id_fkey(nombre),
+  traspaso:team_members!tareas_traspasada_de_fkey(nombre)`
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToTarea(r: any): Tarea {
   const m = Array.isArray(r.miembro) ? r.miembro[0] : r.miembro
+  const tr = Array.isArray(r.traspaso) ? r.traspaso[0] : r.traspaso
   return {
     id: r.id,
     teamMemberId: r.team_member_id ?? null,
@@ -21,5 +23,7 @@ export function rowToTarea(r: any): Tarea {
     completadaAt: r.completada_at ?? null,
     marcaSlug: r.marca_slug ?? null,
     disenoId: r.diseno_id ?? null,
+    traspasadaDeNombre: tr?.nombre ?? null,
+    traspasadaAt: r.traspasada_at ?? null,
   }
 }
