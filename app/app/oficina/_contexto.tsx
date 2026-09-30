@@ -242,12 +242,20 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
 /* Mini control fuera de /oficina: sigues en la oficina aunque estés en otro
    módulo. */
 function MiniOficina({ of }: { of: Valor }) {
+  /* Mientras está visible, el contenido baja un poco (clase en <body>) para
+     que el control no tape los botones de arriba a la derecha. */
+  useEffect(() => {
+    document.body.classList.add('con-mini-oficina')
+    return () => document.body.classList.remove('con-mini-oficina')
+  }, [])
   const cerca = of.listaUI.filter((j) => j.gain > 0.05)
   const hablando = cerca.filter((j) => j.nivel > 0.12)
   return (
     <div
       style={{
-        position: 'fixed', right: 84, bottom: 'calc(22px + env(safe-area-inset-bottom, 0px))', zIndex: 8990,
+        /* Arriba a la derecha, fuera del camino de las barras de abajo y del
+           chat (Pedro 30-sep-2026). */
+        position: 'fixed', right: 16, top: 'calc(12px + env(safe-area-inset-top, 0px))', zIndex: 8990,
         display: 'flex', alignItems: 'center', gap: 4, padding: '5px 6px 5px 10px', borderRadius: 14,
         background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(15,23,42,0.14)',
         fontSize: 12.5, color: '#0f172a', maxWidth: 'calc(100vw - 110px)',

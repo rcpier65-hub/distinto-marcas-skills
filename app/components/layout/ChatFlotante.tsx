@@ -651,7 +651,9 @@ export function ChatFlotante() {
   const PANEL_W = 380
   const PANEL_H = 560
   /* En mobile la burbuja sube para no tapar el "+" flotante de /inicio. */
-  const burbujaBottom = isMobile ? 76 : 20
+  /* Más arriba para no tapar las barras de abajo (p. ej. "Guardar cambios"
+     de la ficha de publicación). Pedro 30-sep-2026. */
+  const burbujaBottom = isMobile ? 88 : 84
   const puedeEnviar = (texto.trim().length > 0 || pendientes.length > 0) && !enviando
 
   /* Arrastrar archivos: solo reaccionamos a arrastres con archivos. */
@@ -711,7 +713,7 @@ export function ChatFlotante() {
             position: 'fixed',
             ...(isMobile
               ? { inset: 0 }
-              : { right: 20, bottom: 84, width: PANEL_W, height: `min(${PANEL_H}px, calc(100vh - 110px))` }),
+              : { right: 20, bottom: 146, width: PANEL_W, height: `min(${PANEL_H}px, calc(100vh - 170px))` }),
             zIndex: 9001,
             background: '#fff',
             borderRadius: isMobile ? 0 : 16,

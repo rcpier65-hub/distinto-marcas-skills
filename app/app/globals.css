@@ -637,3 +637,9 @@
     transform: none !important;
   }
 }
+
+/* Control de la Oficina arriba a la derecha (desktop): el contenido baja lo
+   justo para no quedar tapado. Pedro 30-sep-2026. */
+@media (min-width: 768px) {
+  body.con-mini-oficina .mk-main { padding-top: 52px; }
+}
