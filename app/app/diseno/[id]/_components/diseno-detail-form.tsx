@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Calendar, CalendarCheck, Clock, Folder, Image as ImageIcon, Users,
-  Save, Trash2, Archive, Hourglass, Copy as CopyIcon, ExternalLink, Video, Loader2,
+  Trash2, Archive, Hourglass, Copy as CopyIcon, ExternalLink, Video, Loader2,
+  FileText, ArrowLeft, Check, ChevronDown, CircleDot, PlayCircle, CheckCircle2, Tags,
 } from 'lucide-react'
 import { updateDisenoEntry, archivarTarea, marcarParaDisenarHoy, desmarcarParaDisenarHoy, obtenerCorreosDeMarca } from '../../_actions'
 import { deletePublicacion } from '@/app/publicaciones/[id]/_actions'
@@ -28,10 +29,10 @@ import {
 } from '@/lib/diseno/types'
 
 const SUBESTADO_OPTIONS: { value: SubEstadoDiseno; label: string; color: string }[] = [
-  { value: 'sin_empezar', label: 'Sin empezar', color: '#737373' },
-  { value: 'en_progreso', label: 'En progreso', color: '#60a5fa' },
-  { value: 'listo',       label: 'Listo',       color: '#34d399' },
-  { value: 'archivado',   label: 'Archivado',   color: '#a78bfa' },
+  { value: 'sin_empezar', label: 'Sin empezar', color: '#64748b' },
+  { value: 'en_progreso', label: 'En progreso', color: '#2563eb' },
+  { value: 'listo',       label: 'Listo',       color: '#059669' },
+  { value: 'archivado',   label: 'Archivado',   color: '#7c3aed' },
 ]
 
 type Publicacion = {
@@ -73,6 +74,7 @@ export function DisenoDetailForm({
   /* Etiquetas de marca extra (slugs). Pedro: "en una sola tarea etiquetar
      varias marcas". La principal NO va acá (se cambia con el selector). */
   const [extras, setExtras] = useState<Set<string>>(() => new Set(marcasExtraSlugs))
+  const [verExtras, setVerExtras] = useState(false)
   const [, startTransition] = useTransition()
   const [isSaving, setIsSaving] = useState(false)
   const [meetLink, setMeetLink] = useState<string | null>(publicacion.reunionMeetLink)
@@ -236,62 +238,71 @@ export function DisenoDetailForm({
   return (
     <div className="space-y-5 pb-20">
       {/* HEADER */}
-      <div className="flex items-start gap-4">
-        <div className="w-1 self-stretch rounded-full" style={{ backgroundColor: form.marcaColor }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className="text-xl">{form.marcaEmoji}</span>
-            <span className="text-xs px-2 py-0.5 rounded-md font-medium font-mono"
-              style={{ backgroundColor: `${form.marcaColor}1f`, color: form.marcaColor }}>
-              {form.marcaNombre}
-            </span>
-            <SubEstadoBadge value={form.subEstado as SubEstadoDiseno} onChange={setSubEstado} />
-            {isSaving && <span className="text-[10px] text-muted-foreground">guardando…</span>}
+      <div className="rounded-[18px] border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)] overflow-hidden">
+        <div className="h-1" style={{ background: form.marcaColor }} />
+        <div className="p-5 flex items-start gap-4 flex-wrap">
+          <span className="w-11 h-11 rounded-xl inline-flex items-center justify-center text-xl shrink-0"
+            style={{ background: `${form.marcaColor}18` }}>{form.marcaEmoji}</span>
+          <div className="flex-1 min-w-[220px]">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                style={{ background: `${form.marcaColor}14`, color: form.marcaColor, border: `1px solid ${form.marcaColor}33` }}>
+                {form.marcaNombre}
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {isSaving ? 'Guardando…' : 'Se guarda solo'}
+              </span>
+            </div>
+            <input
+              type="text"
+              value={form.nombre}
+              onChange={(e) => setForm((s) => ({ ...s, nombre: e.target.value }))}
+              onBlur={(e) => setNombre(e.target.value)}
+              placeholder="Nombre de la tarea…"
+              className="w-full text-[26px] leading-tight font-bold tracking-tight text-slate-900 bg-transparent border-0 border-b-2 border-transparent hover:border-slate-100 focus:border-[#7170ff] focus:outline-none transition-colors py-1"
+            />
           </div>
-          <input
-            type="text"
-            value={form.nombre}
-            onChange={(e) => setForm((s) => ({ ...s, nombre: e.target.value }))}
-            onBlur={(e) => setNombre(e.target.value)}
-            placeholder="Nombre de la tarea…"
-            className="w-full text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-muted focus:border-primary focus:outline-none transition-colors py-1 mb-3"
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={toggleHoy}
+              disabled={togglingHoy}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] font-semibold rounded-[10px] transition-colors disabled:opacity-50"
+              style={marcadaHoy
+                ? { background: '#7170ff', color: '#fff', border: '1px solid #7170ff' }
+                : { background: '#f5f3ff', color: '#6d5dfc', border: '1px solid #ddd6fe' }}
+              title={marcadaHoy ? 'Quitar de tu lista de hoy' : 'Añadir a tu lista de HOY'}
+            >
+              <CalendarCheck className="w-4 h-4" />
+              {marcadaHoy ? 'En hoy' : 'Trabajar hoy'}
+            </button>
+            <button
+              onClick={handleArchive}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] font-semibold text-slate-600 bg-white border border-slate-200 rounded-[10px] hover:bg-slate-50 transition-colors"
+              title={form.subEstado === 'archivado' ? 'Reactivar' : 'Archivar'}
+            >
+              <Archive className="w-4 h-4" />
+              {form.subEstado === 'archivado' ? 'Reactivar' : 'Archivar'}
+            </button>
+            <button
+              onClick={handleDelete}
+              className="w-9 h-9 inline-flex items-center justify-center text-red-500 bg-white border border-red-200 rounded-[10px] hover:bg-red-50 transition-colors"
+              title="Eliminar permanentemente"
+              aria-label="Eliminar"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
-          {/* Botón HOY — lo pidió Aylin: mandar la tarea a su lista de hoy sin
-              perderla. Morado lleno = ya está en hoy. */}
-          <button
-            onClick={toggleHoy}
-            disabled={togglingHoy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-colors disabled:opacity-50"
-            style={marcadaHoy
-              ? { background: '#7c3aed', color: '#fff', border: '1px solid #7c3aed' }
-              : { background: 'rgba(124,58,237,0.10)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.35)' }}
-            title={marcadaHoy ? 'Quitar de tu lista de hoy' : 'Añadir a tu lista de HOY'}
-          >
-            <CalendarCheck className="w-3.5 h-3.5" />
-            {marcadaHoy ? 'En HOY ✓' : 'Trabajar HOY'}
-          </button>
-          <button
-            onClick={handleArchive}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors"
-            title={form.subEstado === 'archivado' ? 'Reactivar' : 'Archivar'}
-          >
-            <Archive className="w-3.5 h-3.5" />
-            {form.subEstado === 'archivado' ? 'Reactivar' : 'Archivar'}
-          </button>
-          <button
-            onClick={handleDelete}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 transition-colors"
-            title="Eliminar permanentemente"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+        {/* Estado como control segmentado */}
+        <div className="px-5 pb-5">
+          <SubEstadoBadge value={form.subEstado as SubEstadoDiseno} onChange={setSubEstado} />
         </div>
       </div>
 
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
+      <div className="space-y-5 min-w-0">
       {/* CARD: Información básica */}
-      <Section title="📝 Información">
+      <Section icon={<FileText className="w-4 h-4" />} title="Información" color="#7170ff">
         <Field label="Descripción / Brief">
           <textarea
             value={form.descripcion ?? ''}
@@ -299,7 +310,7 @@ export function DisenoDetailForm({
             onBlur={(e) => setDescripcion(e.target.value)}
             placeholder="¿Qué hay que diseñar? Referencias, especificaciones, etc."
             rows={4}
-            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+            className="w-full px-3 py-2.5 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition resize-y leading-relaxed"
           />
         </Field>
         {/* Cambiar marca de la tarea (Pedro 15-jun-2026). */}
@@ -315,8 +326,14 @@ export function DisenoDetailForm({
         {/* Etiquetas extra: una sola tarea para varias marcas. Excluye la
             principal (esa se cambia arriba). */}
         {marcas.length > 1 && (
-          <Field label="También para estas marcas (opcional)">
-            <div className="flex flex-wrap gap-1.5">
+          <div>
+            <button type="button" onClick={() => setVerExtras((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#6d5dfc] hover:opacity-80">
+              <Tags className="w-4 h-4" /> Etiquetar más marcas{extras.size > 0 ? ` · ${extras.size}` : ''}
+              <ChevronDown className={`w-4 h-4 transition-transform ${verExtras ? 'rotate-180' : ''}`} />
+            </button>
+            {verExtras && (
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
               {marcas
                 .filter((m) => m.slug !== form.marcaSlug)
                 .map((m) => {
@@ -326,50 +343,26 @@ export function DisenoDetailForm({
                       key={m.slug}
                       type="button"
                       onClick={() => toggleExtra(m.slug)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12.5px] font-semibold border transition-colors ${
                         on
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background border-border hover:bg-muted'
+                          ? 'bg-[#f5f3ff] text-[#6d5dfc] border-[#c4b5fd]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
+                      {on && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                       <span>{m.emoji ?? '🏷️'}</span>
                       <span>{m.nombre}</span>
                     </button>
                   )
                 })}
             </div>
-          </Field>
+            )}
+          </div>
         )}
       </Section>
 
-      {/* CARD: Fechas */}
-      <Section title="📅 Fechas">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Fecha de entrega" icon={<Calendar className="w-3.5 h-3.5" />}>
-            <input
-              type="date"
-              value={form.fechaEntrega ?? ''}
-              onChange={(e) => setFecha('fechaEntrega', e.target.value)}
-              onFocus={openPickerOnFocus}
-              onClick={openPickerOnFocus}
-              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
-            />
-          </Field>
-          <Field label="Fecha de diseño" icon={<Calendar className="w-3.5 h-3.5" />}>
-            <input
-              type="date"
-              value={form.fechaDiseno ?? ''}
-              onChange={(e) => setFecha('fechaDiseno', e.target.value)}
-              onFocus={openPickerOnFocus}
-              onClick={openPickerOnFocus}
-              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
-            />
-          </Field>
-        </div>
-      </Section>
-
       {/* CARD: Enlaces de Drive */}
-      <Section title="📁 Enlaces de Drive">
+      <Section icon={<Folder className="w-4 h-4" />} title="Enlaces de Drive" color="#0d9488">
         <Field label="Material para trabajar" icon={<Folder className="w-3.5 h-3.5" />}>
           <DriveInput
             value={form.driveMaterialUrl ?? ''}
@@ -387,7 +380,7 @@ export function DisenoDetailForm({
       </Section>
 
       {/* CARD: Reunión */}
-      <Section title="📹 Reunión de revisión">
+      <Section icon={<Video className="w-4 h-4" />} title="Reunión de revisión" color="#10b981">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Hora" icon={<Clock className="w-3.5 h-3.5" />}>
             <input
@@ -396,7 +389,7 @@ export function DisenoDetailForm({
               onChange={(e) => setHora(e.target.value)}
               onFocus={openPickerOnFocus}
               onClick={openPickerOnFocus}
-              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+              className="w-full h-10 px-3 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition cursor-pointer"
             />
           </Field>
         </div>
@@ -421,7 +414,7 @@ export function DisenoDetailForm({
             onBlur={(e) => setInvitados(e.target.value)}
             placeholder="algún correo extra… (el cliente ya va invitado solo)"
             rows={2}
-            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+            className="w-full px-3 py-2.5 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition resize-y leading-relaxed"
           />
         </Field>
         {/* Sincronizar reunión a Google Calendar (con Meet + invitados) */}
@@ -477,44 +470,76 @@ export function DisenoDetailForm({
         )}
       </Section>
 
+      </div>
+      <div className="space-y-5 lg:sticky lg:top-4">
+      {/* CARD: Fechas */}
+      <Section icon={<Calendar className="w-4 h-4" />} title="Fechas" color="#0284c7">
+        <div className="grid gap-4">
+          <Field label="Fecha de entrega" icon={<Calendar className="w-3.5 h-3.5" />}>
+            <input
+              type="date"
+              value={form.fechaEntrega ?? ''}
+              onChange={(e) => setFecha('fechaEntrega', e.target.value)}
+              onFocus={openPickerOnFocus}
+              onClick={openPickerOnFocus}
+              className="w-full h-10 px-3 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition cursor-pointer"
+            />
+          </Field>
+          <Field label="Fecha de diseño" icon={<Calendar className="w-3.5 h-3.5" />}>
+            <input
+              type="date"
+              value={form.fechaDiseno ?? ''}
+              onChange={(e) => setFecha('fechaDiseno', e.target.value)}
+              onFocus={openPickerOnFocus}
+              onClick={openPickerOnFocus}
+              className="w-full h-10 px-3 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition cursor-pointer"
+            />
+          </Field>
+        </div>
+      </Section>
+
       {/* META + timeline si archivada */}
-      <Section title="ℹ Estado y tiempo">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      <Section icon={<Hourglass className="w-4 h-4" />} title="Estado y tiempo" color="#64748b">
+        <div className="grid gap-2 text-[12.5px] text-slate-500 [&>span:empty]:hidden [&>span.sep]:hidden">
           <span>Creada: {formatDateTimeES(form.createdAt)}</span>
-          <span>·</span>
+          <span className="sep">·</span>
           <span>Última edición: {formatDateTimeES(form.updatedAt)}</span>
           {form.startedAt && (
             <>
-              <span>·</span>
+              <span className="sep">·</span>
               <span><Hourglass className="inline w-3 h-3 mr-1" />Empezada: {formatDateTimeES(form.startedAt)}</span>
             </>
           )}
           {form.archivedAt && (
             <>
-              <span>·</span>
+              <span className="sep">·</span>
               <span>Archivada: {formatDateTimeES(form.archivedAt)}</span>
             </>
           )}
           {duracion && (
             <>
-              <span>·</span>
+              <span className="sep">·</span>
               <span className="font-medium" style={{ color: '#a78bfa' }}>Duró: {duracion}</span>
             </>
           )}
         </div>
       </Section>
 
+      </div>
+      </div>
+
       {/* STICKY save bar */}
-      <div className="fixed bottom-0 left-0 right-0 px-6 py-3 bg-background/95 backdrop-blur border-t flex items-center justify-between gap-2 z-30">
-        <span className="text-xs text-muted-foreground">
-          {isSaving ? '💾 Guardando…' : '✓ Auto-guarda al salir de cada campo'}
+      <div className="fixed bottom-0 left-0 right-0 px-6 py-3 bg-white/95 backdrop-blur border-t border-slate-200 flex items-center justify-between gap-2 z-30">
+        <span className="text-[12.5px] text-slate-500 inline-flex items-center gap-1.5">
+          {isSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Guardando…</> : <><Check className="w-3.5 h-3.5 text-emerald-500" strokeWidth={3} /> Todo guardado</>}
         </span>
         <button
           onClick={() => router.push('/diseno')}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-1.5 h-10 px-4 text-sm font-semibold text-white rounded-[11px] hover:opacity-90 transition-opacity shadow-[0_8px_18px_-8px_rgba(113,112,255,0.8)]"
+          style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}
         >
-          <Save className="w-3.5 h-3.5" />
-          Volver al Kanban
+          <ArrowLeft className="w-4 h-4" />
+          Volver a Diseño
         </button>
       </div>
     </div>
@@ -525,12 +550,15 @@ export function DisenoDetailForm({
    Sub-componentes
    ============================================================ */
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ icon, title, color = '#7170ff', children }: { icon: React.ReactNode; title: string; color?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
-      <div className="space-y-3">{children}</div>
-    </div>
+    <section className="rounded-[18px] border border-slate-200/80 bg-white p-5 space-y-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-slate-900">
+        <span className="w-8 h-8 rounded-[9px] inline-flex items-center justify-center" style={{ background: `${color}14`, color }}>{icon}</span>
+        {title}
+      </h3>
+      <div className="space-y-4">{children}</div>
+    </section>
   )
 }
 
@@ -543,8 +571,8 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        {icon}
+      <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-700">
+        {icon && <span className="text-slate-400">{icon}</span>}
         {label}
       </span>
       {children}
@@ -575,7 +603,7 @@ function DriveInput({
           if (v !== value) onSave(v)
         }}
         placeholder={placeholder}
-        className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+        className="flex-1 min-w-0 h-10 px-3 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition"
       />
       {hasValue && (
         <>
@@ -586,7 +614,7 @@ function DriveInput({
               toast.success('Enlace copiado', { duration: 1000 })
             }}
             title="Copiar"
-            className="px-3 py-2 border border-border rounded-md hover:bg-muted transition-colors"
+            className="w-10 h-10 inline-flex items-center justify-center border border-slate-200 rounded-[10px] text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
           >
             <CopyIcon className="w-3.5 h-3.5" />
           </button>
@@ -595,7 +623,7 @@ function DriveInput({
             target="_blank"
             rel="noopener noreferrer"
             title="Abrir en Drive"
-            className="px-3 py-2 border border-border rounded-md hover:bg-muted transition-colors inline-flex items-center gap-1"
+            className="w-10 h-10 inline-flex items-center justify-center border border-slate-200 rounded-[10px] text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
@@ -611,19 +639,24 @@ function SubEstadoBadge({
   value: SubEstadoDiseno
   onChange: (v: SubEstadoDiseno) => void
 }) {
-  const current = SUBESTADO_OPTIONS.find((o) => o.value === value) ?? SUBESTADO_OPTIONS[0]
+  const ICONOS: Record<string, React.ReactNode> = {
+    sin_empezar: <CircleDot className="w-4 h-4" />,
+    en_progreso: <PlayCircle className="w-4 h-4" />,
+    listo: <CheckCircle2 className="w-4 h-4" />,
+    archivado: <Archive className="w-4 h-4" />,
+  }
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as SubEstadoDiseno)}
-      className="text-xs px-2 py-0.5 rounded-md font-medium border-0 cursor-pointer"
-      style={{ backgroundColor: `${current.color}1f`, color: current.color }}
-    >
-      {SUBESTADO_OPTIONS.map((o) => (
-        <option key={o.value} value={o.value} style={{ color: 'var(--foreground)', backgroundColor: 'var(--background)' }}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div role="radiogroup" aria-label="Estado del diseño" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-slate-200 bg-slate-50">
+      {SUBESTADO_OPTIONS.map((o) => {
+        const activo = o.value === value
+        return (
+          <button key={o.value} type="button" role="radio" aria-checked={activo} onClick={() => onChange(o.value)}
+            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-[13px] font-semibold transition-all ${activo ? 'bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            style={activo ? { color: o.color, boxShadow: `0 0 0 1.5px ${o.color}55, 0 1px 3px rgba(15,23,42,0.08)` } : undefined}>
+            {ICONOS[o.value]}{o.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }

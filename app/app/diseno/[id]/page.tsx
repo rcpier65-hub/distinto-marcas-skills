@@ -107,7 +107,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
   const tipoEntregable = /histor|stor/.test(tipoRaw) ? 'historia' : tipoRaw.includes('carrus') ? 'carrusel' : 'post'
 
   return (
-    <main className={`container mx-auto p-6 ${entregables.length > 0 ? 'max-w-5xl' : 'max-w-3xl'}`}>
+    <main className="container mx-auto p-6 max-w-6xl">
       <nav className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/diseno" className="hover:text-foreground">Diseño</Link>
         <span>/</span>
