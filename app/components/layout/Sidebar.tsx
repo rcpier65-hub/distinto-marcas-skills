@@ -184,6 +184,10 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {puede('metricas') && (
             <NavItem href="/reportes" icon={<ChartIcon />} label="Reportes" active={isActive('/reportes')} />
           )}
+          {/* Rendimiento del equipo — SOLO Pedro (30-sep-2026). */}
+          {esPedro && (
+            <NavItem href="/rendimiento" icon={<RendimientoIcon />} label="Rendimiento" active={isActive('/rendimiento')} />
+          )}
           {puede('publicaciones') && marcasVisibles.some((m) => (m as { influencersActivo?: boolean }).influencersActivo) && (
             <NavItem href="/influencers" icon={<InfluencerIcon />} label="Influencers" active={isActive('/influencers')} />
           )}
@@ -298,5 +302,14 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
         </form>
       </div>
     </aside>
+  )
+}
+
+/* Ícono de Rendimiento (pulso de actividad), mismo trazo que los demás. */
+function RendimientoIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M1.5 7H4L5.5 3L8.5 11L10 7H12.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
