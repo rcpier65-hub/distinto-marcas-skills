@@ -125,17 +125,22 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         </p>
       )}
 
-      {/* Portada: lo clave */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
+      {/* Embudo + portada (se re-anima al cambiar de mes) */}
+      <div key={m.mes} className="space-y-5 rep-in">
+      <Embudo m={m} prev={prev} />
+
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <Portada icon={<Wallet className="w-4 h-4" />} color={VERDE} label={m.pendienteCliente ? 'Ventas web (Shopify)' : 'Ventas directas'}
-          valor={soles(ventas)} extra={<Variacion actual={ventas} previo={prev ? prev.solesTotales ?? prev.solesWeb : null} />} />
-        <Portada icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} label={m.pendienteCliente ? 'Pedidos web' : 'Pedidos'}
-          valor={num(pedidos)} extra={<Variacion actual={pedidos} previo={prev ? prev.pedidosTotales ?? prev.pedidosWeb : null} />} />
-        <Portada icon={<Megaphone className="w-4 h-4" />} color={MORADO} label="Inversión en Facebook Ads"
-          valor={m.fuenteMeta === 'pendiente' ? 'Pendiente' : soles(m.gastoAdsSoles)} sub={m.fuenteMeta === 'pendiente' ? undefined : `${usd(m.gastoAdsUsd)} · incluye IGV`} />
-        <Portada icon={<Gauge className="w-4 h-4" />} color="#ea580c" label="Retorno de la inversión (ROAS)"
+          valor={soles(ventas)} extra={<Variacion actual={ventas} previo={prev ? (m.pendienteCliente ? prev.solesWeb : prev.solesTotales ?? prev.solesWeb) : null} />} />
+        <Portada icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} label={m.pendienteCliente ? 'Pedidos web' : 'Pedidos totales'}
+          valor={num(pedidos)} extra={<Variacion actual={pedidos} previo={prev ? (m.pendienteCliente ? prev.pedidosWeb : prev.pedidosTotales ?? prev.pedidosWeb) : null} />} />
+        <Portada icon={<Megaphone className="w-4 h-4" />} color={MORADO} label="Inversión Facebook Ads"
+          valor={m.fuenteMeta === 'pendiente' ? 'Pendiente' : soles(m.gastoAdsSoles)} sub={m.fuenteMeta === 'pendiente' ? undefined : `${usd(m.gastoAdsUsd)} · incluye IGV`}
+          extra={m.fuenteMeta === 'pendiente' ? undefined : <Variacion actual={m.gastoAdsSoles} previo={prev?.gastoAdsSoles ?? null} invertir />} />
+        <Portada icon={<Gauge className="w-4 h-4" />} color="#ea580c" label="Retorno (ROAS)"
           valor={veces(m.roas ?? m.roasWeb)} sub={m.roas != null ? 'ventas directas ÷ inversión' : 'solo web ÷ inversión'}
-          extra={<Variacion actual={m.roas ?? m.roasWeb} previo={prev ? prev.roas ?? prev.roasWeb : null} />} />
+          extra={<Variacion actual={m.roas ?? m.roasWeb} previo={prev ? (m.roas != null ? prev.roas ?? prev.roasWeb : prev.roasWeb) : null} />} />
+      </div>
       </div>
 
       {/* Meta del mes */}
@@ -233,7 +238,55 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         Fuentes: Shopify (pedidos pagados) · Facebook Ads · tipo de cambio SUNAT S/ {m.tipoCambio.toFixed(3)} · IGV 18%
       </p>
       <style>{'@media print{.no-imprimir,nav,aside,header.mk-mobile-topbar,.mk-sidebar-wrap{display:none!important}.reporte-imprimible{padding:0!important}body{background:#fff!important}section{break-inside:avoid}}'}</style>
+      <style>{ANIM}</style>
     </div>
+  )
+}
+
+const ANIM = `
+@keyframes repIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes repGrow{from{opacity:0;transform:scaleX(.55)}to{opacity:1;transform:scaleX(1)}}
+.rep-in{animation:repIn .45s cubic-bezier(.2,.7,.2,1) both}
+.rep-grow{animation:repGrow .6s cubic-bezier(.2,.8,.2,1) both;transform-origin:center}
+@media (prefers-reduced-motion:reduce){.rep-in,.rep-grow{animation:none}}`
+
+/* Embudo de ventas: conversaciones de WhatsApp → pedidos web → pedidos
+   WhatsApp, con el total de pedidos y soles al costado. */
+function Embudo({ m, prev }: { m: MesDirecto; prev: MesDirecto | null }) {
+  const etapas = [
+    { v: m.leads as number | null, t: 'Conversaciones WhatsApp', bg: 'linear-gradient(90deg,#6366f1,#7170ff)', w1: 94, w2: 76, p: prev?.leads ?? null, pend: m.fuenteMeta === 'pendiente' },
+    { v: m.pedidosWeb as number | null, t: 'Pedidos web · Shopify', bg: 'linear-gradient(90deg,#2563eb,#3b82f6)', w1: 76, w2: 59, p: prev?.pedidosWeb ?? null, pend: false },
+    { v: m.pedidosWhatsApp, t: 'Pedidos WhatsApp', bg: 'linear-gradient(90deg,#16a34a,#22c55e)', w1: 59, w2: 43, p: prev?.pedidosWhatsApp ?? null, pend: m.pendienteCliente },
+  ]
+  return (
+    <section className="rounded-[22px] border border-slate-200/80 bg-white p-5 sm:p-7 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <div className="text-center mb-5">
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7170ff]">Embudo de ventas</div>
+        <div className="text-[13px] text-slate-500 mt-0.5">Facebook Ads (WhatsApp) + Shopify</div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_170px] items-center gap-6">
+        <div className="flex flex-col items-center gap-1.5">
+          {etapas.map((e, i) => (
+            <div key={e.t} className="rep-grow w-full max-w-[600px] h-[86px] text-white flex flex-col items-center justify-center text-center"
+              style={{ background: e.bg, animationDelay: `${i * 110}ms`, clipPath: `polygon(${(100 - e.w1) / 2}% 0, ${100 - (100 - e.w1) / 2}% 0, ${100 - (100 - e.w2) / 2}% 100%, ${(100 - e.w2) / 2}% 100%)` }}>
+              <div className="text-[26px] font-bold leading-none tracking-tight">{e.pend ? '—' : num(e.v)}</div>
+              <div className="text-[10.5px] font-bold uppercase tracking-[0.1em] mt-1.5 opacity-90">{e.t}</div>
+              {e.pend
+                ? <div className="text-[10.5px] mt-0.5 opacity-80">pendiente</div>
+                : e.v != null && e.p != null && e.p > 0 && (
+                  <div className="text-[10.5px] font-semibold mt-0.5 opacity-90">{e.v >= e.p ? '▲' : '▼'} {Math.abs((e.v / e.p - 1) * 100).toFixed(0)}% vs mes anterior</div>
+                )}
+            </div>
+          ))}
+        </div>
+        <div className="text-center md:text-left md:border-l md:border-slate-100 md:pl-6">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">Pedidos totales</div>
+          <div className="text-[44px] font-bold tracking-tight text-slate-900 leading-none mt-1">{m.pedidosTotales == null ? '—' : num(m.pedidosTotales)}</div>
+          <div className="text-[15px] font-semibold text-slate-600 mt-2">{m.solesTotales == null ? 'Falta el cliente' : soles(m.solesTotales)}</div>
+          {m.conversionWhatsApp != null && <div className="text-[12px] text-slate-500 mt-3">{pct(m.conversionWhatsApp, 1)} de las conversaciones terminó en pedido</div>}
+        </div>
+      </div>
+    </section>
   )
 }
 

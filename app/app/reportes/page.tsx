@@ -3,6 +3,7 @@
 // Protegido por: permiso 'metricas' + CÓDIGO de acceso (cookie httpOnly de
 // 12h — Pedro 11-ago-2026: "no todos pueden ver"). El dueño ve TODAS las
 // marcas con selector; las que aún no tienen data salen deshabilitadas.
+import { BarChart3 } from 'lucide-react'
 import { requireUser } from '@/lib/auth/get-user'
 import { ensureAccesoModulo } from '@/lib/team/permisos-helper'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -21,12 +22,15 @@ export default async function ReportesPage() {
   const desbloqueado = await pinReportesOk()
 
   return (
-    <main className="container mx-auto p-6 md:p-8 max-w-5xl">
-      <header className="mb-6">
-        <h1 className="text-3xl font-extrabold tracking-tight">📊 Reportes</h1>
-        <p className="text-sm text-muted-foreground">
-          Dashboards mensuales por marca — data oficial (ex-Excel).
-        </p>
+    <main className="mx-auto p-4 sm:p-6 md:p-8 max-w-5xl">
+      <header className="mb-6 flex items-center gap-3">
+        <span className="w-11 h-11 rounded-[13px] inline-flex items-center justify-center text-white shrink-0" style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
+          <BarChart3 className="w-5 h-5" />
+        </span>
+        <div>
+          <h1 className="text-[26px] font-bold tracking-tight text-slate-900 leading-tight">Reportes</h1>
+          <p className="text-[13px] text-slate-500">Resultados mensuales de cada marca</p>
+        </div>
       </header>
 
       {!desbloqueado ? (
