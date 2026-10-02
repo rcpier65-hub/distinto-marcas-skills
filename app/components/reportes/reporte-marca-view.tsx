@@ -41,7 +41,7 @@ function Variacion({ actual, previo, invertir = false }: { actual: number | null
 }
 
 function Tarjeta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-[20px] border border-slate-200/80 bg-white p-5 sm:p-6 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ${className}`}>{children}</section>
+  return <section className={`min-w-0 rounded-[20px] border border-slate-200/80 bg-white p-5 sm:p-6 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ${className}`}>{children}</section>
 }
 function Titulo({ icon, children, color = MORADO, info }: { icon: React.ReactNode; children: React.ReactNode; color?: string; info?: string[] }) {
   return (
@@ -223,16 +223,25 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         {m.topProductos.length > 0 && (
           <Tarjeta>
             <Titulo icon={<Package className="w-4 h-4" />} color={VERDE} info={ex.productos}>Productos más vendidos (web)</Titulo>
-            <div className="grid gap-2.5">
+            <div className="grid gap-3.5">
               {m.topProductos.map((p, i) => {
                 const max = m.topProductos[0].unidades || 1
                 return (
-                  <div key={p.nombre}>
-                    <div className="flex justify-between gap-3 text-[13px]">
-                      <span className="text-slate-700 truncate"><b className="text-slate-400 mr-1.5">{i + 1}</b>{p.nombre}</span>
-                      <span className="font-semibold text-slate-900 shrink-0">{num(p.unidades)} u · {soles(p.soles)}</span>
+                  <div key={p.nombre} className="flex items-center gap-3 min-w-0">
+                    <span className={`w-7 h-7 rounded-full shrink-0 inline-flex items-center justify-center text-[12px] font-bold ${i === 0 ? 'text-white' : 'bg-slate-100 text-slate-500'}`}
+                      style={i === 0 ? { background: VERDE } : undefined}>{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-3 min-w-0">
+                        <span className="text-[13px] text-slate-700 truncate min-w-0" title={p.nombre}>{p.nombre.replace(/®/g, '')}</span>
+                        <span className="text-[13px] font-bold text-slate-900 shrink-0 tabular-nums">{num(p.unidades)} u</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${(p.unidades / max) * 100}%`, background: VERDE, opacity: i === 0 ? 1 : 0.7 }} />
+                        </div>
+                        <span className="text-[11.5px] text-slate-500 shrink-0 tabular-nums w-[64px] text-right">{soles(p.soles)}</span>
+                      </div>
                     </div>
-                    <div className="h-1.5 rounded-full bg-slate-100 mt-1 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(p.unidades / max) * 100}%`, background: VERDE }} /></div>
                   </div>
                 )
               })}
