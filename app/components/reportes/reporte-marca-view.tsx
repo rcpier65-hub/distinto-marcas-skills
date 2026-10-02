@@ -43,18 +43,43 @@ function Variacion({ actual, previo, invertir = false }: { actual: number | null
 function Tarjeta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-[20px] border border-slate-200/80 bg-white p-5 sm:p-6 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ${className}`}>{children}</section>
 }
-function Titulo({ icon, children, color = MORADO }: { icon: React.ReactNode; children: React.ReactNode; color?: string }) {
+function Titulo({ icon, children, color = MORADO, info }: { icon: React.ReactNode; children: React.ReactNode; color?: string; info?: string[] }) {
   return (
     <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-slate-900 mb-4">
       <span className="w-8 h-8 rounded-[9px] inline-flex items-center justify-center" style={{ background: `${color}14`, color }}>{icon}</span>
       {children}
+      {info && <InfoTip lineas={info} />}
     </h3>
   )
 }
-function Dato({ label, valor, sub, pendiente }: { label: string; valor: string; sub?: React.ReactNode; pendiente?: boolean }) {
+
+/* Ícono (i): al pasar el mouse (o tocar en celular) explica de dónde sale el
+   número, con los valores reales del mes. Pedro 02-oct-2026. */
+function InfoTip({ lineas, claro = false, derecha = false }: { lineas: string[]; claro?: boolean; derecha?: boolean }) {
+  const [abierto, setAbierto] = useState(false)
+  return (
+    <span className="relative inline-flex no-imprimir" onMouseEnter={() => setAbierto(true)} onMouseLeave={() => setAbierto(false)}>
+      <button type="button" aria-label="Cómo se calcula" onClick={(e) => { e.stopPropagation(); setAbierto((v) => !v) }}
+        onBlur={() => setAbierto(false)}
+        className={`w-[18px] h-[18px] rounded-full inline-flex items-center justify-center transition-colors ${claro ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-[#7170ff]'}`}>
+        <Info className="w-[15px] h-[15px]" />
+      </button>
+      {abierto && (
+        <span role="tooltip"
+          className={`rep-tip absolute z-50 ${derecha ? '-right-2' : 'left-1/2 -translate-x-1/2'} bottom-[calc(100%+8px)] w-[290px] max-w-[80vw] rounded-[12px] bg-slate-900 text-white text-left text-[12px] font-normal normal-case tracking-normal leading-[1.5] px-3.5 py-3 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.45)]`}>
+          <span className="block text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#a5a4ff] mb-1.5">Cómo se calcula</span>
+          {lineas.map((l, i) => <span key={i} className="block mt-1 first-of-type:mt-0">{l}</span>)}
+          <span className={`absolute ${derecha ? 'right-[11px]' : 'left-1/2 -translate-x-1/2'} top-full w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-slate-900`} />
+        </span>
+      )}
+    </span>
+  )
+}
+
+function Dato({ label, valor, sub, pendiente, info }: { label: string; valor: string; sub?: React.ReactNode; pendiente?: boolean; info?: string[] }) {
   return (
     <div className="rounded-[14px] bg-slate-50/80 border border-slate-100 p-3.5">
-      <div className="text-[12px] font-semibold text-slate-500">{label}</div>
+      <div className="text-[12px] font-semibold text-slate-500 flex items-center gap-1">{label}{info && <InfoTip lineas={info} />}</div>
       <div className={`text-[20px] font-bold mt-1 leading-none ${pendiente ? 'text-slate-300' : 'text-slate-900'}`}>{pendiente ? 'Pendiente' : valor}</div>
       {sub && <div className="text-[11.5px] text-slate-500 mt-1.5">{sub}</div>}
     </div>
@@ -91,6 +116,7 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
 
   const ventas = m.solesTotales ?? m.solesWeb
   const pedidos = m.pedidosTotales ?? m.pedidosWeb
+  const ex = explicar(m)
 
   return (
     <div className="space-y-5 reporte-imprimible">
@@ -127,17 +153,18 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
 
       {/* Embudo + portada (se re-anima al cambiar de mes) */}
       <div key={m.mes} className="space-y-5 rep-in">
+
       <Embudo m={m} prev={prev} />
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <Portada icon={<Wallet className="w-4 h-4" />} color={VERDE} label={m.pendienteCliente ? 'Ventas web (Shopify)' : 'Ventas directas'}
+        <Portada icon={<Wallet className="w-4 h-4" />} color={VERDE} label={m.pendienteCliente ? 'Ventas web (Shopify)' : 'Ventas directas'} info={ex.ventas}
           valor={soles(ventas)} extra={<Variacion actual={ventas} previo={prev ? (m.pendienteCliente ? prev.solesWeb : prev.solesTotales ?? prev.solesWeb) : null} />} />
-        <Portada icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} label={m.pendienteCliente ? 'Pedidos web' : 'Pedidos totales'}
+        <Portada icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} label={m.pendienteCliente ? 'Pedidos web' : 'Pedidos totales'} info={ex.pedidos}
           valor={num(pedidos)} extra={<Variacion actual={pedidos} previo={prev ? (m.pendienteCliente ? prev.pedidosWeb : prev.pedidosTotales ?? prev.pedidosWeb) : null} />} />
-        <Portada icon={<Megaphone className="w-4 h-4" />} color={MORADO} label="Inversión Facebook Ads"
+        <Portada icon={<Megaphone className="w-4 h-4" />} color={MORADO} label="Inversión Facebook Ads" info={ex.inversion}
           valor={m.fuenteMeta === 'pendiente' ? 'Pendiente' : soles(m.gastoAdsSoles)} sub={m.fuenteMeta === 'pendiente' ? undefined : `${usd(m.gastoAdsUsd)} · incluye IGV`}
           extra={m.fuenteMeta === 'pendiente' ? undefined : <Variacion actual={m.gastoAdsSoles} previo={prev?.gastoAdsSoles ?? null} invertir />} />
-        <Portada icon={<Gauge className="w-4 h-4" />} color="#ea580c" label="Retorno (ROAS)"
+        <Portada icon={<Gauge className="w-4 h-4" />} color="#ea580c" label="Retorno (ROAS)" info={ex.roas}
           valor={veces(m.roas ?? m.roasWeb)} sub={m.roas != null ? 'ventas directas ÷ inversión' : 'solo web ÷ inversión'}
           extra={<Variacion actual={m.roas ?? m.roasWeb} previo={prev ? (m.roas != null ? prev.roas ?? prev.roasWeb : prev.roasWeb) : null} />} />
       </div>
@@ -146,7 +173,7 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
       {/* Meta del mes */}
       {m.objetivoSoles != null && (
         <Tarjeta>
-          <Titulo icon={<Target className="w-4 h-4" />} color={VERDE}>Meta del mes</Titulo>
+          <Titulo icon={<Target className="w-4 h-4" />} color={VERDE} info={ex.meta}>Meta del mes</Titulo>
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <div className="text-[15px] text-slate-600">Vendimos <b className="text-slate-900">{soles(ventas)}</b> de una meta de <b className="text-slate-900">{soles(m.objetivoSoles)}</b></div>
             <div className="text-[28px] font-bold leading-none" style={{ color: (m.avanceObjetivo ?? 0) >= 1 ? VERDE : '#0f172a' }}>{pct(m.avanceObjetivo)}</div>
@@ -160,11 +187,11 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Canales */}
         <Tarjeta>
-          <Titulo icon={<ShoppingBag className="w-4 h-4" />} color={AZUL}>Ventas por canal</Titulo>
+          <Titulo icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} info={ex.mezcla}>Ventas por canal</Titulo>
           <Mezcla m={m} />
           <div className="grid grid-cols-2 gap-2.5 mt-4">
-            <Dato label="Web (Shopify)" valor={soles(m.solesWeb)} sub={`${num(m.pedidosWeb)} pedidos`} />
-            <Dato label="WhatsApp" valor={soles(m.solesWhatsApp)} sub={m.pedidosWhatsApp != null ? `${num(m.pedidosWhatsApp)} pedidos` : undefined} pendiente={m.pendienteCliente} />
+            <Dato label="Web (Shopify)" info={ex.web} valor={soles(m.solesWeb)} sub={`${num(m.pedidosWeb)} pedidos`} />
+            <Dato label="WhatsApp" info={ex.whatsapp} valor={soles(m.solesWhatsApp)} sub={m.pedidosWhatsApp != null ? `${num(m.pedidosWhatsApp)} pedidos` : undefined} pendiente={m.pendienteCliente} />
           </div>
         </Tarjeta>
 
@@ -172,19 +199,19 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         <Tarjeta>
           <Titulo icon={<Gauge className="w-4 h-4" />} color="#ea580c">Eficiencia de la inversión</Titulo>
           <div className="grid grid-cols-2 gap-2.5">
-            <Dato label="Costo por venta" valor={soles(m.costoVenta, 2)} sub="inversión ÷ pedidos" />
-            <Dato label="Ticket promedio" valor={soles(m.ticket, 2)} sub="por pedido" />
-            <Dato label="Conversaciones WhatsApp" valor={num(m.leads)} sub={`costo por mensaje ${soles(m.costoMensaje, 2)}`} pendiente={m.fuenteMeta === 'pendiente'} />
-            <Dato label="Conversión WhatsApp" valor={pct(m.conversionWhatsApp, 1)} sub="ventas ÷ conversaciones" pendiente={m.pendienteCliente} />
-            <Dato label="Inversión total en marketing" valor={soles(m.gastoMkt)} sub={`anuncios + gestión ${soles(m.gestionSoles)}`} />
-            <Dato label="Costo por cliente (CAC)" valor={soles(m.cac, 2)} sub="marketing total ÷ pedidos" />
+            <Dato label="Costo por venta" info={ex.costoVenta} valor={soles(m.costoVenta, 2)} sub="inversión ÷ pedidos" />
+            <Dato label="Ticket promedio" info={ex.ticket} valor={soles(m.ticket, 2)} sub="por pedido" />
+            <Dato label="Conversaciones WhatsApp" info={ex.conversaciones} valor={num(m.leads)} sub={`costo por mensaje ${soles(m.costoMensaje, 2)}`} pendiente={m.fuenteMeta === 'pendiente'} />
+            <Dato label="Conversión WhatsApp" info={ex.conversion} valor={pct(m.conversionWhatsApp, 1)} sub="ventas ÷ conversaciones" pendiente={m.pendienteCliente} />
+            <Dato label="Inversión total en marketing" info={ex.mkt} valor={soles(m.gastoMkt)} sub={`anuncios + gestión ${soles(m.gestionSoles)}`} />
+            <Dato label="Costo por cliente (CAC)" info={ex.cac} valor={soles(m.cac, 2)} sub="marketing total ÷ pedidos" />
           </div>
         </Tarjeta>
 
         {/* Clientes nuevos vs recurrentes */}
         {m.nuevos != null && m.recurrentes != null && (
           <Tarjeta>
-            <Titulo icon={<Users className="w-4 h-4" />} color={MORADO}>Clientes de la web</Titulo>
+            <Titulo icon={<Users className="w-4 h-4" />} color={MORADO} info={ex.clientes}>Clientes de la web</Titulo>
             <BarraDoble a={{ label: 'Nuevos', valor: m.nuevos, color: MORADO }} b={{ label: 'Repiten compra', valor: m.recurrentes, color: '#c4b5fd' }} />
             <p className="text-[12.5px] text-slate-500 mt-3">
               {m.nuevos + m.recurrentes > 0 ? `${pct(m.nuevos / (m.nuevos + m.recurrentes))} de los pedidos web fueron de clientes que compraron por primera vez.` : 'Sin pedidos web este mes.'}
@@ -195,7 +222,7 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         {/* Productos */}
         {m.topProductos.length > 0 && (
           <Tarjeta>
-            <Titulo icon={<Package className="w-4 h-4" />} color={VERDE}>Productos más vendidos (web)</Titulo>
+            <Titulo icon={<Package className="w-4 h-4" />} color={VERDE} info={ex.productos}>Productos más vendidos (web)</Titulo>
             <div className="grid gap-2.5">
               {m.topProductos.map((p, i) => {
                 const max = m.topProductos[0].unidades || 1
@@ -217,7 +244,7 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
       {/* Anuncios ganadores */}
       {m.topAnuncios.length > 0 && (
         <Tarjeta>
-          <Titulo icon={<Trophy className="w-4 h-4" />} color="#ca8a04">Anuncios ganadores</Titulo>
+          <Titulo icon={<Trophy className="w-4 h-4" />} color="#ca8a04" info={ex.anuncios}>Anuncios ganadores</Titulo>
           <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             {m.topAnuncios.map((a, i) => (
               <div key={a.nombre + i} className="rounded-[14px] border border-slate-100 bg-slate-50/80 p-4">
@@ -246,13 +273,75 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
 const ANIM = `
 @keyframes repIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes repGrow{from{opacity:0;transform:scaleX(.55)}to{opacity:1;transform:scaleX(1)}}
+@keyframes repFade{from{opacity:0}to{opacity:1}}
+.rep-tip{animation:repFade .15s ease-out both}
 .rep-in{animation:repIn .45s cubic-bezier(.2,.7,.2,1) both}
 .rep-grow{animation:repGrow .6s cubic-bezier(.2,.8,.2,1) both;transform-origin:center}
 @media (prefers-reduced-motion:reduce){.rep-in,.rep-grow{animation:none}}`
 
+/* Textos de "Cómo se calcula" con los números reales del mes. */
+function explicar(m: MesDirecto) {
+  const directo = m.raw.extra?.formato === 'directo'
+  const tc = String(m.tipoCambio)
+  const ventas = m.solesTotales ?? m.solesWeb
+  const pedidos = m.pedidosTotales ?? m.pedidosWeb
+  const s2 = (n: number | null | undefined) => soles(n, 2)
+  const origenTotal = directo
+    ? `Ventas totales del mes que reportó el cliente (web + WhatsApp): ${s2(m.solesTotales)} en ${num(m.pedidosTotales)} pedidos.`
+    : `Ventas directas del mes registradas en el reporte de ese mes: ${s2(m.solesTotales)} en ${num(m.pedidosTotales)} pedidos.`
+  const gWppUsd = m.raw.extra?.gastoWhatsAppUsd
+  const gWppSoles = gWppUsd != null ? gWppUsd * m.tipoCambio * 1.18 : m.gastoAdsSoles
+  return {
+    ventas: m.solesTotales == null
+      ? ['Solo ventas web mientras el cliente no reporta su total.', `Shopify: suma de los pedidos PAGADOS del mes (sin cancelados ni pruebas) = ${s2(m.solesWeb)}.`]
+      : [origenTotal, `De eso, web (Shopify, pedidos pagados): ${s2(m.solesWeb)}.`, `WhatsApp = total − web = ${s2(m.solesTotales)} − ${s2(m.solesWeb)} = ${s2(m.solesWhatsApp)}.`],
+    pedidos: m.pedidosTotales == null
+      ? [`Pedidos pagados en Shopify en el mes: ${num(m.pedidosWeb)} (sin cancelados ni pruebas).`, 'El total aparece cuando el cliente reporta sus ventas.']
+      : [`Pedidos totales: ${num(m.pedidosTotales)} (${directo ? 'reportados por el cliente' : 'registrados ese mes'}).`, `Web (Shopify, pagados): ${num(m.pedidosWeb)}.`, `WhatsApp = ${num(m.pedidosTotales)} − ${num(m.pedidosWeb)} = ${num(m.pedidosWhatsApp)}.`],
+    inversion: [
+      `Gasto en Facebook Ads del mes${directo ? ' (todas las campañas menos Mil Ideas)' : ''}: US$ ${m.gastoAdsUsd.toFixed(2)}.`,
+      `× tipo de cambio SUNAT (venta) ${tc} = ${s2(m.gastoAdsUsd * m.tipoCambio)}.`,
+      `+ IGV 18% = ${s2(m.gastoAdsSoles)}.`,
+    ],
+    roas: [
+      `ROAS = ventas ÷ inversión en anuncios.`,
+      `${s2(ventas)} ÷ ${s2(m.gastoAdsSoles)} = ${veces(m.roas ?? m.roasWeb)}.`,
+      `Por cada S/ 1 invertido en anuncios se vendieron S/ ${(m.roas ?? m.roasWeb ?? 0).toFixed(2)}.`,
+      ...(m.roas == null ? ['Hoy usa solo las ventas web; se actualiza cuando el cliente reporta su total.'] : []),
+    ],
+    web: [`Suma de los pedidos PAGADOS en Shopify (typhouse.pe) del mes, sin cancelados ni pruebas.`, `${num(m.pedidosWeb)} pedidos = ${s2(m.solesWeb)}.`],
+    whatsapp: m.solesWhatsApp == null ? ['Se calcula cuando el cliente reporta sus ventas totales: total − web.']
+      : [`WhatsApp = ventas totales − ventas web.`, `${s2(m.solesTotales)} − ${s2(m.solesWeb)} = ${s2(m.solesWhatsApp)}.`, `Pedidos: ${num(m.pedidosTotales)} − ${num(m.pedidosWeb)} = ${num(m.pedidosWhatsApp)}.`],
+    mezcla: m.pctWeb == null ? ['Aparece cuando el cliente reporta sus ventas totales.']
+      : [`Web = ${s2(m.solesWeb)} ÷ ${s2(m.solesTotales)} = ${pct(m.pctWeb)}.`, `WhatsApp = el resto: ${pct(1 - m.pctWeb)}.`],
+    costoVenta: [`Inversión en anuncios ÷ pedidos.`, `${s2(m.gastoAdsSoles)} ÷ ${num(pedidos)} = ${s2(m.costoVenta)} por pedido.`],
+    ticket: [`Ventas ÷ pedidos.`, `${s2(ventas)} ÷ ${num(pedidos)} = ${s2(m.ticket)} por pedido.`],
+    conversaciones: [
+      `Conversaciones de WhatsApp iniciadas desde los anuncios de Facebook en el mes: ${num(m.leads)}.`,
+      `Costo por mensaje = inversión en campañas de WhatsApp ÷ conversaciones.`,
+      `${s2(gWppSoles)}${gWppUsd != null ? ` (US$ ${gWppUsd.toFixed(2)} × ${tc} + IGV)` : ''} ÷ ${num(m.leads)} = ${s2(m.costoMensaje)}.`,
+    ],
+    conversion: m.conversionWhatsApp == null ? ['Se calcula cuando el cliente reporta sus ventas totales.']
+      : [`Pedidos por WhatsApp ÷ conversaciones.`, `${num(m.pedidosWhatsApp)} ÷ ${num(m.leads)} = ${pct(m.conversionWhatsApp, 1)}.`, `De cada 100 conversaciones, ${((m.conversionWhatsApp ?? 0) * 100).toFixed(1)} terminaron en pedido.`],
+    mkt: [`Anuncios (con IGV): ${s2(m.gastoAdsSoles)}.`, `+ Gestión Distinto: S/ 1,800 + IGV = ${s2(m.gestionSoles)}.`, `= ${s2(m.gastoMkt)}.`],
+    cac: [`Inversión total en marketing ÷ pedidos.`, `${s2(m.gastoMkt)} ÷ ${num(pedidos)} = ${s2(m.cac)} por pedido.`],
+    clientes: [`Según Shopify, en los pedidos web pagados del mes:`, `Nuevos = su primera compra en la tienda (${num(m.nuevos)}).`, `Repiten = ya habían comprado antes (${num(m.recurrentes)}).`],
+    productos: [`Unidades vendidas por producto en los pedidos web pagados del mes (Shopify).`, `Los soles son el total cobrado por ese producto.`],
+    anuncios: [`Los 3 anuncios de Facebook con más conversaciones de WhatsApp iniciadas en el mes.`, `Costo por conversación = gasto del anuncio ÷ sus conversaciones (en US$, sin IGV).`],
+    meta: m.objetivoSoles == null ? [] : [`Avance = ventas ÷ meta.`, `${s2(ventas)} ÷ ${s2(m.objetivoSoles)} = ${pct(m.avanceObjetivo)}.`],
+    embudo: [
+      `Conversaciones: chats de WhatsApp iniciados desde los anuncios (${num(m.leads)}).`,
+      `Pedidos web: pedidos pagados en Shopify (${num(m.pedidosWeb)}).`,
+      m.pedidosWhatsApp == null ? 'Pedidos WhatsApp: se calculan cuando el cliente reporta su total.' : `Pedidos WhatsApp: total ${num(m.pedidosTotales)} − web ${num(m.pedidosWeb)} = ${num(m.pedidosWhatsApp)}.`,
+      `Las flechas comparan con el mes anterior.`,
+    ],
+  }
+}
+
 /* Embudo de ventas: conversaciones de WhatsApp → pedidos web → pedidos
    WhatsApp, con el total de pedidos y soles al costado. */
 function Embudo({ m, prev }: { m: MesDirecto; prev: MesDirecto | null }) {
+  const ex = explicar(m)
   const etapas = [
     { v: m.leads as number | null, t: 'Conversaciones WhatsApp', bg: 'linear-gradient(90deg,#6366f1,#7170ff)', w1: 94, w2: 76, p: prev?.leads ?? null, pend: m.fuenteMeta === 'pendiente' },
     { v: m.pedidosWeb as number | null, t: 'Pedidos web · Shopify', bg: 'linear-gradient(90deg,#2563eb,#3b82f6)', w1: 76, w2: 59, p: prev?.pedidosWeb ?? null, pend: false },
@@ -261,7 +350,8 @@ function Embudo({ m, prev }: { m: MesDirecto; prev: MesDirecto | null }) {
   return (
     <section className="rounded-[22px] border border-slate-200/80 bg-white p-5 sm:p-7 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <div className="text-center mb-5">
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7170ff]">Embudo de ventas</div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7170ff] inline-flex items-center gap-1.5">Embudo de ventas <InfoTip lineas={ex.embudo} /></div>
+        <div className="text-[20px] font-bold text-slate-900 mt-0.5">{labelMes(m.mes)}</div>
         <div className="text-[13px] text-slate-500 mt-0.5">Facebook Ads (WhatsApp) + Shopify</div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-[1fr_170px] items-center gap-6">
@@ -280,7 +370,7 @@ function Embudo({ m, prev }: { m: MesDirecto; prev: MesDirecto | null }) {
           ))}
         </div>
         <div className="text-center md:text-left md:border-l md:border-slate-100 md:pl-6">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">Pedidos totales</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400 inline-flex items-center gap-1.5">Pedidos totales <InfoTip lineas={[...ex.pedidos, ...ex.ventas.slice(0, 1)]} /></div>
           <div className="text-[44px] font-bold tracking-tight text-slate-900 leading-none mt-1">{m.pedidosTotales == null ? '—' : num(m.pedidosTotales)}</div>
           <div className="text-[15px] font-semibold text-slate-600 mt-2">{m.solesTotales == null ? 'Falta el cliente' : soles(m.solesTotales)}</div>
           {m.conversionWhatsApp != null && <div className="text-[12px] text-slate-500 mt-3">{pct(m.conversionWhatsApp, 1)} de las conversaciones terminó en pedido</div>}
@@ -290,11 +380,13 @@ function Embudo({ m, prev }: { m: MesDirecto; prev: MesDirecto | null }) {
   )
 }
 
-function Portada({ icon, color, label, valor, sub, extra }: { icon: React.ReactNode; color: string; label: string; valor: string; sub?: string; extra?: React.ReactNode }) {
+function Portada({ icon, color, label, valor, sub, extra, info }: { icon: React.ReactNode; color: string; label: string; valor: string; sub?: string; extra?: React.ReactNode; info?: string[] }) {
   return (
     <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <div className="flex items-center gap-2 text-[12.5px] font-semibold text-slate-500">
-        <span className="w-7 h-7 rounded-[8px] inline-flex items-center justify-center" style={{ background: `${color}14`, color }}>{icon}</span>{label}
+        <span className="w-7 h-7 rounded-[8px] inline-flex items-center justify-center shrink-0" style={{ background: `${color}14`, color }}>{icon}</span>
+        <span className="flex-1 min-w-0">{label}</span>
+        {info && <InfoTip lineas={info} derecha />}
       </div>
       <div className="text-[28px] font-bold tracking-tight text-slate-900 mt-2.5 leading-none">{valor}</div>
       {sub && <div className="text-[12px] text-slate-500 mt-1.5">{sub}</div>}
