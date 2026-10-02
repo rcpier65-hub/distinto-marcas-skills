@@ -46,7 +46,7 @@ export type Entregable = {
   slides: string[] | null
 }
 
-export const MAX_SLIDES = 20
+const MAX_SLIDES = 20
 
 async function miembroActivo(service: Service, authUserId: string): Promise<boolean> {
   const { data } = await service.from('team_members').select('id').eq('auth_user_id', authUserId).eq('activo', true).maybeSingle()
