@@ -8,6 +8,10 @@ import { useState } from 'react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { EditorMes } from './editor-mes'
+import { EditorDirecto } from './editor-directo'
+
+/* Marcas con reporte DIRECTO automático (Shopify + Facebook). */
+const DIRECTO = new Set(['little-joe'])
 import type { MesReporte } from '@/lib/reportes/typhouse'
 
 export type ReporteHubItem = { slug: string; nombre: string; meses: MesReporte[] }
@@ -58,7 +62,9 @@ export function ReportesHub({ reportes, marcas }: { reportes: ReporteHubItem[]; 
         )}
 
       {/* Cargar/editar data — el "Excel" ahora vive acá */}
-      <EditorMes marcaSlug={slug} marcaNombre={nombreSel} meses={sel?.meses ?? []} />
+      {DIRECTO.has(slug)
+        ? <EditorDirecto key={slug} marcaSlug={slug} meses={sel?.meses ?? []} />
+        : <EditorMes marcaSlug={slug} marcaNombre={nombreSel} meses={sel?.meses ?? []} />}
     </div>
   )
 }

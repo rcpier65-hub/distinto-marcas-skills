@@ -1,265 +1,404 @@
 'use client'
 
-/* Dashboard mensual TYPHOUSE / LITTLE JOE — reemplaza el Excel.
-   Embudo Meta Ads (WhatsApp) + Shopify, KPIs con variación vs mes anterior,
-   vista omnicanal, tendencia mensual clickeable y tabla comparativa.
-   Data: lib/reportes/typhouse.ts (fuente de verdad, ex-Excel). */
+/* Reporte mensual — formato DIRECTO (Pedro 02-oct-2026): ventas directas
+   (Shopify + WhatsApp) e inversión en Facebook Ads. Diseño de reporte
+   profesional: portada con lo clave, meta, canales, eficiencia, clientes,
+   productos, anuncios, tendencia y tabla. Sirve al equipo (/reportes) y al
+   cliente (portal). El cliente solo ve meses publicados y, si falta, pone
+   sus ventas totales aquí mismo. */
 
-import { useState } from 'react'
-import { labelMes, COSTO_GESTION, type MesReporte } from '@/lib/reportes/typhouse'
-import { Kpi, KPI_TIPS } from './kpi'
-import { usePathname } from 'next/navigation'
-import { EditorMesCliente } from '@/app/cliente/_components/editor-mes-cliente'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import {
+  TrendingUp, TrendingDown, Megaphone, ShoppingBag, MessageCircle, Target, Users, Package,
+  Trophy, Download, Loader2, CalendarDays, Wallet, Gauge, Info,
+} from 'lucide-react'
+import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
+import { computeDirecto, type MesDirecto } from '@/lib/reportes/directo'
 
-const AZUL = '#1E5EDA'
-const CELESTE = '#3BA5E8'
-const NARANJA = '#F97316'
+const AZUL = '#2563eb'
+const VERDE = '#16a34a'
+const MORADO = '#7170ff'
 
-const soles = (n: number, dec = 0) =>
-  'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: dec, maximumFractionDigits: dec })
-const num = (n: number) => n.toLocaleString('es-PE')
-const pct = (n: number, dec = 1) => (n * 100).toFixed(dec) + '%'
+const soles = (n: number | null | undefined, dec = 0) =>
+  n == null || !isFinite(n) ? '—' : `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: dec, maximumFractionDigits: dec })}`
+const usd = (n: number | null | undefined) => (n == null || !isFinite(n) ? '—' : `US$ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+const num = (n: number | null | undefined) => (n == null || !isFinite(n) ? '—' : Math.round(n).toLocaleString('es-PE'))
+const pct = (n: number | null | undefined, dec = 0) => (n == null || !isFinite(n) ? '—' : `${(n * 100).toFixed(dec)}%`)
+const veces = (n: number | null | undefined) => (n == null || !isFinite(n) ? '—' : `${n.toFixed(2)}x`)
 
-/* Chip de variación vs mes anterior. invertir=true → bajar es BUENO (costos). */
-function Delta({ actual, previo, invertir = false, formato = 'pct' }: {
-  actual: number; previo: number | null; invertir?: boolean; formato?: 'pct' | 'pp'
-}) {
-  if (previo == null || previo === 0) return null
-  const d = formato === 'pp' ? (actual - previo) * 100 : ((actual - previo) / Math.abs(previo)) * 100
-  if (!isFinite(d)) return null
-  const sube = d > 0.05, baja = d < -0.05
-  const bueno = invertir ? baja : sube
-  const color = (!sube && !baja) ? 'text-muted-foreground' : bueno ? 'text-emerald-600' : 'text-red-500'
-  const flecha = sube ? '▲' : baja ? '▼' : '·'
+function Variacion({ actual, previo, invertir = false }: { actual: number | null; previo: number | null; invertir?: boolean }) {
+  if (actual == null || previo == null || !isFinite(actual) || !isFinite(previo) || previo === 0) return null
+  const d = actual / previo - 1
+  const bueno = invertir ? d < 0 : d > 0
+  const Icono = d >= 0 ? TrendingUp : TrendingDown
   return (
-    <span className={`text-[11px] font-semibold ${color}`} title="vs mes anterior">
-      {flecha} {Math.abs(d).toFixed(1)}{formato === 'pp' ? ' pts' : '%'}
+    <span className="inline-flex items-center gap-1 text-[12px] font-semibold" style={{ color: Math.abs(d) < 0.005 ? '#64748b' : bueno ? VERDE : '#dc2626' }}>
+      <Icono className="w-3.5 h-3.5" />{d >= 0 ? '+' : ''}{(d * 100).toFixed(0)}% vs mes anterior
     </span>
   )
 }
 
-export function ReporteMarcaView({ nombre, meses }: { nombre: string; meses: MesReporte[] }) {
-  const pathname = usePathname()
-  const enPortalCliente = (pathname ?? '').startsWith('/cliente')
-  const [idx, setIdx] = useState(meses.length - 1)
-  const m = meses[idx]
-  const prev: MesReporte | null = idx > 0 ? meses[idx - 1] : null
+function Tarjeta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <section className={`rounded-[20px] border border-slate-200/80 bg-white p-5 sm:p-6 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ${className}`}>{children}</section>
+}
+function Titulo({ icon, children, color = MORADO }: { icon: React.ReactNode; children: React.ReactNode; color?: string }) {
+  return (
+    <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-slate-900 mb-4">
+      <span className="w-8 h-8 rounded-[9px] inline-flex items-center justify-center" style={{ background: `${color}14`, color }}>{icon}</span>
+      {children}
+    </h3>
+  )
+}
+function Dato({ label, valor, sub, pendiente }: { label: string; valor: string; sub?: React.ReactNode; pendiente?: boolean }) {
+  return (
+    <div className="rounded-[14px] bg-slate-50/80 border border-slate-100 p-3.5">
+      <div className="text-[12px] font-semibold text-slate-500">{label}</div>
+      <div className={`text-[20px] font-bold mt-1 leading-none ${pendiente ? 'text-slate-300' : 'text-slate-900'}`}>{pendiente ? 'Pendiente' : valor}</div>
+      {sub && <div className="text-[11.5px] text-slate-500 mt-1.5">{sub}</div>}
+    </div>
+  )
+}
 
-  /* Tendencia clickeable: métrica elegible */
-  const TENDENCIAS = [
-    { key: 'leads', label: 'Leads', fmt: num },
-    { key: 'ventasTotales', label: 'Ventas totales', fmt: num },
-    { key: 'ingresoDirecto', label: 'Ingreso directo', fmt: (n: number) => soles(n) },
-    { key: 'ventasOmnicanal', label: 'Omnicanal', fmt: (n: number) => soles(n) },
-    { key: 'gastoAdsSoles', label: 'Gasto Ads (S/)', fmt: (n: number) => soles(n) },
-    { key: 'roasDirecto', label: 'ROAS', fmt: (n: number) => n.toFixed(2) + 'x' },
-    { key: 'ticketPromedio', label: 'Ticket promedio', fmt: (n: number) => soles(n, 2) },
-  ] as const
-  const [tKey, setTKey] = useState<(typeof TENDENCIAS)[number]['key']>('ventasTotales')
-  const tSel = TENDENCIAS.find((t) => t.key === tKey)!
-  const tMax = Math.max(...meses.map((x) => Number(x[tKey])))
+export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVentas }: {
+  nombre: string
+  meses: MesReporte[]
+  modo?: 'equipo' | 'cliente'
+  /* Cliente: guardar sus ventas totales del mes. */
+  onGuardarVentas?: (mes: string, pedidos: number, soles: number) => Promise<{ ok: true } | { ok: false; error: string }>
+}) {
+  const todos = useMemo(() => meses.map(computeDirecto), [meses])
+  const visibles = modo === 'cliente' ? todos.filter((m) => m.publicado) : todos
+  /* Mes que espera los datos del cliente (aunque aún no esté publicado). */
+  const porCompletar = modo === 'cliente' ? [...todos].reverse().find((m) => m.pendienteCliente) ?? null : null
+  const [idx, setIdx] = useState(Math.max(0, visibles.length - 1))
+  const m = visibles[idx]
+  const prev = idx > 0 ? visibles[idx - 1] : null
+
+  if (!m) {
+    return (
+      <div className="space-y-4">
+        {porCompletar && onGuardarVentas && <FormVentas mes={porCompletar} onGuardar={onGuardarVentas} />}
+        <Tarjeta className="text-center py-12">
+          <CalendarDays className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+          <div className="font-bold text-slate-900">Tu primer reporte se publica el 2 de cada mes</div>
+          <div className="text-[13px] text-slate-500 mt-1">Aquí verás tus ventas, tu inversión en anuncios y cómo rindió cada canal.</div>
+        </Tarjeta>
+      </div>
+    )
+  }
+
+  const ventas = m.solesTotales ?? m.solesWeb
+  const pedidos = m.pedidosTotales ?? m.pedidosWeb
 
   return (
-    <div className="space-y-6">
-      {enPortalCliente && (
-        <EditorMesCliente marcaNombre={nombre} meses={meses} />
-      )}
-      {/* ── Selector de mes ── */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-          className="h-8 w-8 rounded-lg border bg-background disabled:opacity-30">←</button>
-        {meses.map((x, i) => (
-          <button key={x.mes} onClick={() => setIdx(i)}
-            className={`h-8 px-3 rounded-lg text-xs font-semibold border transition-colors ${i === idx ? 'text-white' : 'bg-background hover:bg-muted'}`}
-            style={i === idx ? { background: AZUL, borderColor: AZUL } : undefined}>
-            {labelMes(x.mes).slice(0, 3)}
+    <div className="space-y-5 reporte-imprimible">
+      {/* Encabezado */}
+      <header className="flex items-end gap-3 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <div className="text-[12px] font-bold uppercase tracking-[0.1em] text-slate-400">Reporte mensual · {nombre}</div>
+          <h2 className="text-[30px] font-bold tracking-tight text-slate-900 leading-tight">{labelMes(m.mes)}</h2>
+        </div>
+        <div className="flex items-center gap-2 no-imprimir">
+          <select value={idx} onChange={(e) => setIdx(Number(e.target.value))}
+            className="h-10 px-3 rounded-[11px] border border-slate-200 bg-white text-[13.5px] font-semibold text-slate-700">
+            {visibles.map((x, i) => <option key={x.mes} value={i}>{labelMes(x.mes)}{modo === 'equipo' && !x.publicado ? ' · borrador' : ''}</option>)}
+          </select>
+          <button type="button" onClick={() => window.print()}
+            className="h-10 px-4 inline-flex items-center gap-2 rounded-[11px] text-[13.5px] font-bold text-white"
+            style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
+            <Download className="w-4 h-4" /> Descargar PDF
           </button>
-        ))}
-        <button onClick={() => setIdx((i) => Math.min(meses.length - 1, i + 1))} disabled={idx === meses.length - 1}
-          className="h-8 w-8 rounded-lg border bg-background disabled:opacity-30">→</button>
-        <span className="ml-2 text-sm font-bold" style={{ color: AZUL }}>{labelMes(m.mes)}</span>
-        {prev && <span className="text-[11px] text-muted-foreground">· variaciones vs {labelMes(prev.mes)}</span>}
+        </div>
+      </header>
+
+      {modo === 'equipo' && !m.publicado && (
+        <p className="flex items-center gap-2 text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 no-imprimir">
+          <Info className="w-4 h-4 shrink-0" /> Borrador: el cliente aún no lo ve. Se publica solo el día 2 (o publícalo abajo).
+        </p>
+      )}
+      {porCompletar && onGuardarVentas && <FormVentas mes={porCompletar} onGuardar={onGuardarVentas} />}
+      {m.pendienteCliente && modo === 'equipo' && (
+        <p className="flex items-center gap-2 text-[13px] text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 no-imprimir">
+          <Info className="w-4 h-4 shrink-0" /> Falta que el cliente ponga sus ventas totales. Mientras tanto se muestran solo las ventas de la web.
+        </p>
+      )}
+
+      {/* Portada: lo clave */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
+        <Portada icon={<Wallet className="w-4 h-4" />} color={VERDE} label={m.pendienteCliente ? 'Ventas web (Shopify)' : 'Ventas directas'}
+          valor={soles(ventas)} extra={<Variacion actual={ventas} previo={prev ? prev.solesTotales ?? prev.solesWeb : null} />} />
+        <Portada icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} label={m.pendienteCliente ? 'Pedidos web' : 'Pedidos'}
+          valor={num(pedidos)} extra={<Variacion actual={pedidos} previo={prev ? prev.pedidosTotales ?? prev.pedidosWeb : null} />} />
+        <Portada icon={<Megaphone className="w-4 h-4" />} color={MORADO} label="Inversión en Facebook Ads"
+          valor={m.fuenteMeta === 'pendiente' ? 'Pendiente' : soles(m.gastoAdsSoles)} sub={m.fuenteMeta === 'pendiente' ? undefined : `${usd(m.gastoAdsUsd)} · incluye IGV`} />
+        <Portada icon={<Gauge className="w-4 h-4" />} color="#ea580c" label="Retorno de la inversión (ROAS)"
+          valor={veces(m.roas ?? m.roasWeb)} sub={m.roas != null ? 'ventas directas ÷ inversión' : 'solo web ÷ inversión'}
+          extra={<Variacion actual={m.roas ?? m.roasWeb} previo={prev ? prev.roas ?? prev.roasWeb : null} />} />
       </div>
 
-      {/* ── Embudo ── */}
-      <div className="rounded-2xl border bg-card p-6">
-        <div className="text-center mb-5">
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: AZUL }}>{nombre}</div>
-          <h2 className="text-2xl font-extrabold tracking-tight">{labelMes(m.mes)}</h2>
-          <div className="text-xs text-muted-foreground mt-1">Meta Ads (WhatsApp) + Shopify — Embudo de ventas</div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-[110px_1fr_130px] items-center gap-4">
-          <div className="hidden md:flex flex-col justify-between h-[240px] py-4 text-right">
-            <div className="text-2xl font-extrabold">{num(m.leads)} <span className="text-muted-foreground">→</span></div>
-            <div className="text-2xl font-extrabold">{num(m.ventasShopify)} <span className="text-muted-foreground">→</span></div>
-            <div className="text-2xl font-extrabold">{num(m.ventasWhatsApp)} <span className="text-muted-foreground">→</span></div>
+      {/* Meta del mes */}
+      {m.objetivoSoles != null && (
+        <Tarjeta>
+          <Titulo icon={<Target className="w-4 h-4" />} color={VERDE}>Meta del mes</Titulo>
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <div className="text-[15px] text-slate-600">Vendimos <b className="text-slate-900">{soles(ventas)}</b> de una meta de <b className="text-slate-900">{soles(m.objetivoSoles)}</b></div>
+            <div className="text-[28px] font-bold leading-none" style={{ color: (m.avanceObjetivo ?? 0) >= 1 ? VERDE : '#0f172a' }}>{pct(m.avanceObjetivo)}</div>
           </div>
-          <div className="flex flex-col items-center gap-1.5">
-            {[
-              { v: m.leads, t: 'Leads entrantes (WhatsApp)', c: AZUL, w1: 92, w2: 72, d: prev ? <Delta actual={m.leads} previo={prev.leads} /> : null },
-              { v: m.ventasShopify, t: 'Ventas Shopify', c: CELESTE, w1: 72, w2: 56, d: prev ? <Delta actual={m.ventasShopify} previo={prev.ventasShopify} /> : null },
-              { v: m.ventasWhatsApp, t: 'Ventas WhatsApp · pedidos', c: NARANJA, w1: 56, w2: 40, d: prev ? <Delta actual={m.ventasWhatsApp} previo={prev.ventasWhatsApp} /> : null },
-            ].map((s) => (
-              <div key={s.t} className="text-white text-center flex flex-col items-center justify-center"
-                style={{
-                  background: s.c, height: 82, width: '100%', maxWidth: 560,
-                  clipPath: `polygon(${(100 - s.w1) / 2}% 0, ${100 - (100 - s.w1) / 2}% 0, ${100 - (100 - s.w2) / 2}% 100%, ${(100 - s.w2) / 2}% 100%)`,
-                }}>
-                <div className="text-2xl font-extrabold leading-none">{num(s.v)}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider mt-1 opacity-90">{s.t}</div>
-                <div className="mt-0.5 [&_span]:!text-white/90">{s.d}</div>
+          <div className="mt-3 h-3 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (m.avanceObjetivo ?? 0) * 100)}%`, background: (m.avanceObjetivo ?? 0) >= 1 ? VERDE : 'linear-gradient(90deg,#7170ff,#ba41f7)' }} />
+          </div>
+        </Tarjeta>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Canales */}
+        <Tarjeta>
+          <Titulo icon={<ShoppingBag className="w-4 h-4" />} color={AZUL}>Ventas por canal</Titulo>
+          <Mezcla m={m} />
+          <div className="grid grid-cols-2 gap-2.5 mt-4">
+            <Dato label="Web (Shopify)" valor={soles(m.solesWeb)} sub={`${num(m.pedidosWeb)} pedidos`} />
+            <Dato label="WhatsApp" valor={soles(m.solesWhatsApp)} sub={m.pedidosWhatsApp != null ? `${num(m.pedidosWhatsApp)} pedidos` : undefined} pendiente={m.pendienteCliente} />
+          </div>
+        </Tarjeta>
+
+        {/* Eficiencia */}
+        <Tarjeta>
+          <Titulo icon={<Gauge className="w-4 h-4" />} color="#ea580c">Eficiencia de la inversión</Titulo>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Dato label="Costo por venta" valor={soles(m.costoVenta, 2)} sub="inversión ÷ pedidos" />
+            <Dato label="Ticket promedio" valor={soles(m.ticket, 2)} sub="por pedido" />
+            <Dato label="Conversaciones WhatsApp" valor={num(m.leads)} sub={`costo por mensaje ${soles(m.costoMensaje, 2)}`} pendiente={m.fuenteMeta === 'pendiente'} />
+            <Dato label="Conversión WhatsApp" valor={pct(m.conversionWhatsApp, 1)} sub="ventas ÷ conversaciones" pendiente={m.pendienteCliente} />
+            <Dato label="Inversión total en marketing" valor={soles(m.gastoMkt)} sub={`anuncios + gestión ${soles(m.gestionSoles)}`} />
+            <Dato label="Costo por cliente (CAC)" valor={soles(m.cac, 2)} sub="marketing total ÷ pedidos" />
+          </div>
+        </Tarjeta>
+
+        {/* Clientes nuevos vs recurrentes */}
+        {m.nuevos != null && m.recurrentes != null && (
+          <Tarjeta>
+            <Titulo icon={<Users className="w-4 h-4" />} color={MORADO}>Clientes de la web</Titulo>
+            <BarraDoble a={{ label: 'Nuevos', valor: m.nuevos, color: MORADO }} b={{ label: 'Repiten compra', valor: m.recurrentes, color: '#c4b5fd' }} />
+            <p className="text-[12.5px] text-slate-500 mt-3">
+              {m.nuevos + m.recurrentes > 0 ? `${pct(m.nuevos / (m.nuevos + m.recurrentes))} de los pedidos web fueron de clientes que compraron por primera vez.` : 'Sin pedidos web este mes.'}
+            </p>
+          </Tarjeta>
+        )}
+
+        {/* Productos */}
+        {m.topProductos.length > 0 && (
+          <Tarjeta>
+            <Titulo icon={<Package className="w-4 h-4" />} color={VERDE}>Productos más vendidos (web)</Titulo>
+            <div className="grid gap-2.5">
+              {m.topProductos.map((p, i) => {
+                const max = m.topProductos[0].unidades || 1
+                return (
+                  <div key={p.nombre}>
+                    <div className="flex justify-between gap-3 text-[13px]">
+                      <span className="text-slate-700 truncate"><b className="text-slate-400 mr-1.5">{i + 1}</b>{p.nombre}</span>
+                      <span className="font-semibold text-slate-900 shrink-0">{num(p.unidades)} u · {soles(p.soles)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 mt-1 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(p.unidades / max) * 100}%`, background: VERDE }} /></div>
+                  </div>
+                )
+              })}
+            </div>
+          </Tarjeta>
+        )}
+      </div>
+
+      {/* Anuncios ganadores */}
+      {m.topAnuncios.length > 0 && (
+        <Tarjeta>
+          <Titulo icon={<Trophy className="w-4 h-4" />} color="#ca8a04">Anuncios ganadores</Titulo>
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            {m.topAnuncios.map((a, i) => (
+              <div key={a.nombre + i} className="rounded-[14px] border border-slate-100 bg-slate-50/80 p-4">
+                <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#ca8a04' }}>#{i + 1}</div>
+                <div className="text-[14px] font-bold text-slate-900 mt-1 line-clamp-2">{a.nombre}</div>
+                <div className="flex items-center gap-1.5 text-[13px] text-slate-600 mt-2"><MessageCircle className="w-4 h-4" /> {num(a.conversaciones)} conversaciones</div>
+                <div className="text-[12px] text-slate-500 mt-0.5">US$ {a.costoUsd.toFixed(2)} por conversación</div>
               </div>
             ))}
           </div>
-          <div className="text-center md:text-left">
-            <div className="text-4xl font-extrabold tracking-tight">{num(m.ventasTotales)}</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ventas totales</div>
-            {prev && <Delta actual={m.ventasTotales} previo={prev.ventasTotales} />}
-          </div>
+        </Tarjeta>
+      )}
+
+      <Tendencia meses={visibles} sel={idx} onSel={setIdx} />
+      <Tabla meses={visibles} />
+
+      <p className="text-[11.5px] text-slate-400 text-center">
+        Fuentes: Shopify (pedidos pagados) · Facebook Ads · tipo de cambio SUNAT S/ {m.tipoCambio.toFixed(3)} · IGV 18%
+      </p>
+      <style>{'@media print{.no-imprimir,nav,aside,header.mk-mobile-topbar,.mk-sidebar-wrap{display:none!important}.reporte-imprimible{padding:0!important}body{background:#fff!important}section{break-inside:avoid}}'}</style>
+    </div>
+  )
+}
+
+function Portada({ icon, color, label, valor, sub, extra }: { icon: React.ReactNode; color: string; label: string; valor: string; sub?: string; extra?: React.ReactNode }) {
+  return (
+    <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <div className="flex items-center gap-2 text-[12.5px] font-semibold text-slate-500">
+        <span className="w-7 h-7 rounded-[8px] inline-flex items-center justify-center" style={{ background: `${color}14`, color }}>{icon}</span>{label}
+      </div>
+      <div className="text-[28px] font-bold tracking-tight text-slate-900 mt-2.5 leading-none">{valor}</div>
+      {sub && <div className="text-[12px] text-slate-500 mt-1.5">{sub}</div>}
+      {extra && <div className="mt-1.5">{extra}</div>}
+    </div>
+  )
+}
+
+function Mezcla({ m }: { m: MesDirecto }) {
+  if (m.solesTotales == null) {
+    return <p className="text-[13px] text-slate-500">La mezcla web / WhatsApp aparece cuando se cargan las ventas totales del mes.</p>
+  }
+  const web = m.pctWeb ?? 0
+  return (
+    <div>
+      <div className="h-4 rounded-full overflow-hidden flex bg-slate-100">
+        <div style={{ width: `${web * 100}%`, background: AZUL }} />
+        <div style={{ width: `${(1 - web) * 100}%`, background: '#25D366' }} />
+      </div>
+      <div className="flex justify-between mt-2 text-[12.5px]">
+        <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: AZUL }} />Web {pct(web)}</span>
+        <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: '#25D366' }} />WhatsApp {pct(1 - web)}</span>
+      </div>
+    </div>
+  )
+}
+
+function BarraDoble({ a, b }: { a: { label: string; valor: number; color: string }; b: { label: string; valor: number; color: string } }) {
+  const tot = a.valor + b.valor || 1
+  return (
+    <div>
+      <div className="h-4 rounded-full overflow-hidden flex bg-slate-100">
+        <div style={{ width: `${(a.valor / tot) * 100}%`, background: a.color }} />
+        <div style={{ width: `${(b.valor / tot) * 100}%`, background: b.color }} />
+      </div>
+      <div className="flex justify-between mt-2 text-[13px]">
+        <span className="text-slate-600"><b className="text-slate-900">{num(a.valor)}</b> {a.label}</span>
+        <span className="text-slate-600"><b className="text-slate-900">{num(b.valor)}</b> {b.label}</span>
+      </div>
+    </div>
+  )
+}
+
+const METRICAS_TENDENCIA: { key: string; label: string; val: (m: MesDirecto) => number | null; fmt: (n: number) => string }[] = [
+  { key: 'ventas', label: 'Ventas', val: (m) => m.solesTotales ?? m.solesWeb, fmt: (n) => soles(n) },
+  { key: 'pedidos', label: 'Pedidos', val: (m) => m.pedidosTotales ?? m.pedidosWeb, fmt: (n) => num(n) },
+  { key: 'inversion', label: 'Inversión', val: (m) => m.gastoAdsSoles, fmt: (n) => soles(n) },
+  { key: 'roas', label: 'ROAS', val: (m) => m.roas ?? m.roasWeb, fmt: (n) => veces(n) },
+  { key: 'costo', label: 'Costo por venta', val: (m) => m.costoVenta, fmt: (n) => soles(n, 2) },
+]
+
+function Tendencia({ meses, sel, onSel }: { meses: MesDirecto[]; sel: number; onSel: (i: number) => void }) {
+  const [k, setK] = useState('ventas')
+  const met = METRICAS_TENDENCIA.find((x) => x.key === k)!
+  const vals = meses.map((m) => met.val(m))
+  const max = Math.max(1, ...vals.map((v) => v ?? 0))
+  return (
+    <Tarjeta>
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-slate-900 flex-1">
+          <span className="w-8 h-8 rounded-[9px] inline-flex items-center justify-center" style={{ background: `${MORADO}14`, color: MORADO }}><TrendingUp className="w-4 h-4" /></span>
+          Tendencia mensual
+        </h3>
+        <div className="inline-flex p-1 rounded-full border border-slate-200 bg-slate-50 gap-1 no-imprimir">
+          {METRICAS_TENDENCIA.map((x) => (
+            <button key={x.key} type="button" onClick={() => setK(x.key)}
+              className={`h-8 px-3 rounded-full text-[12.5px] font-semibold ${k === x.key ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}>{x.label}</button>
+          ))}
         </div>
       </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi label="Inversión Meta Ads" value={soles(m.gastoAdsSoles, 2)}
-          tip={KPI_TIPS.inversionMetaAds}
-          sub={`US$ ${m.gastoAdsUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} · TC ${m.tipoCambio} · IGV ${pct(m.igv, 0)}`}
-          delta={prev ? <Delta actual={m.gastoAdsSoles} previo={prev.gastoAdsSoles} invertir /> : undefined} accent={AZUL} />
-        <Kpi label="Costo por mensaje" value={soles(m.costoMensaje, 2)}
-          tip={KPI_TIPS.costoMensaje}
-          delta={prev ? <Delta actual={m.costoMensaje} previo={prev.costoMensaje} invertir /> : undefined} />
-        <Kpi label="Ticket promedio" value={soles(m.ticketPromedio, 2)}
-          tip={KPI_TIPS.ticketPromedio}
-          delta={prev ? <Delta actual={m.ticketPromedio} previo={prev.ticketPromedio} /> : undefined} accent={CELESTE} />
-        <Kpi label="Costo por venta" value={soles(m.costoVenta, 2)}
-          tip={KPI_TIPS.costoVenta}
-          delta={prev ? <Delta actual={m.costoVenta} previo={prev.costoVenta} invertir /> : undefined} />
-        <Kpi label="Conversión" value={pct(m.conversion)} sub="ventas totales / leads"
-          tip={KPI_TIPS.conversion}
-          delta={prev ? <Delta actual={m.conversion} previo={prev.conversion} formato="pp" /> : undefined} accent="#059669" />
+      <div className="flex items-end gap-2" style={{ height: 180 }}>
+        {meses.map((m, i) => {
+          const v = vals[i]
+          return (
+            <button key={m.mes} type="button" onClick={() => onSel(i)} title={`${labelMes(m.mes)} · ${v == null ? '—' : met.fmt(v)}`}
+              className="flex-1 h-full flex flex-col justify-end items-center gap-1.5 group">
+              <span className="text-[10.5px] font-semibold text-slate-500 opacity-0 group-hover:opacity-100">{v == null ? '' : met.fmt(v)}</span>
+              <div className="w-full max-w-[44px] rounded-t-[7px] transition-all" style={{ height: `${((v ?? 0) / max) * 100}%`, minHeight: v ? 4 : 0, background: i === sel ? 'linear-gradient(180deg,#7170ff,#ba41f7)' : '#e2e8f0' }} />
+            </button>
+          )
+        })}
       </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi label="ROAS directo" value={m.roasDirecto.toFixed(2) + 'x'} sub="ingreso directo / gasto ads"
-          tip={KPI_TIPS.roasDirecto}
-          delta={prev ? <Delta actual={m.roasDirecto} previo={prev.roasDirecto} /> : undefined} accent={NARANJA} />
-        <Kpi label="Ingreso directo" value={soles(m.ingresoDirecto)}
-          tip={KPI_TIPS.ingresoDirecto}
-          delta={prev ? <Delta actual={m.ingresoDirecto} previo={prev.ingresoDirecto} /> : undefined} />
-        <Kpi label="Gasto mkt total" value={soles(m.gastoMktTotal, 0)} sub={`ads + gestión ${soles(COSTO_GESTION)} (+IGV)`}
-          tip={KPI_TIPS.gastoMktTotal}
-          delta={prev ? <Delta actual={m.gastoMktTotal} previo={prev.gastoMktTotal} invertir /> : undefined} />
-        <Kpi label="CAC directo" value={soles(m.cacDirecto, 2)} sub="por venta confirmada"
-          tip={KPI_TIPS.cacDirecto}
-          delta={prev ? <Delta actual={m.cacDirecto} previo={prev.cacDirecto} invertir /> : undefined} />
-        <Kpi label="CAC omnicanal (est.)" value={soles(m.cacOmnicanal, 2)} sub={`${Math.round(m.clientesOmni)} clientes est.`}
-          tip={KPI_TIPS.cacOmnicanal}
-          delta={prev ? <Delta actual={m.cacOmnicanal} previo={prev.cacOmnicanal} invertir /> : undefined} />
+      <div className="flex gap-2 mt-2">
+        {meses.map((m, i) => <span key={m.mes} className={`flex-1 text-center text-[11px] ${i === sel ? 'font-bold text-slate-900' : 'text-slate-400'}`}>{labelMes(m.mes).slice(0, 3)}</span>)}
       </div>
+    </Tarjeta>
+  )
+}
 
-      <div className="rounded-2xl border bg-card p-6">
-        <h3 className="text-lg font-extrabold tracking-tight text-center">Vista omnicanal — {labelMes(m.mes)}</h3>
-        <p className="text-xs text-muted-foreground text-center mt-1 mb-4">
-          Incluye venta retail física (Falabella / Tottus / Sodimac) · atribución a marketing NO medida
-        </p>
-        <div className="w-full h-11 rounded-xl overflow-hidden flex text-white text-xs font-bold">
-          <div className="flex items-center justify-center" style={{ width: `${(1 - m.pctRetail) * 100}%`, background: `linear-gradient(90deg, ${AZUL}, ${CELESTE})`, minWidth: 90 }}>
-            {pct(1 - m.pctRetail)} directo
-          </div>
-          <div className="flex items-center justify-center bg-neutral-500/80"
-            style={{ width: `${m.pctRetail * 100}%`, minWidth: 90, backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 8px, transparent 8px 16px)' }}>
-            {pct(m.pctRetail)} retail
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
-          <Kpi label="Total omnicanal" value={soles(m.ventasOmnicanal)}
-            tip={KPI_TIPS.totalOmnicanal}
-            delta={prev ? <Delta actual={m.ventasOmnicanal} previo={prev.ventasOmnicanal} /> : undefined} />
-          <Kpi label="Directo confirmado" value={soles(m.ingresoDirecto)} accent={AZUL}
-            tip={KPI_TIPS.directoConfirmado}
-            delta={prev ? <Delta actual={m.ingresoDirecto} previo={prev.ingresoDirecto} /> : undefined} />
-          <Kpi label="Ingreso WhatsApp" value={soles(Math.max(0, m.ingresoDirecto - m.ingresoShopify))}
-            tip={KPI_TIPS.ventaDirectaWhatsApp}
-            delta={prev ? <Delta actual={Math.max(0, m.ingresoDirecto - m.ingresoShopify)} previo={Math.max(0, prev.ingresoDirecto - prev.ingresoShopify)} /> : undefined} />
-          <Kpi label="Retail Indirecto" value={soles(m.ventasRetail)}
-            tip={KPI_TIPS.retailIndirecto}
-            delta={prev ? <Delta actual={m.ventasRetail} previo={prev.ventasRetail} /> : undefined} />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border bg-card p-6">
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-          <h3 className="text-lg font-extrabold tracking-tight">Tendencia mensual</h3>
-          <div className="flex gap-1.5 flex-wrap">
-            {TENDENCIAS.map((t) => (
-              <button key={t.key} onClick={() => setTKey(t.key)}
-                className={`h-7 px-2.5 rounded-full text-[11px] font-semibold border ${t.key === tKey ? 'text-white' : 'bg-background hover:bg-muted'}`}
-                style={t.key === tKey ? { background: AZUL, borderColor: AZUL } : undefined}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-end gap-2 h-44">
-          {meses.map((x, i) => {
-            const v = Number(x[tKey])
-            return (
-              <button key={x.mes} onClick={() => setIdx(i)} title={`${labelMes(x.mes)} · ${tSel.fmt(v)}`}
-                className="flex-1 flex flex-col items-center gap-1 group">
-                <span className="text-[10px] font-bold tabular-nums" style={i === idx ? { color: AZUL } : { color: 'var(--mk-text-tertiary, #999)' }}>
-                  {tKey === 'roasDirecto' ? v.toFixed(1) : v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v)}
-                </span>
-                <div className="w-full rounded-t-lg transition-all group-hover:opacity-80"
-                  style={{ height: `${Math.max(6, (v / tMax) * 130)}px`, background: i === idx ? AZUL : `${AZUL}33` }} />
-                <span className={`text-[10px] ${i === idx ? 'font-bold' : 'text-muted-foreground'}`}>{labelMes(x.mes).slice(0, 3)}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border bg-card p-6 overflow-x-auto">
-        <h3 className="text-lg font-extrabold tracking-tight mb-4">Comparativa por mes</h3>
-        <table className="w-full text-xs min-w-[880px]">
+function Tabla({ meses }: { meses: MesDirecto[] }) {
+  const filas = [...meses].reverse()
+  return (
+    <Tarjeta className="!p-0 overflow-hidden">
+      <div className="px-5 pt-5"><Titulo icon={<CalendarDays className="w-4 h-4" />} color="#64748b">Comparativa por mes</Titulo></div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px] min-w-[760px]">
           <thead>
-            <tr className="text-left text-muted-foreground uppercase tracking-wider text-[10px]">
-              <th className="py-2 pr-3">Mes</th><th className="py-2 pr-3 text-right">Leads</th>
-              <th className="py-2 pr-3 text-right">V. Shopify</th><th className="py-2 pr-3 text-right">V. WhatsApp</th>
-              <th className="py-2 pr-3 text-right">V. Totales</th><th className="py-2 pr-3 text-right">Conv.</th>
-              <th className="py-2 pr-3 text-right">Gasto Ads</th><th className="py-2 pr-3 text-right">C/venta</th>
-              <th className="py-2 pr-3 text-right">Ticket</th><th className="py-2 pr-3 text-right">ROAS</th>
-              <th className="py-2 pr-3 text-right">Ing. directo</th><th className="py-2 pr-0 text-right">Omnicanal</th>
+            <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 border-y border-slate-100 bg-slate-50/60">
+              {['Mes', 'Ventas', 'Pedidos', 'Web', 'WhatsApp', 'Inversión', 'ROAS', 'Costo/venta', 'Conversaciones'].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}
             </tr>
           </thead>
           <tbody>
-            {meses.map((x, i) => (
-              <tr key={x.mes} onClick={() => setIdx(i)}
-                className={`border-t cursor-pointer hover:bg-muted/50 ${i === idx ? 'font-bold' : ''}`}
-                style={i === idx ? { background: `${AZUL}0d` } : undefined}>
-                <td className="py-2 pr-3">{labelMes(x.mes)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{num(x.leads)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{num(x.ventasShopify)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{num(x.ventasWhatsApp)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{num(x.ventasTotales)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{pct(x.conversion)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{soles(x.gastoAdsSoles)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{soles(x.costoVenta, 2)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{soles(x.ticketPromedio, 2)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{x.roasDirecto.toFixed(2)}x</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{soles(x.ingresoDirecto)}</td>
-                <td className="py-2 pr-0 text-right tabular-nums">{soles(x.ventasOmnicanal)}</td>
+            {filas.map((m) => (
+              <tr key={m.mes} className="border-b border-slate-50 last:border-0">
+                <td className="px-4 py-2.5 font-semibold text-slate-900">{labelMes(m.mes)}</td>
+                <td className="px-4 py-2.5">{soles(m.solesTotales ?? m.solesWeb)}</td>
+                <td className="px-4 py-2.5">{num(m.pedidosTotales ?? m.pedidosWeb)}</td>
+                <td className="px-4 py-2.5 text-slate-600">{soles(m.solesWeb)}</td>
+                <td className="px-4 py-2.5 text-slate-600">{m.solesWhatsApp == null ? 'Pendiente' : soles(m.solesWhatsApp)}</td>
+                <td className="px-4 py-2.5 text-slate-600">{soles(m.gastoAdsSoles)}</td>
+                <td className="px-4 py-2.5 font-semibold">{veces(m.roas ?? m.roasWeb)}</td>
+                <td className="px-4 py-2.5 text-slate-600">{soles(m.costoVenta, 2)}</td>
+                <td className="px-4 py-2.5 text-slate-600">{num(m.leads)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    </Tarjeta>
+  )
+}
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-xs leading-relaxed text-amber-900">
-        <b>Ventas Totales</b> confirmadas directamente por el equipo (registro propio del embudo WhatsApp).{' '}
-        <b>Ventas WhatsApp</b> (pedidos) = Ventas Totales − Ventas Shopify. <b>Ingreso WhatsApp</b> (S/) = Ingreso directo − Ingreso Shopify. El resto de cifras proviene de Shopify Admin API y Meta Ads API (Graph API).
-        Tipo de cambio SUNAT del mes. La venta retail física (Falabella/Tottus/Sodimac) vive en sus propios sistemas de punto de venta:
-        no hay dato que conecte «vio el anuncio» con «compró en tienda» — por eso NO se asigna un % de atribución inventado.
-        Clientes retail y CAC omnicanal son <b>estimados</b> (retail ÷ ticket promedio).
+/* Formulario del cliente: solo sus ventas totales del mes. */
+function FormVentas({ mes, onGuardar }: { mes: MesDirecto; onGuardar: (mes: string, pedidos: number, soles: number) => Promise<{ ok: true } | { ok: false; error: string }> }) {
+  const router = useRouter()
+  const [pedidos, setPedidos] = useState('')
+  const [monto, setMonto] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  async function guardar() {
+    const p = Number(pedidos), s = Number(monto.replace(/,/g, ''))
+    if (!(p > 0) || !(s > 0)) { toast.error('Pon la cantidad de pedidos y el monto en soles'); return }
+    setGuardando(true)
+    const r = await onGuardar(mes.mes, p, s)
+    setGuardando(false)
+    if (!r.ok) { toast.error(r.error); return }
+    toast.success('¡Listo! Tu reporte se actualizó')
+    router.refresh()
+  }
+  const campo = 'h-11 px-3.5 text-[15px] bg-white text-slate-900 border border-slate-200 rounded-[11px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 w-full'
+  return (
+    <section className="rounded-[20px] border-2 border-[#c4b5fd] bg-gradient-to-br from-[#f5f3ff] to-white p-5 sm:p-6 no-imprimir">
+      <div className="text-[12px] font-bold uppercase tracking-[0.1em] text-[#6d5dfc]">Falta un paso</div>
+      <h3 className="text-[19px] font-bold text-slate-900 mt-1">Pon tus ventas totales de {labelMes(mes.mes)}</h3>
+      <p className="text-[13px] text-slate-500 mt-1 mb-4">
+        Todos los pedidos del mes (web + WhatsApp). La web ya la tenemos: {num(mes.pedidosWeb)} pedidos por {soles(mes.solesWeb)}. Lo de WhatsApp se calcula solo.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end">
+        <label className="grid gap-1.5"><span className="text-[12.5px] font-semibold text-slate-700">Pedidos totales</span>
+          <input type="number" min={0} inputMode="numeric" value={pedidos} onChange={(e) => setPedidos(e.target.value)} placeholder={`más de ${mes.pedidosWeb}`} className={campo} /></label>
+        <label className="grid gap-1.5"><span className="text-[12.5px] font-semibold text-slate-700">Ventas totales (S/)</span>
+          <input type="number" min={0} step="0.01" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="Ej. 28500" className={campo} /></label>
+        <button type="button" onClick={() => void guardar()} disabled={guardando}
+          className="h-11 px-5 inline-flex items-center justify-center gap-2 rounded-[11px] text-[14px] font-bold text-white disabled:opacity-60"
+          style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
+          {guardando && <Loader2 className="w-4 h-4 animate-spin" />} Guardar
+        </button>
       </div>
-    </div>
+    </section>
   )
 }

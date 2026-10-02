@@ -80,3 +80,26 @@ export async function guardarMesReporteCliente(
   revalidatePath('/reportes')
   return { ok: true }
 }
+
+/* Reporte DIRECTO: el cliente solo pone sus VENTAS TOTALES del mes (pedidos
+   y soles). La marca sale de su sesión; requiere el código del reporte.
+   Pedro 02-oct-2026. */
+export async function guardarVentasCliente(mes: string, pedidos: number, soles: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser()
+  const cliente = await getClienteActual()
+  if (!cliente) return { ok: false, error: 'No autorizado' }
+  const { pinReportesOk } = await import('@/app/reportes/_actions')
+  if (!(await pinReportesOk())) return { ok: false, error: 'Ingresa el código del reporte primero' }
+  if (!/^\d{4}-\d{2}$/.test(mes)) return { ok: false, error: 'Mes inválido' }
+  if (!(Number.isFinite(pedidos) && pedidos > 0 && Number.isFinite(soles) && soles > 0)) return { ok: false, error: 'Pon la cantidad de pedidos y el monto en soles' }
+  try {
+    const { aplicarVentasCliente, mesExistente } = await import('@/lib/reportes/auto')
+    const prev = await mesExistente(cliente.marcaSlug, mes)
+    if (prev && Math.round(pedidos) < prev.ventasShopify) {
+      return { ok: false, error: `Tus pedidos totales no pueden ser menos que los de la web (${prev.ventasShopify})` }
+    }
+    await aplicarVentasCliente(cliente.marcaSlug, mes, Math.round(pedidos), Math.round(soles * 100) / 100)
+    revalidatePath('/cliente'); revalidatePath('/reportes')
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+}

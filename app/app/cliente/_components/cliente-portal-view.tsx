@@ -23,6 +23,7 @@ import { TareasClienteView, type TareaClienteItem } from './tareas-cliente-view'
 import { TareasPlanView, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
+import { guardarVentasCliente } from '../_reporte-actions'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
 import { marcarPublicadoCliente, aprobarVideoCliente, enviarObservacionCliente, agendarGrabacionCliente, eliminarObservacionCliente, cambiarFechaPublicacionCliente, enviarCorreccionesCliente, cambiarMarcaCliente, eliminarFechaImportanteCliente } from '../_actions'
@@ -585,7 +586,7 @@ export function ClientePortalView({
     if (restaurado.current) return
     restaurado.current = true
     const qs = new URLSearchParams(window.location.search)
-    if (qs.get('reunion') || qs.get('obs') || qs.get('pub')) return
+    if (qs.get('reunion') || qs.get('obs') || qs.get('pub') || qs.get('reporte')) return
     try {
       const raw = localStorage.getItem(LS_PORTAL)
       const e = raw ? JSON.parse(raw) : null
@@ -638,9 +639,10 @@ export function ClientePortalView({
     /* El deep-link se CONSUME una sola vez: sin esto, cada refresh de pubs
        (realtime / volver a la pestaña) re-forzaba la vista o reabría el modal
        y el cliente no podía salir de la sección. Fix 31-ago-2026. */
-    if (qs.get('reunion') || qs.get('obs') || qs.get('pub')) {
+    if (qs.get('reunion') || qs.get('obs') || qs.get('pub') || qs.get('reporte')) {
       window.history.replaceState(null, '', window.location.pathname)
     }
+    if (qs.get('reporte') && tieneReporte) { setVista('reporte'); return }
     // Deep-links de notificaciones: reunión nueva o respuesta (ahora Soporte).
     if (qs.get('reunion')) { setVista('reuniones'); return }
     if (qs.get('obs')) { setVista('soporte'); return }
@@ -1198,7 +1200,7 @@ export function ClientePortalView({
           se muestra el candado; al validar, el server refresca y manda la data. */}
       {vista === 'reporte' && tieneReporte && (
         reporteMeses
-          ? <ReporteMarcaView nombre={reporteNombre!} meses={reporteMeses} />
+          ? <ReporteMarcaView nombre={reporteNombre!} meses={reporteMeses} modo="cliente" onGuardarVentas={guardarVentasCliente} />
           : <div className="pt-8"><PinGate titulo="Reporte mensual" /></div>
       )}
 

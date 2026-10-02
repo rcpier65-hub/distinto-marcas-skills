@@ -119,3 +119,79 @@ export async function eliminarMesReporte(marcaSlug: string, mes: string): Promis
   revalidatePath('/cliente')
   return { ok: true }
 }
+
+/* ══════════ Reporte DIRECTO (Shopify + Facebook automáticos) ══════════
+   Pedro 02-oct-2026. Estas acciones son SOLO del equipo: además del código,
+   verifican que la sesión sea un miembro activo (el código de reportes lo
+   tienen también los clientes). */
+type Res = { ok: true; avisos?: string[] } | { ok: false; error: string }
+
+async function soloEquipo(): Promise<string | null> {
+  const user = await requireUser()
+  if (!(await pinReportesOk())) return 'Ingresa el código de reportes primero'
+  const { createServiceClient } = await import('@/lib/supabase/service')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const { data } = await service.from('team_members').select('id').eq('auth_user_id', user.id).eq('activo', true).maybeSingle()
+  return data ? null : 'Solo el equipo puede hacer esto'
+}
+async function refrescarReportes() {
+  const { revalidatePath } = await import('next/cache')
+  revalidatePath('/reportes'); revalidatePath('/cliente')
+}
+const mesOk = (m: string) => /^\d{4}-\d{2}$/.test(m)
+
+/** Trae Shopify + Facebook + tipo de cambio para el mes (conserva lo del cliente). */
+export async function actualizarMesDirecto(marcaSlug: string, mes: string): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  if (!mesOk(mes)) return { ok: false, error: 'Mes inválido' }
+  try {
+    const { generarMesDirecto } = await import('@/lib/reportes/auto')
+    const r = await generarMesDirecto(marcaSlug, mes)
+    await refrescarReportes()
+    return { ok: true, avisos: r.avisos }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+}
+
+/** Carga a mano la inversión y los leads de Facebook (mientras no haya token). */
+export async function guardarMetaManual(marcaSlug: string, mes: string, d: { gastoUsd: number; leads: number; gastoWhatsAppUsd?: number | null }): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  const { mesExistente } = await import('@/lib/reportes/auto')
+  const prev = await mesExistente(marcaSlug, mes)
+  if (!prev || prev.extra?.formato !== 'directo') return { ok: false, error: 'Primero genera el mes con "Actualizar datos"' }
+  if (![d.gastoUsd, d.leads].every((v) => isFinite(v) && v >= 0)) return { ok: false, error: 'Números inválidos' }
+  const { guardarMesDb } = await import('@/lib/reportes/db')
+  await guardarMesDb(marcaSlug, {
+    ...prev, gastoAdsUsd: d.gastoUsd, leads: Math.round(d.leads),
+    extra: { ...prev.extra, fuenteMeta: 'manual', gastoWhatsAppUsd: d.gastoWhatsAppUsd ?? prev.extra?.gastoWhatsAppUsd ?? null },
+  })
+  await refrescarReportes()
+  return { ok: true }
+}
+
+/** Meta de ventas del mes (S/) y publicación. */
+export async function ajustarMesDirecto(marcaSlug: string, mes: string, d: { objetivoSoles?: number | null; publicado?: boolean }): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  const { mesExistente } = await import('@/lib/reportes/auto')
+  const prev = await mesExistente(marcaSlug, mes)
+  if (!prev || prev.extra?.formato !== 'directo') return { ok: false, error: 'Primero genera el mes con "Actualizar datos"' }
+  const extra = { ...prev.extra }
+  if (d.objetivoSoles !== undefined) extra.objetivoSoles = d.objetivoSoles && d.objetivoSoles > 0 ? d.objetivoSoles : null
+  if (d.publicado !== undefined) extra.publicado = d.publicado
+  const { guardarMesDb } = await import('@/lib/reportes/db')
+  await guardarMesDb(marcaSlug, { ...prev, extra })
+  await refrescarReportes()
+  return { ok: true }
+}
+
+/** El equipo también puede poner las ventas totales en nombre del cliente. */
+export async function guardarVentasEquipo(marcaSlug: string, mes: string, pedidos: number, soles: number): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  if (!(pedidos >= 0 && soles >= 0 && isFinite(pedidos) && isFinite(soles))) return { ok: false, error: 'Números inválidos' }
+  try {
+    const { aplicarVentasCliente } = await import('@/lib/reportes/auto')
+    await aplicarVentasCliente(marcaSlug, mes, Math.round(pedidos), soles)
+    await refrescarReportes()
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+}

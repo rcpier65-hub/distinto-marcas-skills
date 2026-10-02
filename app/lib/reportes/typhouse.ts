@@ -36,6 +36,25 @@ export type MesRaw = {
   gastoAdsUsd: number    // Meta Ads API
   tipoCambio: number     // SUNAT del mes
   igv: number            // 0.18
+  /* Formato "directo" (Shopify + Facebook automáticos; el cliente solo pone
+     sus ventas totales). Opcional: los meses viejos no lo tienen. Ver
+     lib/reportes/directo.ts. Pedro 02-oct-2026. */
+  extra?: ExtraDirecto
+}
+
+export type ExtraDirecto = {
+  formato?: 'directo'
+  gastoWhatsAppUsd?: number | null
+  nuevos?: number
+  recurrentes?: number
+  topProductos?: { nombre: string; unidades: number; soles: number }[]
+  topAnuncios?: { nombre: string; conversaciones: number; costoUsd: number }[]
+  objetivoSoles?: number | null
+  /* Lo que puso el cliente (ventas totales del mes). null = pendiente. */
+  cliente?: { pedidos: number; soles: number; at: string } | null
+  publicado?: boolean
+  fuenteMeta?: 'auto' | 'manual' | 'pendiente'
+  actualizadoAt?: string
 }
 
 /* Fee fijo mensual de gestión de marketing (S/, sin IGV) — hoja Dashboard. */
