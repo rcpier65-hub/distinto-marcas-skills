@@ -96,11 +96,12 @@ export default async function DisenoDetailPage({ params }: PageProps) {
   let entregables: Entregable[] = []
   try {
     const { data: ents } = await service.from('diseno_entregables')
-      .select('id, orden, titulo, fecha, link, listo_at, publicacion_id').eq('tarea_id', id).order('orden')
+      .select('id, orden, titulo, fecha, link, listo_at, publicacion_id, slides').eq('tarea_id', id).order('orden')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     entregables = ((ents ?? []) as any[]).map((r) => ({
       id: r.id, orden: r.orden, titulo: r.titulo ?? '', fecha: r.fecha ?? null,
       link: r.link ?? null, listoAt: r.listo_at ?? null, publicacionId: r.publicacion_id ?? null,
+      slides: Array.isArray(r.slides) ? (r.slides as unknown[]).map((x) => String(x ?? '')) : null,
     }))
   } catch { /* sin tabla todavía */ }
   const tipoRaw = String((Array.isArray(pub.tipo_contenido) ? pub.tipo_contenido[0] : '') ?? '').toLowerCase()

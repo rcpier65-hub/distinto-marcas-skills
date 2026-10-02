@@ -42,7 +42,11 @@ export type Entregable = {
   link: string | null
   listoAt: string | null
   publicacionId: string | null
+  /* Carrusel: un link por slide, EN ORDEN ('' = falta). null si no es carrusel. */
+  slides: string[] | null
 }
+
+export const MAX_SLIDES = 20
 
 async function miembroActivo(service: Service, authUserId: string): Promise<boolean> {
   const { data } = await service.from('team_members').select('id').eq('auth_user_id', authUserId).eq('activo', true).maybeSingle()
@@ -101,6 +105,8 @@ export async function crearEntregables(input: {
   tipo: TipoEntregable
   plataformas: string[]
   items: { publicacionId?: string | null; fecha: string; titulo: string }[]
+  /* Carrusel: cuántos slides lleva cada uno. */
+  slides?: number
 }): Promise<{ ok: true; creados: number } | Err> {
   const user = await requireUser()
   const service = createServiceClient() as Service
@@ -151,7 +157,8 @@ export async function crearEntregables(input: {
       if (error || !nueva) return { ok: false, error: `No se pudo crear la publicación del ${it.fecha}: ${error?.message ?? ''}` }
       pubId = nueva.id
     }
-    filas.push({ tarea_id: input.tareaId, publicacion_id: pubId, orden, titulo, fecha: it.fecha })
+    const nSlides = input.tipo === 'carrusel' ? Math.min(MAX_SLIDES, Math.max(2, Math.round(input.slides ?? 5))) : 0
+    filas.push({ tarea_id: input.tareaId, publicacion_id: pubId, orden, titulo, fecha: it.fecha, slides: nSlides ? Array(nSlides).fill('') : null })
     orden++
   }
   const { error } = await service.from('diseno_entregables').insert(filas)
@@ -165,7 +172,7 @@ export async function listarEntregables(tareaId: string): Promise<{ ok: true; en
   const service = createServiceClient() as Service
   if (!(await miembroActivo(service, user.id))) return { ok: false, error: 'No autorizado' }
   const { data, error } = await service.from('diseno_entregables')
-    .select('id, orden, titulo, fecha, link, listo_at, publicacion_id').eq('tarea_id', tareaId).order('orden')
+    .select('id, orden, titulo, fecha, link, listo_at, publicacion_id, slides').eq('tarea_id', tareaId).order('orden')
   if (error) return { ok: false, error: error.message }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { ok: true, entregables: ((data ?? []) as any[]).map(filaAEntregable) }
@@ -176,7 +183,36 @@ function filaAEntregable(r: any): Entregable {
   return {
     id: r.id, orden: r.orden, titulo: r.titulo ?? '', fecha: r.fecha ?? null,
     link: r.link ?? null, listoAt: r.listo_at ?? null, publicacionId: r.publicacion_id ?? null,
+    slides: Array.isArray(r.slides) ? (r.slides as unknown[]).map((x) => String(x ?? '')) : null,
   }
+}
+
+/* CARRUSEL: guardar los links de los slides EN ORDEN (también sirve para
+   cambiar la cantidad). Se refleja en la publicación (carrusel_slides) para
+   que Paolo vea el preview con los números. Pedro 02-oct-2026. */
+export async function guardarSlides(id: string, slides: string[]): Promise<{ ok: true } | Err> {
+  const user = await requireUser()
+  const service = createServiceClient() as Service
+  if (!(await miembroActivo(service, user.id))) return { ok: false, error: 'No autorizado' }
+  if (!Array.isArray(slides) || slides.length < 1 || slides.length > MAX_SLIDES) return { ok: false, error: `Entre 1 y ${MAX_SLIDES} slides` }
+  const limpios = slides.map((x) => String(x ?? '').trim())
+  const malo = limpios.findIndex((l) => l && !/^https?:\/\/\S+$/i.test(l))
+  if (malo >= 0) return { ok: false, error: `El link del slide ${malo + 1} no es válido (https://…)` }
+  const { data: e } = await service.from('diseno_entregables').select('id, tarea_id, publicacion_id, listo_at').eq('id', id).maybeSingle()
+  if (!e) return { ok: false, error: 'Entregable no encontrado' }
+  const primero = limpios[0] || null
+  const completos = limpios.every(Boolean)
+  const upd: Record<string, unknown> = { slides: limpios, link: primero }
+  if (!completos) upd.listo_at = null
+  const { error } = await service.from('diseno_entregables').update(upd).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  if (e.publicacion_id) {
+    await service.from('publicaciones').update({
+      carrusel_slides: limpios, drive_resultado_url: primero, portada_editada_url: primero, updated_by: user.id,
+    }).eq('id', e.publicacion_id)
+  }
+  refrescar(e.tarea_id)
+  return { ok: true }
 }
 
 /* Guardar el título y/o el link de UN entregable (se refleja en su publicación). */
@@ -217,8 +253,12 @@ export async function marcarEntregableListo(id: string, listo: boolean): Promise
   const user = await requireUser()
   const service = createServiceClient() as Service
   if (!(await miembroActivo(service, user.id))) return { ok: false, error: 'No autorizado' }
-  const { data: e } = await service.from('diseno_entregables').select('id, tarea_id, publicacion_id, link').eq('id', id).maybeSingle()
+  const { data: e } = await service.from('diseno_entregables').select('id, tarea_id, publicacion_id, link, slides').eq('id', id).maybeSingle()
   if (!e) return { ok: false, error: 'Entregable no encontrado' }
+  if (listo && Array.isArray(e.slides)) {
+    const falta = (e.slides as unknown[]).findIndex((x) => !String(x ?? '').trim())
+    if (falta >= 0) return { ok: false, error: `Falta el link del slide ${falta + 1}` }
+  }
   if (listo && !e.link) return { ok: false, error: 'Primero pega el link del diseño' }
   const { error } = await service.from('diseno_entregables').update({ listo_at: listo ? new Date().toISOString() : null }).eq('id', id)
   if (error) return { ok: false, error: error.message }

@@ -768,8 +768,24 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     ? (extractDriveFolderId(form.drive_resultado_url || '') || extractDriveFolderId(form.enlace_tomas || ''))
     : null
 
+  /* CARRUSEL CON SLIDES EN ORDEN (Pedro 02-oct-2026): Ailyn pega un link por
+     slide en la tarea de diseño → aquí se ve el preview y los números para
+     publicar en el orden correcto. Tiene prioridad sobre la carpeta. */
+  const slidesPub = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = (initial as any).carrusel_slides
+    if (!esCarrusel || !Array.isArray(raw)) return [] as { n: number; link: string; src: string; id: string | null }[]
+    return (raw as unknown[]).map((x, i) => {
+      const link = String(x ?? '').trim()
+      const id = extractDriveFileId(link)
+      return { n: i + 1, link, id, src: id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : link }
+    })
+  }, [initial, esCarrusel])
+  const haySlides = slidesPub.some((x) => x.link)
+  const [slideSel, setSlideSel] = useState(0)
+
   useEffect(() => {
-    if (!carruselFolderId) { setCarruselImgs(null); setCarruselEstado('idle'); return }
+    if (!carruselFolderId || haySlides) { setCarruselImgs(null); setCarruselEstado('idle'); return }
     let cancel = false
     setCarruselEstado('cargando'); setCarruselIdx(0)
     fetch(`/api/publicaciones/drive-images?folder=${encodeURIComponent(carruselFolderId)}`)
@@ -783,7 +799,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
       })
       .catch(() => { if (!cancel) { setCarruselImgs(null); setCarruselEstado('error') } })
     return () => { cancel = true }
-  }, [carruselFolderId])
+  }, [carruselFolderId, haySlides])
 
   return (
     /* Root wrapper. Antes el HEADER (chips marca/estado + título + tabs
@@ -1865,7 +1881,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[9px]">
-                  {esCarrusel && carruselFolderId ? '🎠 Carrusel'
+                  {haySlides ? `🎠 Carrusel · ${slidesPub.length} slides`
+                    : esCarrusel && carruselFolderId ? '🎠 Carrusel'
                     : previewMode === 'diseno' ? '🎨 Diseño'
                     : previewMode === 'editada' ? '✅ Editada'
                     : previewMode === 'cruda' ? '🖼️ Cruda'
@@ -1889,8 +1906,34 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                 const activeId = effectiveMode === 'con' ? conMusicaId : sinMusicaId
 
                 return (
-                  <div className="aspect-[9/16] bg-black flex items-center justify-center relative">
-                    {esCarrusel && carruselFolderId ? (
+                  <div className={`${haySlides ? 'aspect-[4/5]' : 'aspect-[9/16]'} bg-black flex items-center justify-center relative`}>
+                    {haySlides ? (
+                      <div className="w-full h-full relative flex items-center justify-center">
+                        {slidesPub[slideSel]?.link ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={slideSel} src={slidesPub[slideSel].src} alt={`Slide ${slideSel + 1}`} className="w-full h-full object-contain" />
+                        ) : (
+                          <div className="text-white/60 text-xs text-center px-4">Falta el diseño del slide {slideSel + 1}</div>
+                        )}
+                        <div className="absolute top-2 left-2 text-[13px] font-bold bg-black/65 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                          Slide {slideSel + 1} de {slidesPub.length}
+                        </div>
+                        {slidesPub.length > 1 && (
+                          <>
+                            <button type="button" aria-label="Slide anterior"
+                              onClick={() => setSlideSel((i) => (i - 1 + slidesPub.length) % slidesPub.length)}
+                              className="absolute left-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors">
+                              <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <button type="button" aria-label="Slide siguiente"
+                              onClick={() => setSlideSel((i) => (i + 1) % slidesPub.length)}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors">
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ) : esCarrusel && carruselFolderId ? (
                       <div className="w-full h-full relative flex items-center justify-center">
                         {carruselEstado === 'cargando' && (
                           <div className="text-white/60 text-xs">Cargando imágenes…</div>
@@ -2011,7 +2054,32 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   el video preview, no el mock del caption. */}
             </CardContent>
           </Card>
-          {esCarrusel && carruselFolderId && (form.drive_resultado_url || form.enlace_tomas) && (
+          {haySlides && (
+            <div className="rounded-[16px] border border-slate-200/80 bg-white p-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">Orden de publicación</span>
+                <span className="text-[11.5px] text-slate-400">Súbelos en este orden</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {slidesPub.map((sl, i) => (
+                  <button key={i} type="button" onClick={() => setSlideSel(i)} title={`Slide ${sl.n}`}
+                    className={`relative aspect-[4/5] rounded-[10px] overflow-hidden border-2 transition-all ${i === slideSel ? 'border-[#7170ff] shadow-[0_4px_12px_-4px_rgba(113,112,255,0.6)]' : 'border-transparent hover:border-slate-300'} bg-slate-100`}>
+                    {sl.link
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={sl.id ? `https://drive.google.com/thumbnail?id=${sl.id}&sz=w300` : sl.src} alt="" className="w-full h-full object-cover" />
+                      : <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-400">falta</span>}
+                    <span className={`absolute bottom-1 left-1 min-w-[22px] h-[22px] px-1 rounded-full text-[12px] font-bold flex items-center justify-center ${i === slideSel ? 'bg-[#7170ff] text-white' : 'bg-white/95 text-slate-800 shadow-sm'}`}>{sl.n}</span>
+                  </button>
+                ))}
+              </div>
+              {slidesPub[slideSel]?.link && (
+                <a href={slidesPub[slideSel].link} target="_blank" rel="noopener noreferrer" className="mt-2.5 block text-center text-xs font-semibold text-[#6d5dfc] hover:underline">
+                  ↗ Abrir slide {slideSel + 1} en Drive
+                </a>
+              )}
+            </div>
+          )}
+          {!haySlides && esCarrusel && carruselFolderId && (form.drive_resultado_url || form.enlace_tomas) && (
             <a href={form.drive_resultado_url || form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-blue-600 hover:underline">
               ↗ Abrir carpeta del carrusel en Drive
             </a>

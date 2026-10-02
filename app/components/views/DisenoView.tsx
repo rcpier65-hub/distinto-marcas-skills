@@ -1212,6 +1212,8 @@ function NuevaTareaModal({
   /* ENTREGABLES (Post / Carrusel / Historia): días elegidos en el calendario
      de la marca. Cada uno enlaza la publicación que ya existe o crea una. */
   const [entregables, setEntregables] = useState<ItemEntregable[]>([])
+  /* Carrusel: cuántos slides lleva (Pedro 02-oct-2026). */
+  const [nSlides, setNSlides] = useState(5)
   /* Reunión de ENTREGA (Pedro 30-sep-2026): se escribe en una frase como en el
      calendario ("el viernes 2 de octubre a las 11am") y se agenda al crear. */
   const [reunionTexto, setReunionTexto] = useState('')
@@ -1327,7 +1329,7 @@ function NuevaTareaModal({
 
       if (esParaPublicar && tipo) {
         const re = await crearEntregables({
-          tareaId: r.data!.id, marcaSlug, tipo, plataformas: redes,
+          tareaId: r.data!.id, marcaSlug, tipo, plataformas: redes, slides: nSlides,
           items: [...entregables].sort((a, b) => a.fecha.localeCompare(b.fecha))
             .map((e) => ({ publicacionId: e.publicacionId, fecha: e.fecha, titulo: e.titulo })),
         })
@@ -1539,6 +1541,23 @@ function NuevaTareaModal({
                   tipoLabel={tipoInfo.label} color={tipoInfo.color}
                   items={entregables} onChange={setEntregables}
                 />
+              )}
+              {tipo === 'carrusel' && (
+                <Campo label="¿Cuántos slides tendrá cada carrusel?">
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
+                      const on = nSlides === n
+                      return (
+                        <button key={n} type="button" onClick={() => setNSlides(n)}
+                          style={{ width: 40, height: 40, borderRadius: 11, fontSize: 14, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+                            border: `1.5px solid ${on ? tipoInfo.color : '#e2e8f0'}`, background: on ? `${tipoInfo.color}12` : '#fff', color: on ? tipoInfo.color : '#475569',
+                            transition: 'all 120ms' }}>
+                          {n}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Campo>
               )}
               <Campo label="Redes (para las nuevas)">
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
