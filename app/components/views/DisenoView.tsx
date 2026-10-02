@@ -1255,20 +1255,21 @@ function NuevaTareaModal({
     onClose()
   }
 
-  /* Auto-fetch correos de cliente cuando elige marca: mejora UX para
-     que el usuario no tenga que escribir manualmente los emails. */
+  /* Auto-fetch correos de cliente cuando elige marca. Si cambia de marca,
+     REEMPLAZA los correos que se habían llenado solos (antes se quedaban los
+     de la primera marca — fix 02-oct-2026). Lo que el usuario escribió a
+     mano no se pisa. */
+  const invitadosAuto = useRef('')
   useEffect(() => {
-    if (!marcaSlug || marcaSlug === 'interno') {
-      return
+    const reemplazar = (nuevo: string) => {
+      setInvitadosInput((cur) => (!cur.trim() || cur === invitadosAuto.current ? nuevo : cur))
+      invitadosAuto.current = nuevo
     }
+    if (!marcaSlug || marcaSlug === 'interno') { reemplazar(''); return }
     let cancelado = false
     obtenerCorreosDeMarca(marcaSlug).then((r) => {
       if (cancelado) return
-      if (r.ok && r.correos.length > 0) {
-        /* Solo precargo si el usuario NO escribió nada todavía,
-           para no pisar lo que esté tipeando. */
-        setInvitadosInput((cur) => cur.trim() ? cur : r.correos.join(', '))
-      }
+      reemplazar(r.ok ? r.correos.join(', ') : '')
     })
     return () => { cancelado = true }
   }, [marcaSlug])

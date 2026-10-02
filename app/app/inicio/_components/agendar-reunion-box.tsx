@@ -13,16 +13,7 @@ import { interpretarAgenda, agendarReunion, agendarGrabacion, type AgendaPreview
 
 type PreviewOk = Extract<AgendaPreview, { ok: true }>
 
-/* Staff de Distinto Studio invitable con un toque desde la tarjeta de
-   confirmación. Pedro 31-ago-2026 (dictó los correos). Paolo (asistente)
-   aún sin correo — se agrega cuando Pedro lo pase. */
-const STAFF_DISTINTO: Array<{ nombre: string; rol: string; email: string }> = [
-  { nombre: 'Erick',  rol: 'Director',     email: 'erickramirezgarcia15@gmail.com' },
-  { nombre: 'Lorena', rol: 'Social media', email: 'lorechavarry@gmail.com' },
-  { nombre: 'Ailyn',  rol: 'Diseño',       email: 'isaguirre0803@gmail.com' },
-  { nombre: 'Pieer',  rol: 'Editor',       email: 'pieermedina99@gmail.com' },
-  { nombre: 'Feling', rol: 'Sistemas',     email: 'reyescalderonfeling@gmail.com' },
-]
+import { STAFF_DISTINTO } from '@/lib/calendario/staff'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

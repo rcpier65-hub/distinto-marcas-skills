@@ -9,20 +9,30 @@
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { correoCalendarioDe } from '@/lib/calendario/staff'
 import { parseAgenda } from '@/lib/reuniones/parse-agenda'
 import { ejecutarAgendarGrabacion, ejecutarAgendarReunion } from '@/lib/calendario/agendar-web'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 
-/* Solo directores/admin (Pedro, Erick, admin) pueden agendar. Sin team_member =
-   dueño (Pedro) → permitido. */
+/* Pueden agendar: directores/admin (Pedro, Erick, admin) y diseño (Ailyn —
+   Pedro 02-oct-2026). Sin team_member = dueño (Pedro) → permitido. */
 async function esDirector(): Promise<boolean> {
   try {
     const p = await getCurrentMemberPermisos()
     if (!p) return true
-    return p.member.rol_base === 'director' || p.member.rol_base === 'admin'
+    return ROLES_AGENDAN.has(p.member.rol_base)
   } catch { return false }
+}
+const ROLES_AGENDAN = new Set(['director', 'admin', 'disenador'])
+
+/* Quien agenda y no es director queda invitado solo → le aparece en su
+   Google Calendar personal. */
+async function correoPropioSiNoDirector(): Promise<string | null> {
+  const p = await getCurrentMemberPermisos().catch(() => null)
+  if (!p || p.member.rol_base === 'director' || p.member.rol_base === 'admin') return null
+  return correoCalendarioDe(p.member.nombre, p.member.email)
 }
 
 export type MarcaAgenda = { id: string; slug: string; nombre: string; emoji: string | null; correos: string[] }
@@ -46,7 +56,7 @@ export type AgendaPreview =
 
 export async function interpretarAgenda(texto: string): Promise<AgendaPreview> {
   await requireUser()
-  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden agendar.' }
+  if (!(await esDirector())) return { ok: false, error: 'No tienes permiso para agendar.' }
   const t = (texto ?? '').trim()
   if (!t) return { ok: false, error: 'Escribe qué agendar. Ej: "grabación con Kintu el 10 de octubre a las 11am".' }
 
@@ -87,14 +97,18 @@ export async function agendarGrabacion(
   input: Parameters<typeof ejecutarAgendarGrabacion>[0],
 ): Promise<Awaited<ReturnType<typeof ejecutarAgendarGrabacion>>> {
   await requireUser()
-  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden agendar grabaciones.' }
-  return ejecutarAgendarGrabacion(input)
+  if (!(await esDirector())) return { ok: false, error: 'No tienes permiso para agendar grabaciones.' }
+  const propio = await correoPropioSiNoDirector()
+  return ejecutarAgendarGrabacion(propio ? { ...input, invitados: [...new Set([...input.invitados, propio])] } : input)
 }
 
 export async function agendarReunion(
   input: Parameters<typeof ejecutarAgendarReunion>[0],
 ): Promise<Awaited<ReturnType<typeof ejecutarAgendarReunion>>> {
   await requireUser()
-  if (!(await esDirector())) return { ok: false, error: 'Solo los directores pueden agendar reuniones.' }
-  return ejecutarAgendarReunion(input)
+  if (!(await esDirector())) return { ok: false, error: 'No tienes permiso para agendar reuniones.' }
+  const propio = await correoPropioSiNoDirector()
+  return ejecutarAgendarReunion(propio
+    ? { ...input, correosGuardar: input.correosGuardar ?? input.correos, correos: [...new Set([...input.correos, propio])] }
+    : input)
 }

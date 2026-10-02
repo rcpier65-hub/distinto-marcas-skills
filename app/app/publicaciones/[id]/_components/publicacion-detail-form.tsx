@@ -122,6 +122,28 @@ function extractDriveFileId(url: string | null | undefined): string | null {
   return null
 }
 
+/* Imagen del preview. Los enlaces de Drive (open?id=, /file/d/) son páginas,
+   no imágenes: se muestran con la miniatura de Drive y, si no carga (p. ej.
+   un video), con el visor embebido. Fix 02-oct-2026: salía negro. */
+function PreviewImagen({ url }: { url: string | null | undefined }) {
+  const id = extractDriveFileId(url)
+  const [fallo, setFallo] = useState(false)
+  if (!url) return null
+  if (id && fallo) {
+    return <iframe key={id} src={`https://drive.google.com/file/d/${id}/preview`} className="w-full h-full" allow="autoplay" allowFullScreen title="Diseño" />
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      key={url}
+      src={id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : url}
+      alt="Preview"
+      className="w-full h-full object-contain"
+      onError={(e) => { if (id) setFallo(true); else (e.target as HTMLImageElement).style.display = 'none' }}
+    />
+  )
+}
+
 const EMOJI_PICKER = [
   '😀', '😊', '😍', '🥰', '😎', '🤩', '😂', '🤣', '😉', '😘',
   '👍', '👏', '🙌', '✨', '⭐', '🌟', '💯', '🔥', '💪', '🎉',
@@ -732,8 +754,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
 
   // Preview adaptativo
   const driveFolderId = extractDriveFolderId(form.enlace_tomas)
-  const previewMode: 'editada' | 'cruda' | 'drive' | 'empty' =
-    form.portada_editada_url ? 'editada'
+  const previewMode: 'diseno' | 'editada' | 'cruda' | 'drive' | 'empty' =
+    form.drive_resultado_url && extractDriveFileId(form.drive_resultado_url) ? 'diseno'
+    : form.portada_editada_url ? 'editada'
     : form.portada_cruda_url ? 'cruda'
     : driveFolderId ? 'drive'
     : 'empty'
@@ -1843,6 +1866,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                 </div>
                 <Badge variant="outline" className="text-[9px]">
                   {esCarrusel && carruselFolderId ? '🎠 Carrusel'
+                    : previewMode === 'diseno' ? '🎨 Diseño'
                     : previewMode === 'editada' ? '✅ Editada'
                     : previewMode === 'cruda' ? '🖼️ Cruda'
                     : previewMode === 'drive' ? '📁 Tomas'
@@ -1959,13 +1983,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                           </div>
                         )}
                       </>
-                    ) : previewMode === 'editada' || previewMode === 'cruda' ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={previewMode === 'editada' ? form.portada_editada_url : form.portada_cruda_url}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    ) : previewMode === 'diseno' || previewMode === 'editada' || previewMode === 'cruda' ? (
+                      <PreviewImagen
+                        url={previewMode === 'diseno' ? form.drive_resultado_url : previewMode === 'editada' ? form.portada_editada_url : form.portada_cruda_url}
                       />
                     ) : previewMode === 'drive' && driveFolderId ? (
                       <iframe

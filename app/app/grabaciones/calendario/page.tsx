@@ -90,6 +90,8 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
   /* Solo directores ven el asistente agendador (la action igual valida server-side). */
   const permisos = await getCurrentMemberPermisos()
   const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
+  /* El asistente para agendar escribiendo: directores + diseño (Ailyn). */
+  const puedeAgendar = esDirector || permisos?.member.rol_base === 'disenador'
 
   /* Mismo armado que GET /api/v1/grabaciones/calendario. */
   const agenda = await cargarAgendaCalendario({
@@ -156,7 +158,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
       {/* ASISTENTE AGENDADOR (solo directores) — "agéndame una reunión a las
           3:30 con Vid Natur" → detecta correos de la marca y Google manda la
           invitación + recordatorio. */}
-      {esDirector && <AgendarReunionBox />}
+      {puedeAgendar && <AgendarReunionBox />}
 
       {agenda.grabError && (
         <div className="p-4 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
