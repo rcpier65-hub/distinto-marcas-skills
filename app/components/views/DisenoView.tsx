@@ -1331,7 +1331,7 @@ function NuevaTareaModal({
         const re = await crearEntregables({
           tareaId: r.data!.id, marcaSlug, tipo, plataformas: redes, slides: nSlides,
           items: [...entregables].sort((a, b) => a.fecha.localeCompare(b.fecha))
-            .map((e) => ({ publicacionId: e.publicacionId, fecha: e.fecha, titulo: e.titulo })),
+            .map((e) => ({ publicacionId: e.publicacionId, fecha: e.fecha, hora: e.hora, titulo: e.titulo })),
         })
         if (!re.ok) toast.error(`La tarea se creó, pero no sus ${tipoInfo?.label.toLowerCase() ?? 'entregables'}: ${re.error}`)
       }
@@ -1675,7 +1675,7 @@ function TipoDisenoChip({ tipos }: { tipos: string[] | null | undefined }) {
 }
 
 /* ===== Selector de días del calendario (entregables) ===== */
-type ItemEntregable = { key: string; fecha: string; publicacionId: string | null; titulo: string }
+type ItemEntregable = { key: string; fecha: string; hora?: string | null; publicacionId: string | null; titulo: string }
 
 function lunesDe(ymd: string): string {
   const d = new Date(ymd + 'T12:00:00Z'); const dow = (d.getUTCDay() + 6) % 7
@@ -1720,7 +1720,7 @@ function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, 
   }
   function alternarPub(p: PubCalendario) {
     if (elegidaPub.has(p.id)) onChange(items.filter((i) => i.publicacionId !== p.id))
-    else onChange([...items, { key: p.id, fecha: p.fecha, publicacionId: p.id, titulo: p.nombre }])
+    else onChange([...items, { key: p.id, fecha: p.fecha, hora: p.hora, publicacionId: p.id, titulo: p.nombre }])
   }
   const ordenados = [...items].sort((a, b) => a.fecha.localeCompare(b.fecha))
 
@@ -1739,6 +1739,7 @@ function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
           {dias.map((d, idx) => {
             const lista = porDia.get(d) ?? []
+            const ocupada = lista.some(p => !/hist|stor/i.test(p.tipo ?? ''))
             const nuevas = items.filter((i) => !i.publicacionId && i.fecha === d).length
             const pasado = d < hoy
             return (
@@ -1746,6 +1747,7 @@ function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, 
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: d === hoy ? '#6d5dfc' : '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
                   <span>{new Date(d + 'T12:00:00Z').toLocaleDateString('es-PE', { timeZone: 'UTC', weekday: 'narrow' })} {Number(d.slice(8))}</span>
                 </div>
+                {ocupada && <span style={{ fontSize: 9, color: '#0284c7', fontWeight: 700 }}>Publicación programada</span>}
                 {lista.map((p) => {
                   const on = elegidaPub.has(p.id)
                   const bloqueada = p.enlazada && !on
@@ -1753,9 +1755,9 @@ function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, 
                     <button key={p.id} type="button" disabled={bloqueada} onClick={() => alternarPub(p)}
                       title={bloqueada ? `${p.nombre} · ya tiene diseño asignado` : on ? 'Quitar' : `Diseñar: ${p.nombre}`}
                       style={{ textAlign: 'left', fontSize: 10, fontWeight: 600, lineHeight: 1.25, padding: '3px 5px', borderRadius: 6, cursor: bloqueada ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                        border: `1px solid ${on ? color : '#e8eaf0'}`, background: on ? `${color}14` : '#f8fafc', color: on ? color : bloqueada ? '#cbd5e1' : '#475569',
+                        border: `1px solid ${on ? color : '#e8eaf0'}`, background: on ? `${color}14` : /hist|stor/i.test(p.tipo ?? '') ? '#fdf2f8' : '#eff6ff', color: on ? color : bloqueada ? '#cbd5e1' : '#475569',
                         overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                      {on && '✓ '}{p.tipo ? `${p.tipo.toLowerCase().includes('stor') || p.tipo.toLowerCase().includes('histor') ? 'Hist' : p.tipo.slice(0, 4)} · ` : ''}{p.nombre}
+                      {on && '✓ '}{p.hora && `${p.hora} · `}{p.tipo ? `${p.tipo.toLowerCase().includes('stor') || p.tipo.toLowerCase().includes('histor') ? 'Hist' : p.tipo.slice(0, 4)} · ` : ''}{p.nombre}
                     </button>
                   )
                 })}
@@ -1775,7 +1777,7 @@ function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, 
         </div>
       </div>
       <p style={{ margin: 0, fontSize: 11.5, color: '#94a3b8' }}>
-        Toca una publicación que ya creó Lorena para enlazarla, o <b>+</b> para crear una nueva ese día.
+        Los días con publicación muestran una alerta azul para planificar historias. Toca una publicación que ya creó Lorena para enlazarla, o <b>+</b> para crear una nueva ese día.
       </p>
       {ordenados.length > 0 && (
         <div style={{ display: 'grid', gap: 6 }}>
@@ -1785,6 +1787,7 @@ function SelectorEntregables({ marcaSlug, marcaNombre, tipoLabel, color, items, 
               <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', width: 78, flexShrink: 0 }}>{fechaCorta(it.fecha)}</span>
               <input value={it.titulo} onChange={(e) => onChange(items.map((x) => x.key === it.key ? { ...x, titulo: e.target.value } : x))}
                 style={{ ...campo, height: 32, fontSize: 13, flex: 1, minWidth: 0 }} />
+              <input type="time" aria-label={`Hora de publicación de ${it.titulo}`} value={it.hora ?? ''} onChange={(e) => onChange(items.map(x => x.key === it.key ? { ...x, hora: e.target.value } : x))} style={{ ...campo, width: 100, height: 32 }} />
               {it.publicacionId && <span title="Enlazada a la publicación que ya existe" style={{ color: '#10b981', display: 'inline-flex' }}><IcoLink size={15} /></span>}
               <button type="button" onClick={() => onChange(items.filter((x) => x.key !== it.key))} aria-label="Quitar" className="mk-modal-x"
                 style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><IcoBorrar size={14} /></button>

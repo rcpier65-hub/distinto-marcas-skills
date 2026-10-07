@@ -104,6 +104,11 @@ export function TareasView({
   const claveFiltros = `tareas-filtros:${meId ?? 'yo'}`
   const filtrosRestaurados = useRef(false)
   useEffect(() => {
+    const refresh = () => router.refresh()
+    window.addEventListener('distinto-timer', refresh)
+    return () => window.removeEventListener('distinto-timer', refresh)
+  }, [router])
+  useEffect(() => {
     if (filtrosRestaurados.current) return
     filtrosRestaurados.current = true
     try {
@@ -782,7 +787,7 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
         </div>
         {/* Cronómetro + fecha de entrega */}
         <div style={{ height: 1, background: '#f1f3f7', margin: '9px -11px 0' }} />
-        <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><PlanChips tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} /></fieldset>
+        <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><PlanChips key={`${tarea.id}:${planInfo?.estado}:${planInfo?.enProcesoDesde}:${planInfo?.tiempoSeg}`} tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} /></fieldset>
       </div>
       <style>{'.mk-tarea-card:hover{box-shadow:0 6px 18px rgba(15,23,42,0.08)!important}.mk-btn-lista:hover:not(:disabled){background:#dcfce7!important}.mk-btn-mas:hover:not(:disabled){background:#f1f5f9!important;color:#0f172a!important}@keyframes mkVivo{0%,100%{opacity:1}50%{opacity:.3}}.mk-dot-vivo{animation:mkVivo 1.2s ease-in-out infinite}'}</style>
       {menu && (
@@ -887,6 +892,7 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
     const r = await iniciarTarea(tareaId)
     setCargando(false)
     if (!r.ok) { setEstado(antes.estado); setDesde(antes.desde); toast.error(r.error); return }
+    window.dispatchEvent(new Event('distinto-timer'))
     onCambio?.()
   }
   async function pausar() {
@@ -897,12 +903,14 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
     const r = await pausarTarea(tareaId)
     setCargando(false)
     if (!r.ok) { setDesde(antes); toast.error(r.error); return }
+    window.dispatchEvent(new Event('distinto-timer'))
     onCambio?.()
   }
   async function desarchivar() {
     setEstado('sin_empezar')
     const r = await setEstadoTarea(tareaId, 'sin_empezar')
     if (!r.ok) { setEstado('archivado'); toast.error(r.error); return }
+    window.dispatchEvent(new Event('distinto-timer'))
     onCambio?.()
   }
 
@@ -912,6 +920,7 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
     setCargando(false)
     if (!r.ok) { toast.error(r.error); return }
     setEditFechas(false)
+    window.dispatchEvent(new Event('distinto-timer'))
     onCambio?.()
   }
 

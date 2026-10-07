@@ -62,6 +62,7 @@ export default async function PublicarHoyPage({ searchParams }: { searchParams: 
     id, nombre, copy, notas, fecha_publicacion, estado, plataformas, publicado_at,
     enlace_musica, portada_editada_url, portada_cruda_url,
     video_con_musica_url, video_sin_musica_url,
+    tipo_contenido, enlace_tomas, drive_resultado_url, carrusel_slides, hora_publicacion,
     editado, iniciado_edicion_at, editado_at,
     marca:marcas(slug, nombre, emoji_marca, color_primario_hex)
   `
@@ -85,6 +86,10 @@ export default async function PublicarHoyPage({ searchParams }: { searchParams: 
         hora = r.fecha_publicacion.split('T')[1]?.slice(0, 5) ?? null
       }
       return {
+        tipo: (r.tipo_contenido ?? [])[0] ?? null,
+        material: r.enlace_tomas ?? null,
+        resultado: r.drive_resultado_url ?? null,
+        slides: Array.isArray(r.carrusel_slides) ? r.carrusel_slides : [],
         id: r.id as string,
         marcaSlug: (m?.slug ?? '') as string,
         marcaNombre: (m?.nombre ?? 'Marca') as string,
@@ -102,7 +107,7 @@ export default async function PublicarHoyPage({ searchParams }: { searchParams: 
         portada: (r.portada_editada_url ?? r.portada_cruda_url ?? null) as string | null,
         enlaceMusica: (r.enlace_musica ?? null) as string | null,
         redes: normalizeRedes(r.plataformas),
-        hora,
+        hora: r.hora_publicacion?.slice(0, 5) ?? hora,
       }
     })
 

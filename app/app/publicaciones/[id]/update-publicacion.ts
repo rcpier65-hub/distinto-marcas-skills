@@ -38,6 +38,8 @@ export type UpdatePublicacionInput = {
   editor_nombre?: string | null
   editor_id?: string | null
   opcion_2?: string | null
+  hora_publicacion?: string | null
+  indicaciones_edicion?: string | null
   notas?: string | null
   motivo_pausa?: string | null
 }
@@ -48,6 +50,7 @@ export async function updatePublicacion(
   id: string,
   input: UpdatePublicacionInput,
 ): Promise<ActionResult> {
+  if (input.hora_publicacion && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(input.hora_publicacion)) return { ok: false, error: 'Hora inválida' }
   const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any

@@ -165,6 +165,7 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
             <NavItem href="/planes" icon={<PlanesIcon />} label="Planes" active={isActive('/planes')} shortcut="P" />
           )}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
+          <NavItem href="/recordatorios" icon={<NoteIcon />} label="Recordatorios" active={isActive('/recordatorios')} />
           {puede('publicaciones') && (
             <NavItem href="/publicaciones" icon={<CalendarIcon />} label="Publicaciones"  active={isActive('/publicaciones')} shortcut="3" />
           )}

@@ -829,6 +829,7 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
   const router = useRouter()
   const marca = useMarcasNav().find((m) => m.slug === pub.marcaSlug)
   const editor = editorFromPub(pub)
+  const chipColor = pub.tipo === 'story' ? '#db2777' : (marca?.color ?? '#7170ff')
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
   /* Drag-and-drop: el chip es la fuente. Al soltarlo sobre otro día, la celda
      lee este id y llama la action que cambia la fecha. */
@@ -855,8 +856,8 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
         textAlign: 'left',
         padding: variant === 'full' ? '6px 8px' : '4px 7px',
         /* marginBottom removido — el gap del contenedor padre ya lo aporta */
-        background: `${marca?.color}22`,
-        borderLeft: `3px solid ${marca?.color}`,
+        background: `${chipColor}22`,
+        borderLeft: `3px solid ${chipColor}`,
         borderTop: '1px solid transparent',
         borderRight: '1px solid transparent',
         borderBottom: '1px solid transparent',
@@ -868,16 +869,16 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
         transition: 'all var(--mk-dur-fast) var(--mk-ease-out)',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = `${marca?.color}3a`
-        e.currentTarget.style.borderColor = `${marca?.color}77`
-        e.currentTarget.style.borderLeftColor = marca?.color ?? ''
-        e.currentTarget.style.boxShadow = `0 0 0 1px ${marca?.color}55, 0 4px 12px ${marca?.color}40`
+        e.currentTarget.style.background = `${chipColor}3a`
+        e.currentTarget.style.borderColor = `${chipColor}77`
+        e.currentTarget.style.borderLeftColor = chipColor
+        e.currentTarget.style.boxShadow = `0 0 0 1px ${chipColor}55, 0 4px 12px ${chipColor}40`
         e.currentTarget.style.transform = 'translateY(-1px)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = `${marca?.color}22`
+        e.currentTarget.style.background = `${chipColor}22`
         e.currentTarget.style.borderColor = 'transparent'
-        e.currentTarget.style.borderLeftColor = marca?.color ?? ''
+        e.currentTarget.style.borderLeftColor = chipColor
         e.currentTarget.style.boxShadow = 'none'
         e.currentTarget.style.transform = 'translateY(0)'
       }}
@@ -889,6 +890,7 @@ function PubChip({ pub, variant, canDrag = false }: { pub: PublicacionMock; vari
            que no se vea desordenado". Sin caption acá (va en semana/detalle);
            en el mes lo que importa es hora + marca + título. */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {pub.tipoDefinido && <TipoChip tipo={pub.tipo} />}
           {/* Línea 1: hora + marca */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ fontSize: 10.5, color: 'var(--mk-text-primary)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, flexShrink: 0 }}>

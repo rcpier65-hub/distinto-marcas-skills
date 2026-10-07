@@ -301,6 +301,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
     editor_id: initial.editor_id ?? '',
     opcion_2: initial.opcion_2 ?? '',
     notas: initial.notas ?? '',
+    hora_publicacion: initial.hora_publicacion?.slice(0, 5) ?? '',
+    indicaciones_edicion: initial.indicaciones_edicion ?? '',
   })
 
   const [checklist, setChecklist] = useState({
@@ -457,6 +459,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
       editor_id: f.editor_id || null,
       opcion_2: f.opcion_2 || null,
       notas: f.notas || null,
+      hora_publicacion: f.hora_publicacion || null,
+      indicaciones_edicion: f.indicaciones_edicion || null,
     }
   }
 
@@ -534,6 +538,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         editor_id: form.editor_id || null,
         opcion_2: form.opcion_2 || null,
         notas: form.notas || null,
+        hora_publicacion: form.hora_publicacion || null,
+        indicaciones_edicion: form.indicaciones_edicion || null,
       })
       if (result.ok) {
         toast.success('Cambios guardados ✓')
@@ -569,6 +575,8 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         editor_id: form.editor_id || null,
         opcion_2: form.opcion_2 || null,
         notas: form.notas || null,
+        hora_publicacion: form.hora_publicacion || null,
+        indicaciones_edicion: form.indicaciones_edicion || null,
       })
       if (result.ok) {
         setForm((s) => ({ ...s, estado: 'aprobar' }))
@@ -1005,6 +1013,41 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         </div>
       </div>
 
+      <section className="rounded-xl border border-purple-200 bg-purple-50/40 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Espacio del editor</h2>
+          <button type="button" onClick={() => document.getElementById('referencias-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="inline-flex items-center gap-1 text-sm text-purple-700"><Film size={16} /> Referencias</button>
+        </div>
+        <label className="block text-sm font-medium">Indicaciones para edición
+          <textarea value={form.indicaciones_edicion} onChange={e => setForm(s => ({ ...s, indicaciones_edicion: e.target.value }))} rows={6} className="mt-2 w-full rounded-lg border bg-background p-3 text-sm resize-y" placeholder="Ritmo, cortes, textos en pantalla, subtítulos, estilo, correcciones y detalles para el editor…" />
+        </label>
+        {form.enlace_tomas && <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="text-sm underline">Abrir material para editar en Drive</a>}
+        {/* REFERENCIAS DE VIDEO — links a videos de ejemplo/inspiración para
+            que el editor sepa qué estilo o referencia seguir. Pedro 15-jun-2026:
+            "en cada tarea una opción para poner referencias de videos". Se
+            guarda en la columna `opcion_2` (estaba libre). */}
+        <Card id="referencias-editor">
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 px-4 py-3 border-b">
+              <Film className="w-4 h-4 text-[#ba41f7]" />
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide">Referencias de video</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Links de videos de ejemplo o inspiración para el editor (uno por línea).
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={form.opcion_2 ?? ''}
+              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
+              placeholder="Pega aquí links de referencia (TikTok, Drive, YouTube…), uno por línea. Ej: https://www.tiktok.com/@…"
+              rows={3}
+              className="w-full px-4 py-3 text-[13px] leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
+              spellCheck={false}
+            />
+          </CardContent>
+        </Card>
+
+      </section>
       {/* COPY + WORKFLOW LATERAL: el Card del copy ahora tiene un
           sidebar izquierdo (180px) con el progreso del workflow.
           Permite a Pedro ver el avance mientras edita el copy.
@@ -1147,6 +1190,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                   />
                 </div>
 
+                <label className="block text-[10px] text-muted-foreground">Hora de publicación (Lima)
+                  <input type="time" value={form.hora_publicacion} onChange={e => setForm(s => ({ ...s, hora_publicacion: e.target.value }))} className="w-full h-9 rounded-lg border px-3 text-xs" />
+                </label>
                 {/* Edición */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
@@ -1784,32 +1830,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
           </div>{/* Fin flex wrapper Card del copy */}
         </Card>
 
-        {/* REFERENCIAS DE VIDEO — links a videos de ejemplo/inspiración para
-            que el editor sepa qué estilo o referencia seguir. Pedro 15-jun-2026:
-            "en cada tarea una opción para poner referencias de videos". Se
-            guarda en la columna `opcion_2` (estaba libre). */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 px-4 py-3 border-b">
-              <Film className="w-4 h-4 text-[#ba41f7]" />
-              <div>
-                <h3 className="text-sm font-semibold uppercase tracking-wide">Referencias de video</h3>
-                <p className="text-[10px] text-muted-foreground">
-                  Links de videos de ejemplo o inspiración para el editor (uno por línea).
-                </p>
-              </div>
-            </div>
-            <textarea
-              value={form.opcion_2 ?? ''}
-              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
-              placeholder="Pega aquí links de referencia (TikTok, Drive, YouTube…), uno por línea. Ej: https://www.tiktok.com/@…"
-              rows={3}
-              className="w-full px-4 py-3 text-[13px] leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
-              spellCheck={false}
-            />
-          </CardContent>
-        </Card>
-
         {/* INDICACIONES DE PUBLICACIÓN — Lorena escribe acá las notas/
             recomendaciones para quien publica (Ruth). Aparecen como "Paso 5"
             en /publicaciones/publicar-hoy. Se guarda en la columna `notas`
@@ -2084,9 +2104,9 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
               ↗ Abrir carpeta del carrusel en Drive
             </a>
           )}
-          {!esCarrusel && previewMode === 'drive' && form.enlace_tomas && (
+          {form.enlace_tomas && (
             <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-blue-600 hover:underline">
-              ↗ Abrir carpeta de tomas en Drive
+              ↗ Abrir material para editar en Drive
             </a>
           )}
 

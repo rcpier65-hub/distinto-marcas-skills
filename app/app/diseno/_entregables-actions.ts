@@ -30,6 +30,7 @@ export type PubCalendario = {
   id: string
   nombre: string
   fecha: string
+  hora: string | null
   tipo: string | null
   enlazada: boolean   // ya tiene una tarea de diseño asignada
 }
@@ -40,6 +41,7 @@ export type Entregable = {
   titulo: string
   fecha: string | null
   link: string | null
+  hora: string | null
   listoAt: string | null
   publicacionId: string | null
   /* Carrusel: un link por slide, EN ORDEN ('' = falta). null si no es carrusel. */
@@ -57,6 +59,7 @@ function refrescar(tareaId?: string) {
   revalidatePath('/diseno')
   if (tareaId) revalidatePath(`/diseno/${tareaId}`)
   revalidatePath('/publicaciones')
+  revalidatePath('/publicaciones/publicar-hoy')
 }
 
 /* Calendario de publicaciones de una marca (para elegir los días al crear). */
@@ -68,10 +71,10 @@ export async function calendarioMarcaParaDiseno(marcaSlug: string, desde: string
   const { data: marca } = await service.from('marcas').select('id').eq('slug', marcaSlug).maybeSingle()
   if (!marca) return { ok: false, error: 'Marca no encontrada' }
   const { data, error } = await service.from('publicaciones')
-    .select('id, nombre, fecha_publicacion, tipo_contenido')
+    .select('id, nombre, fecha_publicacion, hora_publicacion, tipo_contenido')
     .eq('marca_id', marca.id)
     .gte('fecha_publicacion', desde)
-    .lte('fecha_publicacion', `${hasta}T23:59:59`)
+    .lte('fecha_publicacion', hasta)
     .is('archived_at', null)
     .order('fecha_publicacion', { ascending: true })
     .limit(200)
@@ -91,6 +94,7 @@ export async function calendarioMarcaParaDiseno(marcaSlug: string, desde: string
       id: r.id as string,
       nombre: (r.nombre ?? '(sin título)') as string,
       fecha: String(r.fecha_publicacion).slice(0, 10),
+      hora: r.hora_publicacion?.slice(0, 5) ?? null,
       tipo: (Array.isArray(r.tipo_contenido) && r.tipo_contenido[0]) ? String(r.tipo_contenido[0]) : null,
       enlazada: enlazadas.has(r.id),
     })),
@@ -104,7 +108,7 @@ export async function crearEntregables(input: {
   marcaSlug: string
   tipo: TipoEntregable
   plataformas: string[]
-  items: { publicacionId?: string | null; fecha: string; titulo: string }[]
+  items: { publicacionId?: string | null; fecha: string; hora?: string | null; titulo: string }[]
   /* Carrusel: cuántos slides lleva cada uno. */
   slides?: number
 }): Promise<{ ok: true; creados: number } | Err> {
@@ -112,6 +116,7 @@ export async function crearEntregables(input: {
   const service = createServiceClient() as Service
   if (!(await miembroActivo(service, user.id))) return { ok: false, error: 'No autorizado' }
   if (!VALOR_TIPO[input.tipo]) return { ok: false, error: 'Tipo inválido' }
+  if ((input.items ?? []).some(i => i.hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(i.hora))) return { ok: false, error: 'Hora inválida' }
   const items = (input.items ?? []).filter((i) => /^\d{4}-\d{2}-\d{2}$/.test(i.fecha)).slice(0, 31)
   if (items.length === 0) return { ok: false, error: 'Elige al menos un día' }
 
@@ -136,6 +141,7 @@ export async function crearEntregables(input: {
       if (pub && pub.marca_id === marca.id) {
         pubId = pub.id
         const upd: Record<string, unknown> = { updated_by: user.id }
+        if (it.hora !== undefined) upd.hora_publicacion = it.hora || null
         if (!Array.isArray(pub.tipo_contenido) || pub.tipo_contenido.length === 0) upd.tipo_contenido = [valor]
         /* Queda "Diseñando" mientras Ailyn la trabaja (si aún no avanzó más). */
         if (ESTADOS_PREVIOS.includes(pub.estado)) upd.estado = 'disenando'
@@ -147,6 +153,7 @@ export async function crearEntregables(input: {
         marca_id: marca.id,
         nombre: titulo,
         fecha_publicacion: it.fecha,
+        hora_publicacion: it.hora || null,
         estado: 'disenando',
         plataformas,
         tipo_contenido: [valor],
@@ -172,7 +179,7 @@ export async function listarEntregables(tareaId: string): Promise<{ ok: true; en
   const service = createServiceClient() as Service
   if (!(await miembroActivo(service, user.id))) return { ok: false, error: 'No autorizado' }
   const { data, error } = await service.from('diseno_entregables')
-    .select('id, orden, titulo, fecha, link, listo_at, publicacion_id, slides').eq('tarea_id', tareaId).order('orden')
+    .select('id, orden, titulo, fecha, link, listo_at, publicacion_id, slides, publicacion:publicaciones!publicacion_id(hora_publicacion)').eq('tarea_id', tareaId).order('orden')
   if (error) return { ok: false, error: error.message }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { ok: true, entregables: ((data ?? []) as any[]).map(filaAEntregable) }
@@ -182,6 +189,7 @@ export async function listarEntregables(tareaId: string): Promise<{ ok: true; en
 function filaAEntregable(r: any): Entregable {
   return {
     id: r.id, orden: r.orden, titulo: r.titulo ?? '', fecha: r.fecha ?? null,
+    hora: (Array.isArray(r.publicacion) ? r.publicacion[0] : r.publicacion)?.hora_publicacion?.slice(0, 5) ?? null,
     link: r.link ?? null, listoAt: r.listo_at ?? null, publicacionId: r.publicacion_id ?? null,
     slides: Array.isArray(r.slides) ? (r.slides as unknown[]).map((x) => String(x ?? '')) : null,
   }
@@ -216,8 +224,9 @@ export async function guardarSlides(id: string, slides: string[]): Promise<{ ok:
 }
 
 /* Guardar el título y/o el link de UN entregable (se refleja en su publicación). */
-export async function guardarEntregable(id: string, patch: { titulo?: string; link?: string | null }): Promise<{ ok: true } | Err> {
+export async function guardarEntregable(id: string, patch: { titulo?: string; link?: string | null; hora?: string | null }): Promise<{ ok: true } | Err> {
   const user = await requireUser()
+  if (patch.hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(patch.hora)) return { ok: false, error: 'Hora inválida' }
   const service = createServiceClient() as Service
   if (!(await miembroActivo(service, user.id))) return { ok: false, error: 'No autorizado' }
   const { data: e } = await service.from('diseno_entregables').select('id, tarea_id, publicacion_id').eq('id', id).maybeSingle()
@@ -237,11 +246,18 @@ export async function guardarEntregable(id: string, patch: { titulo?: string; li
     pubUpd.drive_resultado_url = l || null
     if (!l) upd.listo_at = null
   }
-  if (Object.keys(upd).length === 0) return { ok: true }
-  const { error } = await service.from('diseno_entregables').update(upd).eq('id', id)
-  if (error) return { ok: false, error: error.message }
+  if (patch.hora !== undefined) {
+    if (!e.publicacion_id) return { ok: false, error: 'El entregable no tiene publicación enlazada' }
+    pubUpd.hora_publicacion = patch.hora || null
+  }
+  if (Object.keys(upd).length === 0 && Object.keys(pubUpd).length === 0) return { ok: true }
+  if (Object.keys(upd).length > 0) {
+    const { error } = await service.from('diseno_entregables').update(upd).eq('id', id)
+    if (error) return { ok: false, error: error.message }
+  }
   if (e.publicacion_id && Object.keys(pubUpd).length > 0) {
-    await service.from('publicaciones').update({ ...pubUpd, updated_by: user.id }).eq('id', e.publicacion_id)
+    const { error } = await service.from('publicaciones').update({ ...pubUpd, updated_by: user.id }).eq('id', e.publicacion_id)
+    if (error) return { ok: false, error: error.message }
   }
   refrescar(e.tarea_id)
   return { ok: true }

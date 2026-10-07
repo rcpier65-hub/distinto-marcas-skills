@@ -22,6 +22,7 @@ import { CommandPalette } from './CommandPalette'
 import { RealtimeBridge } from '@/lib/realtime/realtime-bridge'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 import { NotificationBell } from './NotificationBell'
+import { PendientesFlotantes } from './PendientesFlotantes'
 import { ChatFlotante } from './ChatFlotante'
 import { SonidosBridge } from './SonidosBridge'
 import { AvisoReunion } from './AvisoReunion'
@@ -185,6 +186,7 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
 
       {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
       <ChatFlotante />
+      {permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} />}
       <SonidosBridge />
       {/* "¿Transcribimos?" cuando empieza una reunión (estilo Granola). */}
       <AvisoReunion />

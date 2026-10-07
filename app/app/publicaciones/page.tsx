@@ -57,6 +57,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       id: string
       nombre: string
       fecha_publicacion: string | null
+      hora_publicacion?: string | null
       estado: string | null
       plataformas: string[] | null
       tipo_contenido: string[] | null
@@ -71,7 +72,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       marca: { slug: string } | { slug: string }[] | null
     }
     const FULL_COLS = `
-        id, nombre, fecha_publicacion, estado,
+        id, nombre, fecha_publicacion, hora_publicacion, estado,
         plataformas, tipo_contenido, copy, editor_id,
         copy_listo, portada_lista, editado,
         iniciado_edicion_at, editado_at,
@@ -79,7 +80,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         marca:marcas(slug)
       `
     const BASE_COLS = `
-        id, nombre, fecha_publicacion, estado,
+        id, nombre, fecha_publicacion, hora_publicacion, estado,
         plataformas, tipo_contenido, copy, editor_id,
         editor:editores(nombre),
         marca:marcas(slug)
@@ -106,7 +107,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       const redes = (r.plataformas ?? []).map(normalizeRed).filter(Boolean) as Red[]
       const tipo = normalizeTipo((r.tipo_contenido ?? [])[0])
       let fecha = new Date().toISOString().slice(0, 10)
-      let hora = '12:00'
+      let hora = r.hora_publicacion?.slice(0, 5) ?? '—'
       if (r.fecha_publicacion) {
         const parts = r.fecha_publicacion.split('T')
         fecha = parts[0]

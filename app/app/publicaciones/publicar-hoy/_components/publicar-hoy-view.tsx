@@ -23,6 +23,10 @@ export type PublicarHoyItem = {
   marcaColor: string
   marcaEmoji: string | null
   titulo: string
+  tipo: string | null
+  material: string | null
+  resultado: string | null
+  slides: string[]
   copy: string | null
   indicaciones: string | null
   frase: string | null
@@ -196,6 +200,9 @@ function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
   const videoCM = urlOk(item.videoConMusica)
   const videoSM = urlOk(item.videoSinMusica)
   const portada = urlOk(item.portada)
+  const tipo = (item.tipo ?? '').toLowerCase()
+  const esImagen = /post|carrusel|imagen/.test(tipo) && !/video/.test(tipo)
+  const tipoLabel = item.frase ? 'Video con frase' : /hist|stor/.test(tipo) ? 'Historia' : /carrusel/.test(tipo) ? 'Carrusel' : esImagen ? 'Post' : /reel/.test(tipo) ? 'Reel' : item.tipo || 'Contenido sin tipo'
   const musica = urlOk(item.enlaceMusica)
 
   async function copiarCopy() {
@@ -217,6 +224,7 @@ function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
         <MarcaLogo slug={item.marcaSlug} nombre={item.marcaNombre} emoji={item.marcaEmoji} size={40} />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-[14px] leading-tight truncate group-hover:underline">{item.titulo}</p>
+          <span className="inline-flex mt-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-bold text-purple-700">{tipoLabel}</span>
           <p className="text-[12px] leading-tight truncate mt-0.5">
             <span style={{ color: item.marcaColor, fontWeight: 600 }}>{item.marcaNombre}</span>
             {item.hora && <span className="text-muted-foreground"> · {item.hora}</span>}
@@ -229,7 +237,7 @@ function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
       </a>
 
       <div className="p-4 space-y-2.5 flex-1">
-        <Paso n={1} label="Descargar video" icon={<Film className="w-4 h-4" />}>
+        <Paso n={1} label={esImagen ? 'Material de publicación' : 'Video y material'} icon={<Film className="w-4 h-4" />}>
           {item.editando && (
             <div className="flex items-center gap-1.5 mb-2 text-[12.5px] font-semibold" style={{ color: '#0891b2' }}>
               <span className="mk-anim-editing inline-flex"><Scissors className="w-4 h-4" /></span>
@@ -237,8 +245,12 @@ function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
             </div>
           )}
           <div className="flex gap-2 flex-wrap">
-            <LinkBtn href={videoCM} icon={<Music className="w-3.5 h-3.5" />} label="Con música" color="#16a34a" />
-            <LinkBtn href={videoSM} icon={<Download className="w-3.5 h-3.5" />} label="Sin música" color="#2563eb" />
+            {!esImagen && videoCM && <LinkBtn href={videoCM} icon={<Music className="w-3.5 h-3.5" />} label="Con música" color="#16a34a" />}
+            {!esImagen && videoSM && <LinkBtn href={videoSM} icon={<Download className="w-3.5 h-3.5" />} label="Sin música" color="#2563eb" />}
+            {item.resultado && <LinkBtn href={urlOk(item.resultado)} icon={<ExternalLink className="w-3.5 h-3.5" />} label="Abrir diseño terminado" color="#0284c7" />}
+            {item.material && <LinkBtn href={urlOk(item.material)} icon={<ExternalLink className="w-3.5 h-3.5" />} label="Abrir material para editar (Drive)" color="#9333ea" />}
+            {item.slides.map((u, i) => u && <LinkBtn key={i} href={urlOk(u)} icon={<ImageIcon className="w-3.5 h-3.5" />} label={`Slide ${i + 1}`} color="#0d9488" />)}
+            {!videoCM && !videoSM && !item.resultado && !item.material && !item.slides.some(Boolean) && <span className="text-xs text-muted-foreground">Material pendiente de subir.</span>}
           </div>
         </Paso>
 
@@ -256,9 +268,9 @@ function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
           {item.copy && <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 whitespace-pre-wrap">{item.copy}</p>}
         </Paso>
 
-        <Paso n={4} label="Música (TikTok)" icon={<Music className="w-4 h-4" />}>
+        {!esImagen && <Paso n={4} label="Música (TikTok)" icon={<Music className="w-4 h-4" />}>
           <LinkBtn href={musica ?? 'https://www.tiktok.com'} icon={<Music className="w-3.5 h-3.5" />} label={musica ? 'Abrir audio' : 'Abrir TikTok'} color="#ec4899" />
-        </Paso>
+        </Paso>}
 
         <Paso n={5} label="Indicaciones (de Lorena)" icon={<StickyNote className="w-4 h-4" />} last={!(item.frase && item.frase.trim())}>
           {item.indicaciones && item.indicaciones.trim() ? (

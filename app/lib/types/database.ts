@@ -321,6 +321,8 @@ export interface PublicacionRow {
   editor_nombre: string | null
   editor_id: string | null
   estado_tarea: EstadoTarea
+  hora_publicacion?: string | null
+  indicaciones_edicion?: string | null
   opcion_2: string | null
   notion_original_id: string | null
   notion_url: string | null
@@ -581,6 +583,12 @@ export type MarcaFactsUpdate = Partial<Omit<MarcaFactsRow, 'marca_id' | 'created
 export interface Database {
   public: {
     Tables: {
+      recordatorios: {
+        Row: { id: string; auth_user_id: string; texto: string; listo: boolean; created_at: string }
+        Insert: { id?: string; auth_user_id: string; texto: string; listo?: boolean; created_at?: string }
+        Update: { texto?: string; listo?: boolean }
+        Relationships: []
+      }
       propuestas_comerciales: {
         Row: { id: string; numero: number; created_by: string; data: Json; revision: number; created_at: string; updated_at: string }
         Insert: { id: string; created_by: string; data: Json; revision?: number; created_at?: string; updated_at?: string }

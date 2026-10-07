@@ -95,7 +95,7 @@ export function EntregablesPanel({ tipo, iniciales }: { tipo: string; iniciales:
   function editarLocal(id: string, patch: Partial<Entregable>) {
     setItems((cur) => cur.map((e) => (e.id === id ? { ...e, ...patch } : e)))
   }
-  async function guardar(e: Entregable, patch: { titulo?: string; link?: string | null }) {
+  async function guardar(e: Entregable, patch: { titulo?: string; link?: string | null; hora?: string | null }) {
     setGuardando(e.id)
     const r = await guardarEntregable(e.id, patch)
     setGuardando(null)
@@ -179,6 +179,9 @@ export function EntregablesPanel({ tipo, iniciales }: { tipo: string; iniciales:
                     onBlur={(ev) => void guardar(e, { titulo: ev.target.value })}
                     placeholder="Título"
                     style={{ height: 30, fontSize: 13, fontWeight: 600, padding: '0 9px', borderRadius: 8, border: '1px solid #e2e8f0', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }} />
+                  {e.publicacionId && <label style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8 }}>Hora de publicación (Lima)
+                    <input type="time" aria-label={`Hora de publicación de ${e.titulo}`} value={e.hora ?? ''} disabled={guardando === e.id} onClick={ev => ev.stopPropagation()} onChange={ev => editarLocal(e.id, { hora: ev.target.value })} onBlur={ev => void guardar(e, { hora: ev.target.value || null })} style={{ height: 30, border: '1px solid #e2e8f0', borderRadius: 8, padding: '0 8px' }} />
+                  </label>}
                   {e.slides ? (
                     <SlidesEditor
                       slides={e.slides} color={ui.color}
