@@ -1,0 +1,7 @@
+# Archivo local de Pedro: no forma parte de la aplicación.
+Reporte-TypHouse-Septiembre-2026-muestra.pdf
+# Credenciales y artefactos locales.
+app/.env.local
+app/.env.*.local
+**/node_modules/**
+**/.next/**
