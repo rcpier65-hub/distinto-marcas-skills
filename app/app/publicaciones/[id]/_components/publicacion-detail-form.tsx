@@ -16,7 +16,7 @@ import {
   Copy as CopyIcon, Trash2, Lightbulb, StickyNote, Sparkles,
   Download, Video as VideoIcon, Check, Pencil, ChevronDown,
   Volume2, VolumeX, Maximize2, X, Table2, Type as TypeIcon,
-  Link as LinkIcon, Mic, SlidersHorizontal, ChevronLeft, ChevronRight,
+  Link as LinkIcon, Mic, SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink,
   Clapperboard as IcoReel, CircleFadingPlus as IcoHistoria, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -1013,41 +1013,6 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
         </div>
       </div>
 
-      <section className="rounded-xl border border-purple-200 bg-purple-50/40 p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Espacio del editor</h2>
-          <button type="button" onClick={() => document.getElementById('referencias-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="inline-flex items-center gap-1 text-sm text-purple-700"><Film size={16} /> Referencias</button>
-        </div>
-        <label className="block text-sm font-medium">Indicaciones para edición
-          <textarea value={form.indicaciones_edicion} onChange={e => setForm(s => ({ ...s, indicaciones_edicion: e.target.value }))} rows={6} className="mt-2 w-full rounded-lg border bg-background p-3 text-sm resize-y" placeholder="Ritmo, cortes, textos en pantalla, subtítulos, estilo, correcciones y detalles para el editor…" />
-        </label>
-        {form.enlace_tomas && <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer" className="text-sm underline">Abrir material para editar en Drive</a>}
-        {/* REFERENCIAS DE VIDEO — links a videos de ejemplo/inspiración para
-            que el editor sepa qué estilo o referencia seguir. Pedro 15-jun-2026:
-            "en cada tarea una opción para poner referencias de videos". Se
-            guarda en la columna `opcion_2` (estaba libre). */}
-        <Card id="referencias-editor">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 px-4 py-3 border-b">
-              <Film className="w-4 h-4 text-[#ba41f7]" />
-              <div>
-                <h3 className="text-sm font-semibold uppercase tracking-wide">Referencias de video</h3>
-                <p className="text-[10px] text-muted-foreground">
-                  Links de videos de ejemplo o inspiración para el editor (uno por línea).
-                </p>
-              </div>
-            </div>
-            <textarea
-              value={form.opcion_2 ?? ''}
-              onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
-              placeholder="Pega aquí links de referencia (TikTok, Drive, YouTube…), uno por línea. Ej: https://www.tiktok.com/@…"
-              rows={3}
-              className="w-full px-4 py-3 text-[13px] leading-relaxed bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
-              spellCheck={false}
-            />
-          </CardContent>
-        </Card>
-
-      </section>
       {/* COPY + WORKFLOW LATERAL: el Card del copy ahora tiene un
           sidebar izquierdo (180px) con el progreso del workflow.
           Permite a Pedro ver el avance mientras edita el copy.
@@ -1822,6 +1787,65 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                 onChange={(e) => setForm((s) => ({ ...s, frase: e.target.value }))}
                 placeholder="Ej. ¿Mi hijo también podría tener TEA o TDAH? — la frase que aparece sobre el video. Si no tiene, déjalo vacío."
                 rows={2}
+                className="w-full px-4 pt-1 pb-3 text-[13px] leading-snug bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
+                spellCheck={false}
+              />
+            </div>
+
+            {/* ESPACIO DEL EDITOR — debajo del guion y la frase, mismo estilo
+                (Pedro 09-oct-2026: el bloque grande arriba desordenaba la vista). */}
+            <div className="border-t bg-background">
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
+                <Scissors className="w-3.5 h-3.5 text-[#ba41f7]" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Indicaciones para edición</span>
+                <span className="text-[10px] text-muted-foreground/60 normal-case">· para el editor</span>
+                {form.enlace_tomas && (
+                  <a href={form.enlace_tomas} target="_blank" rel="noopener noreferrer"
+                    className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-[#7c3aed] hover:underline">
+                    <FolderOpen className="w-3.5 h-3.5" /> Material en Drive
+                  </a>
+                )}
+              </div>
+              <textarea
+                value={form.indicaciones_edicion ?? ''}
+                onChange={(e) => setForm((s) => ({ ...s, indicaciones_edicion: e.target.value }))}
+                placeholder="Ritmo, cortes, textos en pantalla, subtítulos, estilo, correcciones…"
+                rows={Math.min(8, Math.max(2, (form.indicaciones_edicion ?? '').split('\n').length + 1))}
+                className="w-full px-4 pt-1 pb-3 text-[13px] leading-snug bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
+              />
+            </div>
+
+            {/* REFERENCIAS DE VIDEO — links de ejemplo para el editor, uno por
+                línea (columna `opcion_2`). Los links se pueden abrir con un clic. */}
+            <div id="referencias-editor" className="border-t bg-background">
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
+                <Film className="w-3.5 h-3.5 text-[#ba41f7]" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Referencias de video</span>
+                <span className="text-[10px] text-muted-foreground/60 normal-case">· un link por línea</span>
+              </div>
+              {(() => {
+                const links = (form.opcion_2 ?? '').split(/\s+/).filter((l) => /^https?:\/\//i.test(l))
+                return links.length > 0 && (
+                  <div className="px-4 pb-1.5 flex flex-wrap gap-1.5">
+                    {links.map((l, i) => {
+                      let host = l
+                      try { host = new URL(l).hostname.replace(/^www\./, '') } catch {}
+                      return (
+                        <a key={l + i} href={l} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 max-w-full rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-[11px] font-medium text-[#7c3aed] hover:bg-purple-100 transition-colors">
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          <span className="truncate">Ref {i + 1} · {host}</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+              <textarea
+                value={form.opcion_2 ?? ''}
+                onChange={(e) => setForm((s) => ({ ...s, opcion_2: e.target.value }))}
+                placeholder="Pega links de referencia (TikTok, Drive, YouTube…), uno por línea."
+                rows={Math.min(6, Math.max(2, (form.opcion_2 ?? '').split('\n').length + 1))}
                 className="w-full px-4 pt-1 pb-3 text-[13px] leading-snug bg-background border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-muted-foreground/40"
                 spellCheck={false}
               />
