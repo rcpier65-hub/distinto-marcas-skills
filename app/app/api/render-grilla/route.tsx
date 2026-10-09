@@ -162,7 +162,8 @@ export async function GET(request: Request) {
         '--disable-web-security',
       ],
       defaultViewport: { width: 1080, height: 1620, deviceScaleFactor: 1 },
-      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
+      /* En el VPS (Docker) se usa el Chromium del sistema; en Vercel, el pack. */
+      executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || await chromium.executablePath(CHROMIUM_PACK_URL),
       // headless: true (Chromium completo). 'shell' es chromium-headless-shell
       // que es más liviano pero NO renderiza correctamente algunos features
       // (gradients !important, ::first-letter, mix-blend-mode, drop-shadow filters).

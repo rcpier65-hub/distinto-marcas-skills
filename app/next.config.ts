@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   // la URL única del deploy; en local, 'dev' (no auto-recarga).
   env: {
     NEXT_PUBLIC_BUILD_ID:
-      process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || 'dev',
+      process.env.VERCEL_GIT_COMMIT_SHA || process.env.APP_BUILD_ID || process.env.VERCEL_URL || 'dev',
   },
 };
 

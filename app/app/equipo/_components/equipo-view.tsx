@@ -940,7 +940,7 @@ function TabSeguridad({
 
   /* URL canónica de la app — hardcoded para que el link siempre apunte
      a producción y no a un deploy preview con hash. */
-  const APP_URL = 'https://distinto-app.vercel.app'
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://distinto-app.vercel.app'
 
   function generarRandom() {
     /* Mismo charset pronunciable que el server. 12 chars. */

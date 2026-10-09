@@ -16,7 +16,7 @@ export type MarcaMini = { slug: string; nombre: string; emoji: string | null }
 export type AccesoCliente = { id: string; nombre: string; email: string; passwordInicial: string | null; creadoEl: string | null; marcaNombre: string; marcaSlug: string; marcaEmoji: string | null }
 
 const ACCENT = '#7170ff'
-const APP_URL = 'https://distinto-app.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://distinto-app.vercel.app'
 
 /* Clave legible y fuerte: 10 caracteres sin ambiguos (0/O, 1/l/I). */
 function generarClave(): string {

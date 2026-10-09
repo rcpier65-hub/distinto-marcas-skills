@@ -1,0 +1,7 @@
+# distinto-agencia — mismos horarios que vercel.json (en hora UTC)
+0 13 * * * /docker/distinto-agencia/cron.sh /api/cron/morning-fetch
+30 13 * * * /docker/distinto-agencia/cron.sh /api/cron/dispatch-routine
+0 14 * * * /docker/distinto-agencia/cron.sh /api/cron/recordatorio-fechas
+0 22 * * * /docker/distinto-agencia/cron.sh /api/cron/recordatorio-publicar
+0 11 * * * /docker/distinto-agencia/cron.sh /api/cron/sync-calendario
+0 12 1,2 * * /docker/distinto-agencia/cron.sh /api/cron/reporte-mensual

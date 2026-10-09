@@ -131,7 +131,7 @@ export async function GET(request: Request) {
       `  ❌ "no ${marca.slug}" → cancelar`,
       `  🔄 "redo ${marca.slug}" → regenerar`,
       ``,
-      `Dashboard: https://distinto-app.vercel.app/marca/${marca.slug}`,
+      `Dashboard: ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://distinto-app.vercel.app'}/marca/${marca.slug}`,
     ]
       .filter(Boolean)
       .join('\n')

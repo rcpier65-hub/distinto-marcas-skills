@@ -1,0 +1,27 @@
+# App de la agencia en el KVM 4 → https://app.distintostudio.com
+# (No confundir con /docker/distinto, que es otra app.)
+services:
+  app:
+    image: distinto-agencia:prod
+    container_name: distinto-agencia
+    restart: unless-stopped
+    env_file: ./app.env
+    ports:
+      - "127.0.0.1:8120:3000"
+    # Tope de recursos para no quitarle rendimiento a las otras apps del VPS.
+    cpus: "2.0"
+    mem_limit: 2g
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=distinto-agencia_default"
+      - "traefik.http.routers.distinto-agencia.entrypoints=websecure"
+      - "traefik.http.routers.distinto-agencia.rule=Host(`app.distintostudio.com`)"
+      - "traefik.http.routers.distinto-agencia.tls.certresolver=letsencrypt"
+      - "traefik.http.services.distinto-agencia.loadbalancer.server.port=3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+    security_opt:
+      - no-new-privileges:true
