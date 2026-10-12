@@ -61,9 +61,11 @@ export async function getNotificaciones(): Promise<Notificacion[]> {
      getCurrentMemberPermisos está cacheado por request → no cuesta una query
      extra aunque el layout ya lo haya llamado. */
   let esDirector = false
+  let miembroId: string | null = null
   try {
     const { getCurrentMemberPermisos } = await import('@/lib/team/permisos-helper')
     const p = await getCurrentMemberPermisos()
+    miembroId = p?.member.id ?? null
     esDirector = !p || p.member.rol_base === 'director'
   } catch { /* si falla, tratamos como NO director */ }
 
@@ -72,6 +74,21 @@ export async function getNotificaciones(): Promise<Notificacion[]> {
   const hace3 = addDaysLima(new Date(), -3)
 
   const out: Notificacion[] = []
+
+  // El autor conserva el aviso en la app aunque no tenga push activado.
+  if (miembroId) {
+    const { data } = await service.from('soporte_reportes')
+      .select('id, descripcion, nota_resolucion')
+      .eq('team_member_id', miembroId).eq('estado', 'resuelto')
+      .gte('resuelto_at', new Date(Date.now() - 14 * 86_400_000).toISOString())
+      .order('resuelto_at', { ascending: false }).limit(20)
+    for (const r of data ?? []) {
+      out.push({ id: `sop-resuelto-${r.id}`, tipo: 'soporte',
+        titulo: '✅ Tu reporte ya está resuelto',
+        detalle: r.nota_resolucion || r.descripcion,
+        href: '/soporte', urgencia: 'media', marcaColor: '#16a34a', marcaEmoji: null })
+    }
+  }
 
   /* 0) SOPORTE — reportes del equipo (fallas/pedidos/consultas) sin resolver.
      Solo para directores (Erick/Pedro), que son quienes resuelven. Aparecen en

@@ -4,8 +4,8 @@
 // ENTIDAD (cliente / marca / persona) mencionada. Esa entidad es la columna
 // del tablero. Si es un miembro del equipo, la tarea se le asigna.
 //
-//   1) @mención explícita  → esa es la categoría (atajo, sin IA).
-//   2) Marca conocida en el texto → esa marca (determinístico, sin IA).
+//   1) Marca conocida en el texto → esa marca (determinístico, sin IA).
+//   2) @mención explícita → persona cuando no se menciona una marca.
 //   3) OpenAI (gpt-4o-mini) → detecta el nombre propio.
 //   4) Fallback heurístico  → 'General'.
 
@@ -95,36 +95,41 @@ ${lista}`
 /* Normaliza para comparar: minúsculas + sin acentos (quita marcas combinantes
    U+0300–U+036F). */
 function normalizar(s: string): string {
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+// Variantes que usa el equipo. Solo se activan si la marca existe.
+const ALIAS_MARCAS: Record<string, string[]> = {
+  'total-sups': ['total supps', 'total sups', 'total supplements'],
+  'distribuidora-fitness': ['distribuidora fitness', 'distribuidora'],
 }
 
 /* Si el texto menciona una marca conocida, devuelve su nombre (determinístico,
    sin IA). Así "mil ideas bot" siempre cae en "Mil Ideas". */
 export function detectarMarca(texto: string, marcas: { nombre: string; slug: string }[]): string | null {
-  const t = normalizar(texto)
+  const t = ` ${normalizar(texto)} `
   // Ordenar por nombre más largo primero (evita que "joe" gane sobre "little joe").
   const ordenadas = [...marcas].sort((a, b) => b.nombre.length - a.nombre.length)
   for (const m of ordenadas) {
-    const nombre = normalizar(m.nombre)
-    const slugTxt = normalizar(m.slug.replace(/-/g, ' '))
-    if ((nombre.length >= 3 && t.includes(nombre)) || (slugTxt.length >= 3 && t.includes(slugTxt))) {
-      return capitalizar(m.nombre)
+    const nombres = [m.nombre, m.slug, ...(ALIAS_MARCAS[m.slug] ?? [])].map(normalizar)
+    if (nombres.some(n => n.length >= 3 && t.includes(` ${n} `))) {
+      return m.nombre
     }
   }
   return null
 }
 
 /* Devuelve la categoría (entidad) de la tarea.
-   Orden: @mención → marca conocida → IA → 'General'. */
+   Orden: marca conocida → @mención → IA → 'General'. */
 export async function categorizarTarea(
   texto: string,
   existentes: string[] = [],
   marcas: { nombre: string; slug: string }[] = [],
 ): Promise<string> {
-  const mencion = detectarMencion(texto)
-  if (mencion) return mencion
   const porMarca = detectarMarca(texto, marcas)
   if (porMarca) return porMarca
+  const mencion = detectarMencion(texto)
+  if (mencion) return mencion
   // A la IA le pasamos las categorías existentes + nombres de marca como pistas.
   const hints = [...new Set([...existentes, ...marcas.map((m) => m.nombre)])]
   const ia = await categorizarConIA(texto, hints)

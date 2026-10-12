@@ -102,27 +102,42 @@ export function TareasView({
      regresar vuelve a 'Equipo disponible'; casi apago la actividad de
      alguien". Se guarda por usuario en este dispositivo. */
   const claveFiltros = `tareas-filtros:${meId ?? 'yo'}`
-  const filtrosRestaurados = useRef(false)
+  const [filtrosRestaurados, setFiltrosRestaurados] = useState(false)
+  const filtrosCargados = useRef<string | null>(null)
   useEffect(() => {
     const refresh = () => router.refresh()
     window.addEventListener('distinto-timer', refresh)
     return () => window.removeEventListener('distinto-timer', refresh)
   }, [router])
   useEffect(() => {
-    if (filtrosRestaurados.current) return
-    filtrosRestaurados.current = true
+    if (filtrosCargados.current === claveFiltros) return
+    const frame = requestAnimationFrame(() => {
+    filtrosCargados.current = claveFiltros
     try {
       const f = JSON.parse(localStorage.getItem(claveFiltros) || 'null')
       if (!f) return
       if (typeof f.user === 'string' && (f.user === 'todos' || equipo.some((m) => m.id === f.user))) setFiltroUser(f.user)
       if (typeof f.marca === 'string' && (f.marca === 'todas' || marcas.some((m) => m.slug === f.marca))) setMarcaFiltro(f.marca)
       if (f.vista === 'tablero' || f.vista === 'gantt' || f.vista === 'cal') setVistaBoard(f.vista)
-    } catch { /* sin almacenamiento: filtros por defecto */ }
+    } catch { /* sin almacenamiento: filtros por defecto */ } finally { setFiltrosRestaurados(true) }
+    })
+    return () => cancelAnimationFrame(frame)
   }, [claveFiltros, equipo, marcas])
   useEffect(() => {
-    if (!filtrosRestaurados.current) return
+    if (!filtrosRestaurados) return
     try { localStorage.setItem(claveFiltros, JSON.stringify({ user: filtroUser, marca: marcaFiltro, vista: vistaBoard })) } catch { /* nada */ }
-  }, [claveFiltros, filtroUser, marcaFiltro, vistaBoard])
+  }, [claveFiltros, filtroUser, marcaFiltro, vistaBoard, filtrosRestaurados])
+  useEffect(() => {
+    const completar = (event: Event) => {
+      const id = (event as CustomEvent<{ id: string }>).detail?.id
+      if (!id) return
+      const tarea = tareas.find(t => t.id === id)
+      if (tarea) setCompletadas(prev => prev.some(t => t.id === id) ? prev : [{ ...tarea, completada: true, completadaAt: new Date().toISOString(), focusLane: null }, ...prev])
+      setTareas(prev => prev.filter(t => t.id !== id))
+    }
+    window.addEventListener('distinto-tarea-completada', completar)
+    return () => window.removeEventListener('distinto-tarea-completada', completar)
+  }, [tareas])
   const hoyLima = hoy ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
   const [mesCal, setMesCal] = useState(hoyLima.slice(0, 7))
   /* Animación "vuela al archivo" al completar. */

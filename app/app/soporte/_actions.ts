@@ -119,21 +119,23 @@ export async function resolverReporte(id: string, nota?: string): Promise<
 
   const { data: r } = await service
     .from('soporte_reportes')
-    .select('team_member_id, autor_nombre, tipo, descripcion')
+    .select('team_member_id, autor_nombre, tipo, descripcion, estado')
     .eq('id', id)
     .maybeSingle()
 
+  if (!r) return { ok: false, error: 'No se encontró el reporte.' }
+
   const { error } = await service
     .from('soporte_reportes')
-    .update({ estado: 'resuelto', resuelto_at: new Date().toISOString(), resuelto_por: me.id, nota_resolucion: (nota ?? '').trim() || null })
+    .update({ estado: 'resuelto', resuelto_at: new Date().toISOString(), resuelto_por: me.id, nota_resolucion: (nota ?? '').trim() || null, avisado_at: new Date().toISOString() })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
 
-  /* Push al AUTOR del reporte (a su celular). */
-  if (r?.team_member_id) {
+  /* El estado guarda el aviso en su campanita. Push adicional si lo activó. */
+  if (r.team_member_id && r.estado !== 'resuelto') {
     await enviarPushAMiembroId(r.team_member_id, {
       title: '✅ Tu reporte ya se resolvió',
-      body: `${(r.descripcion ?? '').slice(0, 100)}`,
+      body: `${((nota ?? '').trim() || r.descripcion || '').slice(0, 150)}`,
       url: '/soporte',
       tag: `soporte-resuelto-${id}`,
     })

@@ -77,9 +77,11 @@ export type ReporteDelDiaData = {
 
 /** Devuelve fecha YYYY-MM-DD en zona Lima (UTC-5), independiente del runtime. */
 export function fechaLimaIso(d: Date): string {
-  const utc = d.getTime() + d.getTimezoneOffset() * 60_000
-  const lima = new Date(utc - 5 * 60 * 60_000)
-  return lima.toISOString().slice(0, 10)
+  // getTime() ya es UTC: sumar el offset del servidor adelantaba un día
+  // el reporte después de las 19:00 cuando el VPS usa America/Lima.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d)
 }
 
 export function formatFechaLargo(iso: string): string {
