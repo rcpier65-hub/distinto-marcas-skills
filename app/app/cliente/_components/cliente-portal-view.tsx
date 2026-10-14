@@ -2364,7 +2364,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
   const [enviando, setEnviando] = useState(false)
   const videoSinMusica = videoAppUrl(p.videoSinMusica ?? null)
   const portada = urlOk(p.portada)
-  const portadaDescarga = portada ? (driveId(portada) ? `https://drive.google.com/uc?export=download&id=${driveId(portada)}` : portada) : null
+  const portadaDescarga = portada ? (driveId(portada) ? `/api/drive/portada/${p.id}` : portada) : null
   async function marcar() {
     setEnviando(true)
     const r = await marcarPublicadoCliente(p.id, { instagram: ig, tiktok: tt })
@@ -2404,7 +2404,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
           </span>
         ) : null}
         {portadaDescarga && (
-          <a href={portadaDescarga} target="_blank" rel="noopener noreferrer" download
+          <a href={portadaDescarga} download aria-label={`Descargar portada de ${p.titulo}`}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
             <ImageIcon className="w-3.5 h-3.5" /> Portada
           </a>
