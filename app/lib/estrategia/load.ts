@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "server-only";
+import { designFinished } from "./activity-status";
 import { scopeTasks, taskAssignable } from "@/lib/tareas/access";
 import { type Actor, brandAccess } from "./access";
 import { strategyDB } from "./db";
@@ -40,9 +41,12 @@ export async function loadBrand(a: Actor, slug: string) {
           db
             .from("publicaciones")
             .select(
-              "id,nombre,estado,estado_tarea,es_tarea_diseno,fecha_publicacion,hora_publicacion,fecha_edicion,fecha_diseno,fecha_entrega,editor_nombre,editor_id,disenador_nombre,editado,disenado,aprobado_cliente_at,publicado_at,drive_resultado_url,portada_editada_url,tipo_contenido",
+              "id,nombre,estado,estado_tarea,es_tarea_diseno,fecha_publicacion,hora_publicacion,fecha_edicion,fecha_diseno,fecha_entrega,editor_nombre,editor_id,disenador_nombre,editado,disenado,diseno_terminado_at,archived_at,aprobado_cliente_at,publicado_at,drive_resultado_url,portada_editada_url,tipo_contenido",
             )
             .eq("marca_id", brand.id)
+            .is("archived_at", null)
+            .or("estado.is.null,estado.neq.archivado")
+            .or("estado_tarea.is.null,estado_tarea.neq.archivado")
             .order("created_at", { ascending: false })
             .limit(1800),
         )
@@ -185,7 +189,7 @@ export async function loadBrand(a: Actor, slug: string) {
         id: `design:${p.id}`,
         kind: "Diseño",
         date: p.fecha_entrega || p.fecha_diseno,
-        done: !!p.disenado || p.estado_tarea === "archivado",
+        done: designFinished(p),
         owner: p.disenador_nombre || "Sin asignar",
         state: p.estado_tarea || "Pendiente",
         delivery: true,

@@ -109,6 +109,11 @@ export default function Canvas({
       };
     return scene;
   });
+  useEffect(() => {
+    if (!ex || !initial.elements.length) return;
+    const frame = requestAnimationFrame(() => ex.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 }));
+    return () => cancelAnimationFrame(frame);
+  }, [ex, initial.elements.length]);
   const remoteRevision = useRef(data.scene.revision);
   useEffect(() => {
     if (!ex || !loaded.current) return;
@@ -271,6 +276,7 @@ export default function Canvas({
           <MainMenu.DefaultItems.Help />
         </MainMenu>
       </Excalidraw>
+      <button className="st-fit-canvas" onClick={() => ex?.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 })}>Ver todo el lienzo</button>
       <div className="st-canvas-tip">
         Espacio + arrastrar para moverte · rueda + Ctrl para zoom · doble clic
         para escribir

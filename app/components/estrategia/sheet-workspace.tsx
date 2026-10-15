@@ -21,13 +21,14 @@ import { type ActionData, actionInput } from "@/lib/estrategia/model";
 import { api, Field, Empty, Jump, Modal } from "./common";
 import { useRecording } from "./use-recording";
 import "./strategy.css";
+import { LinkedPlan } from "./linked-plan";
 const Canvas = dynamic(() => import("./canvas"), {
   ssr: false,
   loading: () => <div className="st-empty">Abriendo lienzo…</div>,
 });
 export function SheetWorkspace({ initial }: { initial: any }) {
   const [data, setData] = useState(initial),
-    [panel, setPanel] = useState("Reunión"),
+    [panel, setPanel] = useState(initial.me.client ? "Comentarios" : initial.sheet.data.description ? "Plan" : "Reunión"),
     [open, setOpen] = useState(!initial.me.client),
     [status, setStatus] = useState("Guardado"),
     [clientId] = useState(() => crypto.randomUUID()),
@@ -202,7 +203,7 @@ export function SheetWorkspace({ initial }: { initial: any }) {
             <nav className="st-tabs">
               {(data.me.client
                 ? ["Comentarios"]
-                : ["Reunión", "Acuerdos", "Comentarios", "Historial"]
+                : ["Plan", "Reunión", "Acuerdos", "Comentarios", "Historial"]
               ).map((t) => (
                 <button
                   key={t}
@@ -218,6 +219,7 @@ export function SheetWorkspace({ initial }: { initial: any }) {
                 </button>
               ))}
             </nav>
+            {panel === "Plan" && !data.me.client && <LinkedPlan slug={data.brand.slug} sheetId={sheet.id} objective={sheet.data.objective || ""} description={sheet.data.description || ""}/>}
             {panel === "Reunión" && !data.me.client && (
               <>
                 <section>

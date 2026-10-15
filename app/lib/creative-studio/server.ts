@@ -14,7 +14,8 @@ export class StudioError extends Error {
 export async function studioActor(request: Request) {
   if (request.method !== "GET") {
     const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    const host = request.headers.get("host") || new URL(request.url).host;
+    if (origin && new URL(origin).host !== host)
       throw new StudioError("Origen no permitido", 403);
   }
   const user = await getUser();
