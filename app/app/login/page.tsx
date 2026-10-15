@@ -3,7 +3,7 @@
 // Pantalla de login — estilo "Light Editorial Premium" brand Distinto.
 // La UI está en LoginScreen (client component con motion + huella SVG).
 // Esta page solo:
-//   - hace redirect si ya hay sesión (→ /cockpit)
+//   - hace redirect si ya hay sesión (portal de cliente o inicio del equipo)
 //   - lee searchParams para error/message del último intento
 //   - renderiza LoginScreen como client component
 //
@@ -12,6 +12,7 @@
 
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/auth/get-user'
+import { getLandingRoute } from '@/lib/team/permisos-helper'
 import { LoginScreen } from './_components/login-screen'
 
 export const dynamic = 'force-dynamic'
@@ -21,9 +22,9 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string; message?: string }>
 }) {
-  /* Si ya está logueado, ir directo al cockpit. */
+  /* Si ya está logueado, ir directamente a su espacio. */
   const user = await getUser()
-  if (user) redirect('/cockpit')
+  if (user) redirect(await getLandingRoute())
 
   const params = await searchParams
 

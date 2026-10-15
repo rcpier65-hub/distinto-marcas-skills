@@ -35,7 +35,7 @@ export default async function ClientePortalPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
-  const {data: sharedSheets} = await service.from('strategy_records').select('id,title')
+  const sharedSheetsPromise = service.from('strategy_records').select('id,title')
     .eq('marca_id',cliente.marcaId).eq('kind','sheet').eq('archived',false).eq('data->>sharedWithClient','true')
   const hoy = ymdLima(new Date())
 
@@ -49,7 +49,7 @@ export default async function ClientePortalPage() {
      inicio) sin borrar nada — solo deja de mostrarlos. Corte FIJO (no rueda por
      mes) para conservar el historial de aquí en adelante. Pedro 5-ago-2026. */
   const PORTAL_DESDE = '2026-08-01'
-  const { data } = await service
+  const publicacionesPromise = service
     .from('publicaciones')
     .select(COLS)
     .eq('marca_id', cliente.marcaId)
@@ -83,16 +83,13 @@ export default async function ClientePortalPage() {
     estado: r.estado ?? null,
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pubs = (((data as any) ?? []) as any[]).map(mapRow)
-
   /* DISEÑOS de la marca — alimentan el "Área de diseño" del portal. Los diseños
      se ENTREGAN, no se publican: no tienen fecha_publicacion, así que el corte
      por fecha de arriba (PORTAL_DESDE) los dejaba fuera y el área salía vacía.
      Acá los traemos por marca SIN ese corte, con su estado, para que el cliente
      vea TODOS sus diseños (por hacer, en proceso y listos). Se ocultan los
      archivados. La consulta de videos de arriba queda intacta. Pedro 12-ago-2026. */
-  const { data: disenosData } = await service
+  const disenosPromise = service
     .from('publicaciones')
     .select(COLS)
     .eq('marca_id', cliente.marcaId)
@@ -101,83 +98,80 @@ export default async function ClientePortalPage() {
     .limit(200)
     .then((r: unknown) => r, () => ({ data: [] }))
 
-  /* Merge (dedupe por id): agregamos los diseños que la consulta de videos no
-     trajo, saltando los archivados. Así el portal muestra los diseños por marca
-     sin tocar cómo se muestran los videos. */
-  const porId = new Map<string, PubCliente>()
-  for (const p of pubs) porId.set(p.id, p)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of (((disenosData as any) ?? []) as any[])) {
-    if ((r.estado_tarea ?? '') === 'archivado') continue
-    if (!porId.has(r.id)) porId.set(r.id, mapRow(r))
+  const cargarCoordinacion = async () => {
+    const { getObservacionesMarca, getReunionesMarca, getGrabacionesMarca } = await import('@/lib/portal/coordinacion')
+    const [observaciones, reuniones, grabaciones, fechasRes] = await Promise.all([
+      getObservacionesMarca(service, cliente.marcaId).catch(() => []),
+      getReunionesMarca(service, cliente.marcaId).catch(() => []),
+      getGrabacionesMarca(service, cliente.marcaId).catch(() => []),
+      // Fechas importantes de la marca (idea de Lorena) — el cliente las ve en su
+      // portal (solo lectura). Pedro 24-jul-2026.
+      service.from('fechas_importantes')
+        .select('id, titulo, fecha, nota, categoria')
+        .eq('marca_id', cliente.marcaId)
+        .order('fecha', { ascending: true })
+        .then((r: unknown) => r, () => ({ data: [] })),
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fechasImportantes = ((((fechasRes as any)?.data) ?? []) as any[]).map((f) => ({
+      id: f.id as string,
+      titulo: (f.titulo ?? '—') as string,
+      fecha: (typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : f.fecha) as string,
+      nota: (f.nota ?? null) as string | null,
+      categoria: (f.categoria ?? 'otro') as string,
+    }))
+    return { observaciones, reuniones, grabaciones, fechasImportantes }
   }
-  const pubsConDisenos = [...porId.values()]
-
-  const { getObservacionesMarca, getReunionesMarca, getGrabacionesMarca } = await import('@/lib/portal/coordinacion')
-  const [observaciones, reuniones, grabaciones, fechasRes] = await Promise.all([
-    getObservacionesMarca(service, cliente.marcaId).catch(() => []),
-    getReunionesMarca(service, cliente.marcaId).catch(() => []),
-    getGrabacionesMarca(service, cliente.marcaId).catch(() => []),
-    // Fechas importantes de la marca (idea de Lorena) — el cliente las ve en su
-    // portal (solo lectura). Pedro 24-jul-2026.
-    service.from('fechas_importantes')
-      .select('id, titulo, fecha, nota, categoria')
-      .eq('marca_id', cliente.marcaId)
-      .order('fecha', { ascending: true })
-      .then((r: unknown) => r, () => ({ data: [] })),
-  ])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fechasImportantes = ((((fechasRes as any)?.data) ?? []) as any[]).map((f) => ({
-    id: f.id as string,
-    titulo: (f.titulo ?? '—') as string,
-    fecha: (typeof f.fecha === 'string' ? f.fecha.slice(0, 10) : f.fecha) as string,
-    nota: (f.nota ?? null) as string | null,
-    categoria: (f.categoria ?? 'otro') as string,
-  }))
 
   /* Reporte mensual de SU marca (si existe) — protegido por código.
      El desbloqueo (cookie 12h) se decide en el server: la data del reporte
      solo se envía al navegador si ya ingresó el código. */
-  const reporte = await getReporteBySlug(cliente.marcaSlug, cliente.marcaNombre)
-  const reporteDesbloqueado = reporte ? await pinReportesOk() : false
+  const cargarReporte = async () => {
+    const reporte = await getReporteBySlug(cliente.marcaSlug, cliente.marcaNombre)
+    const reporteDesbloqueado = reporte ? await pinReportesOk() : false
+    return { reporte, reporteDesbloqueado }
+  }
 
   /* Reportes de SOPORTE de esta marca (los mandó el cliente desde su portal).
      Defensivo: si la columna marca_id aún no existe en soporte_reportes
      (se auto-crea al primer envío), la lista arranca vacía. Pedro 31-ago-2026. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let reportesSoporte: any[] = []
-  try {
-    let r = await service
-      .from('soporte_reportes')
-      .select('id, tipo, descripcion, estado, nota_resolucion, imagenes, created_at')
-      .eq('marca_id', cliente.marcaId)
-      .order('created_at', { ascending: false })
-      .limit(50)
-    /* Fallback: si la columna marca_id aún no existe (o el insert cayó al
-       camino sin ella), identificamos sus reportes por el autor_nombre que
-       siempre lleva "· NombreDeMarca" al final. Así nunca quedan invisibles. */
-    if (r.error || (r.data ?? []).length === 0) {
-      const r2 = await service
+  const cargarSoporte = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let reportesSoporte: any[] = []
+    try {
+      let r = await service
         .from('soporte_reportes')
         .select('id, tipo, descripcion, estado, nota_resolucion, imagenes, created_at')
-        .ilike('autor_nombre', `%· ${cliente.marcaNombre}`)
+        .eq('marca_id', cliente.marcaId)
         .order('created_at', { ascending: false })
         .limit(50)
-      if (!r2.error && (r2.data ?? []).length > 0) r = r2
-    }
-    if (!r.error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      reportesSoporte = ((r.data ?? []) as any[]).map((x) => ({
-        id: x.id as string,
-        tipo: (x.tipo ?? 'consulta') as string,
-        descripcion: (x.descripcion ?? '') as string,
-        estado: (x.estado ?? 'pendiente') as string,
-        notaResolucion: (x.nota_resolucion ?? null) as string | null,
-        imagenes: (Array.isArray(x.imagenes) ? x.imagenes : []) as string[],
-        createdAt: (x.created_at ?? '') as string,
-      }))
-    }
-  } catch { /* sin soporte todavía */ }
+      /* Fallback: si la columna marca_id aún no existe (o el insert cayó al
+         camino sin ella), identificamos sus reportes por el autor_nombre que
+         siempre lleva "· NombreDeMarca" al final. Así nunca quedan invisibles. */
+      if (r.error || (r.data ?? []).length === 0) {
+        const r2 = await service
+          .from('soporte_reportes')
+          .select('id, tipo, descripcion, estado, nota_resolucion, imagenes, created_at')
+          .ilike('autor_nombre', `%· ${cliente.marcaNombre}`)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        if (!r2.error && (r2.data ?? []).length > 0) r = r2
+      }
+      if (!r.error) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        reportesSoporte = ((r.data ?? []) as any[]).map((x) => ({
+          id: x.id as string,
+          tipo: (x.tipo ?? 'consulta') as string,
+          descripcion: (x.descripcion ?? '') as string,
+          estado: (x.estado ?? 'pendiente') as string,
+          notaResolucion: (x.nota_resolucion ?? null) as string | null,
+          imagenes: (Array.isArray(x.imagenes) ? x.imagenes : []) as string[],
+          createdAt: (x.created_at ?? '') as string,
+        }))
+      }
+    } catch { /* sin soporte todavía */ }
+    return reportesSoporte
+  }
 
   /* INFLUENCERS — si la marca tiene el módulo activado (hoy TypHouse), el
      cliente ve el MISMO kanban del sistema en su portal. Pedro 31-ago-2026.
@@ -186,115 +180,144 @@ export default async function ClientePortalPage() {
   const DRIVE_INFLUENCERS: Record<string, string> = {
     'little-joe': 'https://drive.google.com/drive/folders/1feYgjVXukpORKqeKbmovzALOrBMYUDFq?usp=drive_link',
   }
-  let influencersActivo = false
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let influencersRows: any[] = []
-  try {
-    const { influencersActivoDe, leerInfluencersDb } = await import('@/lib/influencers/db')
-    let flag: boolean | null | undefined
+  const cargarInfluencers = async () => {
+    let influencersActivo = false
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let influencersRows: any[] = []
     try {
-      const rm = await service.from('marcas').select('influencers_activo').eq('id', cliente.marcaId).maybeSingle()
-      flag = rm.error ? undefined : rm.data?.influencers_activo
-    } catch { flag = undefined }
-    influencersActivo = influencersActivoDe(cliente.marcaSlug, flag)
-    if (influencersActivo) {
-      const filas = await leerInfluencersDb(cliente.marcaSlug)
-      influencersRows = filas.map((f) => ({
-        id: f.id,
-        usuarioIg: f.usuario_ig,
-        nombre: f.nombre,
-        estado: f.estado,
-        videoUrl: f.video_url,
-        notas: f.notas,
-        telefono: f.telefono,
-        productosEnviados: f.productos_enviados ?? [],
-        creadoEl: f.created_at,
-      }))
-    }
-  } catch { /* sin influencers */ }
+      const { influencersActivoDe, leerInfluencersDb } = await import('@/lib/influencers/db')
+      let flag: boolean | null | undefined
+      try {
+        const rm = await service.from('marcas').select('influencers_activo').eq('id', cliente.marcaId).maybeSingle()
+        flag = rm.error ? undefined : rm.data?.influencers_activo
+      } catch { flag = undefined }
+      influencersActivo = influencersActivoDe(cliente.marcaSlug, flag)
+      if (influencersActivo) {
+        const filas = await leerInfluencersDb(cliente.marcaSlug)
+        influencersRows = filas.map((f) => ({
+          id: f.id,
+          usuarioIg: f.usuario_ig,
+          nombre: f.nombre,
+          estado: f.estado,
+          videoUrl: f.video_url,
+          notas: f.notas,
+          telefono: f.telefono,
+          productosEnviados: f.productos_enviados ?? [],
+          creadoEl: f.created_at,
+        }))
+      }
+    } catch { /* sin influencers */ }
+    return { influencersActivo, influencersRows }
+  }
 
   /* TAREAS de la marca — el MISMO módulo de tareas del sistema (Pedro
      31-ago-2026): el cliente ve las tareas activas de su marca y puede crear
      y asignar. Se buscan por marca_slug Y por categoría=nombre de la marca
      (dos queries, merge por id — el .or de PostgREST se atora con nombres
      con espacios). */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let tareasMarca: any[] = []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let equipoTareas: any[] = []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let tareasPlan: any[] = []
-  try {
-    /* estado/fecha_inicio/fecha_entrega son columnas self-healing de la vista
-       Plan — retry SIN ellas si aún no existen (no perder las tareas). */
-    const SEL_FULL = `id, texto, color, categoria, marca_slug, created_at, completada, estado, fecha_inicio, fecha_entrega,
-      miembro:team_members!tareas_team_member_id_fkey(nombre)`
-    const SEL_BASE = `id, texto, color, categoria, marca_slug, created_at, completada,
-      miembro:team_members!tareas_team_member_id_fkey(nombre)`
+  const cargarTareas = async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const buscar = async (filtro: (q: any) => any) => {
-      let r = await filtro(service.from('tareas').select(SEL_FULL).eq('completada', false)
-        .order('created_at', { ascending: false }).limit(100))
-      if (r.error && /estado|fecha_inicio|fecha_entrega|schema cache|42703/i.test(r.error.message ?? '')) {
-        r = await filtro(service.from('tareas').select(SEL_BASE).eq('completada', false)
+    let tareasMarca: any[] = []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let equipoTareas: any[] = []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let tareasPlan: any[] = []
+    try {
+      /* estado/fecha_inicio/fecha_entrega son columnas self-healing de la vista
+         Plan — retry SIN ellas si aún no existen (no perder las tareas). */
+      const SEL_FULL = `id, texto, color, categoria, marca_slug, created_at, completada, estado, fecha_inicio, fecha_entrega,
+        miembro:team_members!tareas_team_member_id_fkey(nombre)`
+      const SEL_BASE = `id, texto, color, categoria, marca_slug, created_at, completada,
+        miembro:team_members!tareas_team_member_id_fkey(nombre)`
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const buscar = async (filtro: (q: any) => any) => {
+        let r = await filtro(service.from('tareas').select(SEL_FULL).eq('completada', false)
           .order('created_at', { ascending: false }).limit(100))
+        if (r.error && /estado|fecha_inicio|fecha_entrega|schema cache|42703/i.test(r.error.message ?? '')) {
+          r = await filtro(service.from('tareas').select(SEL_BASE).eq('completada', false)
+            .order('created_at', { ascending: false }).limit(100))
+        }
+        return r.error ? [] : (r.data ?? [])
       }
-      return r.error ? [] : (r.data ?? [])
-    }
-    const [dataSlug, dataCategoria, eq] = await Promise.all([
+      const [dataSlug, dataCategoria, eq] = await Promise.all([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buscar((q: any) => q.eq('marca_slug', cliente.marcaSlug)),
+        /* ilike sin comodines = igualdad case-insensitive: la columna del
+           tablero dice "Typhouse" y la marca "TypHouse" — deben coincidir. */
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buscar((q: any) => q.ilike('categoria', cliente.marcaNombre)),
+        service.from('team_members').select('id, nombre').eq('activo', true).order('nombre')
+          .then((r: unknown) => r, () => ({ data: [] })),
+      ])
+      const porId = new Map<string, unknown>()
+      const candidateIds = [...dataSlug,...dataCategoria].map((r: {id:string})=>r.id)
+      const {data:privateAgreements,error:privacyError} = candidateIds.length ? await service.from('strategy_actions').select('task_id,data').in('task_id',candidateIds).eq('data->>createdTask','true') : {data:[],error:null}
+      if(privacyError)throw new Error('No se pudo comprobar la visibilidad de las tareas')
+      const privateTasks = new Set((privateAgreements??[]).filter((a: {data:{clientVisible?:boolean}})=>a.data.clientVisible!==true).map((a:{task_id:string})=>a.task_id))
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      buscar((q: any) => q.eq('marca_slug', cliente.marcaSlug)),
-      /* ilike sin comodines = igualdad case-insensitive: la columna del
-         tablero dice "Typhouse" y la marca "TypHouse" — deben coincidir. */
+      for (const r of ([...dataSlug, ...dataCategoria] as any[])) {
+        if (!porId.has(r.id) && !privateTasks.has(r.id)) porId.set(r.id, r)
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      buscar((q: any) => q.ilike('categoria', cliente.marcaNombre)),
-      service.from('team_members').select('id, nombre').eq('activo', true).order('nombre')
-        .then((r: unknown) => r, () => ({ data: [] })),
-    ])
-    const porId = new Map<string, unknown>()
-    const candidateIds = [...dataSlug,...dataCategoria].map((r: {id:string})=>r.id)
-    const {data:privateAgreements,error:privacyError} = candidateIds.length ? await service.from('strategy_actions').select('task_id,data').in('task_id',candidateIds).eq('data->>createdTask','true') : {data:[],error:null}
-    if(privacyError)throw new Error('No se pudo comprobar la visibilidad de las tareas')
-    const privateTasks = new Set((privateAgreements??[]).filter((a: {data:{clientVisible?:boolean}})=>a.data.clientVisible!==true).map((a:{task_id:string})=>a.task_id))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of ([...dataSlug, ...dataCategoria] as any[])) {
-      if (!porId.has(r.id) && !privateTasks.has(r.id)) porId.set(r.id, r)
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tareasMarca = ([...porId.values()] as any[])
-      .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
-      .map((r) => {
+      tareasMarca = ([...porId.values()] as any[])
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+        .map((r) => {
+          const m = Array.isArray(r.miembro) ? r.miembro[0] : r.miembro
+          return {
+            id: r.id as string,
+            texto: (r.texto ?? '') as string,
+            color: (r.color ?? '#db2777') as string,
+            asignadoNombre: (m?.nombre ?? null) as string | null,
+            createdAt: (r.created_at ?? '') as string,
+          }
+        })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      equipoTareas = ((((eq as any).data) ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+
+      /* Vista PLAN (estados + fechas + Gantt/calendario) — mismas tareas. */
+      const ESTADOS = ['sin_empezar', 'en_proceso', 'archivado']
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tareasPlan = ([...porId.values()] as any[]).map((r) => {
         const m = Array.isArray(r.miembro) ? r.miembro[0] : r.miembro
         return {
           id: r.id as string,
           texto: (r.texto ?? '') as string,
+          categoria: (r.categoria ?? cliente.marcaNombre) as string,
           color: (r.color ?? '#db2777') as string,
-          asignadoNombre: (m?.nombre ?? null) as string | null,
+          marcaSlug: (r.marca_slug ?? null) as string | null,
+          responsableNombre: (m?.nombre ?? null) as string | null,
+          estado: ESTADOS.includes(r.estado) ? r.estado : 'sin_empezar',
+          fechaInicio: (r.fecha_inicio ?? null) as string | null,
+          fechaEntrega: (r.fecha_entrega ?? null) as string | null,
           createdAt: (r.created_at ?? '') as string,
         }
       })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    equipoTareas = ((((eq as any).data) ?? []) as any[]).map((m) => ({ id: m.id as string, nombre: m.nombre as string }))
+    } catch { /* sin tareas */ }
+    return { tareasMarca, equipoTareas, tareasPlan }
+  }
 
-    /* Vista PLAN (estados + fechas + Gantt/calendario) — mismas tareas. */
-    const ESTADOS = ['sin_empezar', 'en_proceso', 'archivado']
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tareasPlan = ([...porId.values()] as any[]).map((r) => {
-      const m = Array.isArray(r.miembro) ? r.miembro[0] : r.miembro
-      return {
-        id: r.id as string,
-        texto: (r.texto ?? '') as string,
-        categoria: (r.categoria ?? cliente.marcaNombre) as string,
-        color: (r.color ?? '#db2777') as string,
-        marcaSlug: (r.marca_slug ?? null) as string | null,
-        responsableNombre: (m?.nombre ?? null) as string | null,
-        estado: ESTADOS.includes(r.estado) ? r.estado : 'sin_empezar',
-        fechaInicio: (r.fecha_inicio ?? null) as string | null,
-        fechaEntrega: (r.fecha_entrega ?? null) as string | null,
-        createdAt: (r.created_at ?? '') as string,
-      }
-    })
-  } catch { /* sin tareas */ }
+  // Estos módulos solo dependen de la marca autenticada. Iniciarlos juntos
+  // evita sumar la latencia de cada consulta antes de mostrar el portal.
+  const [
+    { data: sharedSheets }, { data }, { data: disenosData },
+    { observaciones, reuniones, grabaciones, fechasImportantes },
+    { reporte, reporteDesbloqueado }, reportesSoporte,
+    { influencersActivo, influencersRows }, { tareasMarca, equipoTareas, tareasPlan },
+  ] = await Promise.all([
+    sharedSheetsPromise, publicacionesPromise, disenosPromise,
+    cargarCoordinacion(), cargarReporte(), cargarSoporte(), cargarInfluencers(), cargarTareas(),
+  ])
+
+  /* Merge por id, conservando el corte de publicaciones y los diseños activos. */
+  const porId = new Map<string, PubCliente>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of ((data ?? []) as any[])) porId.set(r.id, mapRow(r))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of ((disenosData ?? []) as any[])) {
+    if ((r.estado_tarea ?? '') === 'archivado') continue
+    if (!porId.has(r.id)) porId.set(r.id, mapRow(r))
+  }
+  const pubsConDisenos = [...porId.values()]
 
   return (
     <ClientePortalView

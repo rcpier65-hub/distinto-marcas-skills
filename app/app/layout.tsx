@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { after } from 'next/server'
 import { debeIntentarSync, sincronizarCalendario } from '@/lib/calendario/gcal-sync'
 import { Inter_Tight, Geist_Mono } from 'next/font/google'
@@ -9,7 +10,9 @@ import { AutoUpdate } from '@/components/pwa/auto-update'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
 import { getClienteActual } from '@/lib/cliente/get-cliente'
+import { getUser } from '@/lib/auth/get-user'
 import { getNotificaciones, type Notificacion } from '@/lib/notificaciones/get-notificaciones'
+import Loading from './loading'
 import './globals.css'
 
 /* Inter Tight — la fuente signature de Linear. Sustituye Geist Sans.
@@ -67,35 +70,24 @@ export const viewport = {
   themeColor: '#ba41f7',
 }
 
-export default async function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
-  // Marcas desde la base (fuente única). Se inyectan al shell para que el
-  // sidebar y el command palette muestren SIEMPRE las marcas reales — incluidas
-  // las que se crean desde el Dashboard. Defensivo: el helper ya cae a la lista
-  // fija si la base falla.
-  /* Cargamos TODO lo del shell EN PARALELO. Antes las notificaciones y el email
-     del usuario iban EN SERIE después de este Promise.all → sumaban tiempo en
-     blanco al abrir la app. Ahora el layout tarda lo de la consulta más lenta,
-     no la suma. Pedro 06-ago-2026 ("tarda demasiado en aparecer"). */
-  const [marcas, permisos, cliente, notificaciones, user] = await Promise.all([
+async function SessionShell({ children }: { children: React.ReactNode }) {
+  const [user, cliente] = await Promise.all([getUser(), getClienteActual()])
+
+  // El login y el portal no necesitan marcas, notificaciones ni permisos del
+  // equipo. No bloquear su entrada esperando consultas del sistema interno.
+  if (!user || cliente) return <div className="min-h-full">{children}</div>
+
+  const [marcas, permisos, notificaciones] = await Promise.all([
     getMarcasNav(),
     getCurrentMemberPermisos(),
-    getClienteActual(),
     getNotificaciones().catch(() => [] as Notificacion[]),
-    (async () => {
-      try { const { getUser } = await import('@/lib/auth/get-user'); return await getUser() }
-      catch { return null }
-    })(),
   ])
   /* Email del usuario logueado — indicador de sesión activa en el sidebar. */
   const emailActivo: string | null = user?.email ?? null
 
   /* Sincronización Calendario → Google Calendar en segundo plano mientras el
      equipo usa la app (máx. cada 2 min, no frena la página). Pedro 24-sep-2026. */
-  if (user && !cliente && debeIntentarSync()) {
+  if (debeIntentarSync()) {
     after(() => sincronizarCalendario().catch((e) => console.error('[gcal-sync]', e)))
   }
 
@@ -117,6 +109,10 @@ export default async function RootLayout({
       }
     : null
 
+  return <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo} notificaciones={notificaciones}>{children}</AppShell>
+}
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="es"
@@ -128,13 +124,11 @@ export default async function RootLayout({
       className={`${interTight.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        {/* Los CLIENTES (portal de marca) NO ven el sistema interno del equipo:
-            se renderizan en un shell limpio, sin sidebar. El equipo sí ve AppShell. */}
-        {cliente ? (
-          <div className="min-h-full">{children}</div>
-        ) : (
-          <AppShell marcas={marcas} permisos={permisosSimple} emailActivo={emailActivo} notificaciones={notificaciones}>{children}</AppShell>
-        )}
+        {/* loading.tsx no envuelve el layout raíz. Esta frontera permite
+            mostrar la carga mientras se comprueba la sesión y llegan datos. */}
+        <Suspense fallback={<Loading />}>
+          <SessionShell>{children}</SessionShell>
+        </Suspense>
         <Toaster />
         {/* SwRegister: instala /sw.js para hacer la app instalable
             como PWA en macOS/iOS/Android con icono full color. */}

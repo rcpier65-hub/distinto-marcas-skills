@@ -57,7 +57,7 @@ export function LoginScreen({ initialError, initialMessage }: Props) {
           → Isotipo OFICIAL del manual (amarillo + morado brand)
             centrado arriba del form. */}
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        initial={false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.7, ease: EASE }}
         className="relative z-10 w-full max-w-md"
@@ -93,14 +93,14 @@ function FormBody({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
       className="w-full"
     >
       {/* ISOTIPO OFICIAL — centrado arriba del form, colores brand del manual */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.85, y: 12 }}
+        initial={false}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 220, damping: 18, delay: 0.15 }}
         className="flex justify-center mb-8"
@@ -132,7 +132,7 @@ function FormBody({
       {/* Mensaje de éxito */}
       {initialMessage && (
         <motion.div
-          initial={{ opacity: 0, y: -4 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           className="mb-4 rounded-xl border px-4 py-3 text-xs"
           style={{
@@ -148,7 +148,7 @@ function FormBody({
       {/* Error */}
       {initialError && (
         <motion.div
-          initial={{ opacity: 0, y: -4 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           className="mb-4 rounded-xl border px-4 py-3 text-xs"
           style={{

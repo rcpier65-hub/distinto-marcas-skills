@@ -1,12 +1,15 @@
 // app/lib/auth/get-user.ts
 import { createClient } from '@/lib/supabase/server'
+import { cache } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 /**
  * Devuelve el usuario autenticado en una server component/route.
  * Retorna null si no hay sesión válida.
  */
-export async function getUser(): Promise<User | null> {
+// Memoización exclusivamente dentro del render/request, nunca entre usuarios.
+// Layout, portal y permisos comparten la misma verificación de Supabase.
+export const getUser = cache(async (): Promise<User | null> => {
   // Defensive: si env vars Supabase no están configuradas (ej. mockup local sin
   // .env.local poblado), devolvemos null sin crashear. Header.tsx ya maneja null
   // retornando null (no renderiza nada).
@@ -19,7 +22,7 @@ export async function getUser(): Promise<User | null> {
   } catch {
     return null
   }
-}
+})
 
 /**
  * Igual que getUser pero THROW si no hay sesión.

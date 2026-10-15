@@ -14,6 +14,7 @@
 
 import { cache } from 'react'
 import { getUser } from '@/lib/auth/get-user'
+import { getClienteActual } from '@/lib/cliente/get-cliente'
 import { createServiceClient } from '@/lib/supabase/service'
 import {
   type Permisos,
@@ -160,6 +161,8 @@ export async function ensureAccesoModulo(modulo: ModuloPermiso): Promise<void> {
  * el saludo y mensaje de "todavía no tienes módulos asignados".
  */
 export async function getLandingRoute(): Promise<string> {
+  // Clientes: evitar /cockpit y su segunda redirección por el middleware.
+  if (await getClienteActual()) return '/cliente'
   const p = await getCurrentMemberPermisos()
   if (!p) return '/cockpit'  /* admin/owner sin team_member */
   /* Cualquier miembro entra primero por su dashboard de bienvenida */
