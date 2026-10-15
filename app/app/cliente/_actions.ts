@@ -501,6 +501,8 @@ async function tareaDeMiMarca(service: Service, id: string, cliente: { marcaSlug
   const { data } = await service.from('tareas').select('id, categoria, marca_slug, texto').eq('id', id).maybeSingle()
   if (!data) return null
   if (data.marca_slug !== cliente.marcaSlug && data.categoria !== cliente.marcaNombre) return null
+  const { data: agreement, error: privacyError } = await service.from('strategy_actions').select('data').eq('task_id',id).eq('data->>createdTask','true').maybeSingle()
+  if (privacyError || (agreement && agreement.data.clientVisible !== true)) return null
   return data
 }
 

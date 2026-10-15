@@ -49,6 +49,7 @@ export function NavItem({
     <Link
       href={href}
       className="mk-focusable"
+      title={label}
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         width: '100%', height: 28,
@@ -78,7 +79,7 @@ export function NavItem({
       <span style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}
       </span>
-      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <span className="mk-nav-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       {badge !== undefined && (
         <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-tertiary)', fontVariantNumeric: 'tabular-nums', fontWeight: 'var(--mk-weight-medium)' }}>
           {badge}

@@ -13,6 +13,7 @@ export async function updateSession(request: NextRequest) {
   // tienen sesión de usuario → los dejamos pasar directo.
   const p = request.nextUrl.pathname
   const sinAuthUsuario =
+    p.startsWith('/excalidraw/') ||
     p === '/reservar/diagnostico' || p === '/api/reservas' || p === '/api/reservas/disponibilidad' ||
     p === '/api/version' ||
     p.startsWith('/api/cron') ||
@@ -116,6 +117,7 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const path = request.nextUrl.pathname
     const permitidoParaCliente =
+      path.startsWith('/api/estrategia/hojas/') ||
       path === '/cliente' || path.startsWith('/cliente/') ||
       path.startsWith('/api/video') ||   // reproductor del portal (auth propia)
       path.startsWith('/api/drive') ||   // drive del portal (auth propia, scoped a su marca)

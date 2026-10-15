@@ -12,7 +12,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 export type Notificacion = {
   id: string
-  tipo: 'grabacion' | 'editar' | 'observacion' | 'soporte'
+  tipo: 'grabacion' | 'editar' | 'observacion' | 'soporte' | 'tarea'
   titulo: string
   detalle: string
   href: string
@@ -74,6 +74,12 @@ export async function getNotificaciones(): Promise<Notificacion[]> {
   const hace3 = addDaysLima(new Date(), -3)
 
   const out: Notificacion[] = []
+
+  if (miembroId) {
+    const { data } = await service.from('strategy_notifications').select('action_id,title,href')
+      .eq('member_id', miembroId).gte('created_at', new Date(Date.now()-14*86400000).toISOString()).order('created_at', {ascending:false}).limit(15)
+    for (const r of data ?? []) out.push({id:`strategy-${r.action_id}`,tipo:'tarea',titulo:r.title,detalle:'Acuerdo confirmado en Planificación',href:r.href,urgencia:'media',marcaColor:'#8055e8',marcaEmoji:null})
+  }
 
   // El autor conserva el aviso en la app aunque no tenga push activado.
   if (miembroId) {

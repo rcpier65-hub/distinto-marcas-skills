@@ -19,6 +19,7 @@ const ICONO: Record<Notificacion['tipo'], typeof Bell> = {
   editar: Scissors,
   observacion: ClipboardList,
   soporte: LifeBuoy,
+  tarea: ClipboardList,
 }
 
 export function NotificationBell({ notificaciones }: { notificaciones: Notificacion[] }) {

@@ -136,6 +136,7 @@ export function MarcaCard({
           </Badge>
         </div>
 
+        <Link href={`/marca/${marca.slug}/estrategia`} className="block rounded-md border border-violet-200 bg-violet-50 p-3 text-center text-sm font-semibold text-violet-700">Abrir espacio de marca →</Link>
         <ColorMarca slug={marca.slug} inicial={marca.color_primario_hex} />
 
         <div className="grid grid-cols-2 gap-2">

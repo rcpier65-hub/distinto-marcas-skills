@@ -447,7 +447,9 @@ export default function CreativeStudio() {
         setUserId(d.userId);
         uid.current = d.userId;
         if (d.brands.length) {
+          const requestedBrand = new URLSearchParams(window.location.search).get("marca");
           const first =
+            d.brands.find((b: Brand) => b.id === requestedBrand || b.slug === requestedBrand) ||
             d.brands.find((b: Brand) => b.slug.includes("manrique")) ||
             d.brands[0];
           const data: BrandData = await api(`?brand=${first.id}`);

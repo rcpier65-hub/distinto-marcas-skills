@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['127.0.0.1'],
   // Excluir Chromium + puppeteer del bundle de Next.js.
   // Si Next intenta empaquetarlos, su mecanismo interno de resolución de binaries
   // (libs nativas como libnss3, etc) se rompe y Chromium no puede lanzarse.

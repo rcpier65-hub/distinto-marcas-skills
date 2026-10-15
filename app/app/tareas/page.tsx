@@ -50,6 +50,18 @@ export default async function TareasPage() {
   const { data: dataC } = await qc
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const completadas: Tarea[] = ((dataC ?? []) as any[]).map(rowToTarea)
+  // Contexto de planificación solo para tareas que ya pasaron scopeTasks.
+  const visibles = [...tareas, ...completadas]
+  if (visibles.length) {
+    const { data: origins } = await service.from('strategy_actions')
+      .select('task_id,data,sheet_id,hoja:strategy_records!strategy_actions_sheet_id_fkey(title,marca_id,marca:marcas(slug))')
+      .in('task_id', visibles.map(t=>t.id))
+    for (const row of origins ?? []) {
+      const task=visibles.find(t=>t.id===row.task_id), hoja=Array.isArray(row.hoja)?row.hoja[0]:row.hoja
+      const brand=Array.isArray(hoja?.marca)?hoja.marca[0]:hoja?.marca
+      if(task&&hoja&&brand)task.strategy={title:hoja.title,href:`/marca/${brand.slug}/estrategia/hoja/${row.sheet_id}`,deliverable:row.data.deliverable||'',priority:row.data.priority||'Normal',references:row.data.references||''}
+    }
+  }
 
   /* Equipo (para sugerir @menciones al asignar una tarea a otra persona).
      Incluye a todos los miembros activos. El filtro por persona del tablero solo

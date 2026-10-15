@@ -235,6 +235,7 @@ function videoAppUrl(url: string | null): string | null {
    Observaciones se reemplaza por Soporte, y Reuniones+Grabación se unen en un
    solo módulo "Grabaciones y Reuniones" (igual al de la agencia, solo su marca). */
 const NAV = [
+  { id: 'planificacion', label: 'Planificación compartida', corto: 'Planificación', Icono: LayoutGrid },
   { id: 'cal', label: 'Calendario', corto: 'Calendario', Icono: CalendarDays },
   { id: 'stats', label: 'Estadísticas', corto: 'Stats', Icono: BarChart3 },
   { id: 'reuniones', label: 'Grabaciones y Reuniones', corto: 'Agenda', Icono: CalendarClock },
@@ -321,9 +322,10 @@ export function ClientePortalView({
   marcasDisponibles = [],
   reportesSoporte = [],
   influencersActivo = false, influencers = [], influencersDriveUrl = null,
-  tareasMarca = [], equipoTareas = [], tareasPlan = [],
+  tareasMarca = [], equipoTareas = [], tareasPlan = [], planificacionHojas = [],
   reporteNombre = null, reporteMeses = null,
 }: {
+  planificacionHojas?: {id:string;title:string}[]
   marcaId: string
   marcaNombre: string
   marcaSlug: string
@@ -369,7 +371,7 @@ export function ClientePortalView({
   /* ¿Esta marca tiene reporte mensual cargado? (si no, el ítem no aparece) */
   const tieneReporte = !!reporteNombre
   const navVisible = NAV.filter(({ id }) =>
-    (id !== 'reporte' || tieneReporte) && (id !== 'influencers' || influencersActivo))
+    (id !== 'planificacion' || planificacionHojas.length>0) && (id !== 'reporte' || tieneReporte) && (id !== 'influencers' || influencersActivo))
   /* Secciones plegables del menú lateral (como la app: ▼ WORKSPACE / MARCAS).
      Pedro 19-jul-2026. */
   const [secAbierta, setSecAbierta] = useState<{ marca: boolean; herram: boolean }>({ marca: true, herram: true })
@@ -859,6 +861,7 @@ export function ClientePortalView({
             </a>
           )}
 
+      {vista === 'planificacion' && <section className="rounded-2xl border bg-card p-5"><h2 className="text-xl font-bold mb-4">Planificación compartida contigo</h2><div className="grid gap-3 md:grid-cols-2">{planificacionHojas.map(s=><a className="rounded-xl border p-5 hover:bg-violet-50" key={s.id} href={`/cliente/planificacion/${s.id}`}><strong>{s.title}</strong><p className="text-sm text-muted-foreground mt-2">Ver lienzo y comentar →</p></a>)}</div></section>}
       {vista === 'cal' && (
         <div className="space-y-4">
           <section className="rounded-2xl bg-card p-4 sm:p-5 lg:p-7 border">

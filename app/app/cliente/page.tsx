@@ -35,6 +35,8 @@ export default async function ClientePortalPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
+  const {data: sharedSheets} = await service.from('strategy_records').select('id,title')
+    .eq('marca_id',cliente.marcaId).eq('kind','sheet').eq('archived',false).eq('data->>sharedWithClient','true')
   const hoy = ymdLima(new Date())
 
   const COLS = `id, nombre, copy, guion, fecha_publicacion, fecha_entrega, estado, estado_tarea, es_tarea_diseno, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url, link_tiktok, link_instagram, enlace_musica, video_sin_musica_url`
@@ -250,9 +252,13 @@ export default async function ClientePortalPage() {
         .then((r: unknown) => r, () => ({ data: [] })),
     ])
     const porId = new Map<string, unknown>()
+    const candidateIds = [...dataSlug,...dataCategoria].map((r: {id:string})=>r.id)
+    const {data:privateAgreements,error:privacyError} = candidateIds.length ? await service.from('strategy_actions').select('task_id,data').in('task_id',candidateIds).eq('data->>createdTask','true') : {data:[],error:null}
+    if(privacyError)throw new Error('No se pudo comprobar la visibilidad de las tareas')
+    const privateTasks = new Set((privateAgreements??[]).filter((a: {data:{clientVisible?:boolean}})=>a.data.clientVisible!==true).map((a:{task_id:string})=>a.task_id))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ([...dataSlug, ...dataCategoria] as any[])) {
-      if (!porId.has(r.id)) porId.set(r.id, r)
+      if (!porId.has(r.id) && !privateTasks.has(r.id)) porId.set(r.id, r)
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tareasMarca = ([...porId.values()] as any[])
@@ -292,6 +298,7 @@ export default async function ClientePortalPage() {
 
   return (
     <ClientePortalView
+      planificacionHojas={sharedSheets??[]}
       marcaId={cliente.marcaId}
       observaciones={observaciones}
       reuniones={reuniones}

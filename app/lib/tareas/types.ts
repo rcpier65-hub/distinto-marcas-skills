@@ -19,4 +19,5 @@ export type Tarea = {
   /* Traspaso: de quién vino la tarea (Pedro 30-sep-2026). */
   traspasadaDeNombre?: string | null
   traspasadaAt?: string | null
+  strategy?: { title:string; href:string; deliverable:string; priority:string; references:string }
 }

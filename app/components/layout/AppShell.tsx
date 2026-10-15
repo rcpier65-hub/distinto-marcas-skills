@@ -118,6 +118,8 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
   }
 
   const pageTitle = getPageTitle(pathname)
+  const brandWorkspace = !!pathname?.includes('/estrategia')
+  const brandCanvas = !!pathname?.includes('/estrategia/hoja/')
 
   return (
     /* La oficina vive en toda la app: cambiar de módulo no te saca. */
@@ -164,7 +166,8 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
         />
       )}
 
-      <div className="mk-shell">
+      {brandWorkspace && <button className="st-rail-button" aria-label="Mostrar navegación" onClick={() => setDrawerOpen(!drawerOpen)}><Menu size={20}/></button>}
+      <div className={`mk-shell ${brandWorkspace ? 'st-brand-shell' : ''}`}>
         {/* Sidebar — en desktop: posición sticky en flujo.
             En mobile: position fixed con transform translateX. */}
         <div className={`mk-sidebar-wrap ${drawerOpen ? 'mk-sidebar-open' : ''}`}>
@@ -185,11 +188,11 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
 
       {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
-      <ChatFlotante />
-      {permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} />}
+      {!brandCanvas && <ChatFlotante />}
+      {!brandCanvas && permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} />}
       <SonidosBridge />
       {/* "¿Transcribimos?" cuando empieza una reunión (estilo Granola). */}
-      <AvisoReunion />
+      {!brandCanvas && <AvisoReunion />}
     </OficinaProvider>
   )
 }

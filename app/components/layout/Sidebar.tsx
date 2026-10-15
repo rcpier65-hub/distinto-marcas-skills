@@ -217,10 +217,10 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
             {marcasVisibles.map((m) => (
               <NavItem
                 key={m.slug}
-                href={`/grilla/${m.slug}`}
+                href={`/marca/${m.slug}/estrategia`}
                 icon={<MarcaLogo slug={m.slug} nombre={m.nombre} emoji={m.emoji} size={20} />}
                 label={m.nombreCorto}
-                active={isActive(`/grilla/${m.slug}`)}
+                active={isActive(`/marca/${m.slug}`) || isActive(`/grilla/${m.slug}`)}
               />
             ))}
             {puedeGestionarMarcas && (

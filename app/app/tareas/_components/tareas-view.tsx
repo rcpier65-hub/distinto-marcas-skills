@@ -119,7 +119,12 @@ export function TareasView({
       if (typeof f.user === 'string' && (f.user === 'todos' || equipo.some((m) => m.id === f.user))) setFiltroUser(f.user)
       if (typeof f.marca === 'string' && (f.marca === 'todas' || marcas.some((m) => m.slug === f.marca))) setMarcaFiltro(f.marca)
       if (f.vista === 'tablero' || f.vista === 'gantt' || f.vista === 'cal') setVistaBoard(f.vista)
-    } catch { /* sin almacenamiento: filtros por defecto */ } finally { setFiltrosRestaurados(true) }
+    } catch { /* sin almacenamiento: filtros por defecto */ } finally {
+      const requested = new URLSearchParams(window.location.search).get('marca')
+      if (requested && marcas.some(m => m.slug === requested)) { setMarcaFiltro(requested); setFiltroUser('todos') }
+      if (new URLSearchParams(window.location.search).has('tarea')) { setVistaBoard('tablero'); setArchivoOpen(true) }
+      setFiltrosRestaurados(true)
+    }
     })
     return () => cancelAnimationFrame(frame)
   }, [claveFiltros, equipo, marcas])
@@ -138,6 +143,17 @@ export function TareasView({
     window.addEventListener('distinto-tarea-completada', completar)
     return () => window.removeEventListener('distinto-tarea-completada', completar)
   }, [tareas])
+  useEffect(() => {
+    if (!filtrosRestaurados) return
+    const id = new URLSearchParams(window.location.search).get('tarea')
+    if (!id) return
+    const frame = requestAnimationFrame(() => {
+      const card = document.getElementById(`tarea-${id}`)
+      card?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      card?.animate([{ outline: '3px solid #a78bfa', outlineOffset: '4px' }, { outline: '3px solid transparent', outlineOffset: '4px' }], { duration: 2500 })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [filtrosRestaurados])
   const hoyLima = hoy ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
   const [mesCal, setMesCal] = useState(hoyLima.slice(0, 7))
   /* Animación "vuela al archivo" al completar. */
@@ -762,7 +778,7 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
   }
 
   return (
-    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1, position: 'relative' }}>
+    <div id={`tarea-${tarea.id}`} ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1, position: 'relative' }}>
       <div ref={cardRef} className="mk-tarea-card" style={{
         background: '#fff', borderRadius: 12, border: '1px solid #eceef3', borderLeft: `3px solid ${tarea.color}`,
         padding: '10px 11px 9px', color: '#0f172a', boxShadow: '0 1px 2px rgba(15,23,42,0.05)',
@@ -772,6 +788,7 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
         <p {...attributes} {...listeners} style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.38, color: '#0f172a', cursor: readOnly ? 'default' : 'grab', touchAction: 'none', wordBreak: 'break-word' }}>
           {tarea.texto}
         </p>
+        {tarea.strategy && <details style={{fontSize:11,color:'#816699',marginTop:8}}><summary>Contexto de planificación · {tarea.strategy.priority}</summary><p style={{whiteSpace:'pre-wrap'}}>{tarea.strategy.deliverable}</p><p style={{whiteSpace:'pre-wrap'}}>{tarea.strategy.references}</p><a href={tarea.strategy.href}>Abrir hoja: {tarea.strategy.title} ↗</a></details>}
         {tarea.traspasadaDeNombre && (
           <div title={tarea.traspasadaAt ? `Traspasada el ${new Date(tarea.traspasadaAt).toLocaleString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Traspasada'}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10.5, fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: 999 }}>
