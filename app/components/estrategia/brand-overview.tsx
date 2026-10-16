@@ -30,6 +30,7 @@ import { Modal, PrettyDate, Empty } from "./common";
 import { Agenda } from "./agenda";
 import { ExistingWork, workKinds } from "./existing-work";
 import { SocialCard } from "./social-card";
+import { useWorkPeriod } from "./use-work-period";
 
 type BrandObservation = {
   id: string;
@@ -65,8 +66,8 @@ export function BrandOverview({
   createPlan: () => void;
   createApproval: () => void;
 }) {
-  const [detail, setDetail] = useState<Detail>(null),
-    [period, setPeriod] = useState<WorkPeriod>(DEFAULT_WORK_PERIOD);
+  const [detail, setDetail] = useState<Detail>(null);
+  const [period, setPeriod] = useWorkPeriod(b.me.id, b.brand.id, b.workPeriod);
   const [detailPeriod, setDetailPeriod] =
     useState<WorkPeriod>(DEFAULT_WORK_PERIOD);
   const [workKind, setWorkKind] = useState(""),

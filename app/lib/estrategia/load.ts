@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "server-only";
+import { cookies } from "next/headers";
 import { creationDateLima, designFinished } from "./activity-status";
 import { scopeTasks, taskAssignable } from "@/lib/tareas/access";
 import { type Actor, brandAccess } from "./access";
@@ -7,10 +8,12 @@ import { strategyDB } from "./db";
 import { type Activity, type StrategyRecord, todayLima } from "./model";
 import { cargarAgendaCalendario } from "@/lib/calendario/cargar-agenda";
 import { calendarMonthRange, calendarDayHref, googleBrandActivities, recordingFinished } from "./calendar-activities";
+import { readWorkPeriod, workPeriodCookie } from "./work-preferences";
 
 export async function loadBrand(a: Actor, slug: string, calendarMonth = todayLima().slice(0, 7)) {
   const brand = await brandAccess(a, slug),
     db = a.service;
+  const workPeriod = readWorkPeriod((await cookies()).get(workPeriodCookie(a.member.id, brand.id))?.value);
   const warnings: string[] = [];
   async function read(name: string, q: PromiseLike<any>) {
     const r = await q;
@@ -307,6 +310,7 @@ export async function loadBrand(a: Actor, slug: string, calendarMonth = todayLim
     ),
     activities,
     calendarMonth,
+    workPeriod,
     recordings,
     publications,
     observations,
