@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgendaEvento } from './agenda-calendar'
+import { duracionDe, horarioEvento, layoutDia } from '@/lib/calendario/intervalos'
 
 const H_INI = 6
 const H_FIN = 23
@@ -24,13 +25,6 @@ const UMBRAL_PX = 4
 
 export type Movimiento = { fecha: string; hora: string | null; duracionMin: number }
 
-/* Duración con la que se dibuja cada tipo si no la conocemos. */
-export function duracionDe(e: AgendaEvento): number {
-  if (e.duracionMin && e.duracionMin > 0) return e.duracionMin
-  if (e.tipo === 'reunion') return 45
-  if (e.tipo === 'publicacion') return 120
-  return 60
-}
 /* Qué se puede mover / estirar desde el calendario. */
 export function sePuedeMover(e: AgendaEvento): boolean {
   return e.tipo === 'grabacion' || e.tipo === 'reunion' || e.tipo === 'gcal' || e.tipo === 'publicacion' || e.tipo === 'fecha'
@@ -64,30 +58,6 @@ function colores(e: AgendaEvento): { bg: string; fg: string; borde: string } {
   if (e.tipo === 'fecha') return { bg: '#fef9c3', fg: '#a16207', borde: e.color }
   if (e.tipo === 'diseno') return { bg: '#fef3c7', fg: '#92400e', borde: e.color }
   return { bg: '#dbeafe', fg: '#1d4ed8', borde: '#3b82f6' }
-}
-
-/* Reparte eventos que se pisan en columnas (como Google Calendar). */
-function layoutDia(evs: { e: AgendaEvento; ini: number; fin: number }[]) {
-  const orden = [...evs].sort((a, b) => a.ini - b.ini || b.fin - a.fin)
-  const out: { e: AgendaEvento; ini: number; fin: number; col: number; cols: number }[] = []
-  let grupo: typeof out = []
-  let finGrupo = -1
-  const cerrar = () => {
-    const cols = Math.max(1, ...grupo.map((g) => g.col + 1))
-    grupo.forEach((g) => { g.cols = cols })
-    out.push(...grupo)
-    grupo = []
-  }
-  for (const ev of orden) {
-    if (grupo.length && ev.ini >= finGrupo) cerrar()
-    const ocupadas = new Set(grupo.filter((g) => g.fin > ev.ini).map((g) => g.col))
-    let col = 0
-    while (ocupadas.has(col)) col++
-    grupo.push({ ...ev, col, cols: 1 })
-    finGrupo = Math.max(finGrupo, ev.fin)
-  }
-  if (grupo.length) cerrar()
-  return out
 }
 
 type Arrastre = {
@@ -221,13 +191,18 @@ export function GrillaHoras({ dias, eventos, hoy, puedeEditar, onAbrir, onMover 
   const tarjeta = (e: AgendaEvento, diaIdx: number, estilo: React.CSSProperties, ini: number | null, dur: number, fantasma = false) => {
     const c = colores(e)
     const escondido = !fantasma && moviendo?.e.id === e.id && moviendo.e.tipo === e.tipo
-    const corto = dur < 40
+    const corto = dur < 60
+    const muyCorto = dur < 40
     return (
       <div
         key={`${fantasma ? 'g-' : ''}${e.tipo}-${e.id}`}
+        role={fantasma ? undefined : 'button'}
+        tabIndex={fantasma ? -1 : 0}
+        aria-label={`${e.titulo} · ${horarioEvento(e)}`}
+        onKeyDown={(ev) => { if (!fantasma && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); onAbrir(e) } }}
         onPointerDown={(ev) => empezar(ev, e, 'mover', diaIdx)}
         onClick={() => { if (!fantasma && !suprimirClickRef.current) onAbrir(e) }}
-        title={`${e.titulo}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}${puedeEditar && sePuedeMover(e) ? ' — arrastra para mover' : ''}`}
+        title={`${e.titulo} · ${horarioEvento(e)}${e.marcaNombre ? ` · ${e.marcaNombre}` : ''}${puedeEditar && sePuedeMover(e) ? ' — arrastra para mover' : ''}`}
         style={{
           ...estilo,
           background: c.bg, color: c.fg,
@@ -240,12 +215,15 @@ export function GrillaHoras({ dias, eventos, hoy, puedeEditar, onAbrir, onMover 
           userSelect: 'none', zIndex: fantasma ? 30 : 2,
         }}
       >
-        <div style={{ fontWeight: 600, whiteSpace: corto ? 'nowrap' : 'normal', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {corto && ini !== null ? `${hora12(ini)} · ` : ''}{e.tipo === 'grabacion' ? (e.marcaNombre ?? e.titulo) : e.titulo}
-        </div>
-        {!corto && ini !== null && (
-          <div style={{ opacity: 0.85, fontSize: 10.5 }}>{hora12(ini)} – {hora12(ini + dur)}</div>
+        {ini !== null && !muyCorto && (
+          <div style={{ fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {hora12(ini)}{corto ? '' : ` – ${hora12(ini + dur)}`}
+          </div>
         )}
+        <div style={{ fontWeight: 600, overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: corto ? 1 : 3 }}>
+          {muyCorto && ini !== null ? `${hora12(ini)} · ` : ''}
+          {e.tipo === 'grabacion' ? (e.marcaNombre ?? e.titulo) : e.titulo}
+        </div>
         {/* Borde inferior para estirar (cambiar duración) */}
         {puedeEditar && ini !== null && sePuedeEstirar(e) && !fantasma && (
           <div

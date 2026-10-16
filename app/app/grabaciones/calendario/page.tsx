@@ -178,6 +178,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         hoy={hoyLima}
         esDirector={esDirector}
         filtrosIniciales={filtrosGuardados}
+        actualizadaEn={new Date().toISOString()}
         marcasTodas={agenda.marcasTodas}
       />
 

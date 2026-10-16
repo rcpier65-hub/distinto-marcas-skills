@@ -22,6 +22,8 @@ import { GrillaHoras, sePuedeMover, type Movimiento } from './grilla-horas'
 import { EventoModal } from './evento-modal'
 import { CalendarDays, Megaphone, Palette, Star, Users, Video, type LucideIcon } from 'lucide-react'
 import { guardarFiltrosCalendario, type FiltrosCalendario } from './filtros'
+import { crucesAgenda, horarioEvento } from '@/lib/calendario/intervalos'
+import { ActualizarAgenda } from './actualizar-agenda'
 
 export type AgendaEvento = {
   id: string
@@ -56,6 +58,7 @@ type Props = {
   esDirector: boolean      // habilita vincular/editar/eliminar
   marcasTodas: MarcaOpcion[]  // todas las marcas (para el selector de vincular)
   filtrosIniciales: FiltrosCalendario  // chips + marca guardados (cookie)
+  actualizadaEn: string
 }
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -133,7 +136,7 @@ function sugerirMarca(titulo: string, marcas: MarcaOpcion[]): string {
   return mejor
 }
 
-export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas, filtrosIniciales }: Props) {
+export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector, marcasTodas, filtrosIniciales, actualizadaEn }: Props) {
   /* Por defecto solo 🎥 Grabaciones y 🤝 Reuniones (Pedro 24-sep-2026). Lo
      que el usuario elija se guarda (cookie) y se mantiene al cambiar de
      semana/mes o volver a entrar. */
@@ -220,6 +223,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
     }
     return map
   }, [filtrados])
+  const cruces = useMemo(() => crucesAgenda(filtrados), [filtrados])
 
   function toggleTipo(t: AgendaEvento['tipo']) {
     const nuevos = { ...tipos, [t]: !tipos[t] }
@@ -235,6 +239,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
   return (
     <div className="space-y-3">
       {eventoSel && <EventoModal e={eventoSel} esDirector={esDirector} onCerrar={() => setEventoSel(null)} />}
+      <ActualizarAgenda actualizadaEn={actualizadaEn} pausada={!!eventoSel || !!arrastrandoMes} />
 
       {/* ===== Filtros ===== */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -253,6 +258,7 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
                   : 'bg-muted/30 border-border text-muted-foreground opacity-60'
               }`}
               title={on ? 'Ocultar' : 'Mostrar'}
+              aria-pressed={on}
             >
               <TipoIcono t={t} size={14} />
               {TIPO_META[t].label}
@@ -280,6 +286,32 @@ export function AgendaCalendar({ vista, desde, eventos, marcas, hoy, esDirector,
           ))}
         </select>
       </div>
+
+      {cruces.length > 0 && (
+        <details className="rounded-xl border border-amber-200 bg-amber-50/60 text-amber-950 p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            {cruces.length} {cruces.length === 1 ? 'cruce de horario' : 'cruces de horario'} · Ver eventos simultáneos
+          </summary>
+          <p className="mt-2 text-xs">Estos eventos coinciden en la agenda del equipo. Abre cualquiera para revisar sus datos.</p>
+          <ul className="mt-3 space-y-3">
+            {cruces.map(grupo => (
+              <li key={`${grupo.fecha}-${grupo.eventos[0].tipo}-${grupo.eventos[0].id}`} className="text-xs">
+                <p className="capitalize font-semibold mb-1">{fechaLarga(grupo.fecha)}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {grupo.eventos.map(e => (
+                    <button key={`${e.tipo}-${e.id}`} type="button" onClick={() => setEventoSel(e)}
+                      className="bg-card border border-amber-200 rounded-lg px-3 py-2 text-left hover:bg-amber-100 min-w-0 max-w-full">
+                      <strong className="block">{horarioEvento(e)}</strong>
+                      <span className="block break-words">{e.titulo}</span>
+                      {e.marcaNombre && <small>{e.marcaNombre}</small>}
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {/* ===== VISTA MES ===== */}
       {vista === 'mes' && (
