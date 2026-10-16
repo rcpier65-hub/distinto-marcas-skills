@@ -27,7 +27,7 @@ import { RangoNav, type VistaAgenda } from './_components/rango-nav'
 
 export const dynamic = 'force-dynamic'
 
-type SP = { desde?: string; hasta?: string; vista?: string }
+type SP = { desde?: string; hasta?: string; vista?: string; marca?: string }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
@@ -160,9 +160,9 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
           invitación + recordatorio. */}
       {puedeAgendar && <AgendarReunionBox />}
 
-      {agenda.grabError && (
+      {(agenda.grabError || agenda.gcalError) && (
         <div className="p-4 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-          ⚠️ {agenda.grabError}
+          ⚠️ {agenda.grabError || agenda.gcalError}
         </div>
       )}
 
@@ -177,7 +177,9 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         marcas={marcasMes}
         hoy={hoyLima}
         esDirector={esDirector}
-        filtrosIniciales={filtrosGuardados}
+        filtrosIniciales={sp.marca && marcasMes.some(m => m.slug === sp.marca)
+          ? { ...filtrosGuardados, marca: sp.marca, tipos: { ...filtrosGuardados.tipos, grabacion: true, reunion: true } }
+          : filtrosGuardados}
         actualizadaEn={new Date().toISOString()}
         marcasTodas={agenda.marcasTodas}
       />

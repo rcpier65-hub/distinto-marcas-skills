@@ -5,8 +5,10 @@ import { scopeTasks, taskAssignable } from "@/lib/tareas/access";
 import { type Actor, brandAccess } from "./access";
 import { strategyDB } from "./db";
 import { type Activity, type StrategyRecord, todayLima } from "./model";
+import { cargarAgendaCalendario } from "@/lib/calendario/cargar-agenda";
+import { calendarMonthRange, calendarDayHref, googleBrandActivities, recordingFinished } from "./calendar-activities";
 
-export async function loadBrand(a: Actor, slug: string) {
+export async function loadBrand(a: Actor, slug: string, calendarMonth = todayLima().slice(0, 7)) {
   const brand = await brandAccess(a, slug),
     db = a.service;
   const warnings: string[] = [];
@@ -21,6 +23,7 @@ export async function loadBrand(a: Actor, slug: string) {
   const canPub = a.access.owner || a.permisos.publicaciones?.acceso === true,
     canDesign = a.access.owner || a.permisos.diseno?.acceso === true,
     canEdit = a.access.owner || a.permisos.editor?.acceso === true;
+  const calendarMonths = [...new Set([todayLima().slice(0, 7), calendarMonth])];
   const [
     pubs,
     tasks,
@@ -34,6 +37,7 @@ export async function loadBrand(a: Actor, slug: string) {
     notes,
     records,
     links,
+    agendas,
   ] = await Promise.all([
     canPub || canDesign || canEdit
       ? read(
@@ -73,7 +77,7 @@ export async function loadBrand(a: Actor, slug: string) {
           db
             .from("grabaciones")
             .select(
-              "id,fecha_planeada,hora_planeada,fecha_real,estado,videos_grabados,notas,enlace_guiones",
+              "id,fecha_planeada,hora_planeada,fecha_real,estado,videos_grabados,notas,enlace_guiones,google_event_id",
             )
             .eq("marca_id", brand.id)
             .order("fecha_planeada", { ascending: false })
@@ -85,7 +89,7 @@ export async function loadBrand(a: Actor, slug: string) {
           "reuniones",
           db
             .from("marca_reuniones")
-            .select("id,titulo,fecha_hora,estado,modalidad,lugar_enlace")
+            .select("id,titulo,fecha_hora,estado,modalidad,lugar_enlace,google_event_id")
             .eq("marca_id", brand.id)
             .order("fecha_hora", { ascending: false })
             .limit(500),
@@ -149,6 +153,9 @@ export async function loadBrand(a: Actor, slug: string) {
     strategyDB().query("SELECT * FROM strategy_links WHERE marca_id=$1", [
       brand.id,
     ]),
+    canPub ? Promise.all(calendarMonths.map(month => cargarAgendaCalendario({
+      ...calendarMonthRange(month), marcasAcceso: [brand.id],
+    }))) : [],
   ]);
   if (pubs?.length === 1800 || tasks?.length === 1500)
     warnings.push(
@@ -244,9 +251,9 @@ export async function loadBrand(a: Actor, slug: string) {
       date: r.fecha_planeada,
       time: r.hora_planeada || "",
       state: r.estado,
-      done: !!r.fecha_real || r.estado === "realizada",
+      done: recordingFinished(r),
       owner: "Equipo audiovisual",
-      href: `/grabaciones/calendario?marca=${slug}`,
+      href: calendarDayHref(r.fecha_planeada, slug),
     });
   for (const r of meetings ?? []) {
     const d = new Date(r.fecha_hora);
@@ -267,8 +274,14 @@ export async function loadBrand(a: Actor, slug: string) {
       state: r.estado || "Programada",
       done: r.estado === "realizada",
       owner: "Equipo",
-      href: `/grabaciones/calendario?marca=${slug}`,
+      href: calendarDayHref(creationDateLima(r.fecha_hora)!, slug),
     });
+  }
+  const linkedGoogleIds = new Set<string>([...(recordings ?? []), ...(meetings ?? [])]
+    .map(r => r.google_event_id).filter(Boolean));
+  activities.push(...googleBrandActivities(agendas.flatMap(agenda => agenda.eventos), slug, linkedGoogleIds));
+  for (const agenda of agendas) {
+    if (agenda.gcalError && !warnings.includes(agenda.gcalError)) warnings.push(agenda.gcalError);
   }
   for (const r of dates ?? [])
     add({
@@ -293,6 +306,7 @@ export async function loadBrand(a: Actor, slug: string) {
       visibleTargets.has(`${l.target_type}:${l.target_id}`),
     ),
     activities,
+    calendarMonth,
     recordings,
     publications,
     observations,

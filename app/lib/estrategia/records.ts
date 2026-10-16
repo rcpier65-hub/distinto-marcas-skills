@@ -217,6 +217,8 @@ export async function linkWork(a: Actor, slug: string, input: any) {
       "El trabajo no pertenece a esta marca o no tienes acceso",
       403,
     );
+  if (target.source === "calendar")
+    throw new StrategyError("Este evento se consulta desde el calendario. Vincula un registro interno para asociarlo a una campaña.");
   if (!input.campaignId && !input.sheetId)
     throw new StrategyError("Elige una campaña o una hoja");
   for (const [id, kind] of [

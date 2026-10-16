@@ -16,6 +16,7 @@
 //   GOOGLE_OAUTH_REDIRECT_URI (default: https://distinto-app.vercel.app/api/auth/google/callback)
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { fetchCalendarPages } from '@/lib/calendario/google-event-pages'
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -39,6 +40,7 @@ async function getGrabacionesCalendarId(token: string): Promise<string> {
   try {
     const res = await fetch(`${CAL_API}/users/me/calendarList?fields=items(id,summary)`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) {
       _grabacionesCalendarIdCache = 'primary'
@@ -328,10 +330,9 @@ export async function createReunionEvent(
   const data = await res.json()
   if (!res.ok) return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const meetLink: string | null =
     data.hangoutLink ??
-    data.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri ??
+    data.conferenceData?.entryPoints?.find((e: { entryPointType?: string; uri?: string }) => e.entryPointType === 'video')?.uri ??
     null
   return { ok: true, eventId: data.id, meetLink }
 }
@@ -591,7 +592,7 @@ function isoALima(iso: string): { ymd: string; hm: string } {
  * el calendario de la app muestre también lo que Pedro agenda directo en
  * Google. Best-effort: cualquier fallo devuelve [] — la vista sigue viva.
  */
-export async function listCalendarEvents(desde: string, hasta: string): Promise<GCalEventLite[]> {
+export async function listCalendarEvents(desde: string, hasta: string, onError?: () => void): Promise<GCalEventLite[]> {
   /* Best-effort DE VERDAD: esta función corre en el render de la página del
      calendario — un refresh de token que falle o se cuelgue no puede tumbar
      ni frenar la vista. Tope duro de 6s para conseguir token. */
@@ -601,8 +602,8 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
       getValidAccessToken(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
     ])
-  } catch (e) { console.error('[gcal] listCalendarEvents: token falló', e); return [] }
-  if (!token) { console.error('[gcal] listCalendarEvents: sin token (refresh falló o tardó >6s)'); return [] }
+  } catch (e) { console.error('[gcal] listCalendarEvents: token falló', e); onError?.(); return [] }
+  if (!token) { console.error('[gcal] listCalendarEvents: sin token (refresh falló o tardó >6s)'); onError?.(); return [] }
 
   const grabCal = await getGrabacionesCalendarId(token)
   const calIds = [...new Set([grabCal, 'primary'])]
@@ -613,7 +614,7 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
     singleEvents: 'true',
     orderBy: 'startTime',
     maxResults: '250',
-    fields: 'items(id,summary,status,start,end,hangoutLink)',
+    fields: 'nextPageToken,items(id,summary,status,start,end,hangoutLink)',
   })
 
   const durMin = (ev: { start?: { dateTime?: string }; end?: { dateTime?: string } }): number | null => {
@@ -625,19 +626,13 @@ export async function listCalendarEvents(desde: string, hasta: string): Promise<
   /* Los calendarios se consultan EN PARALELO y con timeout corto — esta
      lectura corre en el render de la página y no debe frenarla. */
   const respuestas = await Promise.all(calIds.map(async (calId) => {
-    try {
-      const res = await fetch(
-        `${CAL_API}/calendars/${encodeURIComponent(calId)}/events?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) },
-      )
-      if (!res.ok) {
-        console.error('[gcal] listCalendarEvents', calId, 'HTTP', res.status, (await res.text().catch(() => '')).slice(0, 300))
-        return []
-      }
-      const data = await res.json()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data.items ?? []) as any[]
-    } catch (e) { console.error('[gcal] listCalendarEvents', calId, e); return [] }  /* best-effort */
+    const signal = AbortSignal.timeout(8000)
+    const result = await fetchCalendarPages(
+      new URL(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events?${params.toString()}`),
+      url => fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal, cache: 'no-store' }),
+    )
+    if (!result.complete) onError?.()
+    return result.items
   }))
 
   const vistos = new Set<string>()

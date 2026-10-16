@@ -27,7 +27,7 @@ export type Member = { id: string; nombre: string };
 export type Activity = {
   id: string;
   sourceId: string;
-  source: "publication" | "task" | "recording" | "meeting" | "date";
+  source: "publication" | "task" | "recording" | "meeting" | "date" | "calendar";
   kind:
     | "Publicación"
     | "Tarea"

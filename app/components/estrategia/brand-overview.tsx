@@ -53,8 +53,13 @@ export function BrandOverview({
   edit,
   createPlan,
   createApproval,
+  calendarMonth, onCalendarMonthChange, calendarLoading, calendarError,
 }: {
   b: BrandPayload;
+  calendarMonth: string;
+  onCalendarMonthChange: (month: string) => void;
+  calendarLoading: boolean;
+  calendarError: string | null;
   navigate: (tab: string, sub?: string) => void;
   edit: (r: StrategyRecord) => void;
   createPlan: () => void;
@@ -440,7 +445,7 @@ export function BrandOverview({
                 {activityList(work)}
               </>
             )}
-            {detail === "calendar" && <Agenda activities={b.activities} />}
+            {detail === "calendar" && <Agenda activities={b.activities} month={calendarMonth} onMonthChange={onCalendarMonthChange} syncing={calendarLoading} error={calendarError} />}
             {detail === "attention" && (
               <>
                 <h3>Vencidos de este mes · {late.length}</h3>

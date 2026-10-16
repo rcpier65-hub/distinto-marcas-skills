@@ -12,8 +12,11 @@ const kinds = [
   "Reunión",
   "Fecha importante",
 ];
-export function Agenda({ activities }: { activities: Activity[] }) {
-  const [month, setMonth] = useState(todayLima().slice(0, 7)),
+export function Agenda({ activities, month, onMonthChange: setMonth, syncing, error }: {
+  activities: Activity[]; month: string; onMonthChange: (month: string) => void;
+  syncing?: boolean; error?: string | null;
+}) {
+  const
     [kind, setKind] = useState(""),
     [owner, setOwner] = useState(""),
     [state, setState] = useState(""),
@@ -61,7 +64,7 @@ export function Agenda({ activities }: { activities: Activity[] }) {
       <div className="st-row">
         <div>
           <h2>Calendario de la marca</h2>
-          <p>Publicación, entregas y reuniones en su fecha correspondiente.</p>
+          <p>Publicaciones, entregas, grabaciones y reuniones en su fecha correspondiente.</p>
         </div>
         <div className="st-row st-tight">
           <button
@@ -124,6 +127,8 @@ export function Agenda({ activities }: { activities: Activity[] }) {
           <option value="done">Terminados</option>
         </select>
       </div>
+      {syncing && <p role="status">Actualizando agenda…</p>}
+      {error && <p role="alert">{error}</p>}
       {mode === "month" ? (
         <div className="st-month">
           {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
@@ -185,8 +190,9 @@ export function Agenda({ activities }: { activities: Activity[] }) {
               {selected.kind === "Tarea" ? "Tareas" : "el módulo de origen"}
             </Jump>
             <small>
-              La fecha y el estado se leen del registro original. Los cambios
-              aparecerán aquí al actualizar.
+              {selected.source === "calendar"
+                ? "Fecha y hora sincronizadas con Google Calendar. La cita no confirma por sí sola que se realizó la sesión."
+                : "La fecha y el estado se leen del registro original. Los cambios aparecerán aquí al actualizar."}
             </small>
           </div>
         </Modal>

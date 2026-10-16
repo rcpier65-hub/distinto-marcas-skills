@@ -137,6 +137,7 @@ export async function GET(request: Request) {
     hoy,
     total: eventos.length,
     grab_error: agenda.grabError,
+    google_error: agenda.gcalError,
     google_conectado: agenda.gcal.connected,
     eventos,
   })

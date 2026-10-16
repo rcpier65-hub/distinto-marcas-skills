@@ -5,10 +5,14 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const month = url.searchParams.get("mes") || undefined;
+    if (month && !/^(20\d{2})-(0[1-9]|1[0-2])$/.test(month)) throw new StrategyError("Mes inválido");
     return Response.json(
       await loadBrand(
         await actor(req),
         new URL(req.url).searchParams.get("marca") || "",
+        month,
       ),
       { headers: { "Cache-Control": "private, no-store" } },
     );

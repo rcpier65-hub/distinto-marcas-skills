@@ -45,6 +45,9 @@ const kindLabel = {
 export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
   const router = useRouter(),
     [b, setB] = useState(initial),
+    [calendarMonth, setCalendarMonth] = useState(initial.calendarMonth),
+    [calendarLoading, setCalendarLoading] = useState(false),
+    [calendarError, setCalendarError] = useState<string | null>(null),
     [tab, setTab] = useState("Resumen"),
     [sub, setSub] = useState("Contexto"),
     [campaignId, setCampaignId] = useState(""),
@@ -71,13 +74,15 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
     const refresh = () => {
       if (document.visibilityState !== "visible" || inFlight) return;
       inFlight = true;
-      void api(`/api/estrategia?marca=${encodeURIComponent(brand.slug)}`)
+      setCalendarLoading(true);
+      void api(`/api/estrategia?marca=${encodeURIComponent(brand.slug)}&mes=${calendarMonth}`)
         .then((x) => {
-          if (!stopped) setB(x);
+          if (!stopped) { setB(x); setCalendarError(null); }
         })
-        .catch(() => {})
+        .catch(() => { if (!stopped) setCalendarError("No se pudo actualizar la agenda. Intenta actualizar de nuevo."); })
         .finally(() => {
           inFlight = false;
+          if (!stopped) setCalendarLoading(false);
         });
     };
     // Recheck cached navigation and changes made from another module or tab.
@@ -97,11 +102,11 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
       events.forEach((event) => window.removeEventListener(event, refresh));
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [brand.slug]);
+  }, [brand.slug, calendarMonth]);
   async function reload() {
     setBusy(true);
     try {
-      setB(await api(`/api/estrategia?marca=${brand.slug}`));
+      setB(await api(`/api/estrategia?marca=${brand.slug}&mes=${calendarMonth}`));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -310,6 +315,10 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
         {tab === "Resumen" && (
           <BrandOverview
             b={b}
+            calendarMonth={calendarMonth}
+            onCalendarMonthChange={setCalendarMonth}
+            calendarLoading={calendarLoading}
+            calendarError={calendarError}
             navigate={(next, section) => {
               setTab(next);
               if (section) setSub(section);
@@ -539,7 +548,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
                 )}
               </>
             )}
-            {campaignTab === "Agenda" && <Agenda activities={activities} />}
+            {campaignTab === "Agenda" && <Agenda activities={activities} month={calendarMonth} onMonthChange={setCalendarMonth} syncing={calendarLoading} error={calendarError} />}
             {campaignTab === "Resultados" && (
               <Results campaign={campaign} edit={() => setEditing(campaign)} />
             )}
@@ -727,7 +736,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
                     })}
                   </div>
                   <p className="st-muted">
-                    Las cantidades no se suman entre unidades. El avance usa las
+                    Grabaciones en la agenda del mes: {b.activities.filter(a => a.kind === "Grabación" && a.date?.startsWith(month)).length}. Una cita de Google requiere confirmar su realización para contar como realizada. Las cantidades no se suman entre unidades. El avance usa las
                     fechas registradas en cada módulo.
                   </p>
                 </section>
@@ -827,7 +836,7 @@ function LinkExisting({
     [busy, setBusy] = useState(false),
     items = [
       ...new Map(
-        b.activities.map((a) => [a.source + ":" + a.sourceId, a]),
+        b.activities.filter(a => a.source !== "calendar").map((a) => [a.source + ":" + a.sourceId, a]),
       ).values(),
     ];
   async function link() {

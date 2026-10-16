@@ -41,6 +41,7 @@ export type AgendaCargada = {
   marcasMes: AgendaMarcaMes[]
   marcasTodas: AgendaMarcaOpcion[]
   grabError: string | null
+  gcalError: string | null
   gcal: { connected: boolean; email: string | null }
 }
 
@@ -54,11 +55,12 @@ export async function cargarAgendaCalendario(opts: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
 
+  let gcalError: string | null = null
   const [grabRes, marcasRes, gcalStatus, gcalEvents] = await Promise.all([
     consultarGrabaciones(desde, hasta),
     service.from('marcas').select('id, slug, nombre, emoji_marca, color_calendario'),
     getGoogleCalendarStatus(),
-    listCalendarEvents(desde, hasta),
+    listCalendarEvents(desde, hasta, () => { gcalError = 'No se pudo actualizar toda la agenda de Google Calendar. Vuelve a actualizar para comprobar las grabaciones y reuniones.' }),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -276,5 +278,6 @@ export async function cargarAgendaCalendario(opts: {
     })),
     grabError: grabRes.ok ? null : grabRes.error,
     gcal: gcalStatus,
+    gcalError,
   }
 }
