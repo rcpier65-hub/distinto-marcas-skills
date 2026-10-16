@@ -30,9 +30,8 @@ import {
 import { MarcaLogo } from "@/components/marca-logo";
 import { api, Modal, Field, Empty, Jump, Stat, PrettyDate } from "./common";
 import { Agenda } from "./agenda";
-import { SocialCard } from "./social-card";
-import { ExistingWork } from "./existing-work";
-import { designFinished, operational, weekWindow } from "@/lib/estrategia/activity-status";
+import { BrandOverview } from "./brand-overview";
+import { designFinished } from "@/lib/estrategia/activity-status";
 import "./strategy.css";
 
 const nav = ["Resumen", "Planificación", "Campañas", "Oportunidades", "Marca"];
@@ -64,17 +63,8 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
   const month = b.today.slice(0, 7),
     scope = live.find((r) => r.kind === "settings" && r.data.month === month),
     activities = byCampaign(b.activities, b.links, campaignId),
-    pending = b.activities.filter((x) => !x.done && operational(x)),
-    current = pending.filter((x) => !x.date || x.date >= `${month}-01`),
-    late = current.filter((x) => x.date && x.date < b.today).sort((a,b) => (b.date || "").localeCompare(a.date || "")),
     approvals = live.filter((r) => r.kind === "approval"),
     unapproved = approvals.filter((r) => r.data.state !== "Aprobada");
-  const week = weekWindow(b.today);
-  const activePlan = live.find((s) => s.kind === "sheet" && (!s.data.end || String(s.data.end) >= b.today));
-  const linkedWork = activePlan ? b.activities.filter(a => b.links.some(l => l.sheet_id === activePlan.id && l.target_type === a.source && l.target_id === a.sourceId)) : [];
-  const published = b.activities.filter(
-    (x) => x.kind === "Publicación" && x.date?.startsWith(month) && x.done,
-  );
   useEffect(() => {
     let stopped = false;
     const refresh = () => {
@@ -159,8 +149,13 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
     return (
       <article className="st-card st-sheet-card" key={s.id}>
         <Link className="st-sheet-preview" href={`${base}/hoja/${s.id}`}>
-          <div className="st-mini-note">{str(s.data,"objective") || "Objetivos por definir"}</div>
-          <div className="st-mini-note">{b.links.filter(l=>l.sheet_id===s.id).length} registros vinculados</div>
+          <div className="st-mini-note">
+            {str(s.data, "objective") || "Objetivos por definir"}
+          </div>
+          <div className="st-mini-note">
+            {b.links.filter((l) => l.sheet_id === s.id).length} registros
+            vinculados
+          </div>
           <LayoutTemplate size={24} />
         </Link>
         <div className="st-row">
@@ -243,7 +238,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
     </div>
   );
   return (
-    <div className="st-workspace">
+    <div className={`st-workspace ${tab === "Resumen" ? "st-overview" : ""}`}>
       <header className="st-header">
         <div className="st-row">
           <div className="st-brand">
@@ -296,133 +291,16 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
       )}
       <div className="st-body">
         {tab === "Resumen" && (
-          <>
-            <div className="st-summary-grid">
-              <SocialCard key={brand.slug} slug={brand.slug} manager={b.me.manager}/>
-              <section className="st-card st-focus">
-                <span className="st-eyebrow">EL FOCO DE LA MARCA</span>
-                <h2>
-                  {str(scope?.data || {}, "objective") ||
-                    "Definamos el objetivo de este mes"}
-                </h2>
-                <p>
-                  {campaigns.find((c) => c.data.priority === true)?.title ||
-                    campaigns.find((c) => c.data.state === "Activa")?.title ||
-                    "Elige una campaña prioritaria o trabaja con contenido recurrente."}
-                </p>
-                <button
-                  onClick={() => {
-                    setTab("Marca");
-                    setSub("Alcance del mes");
-                  }}
-                >
-                  Revisar objetivo y alcance →
-                </button>
-              </section>
-            </div>
-            <div className="st-stats">
-              <Stat label="Publicaciones del mes" value={published.length} detail="Publicadas según la grilla"/>
-              <Stat label="Pendientes esta semana" value={current.filter(a=>a.date && a.date>=week.start && a.date<=week.end).length} detail="Trabajo operativo con fecha"/>
-              <Stat label="Por programar" value={current.filter(a=>!a.date).length} detail="Trabajo existente sin fecha"/>
-              <Stat label="Revisar este mes" value={late.length+unapproved.length} detail="Vencidos del mes y aprobaciones"/>
-            </div>
-            <section className="st-card st-plan-highlight">
-              <div><span className="st-eyebrow">PLAN DE TRABAJO</span><h2>{activePlan?.title || "Organiza el siguiente paso de la marca"}</h2>
-                <p>{str(activePlan?.data || {}, "objective") || "Crea una hoja y vincula el trabajo que ya existe."}</p>
-                {activePlan && <small>{str(activePlan.data,"state")} · <PrettyDate value={str(activePlan.data,"start")}/> — <PrettyDate value={str(activePlan.data,"end")}/> · {linkedWork.length} actividades vinculadas · {linkedWork.filter(a=>a.done).length} terminadas</small>}
-              </div>
-              {activePlan ? <Link className="st-primary" href={`${base}/hoja/${activePlan.id}`}>Abrir plan y lienzo →</Link> : <button className="st-primary" onClick={()=>create("sheet")}>Crear plan</button>}
-            </section>
-            <ExistingWork activities={b.activities} today={b.today}/>
-            <div className="st-two">
-              <section className="st-card">
-                <div className="st-row">
-                  <h2>Vencido este mes</h2>
-                  <span className="st-badge">{late.length}</span>
-                </div>
-                {workList(late.slice(0, 5))}
-                {!late.length && (
-                  <p>No hay entregas vencidas de este mes. El calendario conserva el historial.</p>
-                )}
-              </section>
-              <section className="st-card">
-                <div className="st-row">
-                  <h2>Esperamos del cliente</h2>
-                  <button
-                    onClick={() =>
-                      create("approval", { waitingFor: "Cliente" })
-                    }
-                  >
-                    <Plus size={15} />
-                    Añadir
-                  </button>
-                </div>
-                {unapproved
-                  .filter((r) => r.data.waitingFor === "Cliente")
-                  .map((r) => (
-                    <button
-                      className="st-attention"
-                      key={r.id}
-                      onClick={() => setEditing(r)}
-                    >
-                      <strong>{r.title}</strong>
-                      <small>
-                        {str(r.data, "description")} ·{" "}
-                        <PrettyDate value={str(r.data, "date")} />
-                      </small>
-                    </button>
-                  ))}
-                {(b.observations ?? [])
-                  .filter((o: any) => !o.atendida)
-                  .slice(0, 3)
-                  .map((o: any) => (
-                    <div className="st-attention" key={o.id}>
-                      <strong>Observación de {o.autor_nombre}</strong>
-                      <p>{o.texto}</p>
-                      <Jump href={`/grilla/${brand.slug}`}>
-                        Revisar en grilla
-                      </Jump>
-                    </div>
-                  ))}
-              </section>
-            </div>
-            <Agenda activities={b.activities} />
-            <section className="st-card">
-              <div className="st-row"><div><h2>Grabaciones del mes</h2><p>{(b.recordings || []).filter((r:any) => (r.fecha_real || r.fecha_planeada || "").startsWith(month)).length} sesiones registradas · Objetivo configurado: {brand.grabaciones_objetivo_mensual ?? "por definir"} sesiones</p><small>El objetivo de sesiones es distinto de la cantidad de videos y debe cotejarse con el alcance comercial.</small></div><Jump href={`/grabaciones/calendario?marca=${brand.slug}`}>Revisar grabaciones</Jump></div>
-            </section>
-            <div className="st-two">
-              <section className="st-card">
-                <h2>Equipo con acceso a la marca</h2>
-                {b.team.map((m: any) => (
-                  <div className="st-row st-team" key={m.id}>
-                    <strong>{m.nombre}</strong>
-                    <small>{m.rol.replaceAll("_", " ")}</small>
-
-                  </div>
-                ))}
-              </section>
-              <section className="st-card">
-                <h2>Últimas decisiones y cambios</h2>
-                {live.slice(0, 5).map((r) => (
-                  <button
-                    className="st-attention"
-                    key={r.id}
-                    onClick={() =>
-                      r.kind === "sheet"
-                        ? router.push(`${base}/hoja/${r.id}`)
-                        : setEditing(r)
-                    }
-                  >
-                    <strong>{r.title}</strong>
-                    <small>
-                      {kindLabel[r.kind]} · {str(r.data, "state")} ·{" "}
-                      <PrettyDate value={r.updated_at} />
-                    </small>
-                  </button>
-                ))}
-              </section>
-            </div>
-          </>
+          <BrandOverview
+            b={b}
+            navigate={(next, section) => {
+              setTab(next);
+              if (section) setSub(section);
+            }}
+            edit={setEditing}
+            createPlan={() => create("sheet")}
+            createApproval={() => create("approval", { waitingFor: "Cliente" })}
+          />
         )}
         {tab === "Planificación" && (
           <>
@@ -811,7 +689,9 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
                                     p.es_tarea_diseno &&
                                     designFinished(p) &&
                                     (
-                                      p.diseno_terminado_at || p.fecha_entrega || p.fecha_diseno
+                                      p.diseno_terminado_at ||
+                                      p.fecha_entrega ||
+                                      p.fecha_diseno
                                     )?.startsWith(period),
                                 ).length
                               : null;

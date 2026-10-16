@@ -8,11 +8,13 @@ import { completarTarea } from '@/app/tareas/_actions'
 import { iniciarTarea, pausarTarea } from '@/app/tareas/_plan-actions'
 import { listarRecordatorios, marcarRecordatorio, type Recordatorio } from '@/app/recordatorios/_actions'
 
-export function PendientesFlotantes({ usuario }: { usuario: string }) {
+export function PendientesFlotantes({ usuario, compact = false }: { usuario: string; compact?: boolean }) {
   const [tareas, setTareas] = useState<TareaFlotante[]>([])
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([])
   const [pos, setPos] = useState({ x: 16, y: 140 })
   const [cerrado, setCerrado] = useState(false)
+  const [dockOpen, setDockOpen] = useState(false)
+  const collapsed = compact ? !dockOpen : cerrado
   const [busy, setBusy] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
@@ -60,13 +62,13 @@ export function PendientesFlotantes({ usuario }: { usuario: string }) {
     } catch { toast.error('No se pudo completar la tarea.') } finally { setBusy(null) }
   }
   if (!tareas.length && !recordatorios.length) return null
-  return <aside aria-label="Tareas y recordatorios anclados" className="fixed z-40 flex flex-col overflow-hidden w-[280px] max-w-[calc(100vw-16px)] rounded-2xl border bg-card shadow-xl" style={{ left: pos.x, top: pos.y, maxHeight: `calc(100dvh - ${pos.y + 88}px)` }}>
+  return <aside aria-label="Tareas y recordatorios anclados" className={`fixed z-40 flex flex-col overflow-hidden w-[280px] max-w-[calc(100vw-16px)] rounded-2xl border bg-card shadow-xl ${compact ? "st-brand-pending" : ""}`} style={{ left: pos.x, top: pos.y, maxHeight: `calc(100dvh - ${pos.y + 88}px)` }}>
     <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
-      <button type="button" aria-label="Mover panel; también puedes usar las flechas del teclado" className="cursor-grab touch-none p-1" onPointerDown={e => { drag.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }; e.currentTarget.setPointerCapture(e.pointerId) }} onPointerMove={e => { const d = drag.current; if (!d) return; setPos({ x: Math.max(8, Math.min(window.innerWidth - 288, d.px + e.clientX - d.x)), y: Math.max(60, Math.min(window.innerHeight - 120, d.py + e.clientY - d.y)) }) }} onPointerUp={() => { drag.current = null; localStorage.setItem(`distinto-flotante:${usuario}`, JSON.stringify(pos)) }} onPointerCancel={() => { drag.current = null }} onKeyDown={e => { const delta = { ArrowLeft: [-20,0], ArrowRight: [20,0], ArrowUp: [0,-20], ArrowDown: [0,20] }[e.key]; if (!delta) return; e.preventDefault(); setPos(p => { const v = { x: Math.max(8, Math.min(window.innerWidth - 288, p.x + delta[0])), y: Math.max(60, Math.min(window.innerHeight - 120, p.y + delta[1])) }; localStorage.setItem(`distinto-flotante:${usuario}`, JSON.stringify(v)); return v }) }}><GripHorizontal size={16} /></button>
+      <button type="button" aria-label="Mover panel; también puedes usar las flechas del teclado" className="st-pending-drag cursor-grab touch-none p-1" onPointerDown={e => { drag.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }; e.currentTarget.setPointerCapture(e.pointerId) }} onPointerMove={e => { const d = drag.current; if (!d) return; setPos({ x: Math.max(8, Math.min(window.innerWidth - 288, d.px + e.clientX - d.x)), y: Math.max(60, Math.min(window.innerHeight - 120, d.py + e.clientY - d.y)) }) }} onPointerUp={() => { drag.current = null; localStorage.setItem(`distinto-flotante:${usuario}`, JSON.stringify(pos)) }} onPointerCancel={() => { drag.current = null }} onKeyDown={e => { const delta = { ArrowLeft: [-20,0], ArrowRight: [20,0], ArrowUp: [0,-20], ArrowDown: [0,20] }[e.key]; if (!delta) return; e.preventDefault(); setPos(p => { const v = { x: Math.max(8, Math.min(window.innerWidth - 288, p.x + delta[0])), y: Math.max(60, Math.min(window.innerHeight - 120, p.y + delta[1])) }; localStorage.setItem(`distinto-flotante:${usuario}`, JSON.stringify(v)); return v }) }}><GripHorizontal size={16} /></button>
       <span className="flex-1 text-xs font-semibold">Mis pendientes · {tareas.length + recordatorios.length}</span>
-      <button aria-label={cerrado ? 'Expandir pendientes' : 'Contraer pendientes'} onClick={() => { setCerrado(!cerrado); try { localStorage.setItem(`distinto-flotante-cerrado:${usuario}`, cerrado ? '0' : '1') } catch {} }}>{cerrado ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
+      <button aria-label={collapsed ? 'Expandir pendientes' : 'Contraer pendientes'} onClick={() => { if (compact) { setDockOpen(!dockOpen); return }; setCerrado(!cerrado); try { localStorage.setItem(`distinto-flotante-cerrado:${usuario}`, cerrado ? '0' : '1') } catch {} }}>{collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
     </div>
-    {!cerrado && <div className="min-h-0 max-h-[45vh] overflow-y-auto p-3 space-y-3">
+    {!collapsed && <div className="min-h-0 max-h-[45vh] overflow-y-auto p-3 space-y-3">
       {tareas.map(t => {
         const seg = (t.tiempo_seg ?? 0) + (t.en_proceso_desde ? Math.max(0, Math.floor((ahora - new Date(t.en_proceso_desde).getTime()) / 1000)) : 0)
         const tiempo = `${Math.floor(seg/3600)}:${String(Math.floor(seg/60)%60).padStart(2,'0')}:${String(seg%60).padStart(2,'0')}`

@@ -188,8 +188,8 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
 
       {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
-      {!brandCanvas && <ChatFlotante />}
-      {!brandCanvas && permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} />}
+      {!brandCanvas && <div className={brandWorkspace ? "st-brand-chat" : undefined}><ChatFlotante /></div>}
+      {!brandCanvas && permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} compact={brandWorkspace} />}
       <SonidosBridge />
       {/* "¿Transcribimos?" cuando empieza una reunión (estilo Granola). */}
       {!brandCanvas && <AvisoReunion />}
