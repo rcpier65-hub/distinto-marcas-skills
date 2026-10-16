@@ -66,19 +66,36 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
     approvals = live.filter((r) => r.kind === "approval"),
     unapproved = approvals.filter((r) => r.data.state !== "Aprobada");
   useEffect(() => {
-    let stopped = false;
+    let stopped = false,
+      inFlight = false;
     const refresh = () => {
-      if (document.visibilityState === "visible")
-        api(`/api/estrategia?marca=${brand.slug}`)
-          .then((x) => {
-            if (!stopped) setB(x);
-          })
-          .catch(() => {});
+      if (document.visibilityState !== "visible" || inFlight) return;
+      inFlight = true;
+      void api(`/api/estrategia?marca=${encodeURIComponent(brand.slug)}`)
+        .then((x) => {
+          if (!stopped) setB(x);
+        })
+        .catch(() => {})
+        .finally(() => {
+          inFlight = false;
+        });
     };
+    // Recheck cached navigation and changes made from another module or tab.
+    refresh();
     const timer = setInterval(refresh, 30000);
+    const events = [
+      "focus",
+      "online",
+      "distinto-tarea-completada",
+      "distinto-timer",
+    ];
+    events.forEach((event) => window.addEventListener(event, refresh));
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       stopped = true;
       clearInterval(timer);
+      events.forEach((event) => window.removeEventListener(event, refresh));
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [brand.slug]);
   async function reload() {

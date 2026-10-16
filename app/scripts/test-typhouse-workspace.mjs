@@ -1,6 +1,7 @@
 // Read-only app integration checks. Creates and closes temporary auth sessions.
 import assert from 'node:assert/strict'
 import env from '@next/env'
+import {periodWork,DEFAULT_WORK_PERIOD} from '../lib/estrategia/activity-status.ts'
 import {createClient} from '@supabase/supabase-js'
 import {createServerClient} from '@supabase/ssr'
 env.loadEnvConfig(process.cwd(),false,{info(){},error(){}})
@@ -13,6 +14,17 @@ try{
  const headers={cookie:pedro.cookie()}
  const r=await fetch(base+'/api/estrategia?marca=little-joe',{headers});assert.equal(r.status,200)
  const b=await r.json();assert.equal(b.brand.nombre,'TypHouse');assert(b.profile.data.positioning.includes('TypHouse'))
+ // Compare IDs with the original source, including tasks with no delivery date.
+ const taskResult=await svc.from('tareas').select('id,diseno_id,team_member_id,fecha_entrega').eq('completada',false).or(`marca_slug.eq.${b.brand.slug},categoria.ilike.${b.brand.nombre}`)
+ assert.ifError(taskResult.error)
+ const designs=new Set(b.activities.filter(a=>a.kind==='Diseño').map(a=>a.sourceId))
+ const expectedTasks=taskResult.data.filter(t=>!t.diseno_id||!designs.has(t.diseno_id))
+ const overviewTasks=periodWork(b.activities,b.today,DEFAULT_WORK_PERIOD).filter(a=>a.kind==='Tarea'&&!a.done)
+ assert.deepEqual(overviewTasks.map(t=>t.sourceId).sort(),expectedTasks.map(t=>t.id).sort(),'Default overview must show every original pending task once')
+ assert(overviewTasks.some(a=>!a.date),'TypHouse undated tasks must appear by default')
+ const pedroTasks=new Set(expectedTasks.filter(t=>t.team_member_id===b.me.id).map(t=>t.id))
+ assert(overviewTasks.filter(a=>pedroTasks.has(a.sourceId)).length===pedroTasks.size)
+ console.log('PASS source/dashboard task IDs match:',overviewTasks.length,'pending,',pedroTasks.size,'assigned to Pedro')
  const sheet=b.records.find(r=>r.kind==='sheet'&&r.title==='Plan de trabajo · TypHouse · octubre 2026');assert(sheet);assert.equal(sheet.data.sharedWithClient,false)
  const done=b.activities.find(a=>a.id==='design:1eafd709-3c4b-88e9-aa97-c727b735a5f6');assert(done?.done,'Finished catalog design is not overdue')
  assert(!b.activities.some(a=>a.state==='archivado'))

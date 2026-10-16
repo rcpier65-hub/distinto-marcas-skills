@@ -20,15 +20,16 @@ import {
   type Activity,
   type StrategyRecord,
 } from "@/lib/estrategia/model";
-import { operational, weekWindow } from "@/lib/estrategia/activity-status";
+import {
+  operational,
+  weekWindow,
+  periodWork,
+  DEFAULT_WORK_PERIOD,
+  type WorkPeriod,
+} from "@/lib/estrategia/activity-status";
 import { Modal, PrettyDate, Empty } from "./common";
 import { Agenda } from "./agenda";
-import {
-  ExistingWork,
-  periodWork,
-  workKinds,
-  type WorkPeriod,
-} from "./existing-work";
+import { ExistingWork, workKinds } from "./existing-work";
 import { SocialCard } from "./social-card";
 
 type BrandObservation = {
@@ -61,7 +62,9 @@ export function BrandOverview({
   createApproval: () => void;
 }) {
   const [detail, setDetail] = useState<Detail>(null),
-    [period, setPeriod] = useState<WorkPeriod>("mes");
+    [period, setPeriod] = useState<WorkPeriod>(DEFAULT_WORK_PERIOD);
+  const [detailPeriod, setDetailPeriod] =
+    useState<WorkPeriod>(DEFAULT_WORK_PERIOD);
   const [workKind, setWorkKind] = useState(""),
     [includeDone, setIncludeDone] = useState(false);
   const live = b.records.filter((r) => !r.archived),
@@ -118,7 +121,7 @@ export function BrandOverview({
       r.kind === "opportunity" &&
       !["Descartada", "Implementada"].includes(str(r.data, "state")),
   );
-  const work = periodWork(b.activities, b.today, period)
+  const work = periodWork(b.activities, b.today, detailPeriod)
     .filter(
       (a) => (!workKind || a.kind === workKind) && (includeDone || !a.done),
     )
@@ -133,7 +136,7 @@ export function BrandOverview({
   );
   function openWork(kind = "", nextPeriod = period) {
     setWorkKind(kind);
-    setPeriod(nextPeriod);
+    setDetailPeriod(nextPeriod);
     setIncludeDone(false);
     setDetail("work");
   }
@@ -406,9 +409,12 @@ export function BrandOverview({
                   </select>
                   <select
                     aria-label="Periodo del detalle"
-                    value={period}
-                    onChange={(e) => setPeriod(e.target.value as WorkPeriod)}
+                    value={detailPeriod}
+                    onChange={(e) =>
+                      setDetailPeriod(e.target.value as WorkPeriod)
+                    }
                   >
+                    <option value="todos">Todas las fechas</option>
                     <option value="mes">Este mes</option>
                     <option value="semana">Esta semana</option>
                     <option value="sinfecha">Sin fecha</option>

@@ -20,3 +20,17 @@ export function weekWindow(today: string) {
 export function operational(a: Activity) {
   return !['Fecha importante', 'Reunión'].includes(a.kind)
 }
+
+export type WorkPeriod = 'todos' | 'mes' | 'semana' | 'sinfecha'
+export const DEFAULT_WORK_PERIOD: WorkPeriod = 'todos'
+
+// The overview must include undated and overdue work until a date filter is chosen.
+export function periodWork(activities: Activity[], today: string, period: WorkPeriod) {
+  const week = weekWindow(today)
+  return activities.filter(a => operational(a) && (
+    period === 'todos' ? true :
+    period === 'sinfecha' ? !a.date && !a.done :
+    period === 'semana' ? !!a.date && a.date >= week.start && a.date <= week.end :
+    !!a.date && a.date.startsWith(today.slice(0, 7))
+  ))
+}

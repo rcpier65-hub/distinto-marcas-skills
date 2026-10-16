@@ -8,7 +8,11 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import type { Activity } from "@/lib/estrategia/model";
-import { weekWindow } from "@/lib/estrategia/activity-status";
+import {
+  periodWork,
+  operational,
+  type WorkPeriod,
+} from "@/lib/estrategia/activity-status";
 
 export const workKinds = [
   { kind: "Tarea", label: "Tareas", Icon: CheckSquare, color: "#8561d7" },
@@ -17,23 +21,6 @@ export const workKinds = [
   { kind: "Publicación", label: "Publicaciones", Icon: Send, color: "#26a493" },
   { kind: "Grabación", label: "Grabaciones", Icon: Video, color: "#cb943a" },
 ] as const;
-export type WorkPeriod = "mes" | "semana" | "sinfecha";
-export function periodWork(
-  activities: Activity[],
-  today: string,
-  period: WorkPeriod,
-) {
-  const week = weekWindow(today);
-  return activities.filter(
-    (a) =>
-      workKinds.some((k) => k.kind === a.kind) &&
-      (period === "sinfecha"
-        ? !a.date && !a.done
-        : period === "semana"
-          ? a.date && a.date >= week.start && a.date <= week.end
-          : a.date?.startsWith(today.slice(0, 7))),
-  );
-}
 export function ExistingWork({
   activities,
   today,
@@ -45,9 +32,13 @@ export function ExistingWork({
   today: string;
   period: WorkPeriod;
   setPeriod: (period: WorkPeriod) => void;
-  open: (kind: string) => void;
+  open: (kind: string, period?: WorkPeriod) => void;
 }) {
   const items = periodWork(activities, today, period);
+  const shownIds = new Set(items.map((a) => a.id));
+  const outside = activities.filter(
+    (a) => operational(a) && !a.done && !shownIds.has(a.id),
+  ).length;
   return (
     <section className="st-card st-production" aria-label="Trabajo del equipo">
       <div className="st-row st-dash-heading">
@@ -57,6 +48,7 @@ export function ExistingWork({
           value={period}
           onChange={(e) => setPeriod(e.target.value as WorkPeriod)}
         >
+          <option value="todos">Todas las fechas</option>
           <option value="mes">Este mes</option>
           <option value="semana">Esta semana</option>
           <option value="sinfecha">Sin fecha</option>
@@ -139,8 +131,18 @@ export function ExistingWork({
         </tbody>
       </table>
       <div className="st-production-foot">
-        <small>Avance del trabajo registrado en este periodo.</small>
-        <button className="st-text-button" onClick={() => open("")}>
+        {outside ? (
+          <button className="st-text-button" onClick={() => setPeriod("todos")}>
+            {outside} pendientes fuera del filtro →
+          </button>
+        ) : (
+          <small>
+            {period === "todos"
+              ? "Incluye tareas sin fecha y de otros meses."
+              : "Avance del trabajo registrado en este periodo."}
+          </small>
+        )}
+        <button className="st-text-button" onClick={() => open("", "todos")}>
           Ver todo →
         </button>
       </div>
