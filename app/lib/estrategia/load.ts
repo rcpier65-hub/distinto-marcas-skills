@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "server-only";
-import { designFinished } from "./activity-status";
+import { creationDateLima, designFinished } from "./activity-status";
 import { scopeTasks, taskAssignable } from "@/lib/tareas/access";
 import { type Actor, brandAccess } from "./access";
 import { strategyDB } from "./db";
@@ -224,6 +224,7 @@ export async function loadBrand(a: Actor, slug: string) {
         title: t.texto,
         kind: "Tarea",
         date: t.fecha_entrega,
+        createdDate: creationDateLima(t.created_at),
         time: t.hora_entrega ?? "",
         state: t.completada ? "Terminada" : t.estado || "sin_empezar",
         done: t.completada,

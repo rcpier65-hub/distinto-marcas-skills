@@ -24,13 +24,24 @@ export function operational(a: Activity) {
 export type WorkPeriod = 'todos' | 'mes' | 'semana' | 'sinfecha'
 export const DEFAULT_WORK_PERIOD: WorkPeriod = 'todos'
 
+export function creationDateLima(timestamp: string | null | undefined) {
+  if (!timestamp) return null
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(date)
+}
+
 // The overview must include undated and overdue work until a date filter is chosen.
 export function periodWork(activities: Activity[], today: string, period: WorkPeriod) {
   const week = weekWindow(today)
-  return activities.filter(a => operational(a) && (
-    period === 'todos' ? true :
-    period === 'sinfecha' ? !a.date && !a.done :
-    period === 'semana' ? !!a.date && a.date >= week.start && a.date <= week.end :
-    !!a.date && a.date.startsWith(today.slice(0, 7))
-  ))
+  return activities.filter(a => {
+    if (!operational(a)) return false
+    if (period === 'todos') return true
+    if (period === 'sinfecha') return !a.date && !a.done
+    // Creation places undated tasks in a work period, never on the delivery calendar.
+    const date = a.date || (a.kind === 'Tarea' ? a.createdDate : null)
+    return !!date && (period === 'semana'
+      ? date >= week.start && date <= week.end
+      : date.startsWith(today.slice(0, 7)))
+  })
 }

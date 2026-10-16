@@ -38,6 +38,7 @@ export type Activity = {
     | "Fecha importante";
   title: string;
   date: string | null;
+  createdDate?: string | null;
   time?: string;
   state: string;
   done: boolean;

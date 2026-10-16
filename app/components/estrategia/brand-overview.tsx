@@ -22,7 +22,6 @@ import {
 } from "@/lib/estrategia/model";
 import {
   operational,
-  weekWindow,
   periodWork,
   DEFAULT_WORK_PERIOD,
   type WorkPeriod,
@@ -68,8 +67,7 @@ export function BrandOverview({
   const [workKind, setWorkKind] = useState(""),
     [includeDone, setIncludeDone] = useState(false);
   const live = b.records.filter((r) => !r.archived),
-    month = b.today.slice(0, 7),
-    week = weekWindow(b.today);
+    month = b.today.slice(0, 7);
   const scope = live.find(
     (r) => r.kind === "settings" && r.data.month === month,
   );
@@ -151,8 +149,12 @@ export function BrandOverview({
             <strong>{a.title}</strong>
           </span>
           <span>
+            {a.kind === "Tarea" && "Entrega: "}
             <PrettyDate value={a.date} />
             {a.time ? ` · ${a.time.slice(0, 5)}` : ""}
+            {a.kind === "Tarea" && a.createdDate && (
+              <small>Creada: <PrettyDate value={a.createdDate} /></small>
+            )}
             <small className={a.done ? "st-done" : ""}>
               {a.done ? "Terminada" : a.state.replaceAll("_", " ")}
             </small>
@@ -244,8 +246,8 @@ export function BrandOverview({
               <small>Pendientes esta semana</small>
               <strong>
                 {
-                  pending.filter(
-                    (a) => a.date && a.date >= week.start && a.date <= week.end,
+                  periodWork(b.activities, b.today, "semana").filter(
+                    (a) => !a.done,
                   ).length
                 }
               </strong>
@@ -431,6 +433,9 @@ export function BrandOverview({
                 <p>
                   {work.length} actividades · abre una para trabajar en su
                   módulo original.
+                  {(detailPeriod === "mes" || detailPeriod === "semana") && (
+                    <> Tareas sin fecha de entrega: se usa la fecha de creación.</>
+                  )}
                 </p>
                 {activityList(work)}
               </>
