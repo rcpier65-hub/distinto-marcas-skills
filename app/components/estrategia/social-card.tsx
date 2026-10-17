@@ -110,6 +110,7 @@ export function SocialCard({
           profesional de la marca.
         </p>
       )}
+      {manager && <a className="st-text-button" href={`/marca/${encodeURIComponent(slug)}/metricas`}>Configurar conexión de Meta →</a>}
     </div>
   );
   return (
