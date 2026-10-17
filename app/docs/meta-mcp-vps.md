@@ -88,10 +88,29 @@ acceso solo del backend. No se modifican tareas, calendarios ni reportes anterio
 Se comprobó desde el VPS el MCP de Meta y una consulta de TEAM LITTLE JOE
 (`1206507377876940`, USD, America/Lima): 899.62 de inversión y 324668 impresiones
 en este mes en la consulta del 17-oct. La cuenta coincide con el reporte anterior.
-La API de Instagram respondió para `typhouse.pe` (`17841465287280190`) con 9441
-seguidores. Facebook (`246561581878576`) exigió `pages_read_engagement` con la
-autorización inicial. La ampliación global y los selectores deben verificarse
-en producción antes de declararlos completados.
+La autorización global se completó en producción el 17-oct. Pedro pidió y
+confirmó explícitamente «actuales y futuros» para páginas, negocios e Instagram;
+Meta confirmó esas tres selecciones al guardar. Antes se habilitaron
+`instagram_manage_insights` y `read_insights` en los casos de uso de la app;
+sin ese paso, Meta rechazaba ambos scopes como inválidos. Esto no publica la app:
+continúa en desarrollo, con autorización del administrador.
+
+Desde la UI de producción se guardó TypHouse con Ads `1206507377876940`,
+Facebook `246561581878576` e Instagram `17841465287280190`. El catálogo
+mostró 31 cuentas de Ads, 14 páginas y 13 cuentas de Instagram. No se asignaron
+cuentas automáticamente al resto de marcas. La selección de nuevas marcas usa
+el mismo catálogo autorizado; Meta puede requerir renovar permisos o sesión.
+
+Consulta real de producción a las 13:53 Lima: inversión USD 900.63, 325124
+impresiones y 148494 de alcance de Ads; Instagram 9441 seguidores, 113609 de
+alcance y 981 interacciones (3–16 octubre); Facebook 2629 seguidores. Son
+instantáneas, no cifras fijas. Las pruebas de acceso/OAuth y de reportes reales
+pasaron en producción, incluyendo bloqueo de clientes, enumeración de activos
+reservada al propietario y TOTAL SUPS sin acceso implícito a los datos de TypHouse.
+
+La prueba visual detectó dos componentes hermanos con la misma key: al guardar
+se repetía el selector. Se diferenciaron los prefijos `accounts:` y `ads:` para
+que router.refresh sustituya correctamente cada panel.
 
 Referencias: https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-get-started
 https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-tools-comprehensive-reporting
