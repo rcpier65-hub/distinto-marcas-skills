@@ -1,27 +1,21 @@
 import Link from 'next/link'
 import { actor, brandAccess } from '@/lib/estrategia/access'
-import { config, connection } from '@/lib/meta-mcp/server'
-import { MetaConnection } from '@/components/estrategia/meta-connection'
+import { connection, brandBinding } from '@/lib/meta-mcp/server'
+import { MetaAdsPanel } from '@/components/estrategia/meta-ads-panel'
+import { MetaAssetSelector } from '@/components/estrategia/meta-asset-selector'
+import { SocialCard } from '@/components/estrategia/social-card'
 export const dynamic='force-dynamic'
-export default async function Page({params,searchParams}:{params:Promise<{slug:string}>,searchParams:Promise<{meta?:string}>}){
+export default async function Page({params}:{params:Promise<{slug:string}>}){
   const {slug}=await params,a=await actor(),brand=await brandAccess(a,slug)
-  if(!a.manager||a.client)return <div className="p-8">Solo administración puede configurar las cuentas de Meta.</div>
-  let configured=true;try{config()}catch{configured=false}
-  const row=configured?await connection(brand.id):null
-  const result=(await searchParams).meta
-  return <main className="mx-auto max-w-3xl p-6 md:p-10">
-    <Link className="text-violet-600" href={`/marca/${slug}/estrategia`}>← Volver a {brand.nombre}</Link>
-    <h1 className="mt-5 text-3xl font-semibold">Conectar las métricas de {brand.nombre}</h1>
-    <p className="mt-3 text-slate-600">Autoriza la conexión de Meta Ads. Distinto guardará la autorización en el servidor para consultar los resultados aunque cierres tu computadora.</p>
-    <section className="mt-6 rounded-2xl border border-violet-100 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-semibold">Meta Ads</h2>
-      <p className="mt-2 text-slate-600">Conexión directa con el MCP oficial de Meta. Esta integración se está preparando para consultar resultados publicitarios.</p>
-      {result==='failed'&&<p className="mt-4 text-red-700" role="alert">No se completó la autorización de Meta. Reintenta desde este botón con tu cuenta administradora.</p>}
-      <MetaConnection slug={slug} configured={configured} authorized={!!row} />
-    </section>
-    <section className="mt-5 rounded-2xl border p-6">
-      <h2 className="text-xl font-semibold">Facebook e Instagram</h2>
-      <p className="mt-2 text-slate-600">Los seguidores y el rendimiento orgánico requieren su propia autorización de lectura. Conectar Ads no activa automáticamente estas métricas.</p>
-    </section>
+  if(!a.manager||a.client)return <main className="p-8">Solo administración puede consultar las métricas y configurar las cuentas de Meta.</main>
+  const [row,binding]=await Promise.all([connection(),brandBinding(brand.id)])
+  const bindingKey=`${slug}:${binding?.updated_at||''}`
+  return <main className="mx-auto max-w-6xl p-6 md:p-10">
+    <Link className="text-sm text-violet-600" href={`/marca/${slug}/estrategia`}>← Volver a {brand.nombre}</Link>
+    <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><h1 className="text-3xl font-semibold">Métricas de {brand.nombre}</h1>{a.access.owner&&<Link href="/settings/meta" className="rounded-xl border bg-white px-4 py-2 text-sm text-violet-700">Conexión de la agencia →</Link>}</div>
+    <p className="mt-3 text-slate-600">{row?'Usa la conexión compartida de Meta. Las cuentas seleccionadas aquí pertenecen al panel de esta marca.':'Primero conecta Meta una sola vez desde la configuración de la agencia.'}</p>
+    {row&&a.access.owner&&<MetaAssetSelector key={bindingKey} slug={slug} binding={binding}/>}
+    {row&&<MetaAdsPanel key={bindingKey} slug={slug} accountId={binding?.ad_account_id||null}/>}
+    <section className="mt-6 rounded-2xl border bg-white p-6"><h2 className="mb-4 text-xl font-semibold">Facebook e Instagram · orgánico</h2><SocialCard key={bindingKey} slug={slug} manager={false}/></section>
   </main>
 }

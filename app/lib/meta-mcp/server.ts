@@ -11,9 +11,10 @@ export const META_TOKEN_URL = 'https://graph.facebook.com/v26.0/oauth/access_tok
 export const META_CALLBACK_PATH = '/api/meta/ads-mcp/callback'
 export const META_STATE_COOKIE = 'distinto_meta_mcp_state'
 // Request reporting access. Never request campaign/catalog writes for this integration.
-export const META_SCOPES = ['ads_read','ads_mcp_management','business_management','pages_show_list','instagram_basic']
+export const META_SCOPES = ['ads_read','ads_mcp_management','business_management','pages_show_list','instagram_basic','pages_read_engagement','instagram_manage_insights','read_insights']
 export type Tokens = { access_token: string; refresh_token?: string; token_type: string; expires_in?: number; scope?: string }
-export type ConnectionRow = { marca_id: string; tokens_encrypted: string; expires_at: string | null; updated_at: string; scopes: string[]; ad_account_id: string | null }
+export type ConnectionRow = { id: boolean; tokens_encrypted: string; token_context: string; expires_at: string | null; updated_at: string; scopes: string[] }
+export type BrandBinding = { marca_id:string; ad_account_id:string|null; facebook_page_id:string|null; instagram_user_id:string|null; display_data:{adAccountName?:string;facebookPageName?:string;instagramUsername?:string;currency?:string}; updated_at:string }
 
 export function config() {
   const appId=process.env.META_MCP_APP_ID || ''
@@ -44,38 +45,48 @@ export async function exchange(params: Record<string,string>): Promise<Tokens> {
     ...(typeof data.scope==='string'?{scope:data.scope}:{})}
 }
 
-export async function connection(brandId:string) {
-  const result=await strategyDB().query<ConnectionRow>('SELECT * FROM meta_mcp_connections WHERE marca_id=$1',[brandId])
+export async function connection() {
+  const result=await strategyDB().query<ConnectionRow>('SELECT * FROM meta_agency_connection WHERE id=true')
   return result.rows[0] || null
 }
+export async function brandBinding(brandId:string){
+  const {rows}=await strategyDB().query<BrandBinding>('SELECT * FROM meta_brand_accounts WHERE marca_id=$1',[brandId])
+  return rows[0]||null
+}
 function expiration(tokens:Tokens) { return tokens.expires_in ? new Date(Date.now()+tokens.expires_in*1000).toISOString() : null }
-export async function saveConnection(brandId:string,userId:string,tokens:Tokens) {
-  await strategyDB().query(`INSERT INTO meta_mcp_connections (marca_id,authorized_by,tokens_encrypted,expires_at,scopes)
-    VALUES ($1,$2,$3,$4,$5) ON CONFLICT (marca_id) DO UPDATE SET
-    authorized_by=EXCLUDED.authorized_by,tokens_encrypted=EXCLUDED.tokens_encrypted,expires_at=EXCLUDED.expires_at,
-    scopes=EXCLUDED.scopes,ad_account_id=NULL,updated_at=now()`,
-    [brandId,userId,encrypt(JSON.stringify(tokens),`meta-mcp:${brandId}`),expiration(tokens),tokens.scope?.split(/[ ,]+/).filter(Boolean)||[]])
+export async function saveConnection(userId:string,tokens:Tokens) {
+  let scopes=tokens.scope?.split(/[ ,]+/).filter(Boolean)||[]
+  try{
+    const r=await fetch('https://graph.facebook.com/v26.0/me/permissions',{headers:{Authorization:`Bearer ${tokens.access_token}`},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)})
+    const data=await r.json()
+    if(r.ok&&Array.isArray(data.data))scopes=data.data.filter((p:{status?:string;permission?:string})=>p.status==='granted'&&typeof p.permission==='string').map((p:{permission:string})=>p.permission)
+  }catch{/* Unknown permissions remain unknown, never assume they were granted. */}
+  await strategyDB().query(`INSERT INTO meta_agency_connection (id,authorized_by,tokens_encrypted,token_context,expires_at,scopes)
+    VALUES (true,$1,$2,'meta-agency',$3,$4) ON CONFLICT (id) DO UPDATE SET
+    authorized_by=EXCLUDED.authorized_by,tokens_encrypted=EXCLUDED.tokens_encrypted,token_context=EXCLUDED.token_context,
+    expires_at=EXCLUDED.expires_at,scopes=EXCLUDED.scopes,updated_at=now()`,
+    [userId,encrypt(JSON.stringify(tokens),'meta-agency'),expiration(tokens),scopes])
 }
 
-async function accessToken(brandId:string) {
+export async function metaAccessToken() {
   return transaction(async db=>{
-    const {rows}=await db.query<ConnectionRow>('SELECT * FROM meta_mcp_connections WHERE marca_id=$1 FOR UPDATE',[brandId])
+    const {rows}=await db.query<ConnectionRow>('SELECT * FROM meta_agency_connection WHERE id=true FOR UPDATE')
     const row=rows[0]
-    if(!row)throw new StrategyError('Conecta Meta Ads para esta marca.',409)
-    let tokens=JSON.parse(decrypt(row.tokens_encrypted,`meta-mcp:${brandId}`)) as Tokens
+    if(!row)throw new StrategyError('Conecta Meta en Configuración de la agencia.',409)
+    let tokens=JSON.parse(decrypt(row.tokens_encrypted,row.token_context)) as Tokens
     if(row.expires_at&&Date.parse(row.expires_at)<=Date.now()+60000){
       if(!tokens.refresh_token)throw new StrategyError('La autorización venció. Reconecta Meta Ads.',409)
       const renewed=await exchange({grant_type:'refresh_token',refresh_token:tokens.refresh_token,client_id:config().appId,resource:META_MCP_URL})
       tokens={...tokens,...renewed}
-      await db.query('UPDATE meta_mcp_connections SET tokens_encrypted=$2,expires_at=$3,updated_at=now() WHERE marca_id=$1',
-        [brandId,encrypt(JSON.stringify(tokens),`meta-mcp:${brandId}`),expiration(renewed)])
+      await db.query("UPDATE meta_agency_connection SET tokens_encrypted=$1,token_context='meta-agency',expires_at=$2,updated_at=now() WHERE id=true",
+        [encrypt(JSON.stringify(tokens),'meta-agency'),expiration(renewed)])
     }
     return tokens.access_token
   })
 }
 
-export async function withAdsMcp<T>(brandId:string,run:(client:Client)=>Promise<T>):Promise<T> {
-  const token=await accessToken(brandId)
+export async function withAdsMcp<T>(run:(client:Client)=>Promise<T>):Promise<T> {
+  const token=await metaAccessToken()
   const client=new Client({name:'Distinto Agencia VPS',version:'1.0.0'},{capabilities:{}})
   const transport=new StreamableHTTPClientTransport(new URL(META_MCP_URL),{
     requestInit:{headers:{Authorization:`Bearer ${token}`},redirect:'error'},
@@ -90,8 +101,8 @@ export async function withAdsMcp<T>(brandId:string,run:(client:Client)=>Promise<
     throw new StrategyError('Meta no permitió completar la consulta. Revisa los permisos de la conexión o reintenta.',502)
   } finally { await client.close().catch(()=>{}) }
 }
-export async function inventory(brandId:string) {
-  return withAdsMcp(brandId,async client=>{
+export async function inventory() {
+  return withAdsMcp(async client=>{
     const tools=[]; let cursor:string|undefined
     for(let page=0;page<10;page++) {
       const result=await client.listTools(cursor?{cursor}:{},{timeout:20000})

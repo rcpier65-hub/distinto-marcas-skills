@@ -13,6 +13,7 @@ import { MarcaFactsCard } from './_components/marca-facts-card'
 import { CorreosClientesInput } from './_components/correos-clientes-input'
 import { listWhatsAppGroups } from '@/lib/integrations/rubi'
 import { getIntegracionesConfig } from './_actions'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,6 +79,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+      <Card><CardHeader><CardTitle>Meta — Ads, Facebook e Instagram</CardTitle></CardHeader><CardContent><p className="mb-3 text-sm text-muted-foreground">Una conexión para la agencia. Selecciona las cuentas que consulta cada marca.</p><Link href="/settings/meta" className="font-medium text-violet-600">Administrar conexión de Meta →</Link></CardContent></Card>
       {/* LOGOS de marca — Pedro pega aquí URLs de Drive */}
       <Card>
         <CardHeader>

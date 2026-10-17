@@ -1,84 +1,104 @@
-# Meta Ads MCP desde el VPS
+# Meta: una conexión de agencia y selección por marca
 
-Pedro pidió el 17-oct-2026 que la conexión funcione desde Hostinger, sin depender
-de la computadora local. Esta integración es un **cliente del MCP oficial de
-Meta**, alojado dentro de la app de la agencia; no publica un MCP sin autenticación.
+Pedro pidió el 17-oct-2026 una sola autorización para sus cuentas de Meta,
+con selectores de Ads, Facebook e Instagram dentro de cada marca.
+Producción es Hostinger: https://app.distintostudio.com, contenedor
+`distinto-agencia`. No se publica en Vercel ni se requiere la computadora local.
 
-- Producción: `https://app.distintostudio.com`, contenedor `distinto-agencia`.
-- Meta app: Distinto Agencia, ID público `1401221451726168`, en desarrollo.
-- Servidor remoto: `https://mcp.facebook.com/ads`.
-- Pantalla: `/marca/[slug]/metricas`; TypHouse mantiene `little-joe`.
-- Callback HTTPS: `/api/meta/ads-mcp/callback`, registrado en Facebook Login
-  for Business. Meta lo validó en su comprobador de URI.
+## Flujo
 
-## Estado de esta primera entrega
+- Configuración central: `/settings/meta` (enlace desde Settings).
+- Una app de Meta: Distinto Agencia, ID público `1401221451726168`.
+- OAuth del propietario: `/api/meta/ads-mcp/start`, retorno HTTPS registrado
+  `/api/meta/ads-mcp/callback`. El retorno va a la configuración central.
+- Una fila `meta_agency_connection`: credencial cifrada AES-256-GCM,
+  autorización y expiración. Renovación bajo bloqueo de fila cuando Meta ofrece
+  refresh token. Sin refresh token, se pide renovar la autorización al vencer.
+- `meta_brand_accounts`: solo IDs y nombres de las cuentas elegidas por marca;
+  no contiene tokens ni inicia autorizaciones independientes.
+- Página de marca `/marca/[slug]/metricas`: selectores de cuentas, reporte de
+  Meta Ads y métricas orgánicas. TypHouse conserva slug `little-joe`.
+- Ads: el VPS consume `https://mcp.facebook.com/ads` con el SDK oficial MCP.
+  Facebook/Instagram: el mismo token de Meta se usa por servidor con Graph API.
+  TikTok necesita su propio proveedor; no se inventan datos de esa red.
 
-Se prepara el inicio, recepción y almacenamiento de la autorización, más una
-comprobación del catálogo MCP desde el servidor. **No equivale a métricas reales
-conectadas**: falta el consentimiento de Meta, verificar las herramientas devueltas,
-seleccionar la cuenta de cada marca y probar una lectura real de resultados.
-La pantalla lo distingue explícitamente. No se implementó todavía un sincronizador
-de Ads, un historial de resultados ni una herramienta para escribir campañas.
+## Autorización y seguridad
 
-El MCP de Ads no reemplaza los insights orgánicos de Instagram/Facebook. Se
-conserva el adaptador Graph API del panel, todavía pendiente de su autorización.
-No se reutilizan credenciales del MCP local ni de otros contenedores del VPS.
+Solo el propietario puede iniciar/reemplazar la conexión central, enumerar todo
+el catálogo o guardar asignaciones. Los reportes comprueban administración y
+acceso a la marca; los clientes y usuarios anónimos no acceden a estas rutas.
+El resumen orgánico conserva los permisos existentes del espacio de marca.
 
-## Autorización
+OAuth usa PKCE S256, estado aleatorio de 256 bits, cookie HttpOnly/Secure/Lax,
+Origin exacto, vencimiento a 10 minutos y consumo atómico vinculado al usuario.
+Denegación, estados repetidos o expirados no sustituyen la autorización anterior.
+El SDK usa URL fija, Bearer, tiempos máximos y prohíbe redirects. Nunca se imprimen
+códigos ni tokens ni se envían al navegador. Los permisos guardados provienen de
+la respuesta real o de `/me/permissions`, no de asumir que se concedieron.
 
-`POST /api/meta/ads-mcp/start` comprueba usuario activo, administración, acceso a
-la marca y Origin exacto. Usa OAuth authorization code con PKCE S256, estado
-aleatorio de 256 bits, cookie HttpOnly/Secure/SameSite=Lax y retorno HTTPS fijo.
-No obtiene el dominio de un parámetro del navegador.
+Permisos solicitados: `ads_read`, `ads_mcp_management`, `business_management`,
+`pages_show_list`, `instagram_basic`, `pages_read_engagement`,
+`instagram_manage_insights`, `read_insights`. No se piden `ads_management` ni
+`catalog_management`. Meta muestra un permiso amplio de administración de negocio;
+Pedro debe revisar y aprobar la ampliación de activos/permisos en su diálogo.
+La app solo invoca estas herramientas MCP: `ads_get_ad_accounts`,
+`ads_get_field_context`, `ads_get_ad_entities`. No hay proxy de herramientas
+arbitrarias, cambios de campañas ni envío de mensajes.
 
-El callback comprueba la sesión actual y el estado de la cookie. Consume el
-estado de manera atómica, atado al usuario y a la marca, antes de canjear el
-código. Un intento vencido/repetido, sin cookie, sin sesión o sin permiso no
-genera una conexión. La denegación no modifica una autorización previa.
+Los selectores validan los activos contra Meta antes de guardarlos. Instagram
+se valida contra la página elegida. El servidor fija la cuenta desde la marca,
+no desde parámetros de un reporte. Cambiar de autorización conserva las
+asignaciones, pero se revalida acceso a la cuenta antes de cada reporte sin caché.
+Cambiar una asignación invalida las claves de caché de esa marca; la conexión
+central actualizada invalida todas. No se asignan cuentas por similitud de nombre.
 
-Meta anuncia `token_endpoint_auth_methods_supported: ["none"]` y PKCE S256
-en `https://www.facebook.com/.well-known/oauth-authorization-server/ads`.
-El flujo no requiere copiar el secreto de la aplicación. Los scopes solicitados
-son `ads_read`, `ads_mcp_management`, `business_management`, `pages_show_list` e
-`instagram_basic`; no se solicita `ads_management` ni `catalog_management`.
-Si el servidor requiere más permisos, revisarlos con Pedro antes de ampliarlos.
+## Datos y límites
 
-## Almacenamiento y consultas
+Ads ofrece este mes, mes pasado, 7 días y 30 días. Muestra inversión, alcance,
+impresiones, clics, CTR/CPC y compras atribuidas con valor/ROAS de compras web.
+Son métricas de atribución publicitaria, no ventas conciliadas ni pedidos Shopify.
+Cifras ausentes se muestran como «—». Se verifican ID, moneda y formatos reales de
+Meta (objetos monetarios, porcentajes con coma). Caché máximo 5 minutos.
 
-Migración: `20261017180000_meta_mcp_vps.sql`. Tablas nuevas
-`meta_mcp_connections` y `meta_mcp_oauth_states`, RLS activado y permisos revocados
-a PUBLIC/anon/authenticated. Backend con permisos comprobados antes de SQL.
+El panel orgánico conserva seguidores de Facebook/Instagram y alcance e
+interacciones de Instagram de 14 días completos. Usa solo los IDs asignados;
+no copia el resultado de una marca a otra. Permisos faltantes dan estado parcial,
+no éxito ficticio. No hay aún histórico persistente de métricas ni sincronizador
+periódico: la lectura se realiza al abrir/actualizar, desde el VPS.
 
-Credenciales cifradas AES-256-GCM con contexto de marca; verificador PKCE cifrado
-con contexto del estado. Clave `META_MCP_ENCRYPTION_KEY` solo en el entorno
-privado del VPS, junto a `META_MCP_APP_ID` y `META_MCP_ORIGIN`. No copiar valores
-secretos a Git, documentación, navegador, conversaciones ni logs.
+La migración `20261017210000_meta_agency_connection.sql` adopta la única
+credencial anterior preservando su cifrado y AAD; no amplía permisos por SQL.
+Las tablas anteriores quedan como legado sin uso por el código nuevo. Las tres
+tablas nuevas tienen RLS, privilegios revocados a PUBLIC/anon/authenticated y
+acceso solo del backend. No se modifican tareas, calendarios ni reportes anteriores.
 
-El cliente usa el SDK MCP 1.32.1, Streamable HTTP, Bearer solo al endpoint fijo
-de Meta, redirects prohibidos, tiempo máximo por solicitud y cierre de conexión
-al terminar. Renueva tokens, cuando Meta entrega refresh token, bajo bloqueo de
-fila para evitar carreras. Si no hay refresh, requiere reconectar al vencer.
-Errores originales de Meta/SDK no se devuelven ni registran con tokens.
+## Comprobaciones
 
-La comprobación del catálogo está restringida a administración y marca. Todavía
-no hay un proxy genérico para invocar herramientas. Antes de habilitar reportes:
-validar el esquema real, permitir únicamente herramientas de lectura concretas,
-fijar la cuenta en el servidor y no aceptar cuentas o herramientas arbitrarias
-desde el navegador.
+- Build Next.js/TypeScript y lint de código nuevo.
+- `node scripts/test-meta-mcp-crypto.mjs`.
+- `node scripts/test-meta-mcp-report.mjs`: formatos reales, nulos, cuenta y moneda.
+- `TEST_BASE_URL=... TEST_PUBLIC_ORIGIN=... node scripts/test-meta-mcp-access.mjs`:
+  sesiones temporales, propietario/cliente/anónimo, Origin, PKCE, cookies, estado
+  de un solo uso, denegación y tablas privadas. No ejecutar durante un OAuth real.
+- `TEST_BASE_URL=... TEST_PUBLIC_ORIGIN=... node scripts/test-meta-mcp-report-access.mjs`:
+  bloqueo de enumeración a Lorena, clientes y anónimos, cuenta fija, periodos
+  permitidos, herramientas arbitrarias rechazadas y asignaciones intactas.
+  `TEST_LIVE_META=1` comprueba un reporte real de TypHouse ya vinculado.
 
-## Validación
+Se comprobó desde el VPS el MCP de Meta y una consulta de TEAM LITTLE JOE
+(`1206507377876940`, USD, America/Lima): 899.62 de inversión y 324668 impresiones
+en este mes en la consulta del 17-oct. La cuenta coincide con el reporte anterior.
+La API de Instagram respondió para `typhouse.pe` (`17841465287280190`) con 9441
+seguidores. Facebook (`246561581878576`) exigió `pages_read_engagement` con la
+autorización inicial. La ampliación global y los selectores deben verificarse
+en producción antes de declararlos completados.
 
-- Build y lint de archivos afectados.
-- `node scripts/test-meta-mcp-crypto.mjs`: cifrado, contexto de marca, alteración,
-  estado y vector oficial de PKCE RFC 7636.
-- `TEST_PUBLIC_ORIGIN=https://localhost:3117 node scripts/test-meta-mcp-access.mjs`
-  contra servidor local con ese origen configurado. En producción usar
-  `TEST_BASE_URL=https://app.distintostudio.com` sin TEST_PUBLIC_ORIGIN.
-- Prueba crea sesiones temporales de Pedro/TOTAL SUPS y un intento OAuth que
-  deniega; no autoriza Meta ni canjea códigos. Cierra solo esas sesiones y elimina
-  su estado. Comprueba acceso, Origin, cookies, estado de un solo uso, denegación,
-  aislamiento del cliente y tablas privadas.
+Referencias: https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-get-started
+https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-tools-comprehensive-reporting
 
-Fuentes: [Meta Ads MCP](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-overview),
-[autorización](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-get-started),
-[reportes](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-tools-comprehensive-reporting).
+QA de continuidad: las 722 actividades de TypHouse, sus IDs/estados/fechas,
+planes y vínculos coinciden con producción 779d2cd. El test histórico
+`test-typhouse-workspace.mjs` se detiene porque esperaba un banner pendiente que
+ahora está Listo tanto en producción como local; no se cambió ese registro.
+Settings conserva cuatro advertencias/error de lint de comillas sin escapar,
+confirmadas en HEAD anterior. El código nuevo no tiene errores de lint.
