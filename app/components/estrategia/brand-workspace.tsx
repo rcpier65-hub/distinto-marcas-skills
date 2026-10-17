@@ -304,6 +304,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
               {n}
             </button>
           ))}
+          {b.me.manager && <a className="st-text-button" style={{ padding: '10px 16px', alignSelf: 'center' }} href={`/marca/${brand.slug}/reportes`}>Reportes de redes ↗</a>}
         </nav>
       </header>
       {b.warnings.length > 0 && (

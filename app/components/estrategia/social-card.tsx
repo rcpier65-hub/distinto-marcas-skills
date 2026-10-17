@@ -121,9 +121,9 @@ export function SocialCard({
       >
         <div className="st-row">
           <span className="st-eyebrow">REDES SOCIALES</span>
-          <button className="st-text-button" onClick={() => setExpanded(true)}>
+          {manager ? <a className="st-text-button" href={`/marca/${encodeURIComponent(slug)}/reportes`}>Ver reporte <ArrowUpRight size={13}/></a> : <button className="st-text-button" onClick={() => setExpanded(true)}>
             Ver métricas <ArrowUpRight size={13} />
-          </button>
+          </button>}
         </div>
         {busy && !data && <p role="status">Consultando las redes…</p>}
         {error && <p role="alert">{error}</p>}
