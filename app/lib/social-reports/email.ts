@@ -45,11 +45,13 @@ function transporte() {
 export async function pdfReporte(slug: string, mes: string): Promise<Buffer> {
   const exp = Date.now() + 5 * 60000;
   const url = `http://127.0.0.1:${process.env.PORT || 3000}/imprimir/reporte-redes/${encodeURIComponent(slug)}?${new URLSearchParams({ mes, exp: String(exp), f: firmaImpresion(slug, mes, exp) })}`;
-  const chromium = (await import("@sparticuz/chromium-min")).default;
   const puppeteer = (await import("puppeteer-core")).default;
   const browser = await puppeteer.launch({
-    // Opciones de servidor (Linux/Docker); en una Mac basta el Chrome normal.
-    args: process.platform === "linux" ? chromium.args : ["--disable-gpu", "--no-first-run"],
+    /* Chromium del sistema en el contenedor del VPS. Las opciones de
+       @sparticuz (pensadas para Vercel) NO arrancan aquí: verificado 18-oct. */
+    args: process.platform === "linux"
+      ? ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--headless=new"]
+      : ["--disable-gpu", "--no-first-run"],
     headless: true,
     executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   });
