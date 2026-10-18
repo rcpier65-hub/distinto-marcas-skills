@@ -14,6 +14,7 @@ export async function updateSession(request: NextRequest) {
   const p = request.nextUrl.pathname
   const sinAuthUsuario =
     p.startsWith('/excalidraw/') ||
+    p.startsWith('/imprimir/') ||   // PDF interno del servidor (firma HMAC propia, 5 min)
     p === '/reservar/diagnostico' || p === '/api/reservas' || p === '/api/reservas/disponibilidad' ||
     p === '/api/version' ||
     p.startsWith('/api/cron') ||

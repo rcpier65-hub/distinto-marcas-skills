@@ -23,6 +23,7 @@ import styles from "./social-report.module.css";
 import { FacebookLogo, InstagramLogo, MetaLogo, TikTokLogo } from "./social-icons";
 import { TrendModal, useTrend, type TrendMetric } from "./social-trend";
 import { SocialReportPdf } from "./social-report-pdf";
+import { EnviarCorreoBoton } from "./social-email";
 import { Download, TrendingUp } from "lucide-react";
 
 const names = { facebook: "Facebook", instagram: "Instagram" };
@@ -240,6 +241,7 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
           </div>
           <div className={styles.heroActions}>
             <ExportPdf slug={slug} month={month} brand={brandName} report={data} />
+            <EnviarCorreoBoton slug={slug} month={month} brand={brandName} />
           </div>
         </div>
       </section>

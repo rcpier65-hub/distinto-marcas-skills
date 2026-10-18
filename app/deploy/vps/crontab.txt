@@ -5,3 +5,4 @@
 0 22 * * * /docker/distinto-agencia/cron.sh /api/cron/recordatorio-publicar
 0 11 * * * /docker/distinto-agencia/cron.sh /api/cron/sync-calendario
 0 12 1,2 * * /docker/distinto-agencia/cron.sh /api/cron/reporte-mensual
+0 14 3 * * /docker/distinto-agencia/cron.sh /api/cron/reportes-redes
