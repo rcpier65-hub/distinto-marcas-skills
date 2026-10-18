@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { SocialReportView } from "./social-report";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -68,6 +69,15 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
     activities = byCampaign(b.activities, b.links, campaignId),
     approvals = live.filter((r) => r.kind === "approval"),
     unapproved = approvals.filter((r) => r.data.state !== "Aprobada");
+  /* "Ver reporte" de la tarjeta de redes abre la pestaña sin salir de la marca. */
+  useEffect(() => {
+    const abrir = (e: Event) => {
+      const t = (e as CustomEvent<string>).detail;
+      if (t) { setTab(t); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    };
+    window.addEventListener("st:abrir-pestana", abrir);
+    return () => window.removeEventListener("st:abrir-pestana", abrir);
+  }, []);
   useEffect(() => {
     let stopped = false,
       inFlight = false;
@@ -304,7 +314,17 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
               {n}
             </button>
           ))}
-          {b.me.manager && <a className="st-text-button" style={{ padding: '10px 16px', alignSelf: 'center' }} href={`/marca/${brand.slug}/reportes`}>Reportes de redes ↗</a>}
+          {b.me.manager && (
+            <button
+              className={tab === "Reportes" ? "st-active" : ""}
+              onClick={() => {
+                setTab("Reportes");
+                setCampaignId("");
+              }}
+            >
+              Reportes de redes
+            </button>
+          )}
         </nav>
       </header>
       {b.warnings.length > 0 && (
@@ -313,6 +333,9 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
         </div>
       )}
       <div className="st-body">
+        {tab === "Reportes" && b.me.manager && (
+          <SocialReportView slug={brand.slug} today={b.today} brandName={brand.nombre} />
+        )}
         {tab === "Resumen" && (
           <BrandOverview
             b={b}

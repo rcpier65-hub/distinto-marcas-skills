@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, Camera, Users, Music2, ArrowUpRight } from "lucide-react";
+import { RefreshCw, ArrowUpRight } from "lucide-react";
+import { NETWORK_LOGO } from "./social-icons";
 import type { SocialSummary } from "@/lib/estrategia/social-model";
 import { Modal, PrettyDate } from "./common";
-const icons = { instagram: Camera, facebook: Users, tiktok: Music2 };
+const icons = NETWORK_LOGO;
 export function SocialCard({
   slug,
   manager,
@@ -121,7 +122,7 @@ export function SocialCard({
       >
         <div className="st-row">
           <span className="st-eyebrow">REDES SOCIALES</span>
-          {manager ? <a className="st-text-button" href={`/marca/${encodeURIComponent(slug)}/reportes`}>Ver reporte <ArrowUpRight size={13}/></a> : <button className="st-text-button" onClick={() => setExpanded(true)}>
+          {manager ? <button className="st-text-button" onClick={() => window.dispatchEvent(new CustomEvent("st:abrir-pestana", { detail: "Reportes" }))}>Ver reporte <ArrowUpRight size={13}/></button> : <button className="st-text-button" onClick={() => setExpanded(true)}>
             Ver métricas <ArrowUpRight size={13} />
           </button>}
         </div>

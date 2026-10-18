@@ -27,6 +27,10 @@ import {
   type SocialReport,
   type Post,
   type PostReport,
+  type SocialTrend,
+  type TrendPoint,
+  monthOffset,
+  net,
 } from "./model";
 
 type JSONData = Record<string, unknown>;
@@ -550,4 +554,99 @@ export async function socialReport(
     if (cache.get(key)?.promise === promise) cache.delete(key);
   });
   return promise;
+}
+
+/* Tendencia de los últimos `count` meses hasta `month` (inclusive), para las
+   gráficas de crecimiento. Meses cerrados se guardan 12 h; el mes en curso, 5 min. */
+const trendCache = new Map<string, { until: number; value: Promise<TrendPoint> }>();
+async function trendMonth(
+  binding: BrandBinding,
+  month: string,
+  token: string,
+  pt: string | null,
+  currency: string | null,
+): Promise<TrendPoint> {
+  const period = reportPeriod(month, todayLima()),
+    r = period.current;
+  const point: TrendPoint = {
+    month,
+    days: r.days,
+    partial: period.partial,
+    views: { facebook: null, instagram: null },
+    interactions: { facebook: null, instagram: null },
+    netFollows: { facebook: null, instagram: null },
+    spend: null,
+    conversations: null,
+  };
+  if (!r.days) return point;
+  await Promise.all([
+    (async () => {
+      if (!binding.instagram_user_id) return;
+      const v = await instagram(binding.instagram_user_id, r, token);
+      point.views.instagram = v.views;
+      point.interactions.instagram = v.interactions;
+      point.netFollows.instagram = net(v);
+    })(),
+    (async () => {
+      if (!binding.facebook_page_id || !pt) return;
+      const { values: v } = await facebook(binding.facebook_page_id, r, pt);
+      point.views.facebook = v.views;
+      point.interactions.facebook = v.interactions;
+      point.netFollows.facebook = net(v);
+    })(),
+    (async () => {
+      if (!binding.ad_account_id || !currency) return;
+      const a = await ads(binding.ad_account_id, r, token, currency);
+      point.spend = a.spend;
+      point.conversations = a.conversations;
+    })(),
+  ]);
+  return point;
+}
+export async function socialTrend(
+  brandId: string,
+  month: string,
+  count = 6,
+): Promise<SocialTrend> {
+  reportPeriod(month, todayLima());
+  const ctx = await context(brandId),
+    stamp = signature(ctx.binding, ctx.agency),
+    token = await metaAccessToken();
+  const pt = ctx.binding.facebook_page_id
+    ? await pageToken(ctx.binding.facebook_page_id, token)
+    : null;
+  let currency: string | null = null;
+  if (ctx.binding.ad_account_id) {
+    const prof = await graph(
+      `act_${ctx.binding.ad_account_id}`,
+      { fields: "account_id,currency" },
+      token,
+    );
+    if (prof?.account_id === ctx.binding.ad_account_id && typeof prof.currency === "string")
+      currency = prof.currency;
+  }
+  const today = todayLima(),
+    oldest = monthOffset(today.slice(0, 7), -23);
+  const months: string[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const m = monthOffset(month, -i);
+    if (m >= oldest) months.push(m);
+  }
+  const points = await Promise.all(
+    months.map((m) => {
+      const key = [brandId, m, stamp, currency].join(":"),
+        hit = trendCache.get(key);
+      if (hit && hit.until > Date.now()) return hit.value;
+      const value = trendMonth(ctx.binding, m, token, pt, currency);
+      if (trendCache.size >= 200) trendCache.delete(trendCache.keys().next().value!);
+      const closed = m < today.slice(0, 7);
+      trendCache.set(key, { until: Date.now() + (closed ? 12 * 3600000 : 5 * 60000), value });
+      void value.catch(() => trendCache.delete(key));
+      return value;
+    }),
+  );
+  const networks: SocialTrend["networks"] = [];
+  if (ctx.binding.facebook_page_id) networks.push("facebook");
+  if (ctx.binding.instagram_user_id) networks.push("instagram");
+  return { months: points, currency, networks, checkedAt: new Date().toISOString() };
 }

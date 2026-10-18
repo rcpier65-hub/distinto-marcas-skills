@@ -259,3 +259,25 @@ export function publicURL(
     return null;
   }
 }
+
+/* Tendencia mensual (gráficas de crecimiento al hacer clic en un indicador).
+   Cada punto es un mes completo; el mes en curso usa solo días completos.
+   null = dato no disponible (nunca se rellena con cero). Pedro 18-oct-2026. */
+export type TrendPoint = {
+  month: string;
+  days: number;
+  partial: boolean;
+  views: { facebook: number | null; instagram: number | null };
+  interactions: { facebook: number | null; instagram: number | null };
+  netFollows: { facebook: number | null; instagram: number | null };
+  spend: number | null;
+  conversations: number | null;
+};
+export type SocialTrend = {
+  months: TrendPoint[];
+  currency: string | null;
+  networks: ("facebook" | "instagram")[];
+  checkedAt: string;
+};
+export const net = (v: Values) =>
+  v.follows !== null && v.unfollows !== null ? v.follows - v.unfollows : null;

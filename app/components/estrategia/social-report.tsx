@@ -8,8 +8,6 @@ import {
   Users,
   Eye,
   MessageCircle,
-  Megaphone,
-  Camera,
 } from "lucide-react";
 import {
   addDays,
@@ -22,6 +20,10 @@ import {
   type SocialReport,
 } from "@/lib/social-reports/model";
 import styles from "./social-report.module.css";
+import { FacebookLogo, InstagramLogo, MetaLogo, TikTokLogo } from "./social-icons";
+import { TrendModal, useTrend, type TrendMetric } from "./social-trend";
+import { SocialReportPdf } from "./social-report-pdf";
+import { Download, TrendingUp } from "lucide-react";
 
 const names = { facebook: "Facebook", instagram: "Instagram" };
 const integer = (value: number | null) =>
@@ -102,9 +104,11 @@ function useReport<T>(slug: string, month: string, detail: "report" | "posts") {
 export function SocialReportView({
   slug,
   today,
+  brandName,
 }: {
   slug: string;
   today: string;
+  brandName?: string;
 }) {
   const [month, setMonth] = useState(today.slice(0, 7)),
     [revision, setRevision] = useState(0);
@@ -140,13 +144,41 @@ export function SocialReportView({
         key={`${slug}:${month}:${revision}`}
         slug={slug}
         month={month}
+        brandName={brandName || slug}
       />
     </div>
   );
 }
-function ReportBody({ slug, month }: { slug: string; month: string }) {
+/* Exportar PDF: trae la tendencia de 6 meses, monta el documento A4 e imprime. */
+function ExportPdf({ slug, month, brand, report }: { slug: string; month: string; brand: string; report: SocialReport }) {
+  const [on, setOn] = useState(false);
+  const { data: trend, error } = useTrend(slug, month, on);
+  const listo = on && (trend || error);
+  useEffect(() => {
+    if (!listo) return;
+    const antes = document.title;
+    document.title = `Reporte redes ${brand} - ${monthName(month)}`;
+    const t = setTimeout(() => {
+      window.print();
+      document.title = antes;
+      setOn(false);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [listo, brand, month]);
+  return (
+    <>
+      <button onClick={() => setOn(true)} disabled={on} aria-label="Exportar el reporte en PDF">
+        <Download size={15} />
+        {on ? "Preparando PDF…" : "Exportar PDF"}
+      </button>
+      {on && listo && <SocialReportPdf brand={brand} report={report} trend={trend ?? null} />}
+    </>
+  );
+}
+function ReportBody({ slug, month, brandName }: { slug: string; month: string; brandName: string }) {
   const { data, error } = useReport<SocialReport>(slug, month, "report");
   const [showPosts, setShowPosts] = useState(false);
+  const [trend, setTrend] = useState<TrendMetric | null>(null);
   if (error)
     return (
       <div className={styles.notice} role="alert">
@@ -197,13 +229,18 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
             {period.partial ? " · Mes en curso, solo días completos" : ""}
           </small>
         </div>
-        <div className={styles.heroStamp}>
-          <BarChart3 size={32} />
-          <span>
-            {period.current.days} días
-            <br />
-            de actividad
-          </span>
+        <div className={styles.heroSide}>
+          <div className={styles.heroStamp}>
+            <BarChart3 size={32} />
+            <span>
+              {period.current.days} días
+              <br />
+              de actividad
+            </span>
+          </div>
+          <div className={styles.heroActions}>
+            <ExportPdf slug={slug} month={month} brand={brandName} report={data} />
+          </div>
         </div>
       </section>
       {data.warnings.map((w) => (
@@ -212,7 +249,7 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
         </p>
       ))}
       <section className={styles.kpis} aria-label="Resumen del periodo">
-        <div>
+        <button type="button" className={styles.kpiButton} onClick={() => setTrend("views")}>
           <span>
             <Eye size={15} />
             Visualizaciones
@@ -220,8 +257,9 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
           <strong>{integer(currentViews)}</strong>
           <Change current={currentViews} previous={previousViews} />
           <small>{source}</small>
-        </div>
-        <div>
+          <em><TrendingUp size={12} /> Ver crecimiento</em>
+        </button>
+        <button type="button" className={styles.kpiButton} onClick={() => setTrend("netFollows")}>
           <span>
             <Users size={15} />
             Seguidores actuales
@@ -229,10 +267,11 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
           <strong>{integer(followers)}</strong>
           <small>{source} · cifra al consultar</small>
           <small>No representa personas únicas entre redes</small>
-        </div>
-        <div>
+          <em><TrendingUp size={12} /> Ver crecimiento</em>
+        </button>
+        <button type="button" className={styles.kpiButton} onClick={() => setTrend("spend")}>
           <span>
-            <Megaphone size={15} />
+            <MetaLogo size={15} />
             Inversión en pauta
           </span>
           <strong>{ads ? money(ads.current.spend, ads.currency) : "—"}</strong>
@@ -240,8 +279,9 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
             <Change current={ads.current.spend} previous={ads.previous.spend} />
           )}
           <small>Meta Ads · {ads?.currency || "sin cuenta seleccionada"}</small>
-        </div>
-        <div>
+          <em><TrendingUp size={12} /> Ver crecimiento</em>
+        </button>
+        <button type="button" className={styles.kpiButton} onClick={() => setTrend("conversations")}>
           <span>
             <MessageCircle size={15} />
             Conversaciones iniciadas
@@ -254,8 +294,10 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
             />
           )}
           <small>Mensajería de anuncios</small>
-        </div>
+          <em><TrendingUp size={12} /> Ver crecimiento</em>
+        </button>
       </section>
+      {trend && <TrendModal slug={slug} month={month} initial={trend} close={() => setTrend(null)} />}
       <div className={styles.heading}>
         <h2>Rendimiento por canal</h2>
         <span>Periodo actual / anterior</span>
@@ -281,7 +323,10 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
               sum = (c.organic || 0) + (c.paid || 0);
             return (
               <div className={styles.splitCard} key={c.network}>
-                <h3>{names[c.network]}</h3>
+                <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {c.network === "facebook" ? <FacebookLogo size={18} /> : <InstagramLogo size={18} />}
+                  {names[c.network]}
+                </h3>
                 {available ? (
                   <>
                     <div
@@ -318,7 +363,7 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
       <section className={styles.ads}>
         <div className={styles.heading}>
           <h2>
-            <Megaphone size={18} />
+            <MetaLogo size={20} />
             Resultados de pauta · mensajería
           </h2>
           <span>{ads?.name || "Selecciona una cuenta publicitaria"}</span>
@@ -400,6 +445,7 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
         </p>
       </section>
       <div className={styles.tiktok}>
+        <TikTokLogo size={26} />
         <strong>TikTok · pendiente de conexión</strong>
         <span>
           La API de Meta cubre Facebook e Instagram. TikTok necesita su propia
@@ -419,7 +465,7 @@ function ReportBody({ slug, month }: { slug: string; month: string }) {
   );
 }
 function ChannelCard({ channel: c }: { channel: Channel }) {
-  const Icon = c.network === "facebook" ? Users : Camera;
+  const Logo = c.network === "facebook" ? FacebookLogo : InstagramLogo;
   const rows: { key: MetricKey; label: string }[] = [
     { key: "views", label: "Visualizaciones" },
     {
@@ -445,10 +491,8 @@ function ChannelCard({ channel: c }: { channel: Channel }) {
   return (
     <article className={styles.channel}>
       <header>
-        <span
-          className={`${styles.networkIcon} ${c.network === "instagram" ? styles.ig : ""}`}
-        >
-          <Icon size={22} />
+        <span className={styles.networkLogo}>
+          <Logo size={34} />
         </span>
         <div>
           <h3>{names[c.network]}</h3>
@@ -503,7 +547,10 @@ function PostCards({ slug, month }: { slug: string; month: string }) {
     <div>
       {data.groups.map((group) => (
         <section key={group.network} className={styles.postGroup}>
-          <h3>{names[group.network]}</h3>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {group.network === "facebook" ? <FacebookLogo size={18} /> : <InstagramLogo size={18} />}
+            {names[group.network]}
+          </h3>
           <p className={styles.footnote}>{group.note}</p>
           {!group.posts.length && (
             <p>

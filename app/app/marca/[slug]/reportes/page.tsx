@@ -45,7 +45,7 @@ export default async function Page({
           </h1>
         </div>
       </div>
-      <SocialReportView slug={slug} today={todayLima()} />
+      <SocialReportView slug={slug} today={todayLima()} brandName={brand.nombre} />
     </main>
   );
 }
