@@ -10,7 +10,7 @@ export async function GET(request: Request) {
      el origin de request.url es http://localhost:3000. */
   const base = 'http://interno.local'
   const destino = /[\\\s]/.test(pedido) ? null : new URL(pedido, base)
-  const next = pedido.startsWith('/') && destino?.origin === base ? destino.pathname + destino.search + destino.hash : '/dashboard'
+  const next = pedido.startsWith('/') && destino?.origin === base ? '/' + destino.pathname.replace(/^\/+/, '') + destino.search + destino.hash : '/dashboard'
   const ir = (destino: string) => new NextResponse(null, { status: 307, headers: { Location: destino } })
 
   if (code) {
