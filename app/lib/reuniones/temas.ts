@@ -41,7 +41,10 @@ export async function marcaDeTarea(
   }
   const cat = (t.categoria ?? "").trim();
   if (!cat || cat.toLowerCase() === "general") return null;
-  const { data } = await service.from("marcas").select("id,slug,nombre").ilike("nombre", cat).limit(1);
+  /* Igualdad sin distinguir mayúsculas: se escapan los comodines de LIKE para que
+     una columna llamada "%" o "_" no coincida con otra marca. */
+  const exacto = cat.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data } = await service.from("marcas").select("id,slug,nombre").ilike("nombre", exacto).limit(1);
   const m = data?.[0];
   return m && m.slug !== "interno" ? m : null;
 }

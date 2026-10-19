@@ -5,7 +5,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
-import { mayEditTask } from '@/lib/tareas/access-server'
+import { loadTaskAccess, mayEditTask } from '@/lib/tareas/access-server'
 import { marcaDeTarea } from '@/lib/reuniones/temas'
 
 export async function marcarTareaParaReunion(id: string, activa: boolean): Promise<{ ok: boolean; error?: string; marca?: string }> {
@@ -27,7 +27,12 @@ export async function marcarTareaParaReunion(id: string, activa: boolean): Promi
   const marca = await marcaDeTarea(service, t)
   if (!marca) return { ok: false, error: 'Primero mueve la tarea a la columna de una marca.' }
 
-  const { data: me } = await service.from('team_members').select('id').eq('auth_user_id', user.id).maybeSingle()
+  /* Misma regla que el espacio de marca: si la persona tiene marcas
+     restringidas, solo puede llevar temas a la reunión de esas marcas. */
+  const { access } = await loadTaskAccess(service, user.id)
+  const { data: me } = await service.from('team_members').select('id, marcas_acceso').eq('auth_user_id', user.id).maybeSingle()
+  const permitidas = access.owner ? null : ((me?.marcas_acceso ?? null) as string[] | null)
+  if (permitidas && !permitidas.includes(marca.id)) return { ok: false, error: 'No tienes acceso a esa marca.' }
   const { error } = await service.from('reunion_temas').insert({ marca_id: marca.id, tarea_id: id, created_by: me?.id ?? null })
   /* 23505 = ya estaba en la lista: se considera hecho. */
   if (error && error.code !== '23505') return { ok: false, error: 'No se pudo agregar a la reunión.' }
