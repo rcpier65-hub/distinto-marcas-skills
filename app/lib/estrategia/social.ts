@@ -2,6 +2,7 @@ import 'server-only'
 import { socialNetworks, metricNumber, insightTotal, type SocialSummary } from './social-model'
 import { todayLima } from './model'
 import { brandBinding, connection as agencyConnection, metaAccessToken } from '@/lib/meta-mcp/server'
+import { seguidoresGuardados } from '@/lib/tiktok/server'
 
 type Account = { facebookPageId?: string; instagramUserId?: string; accessToken?: string }
 const cache = new Map<string, { until: number; promise: Promise<SocialSummary> }>()
@@ -42,7 +43,11 @@ export async function socialSummary(brandId:string):Promise<SocialSummary> {
     let token:string
     try{token=binding?await metaAccessToken():legacyToken!}catch{return {...base,status:'reconnect',message:'Actualiza la conexión de Meta de la agencia para continuar consultando las redes.'}}
     const networks=await Promise.all(base.networks.map(async(n)=>{
-      if(n.network==='tiktok')return n
+      if(n.network==='tiktok'){
+        // TikTok: seguidores de la última foto diaria de la cuenta conectada (Login Kit).
+        const tk=await seguidoresGuardados(brandId).catch(()=>null)
+        return tk?{...n,followers:tk.followers,asOf:tk.day||null,available:tk.followers!==null,note:'API oficial de TikTok · foto diaria de seguidores.'}:n
+      }
       const id=String((n.network==='facebook'?account.facebookPageId:account.instagramUserId)||'')
       if(!/^\d+$/.test(id))return {...n,note:'Cuenta pendiente de vincular'}
       try {

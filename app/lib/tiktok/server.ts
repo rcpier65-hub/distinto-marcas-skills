@@ -92,6 +92,11 @@ export async function completarConexion(state: string, code: string) {
     updated_at: new Date().toISOString(),
   });
   if (error) throw Error("No se pudo guardar la cuenta de TikTok.");
+  // Primera foto de seguidores (desde aquí se mide el crecimiento).
+  if (perfil) {
+    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(new Date());
+    await db().from("tiktok_follower_snapshots").upsert({ brand_id: st.brand_id, day: hoy, followers: perfil.follower_count, likes: perfil.likes_count, videos: perfil.video_count });
+  }
   // La versión guardada del reporte sin TikTok deja de valer: se consultará de nuevo.
   await db().from("social_report_snapshots").delete().eq("brand_id", st.brand_id).eq("kind", "tiktok");
   const { data: marca } = await db().from("marcas").select("slug, nombre").eq("id", st.brand_id).maybeSingle();
@@ -243,4 +248,13 @@ export async function guardarFotosDiarias(hoy: string) {
     }
   }
   return r;
+}
+
+/* Seguidores guardados (última foto diaria) para la tarjeta de redes del resumen.
+   No consulta TikTok en vivo. null = la marca no tiene TikTok conectado. */
+export async function seguidoresGuardados(brandId: string): Promise<{ followers: number | null; day: string } | null> {
+  const { data: cuenta } = await db().from("tiktok_brand_accounts").select("brand_id").eq("brand_id", brandId).maybeSingle();
+  if (!cuenta) return null;
+  const { data } = await db().from("tiktok_follower_snapshots").select("day, followers").eq("brand_id", brandId).order("day", { ascending: false }).limit(1).maybeSingle();
+  return data ? { followers: data.followers, day: data.day } : { followers: null, day: "" };
 }
