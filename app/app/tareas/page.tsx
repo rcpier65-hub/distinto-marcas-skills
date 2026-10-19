@@ -53,6 +53,11 @@ export default async function TareasPage() {
   // Contexto de planificación solo para tareas que ya pasaron scopeTasks.
   const visibles = [...tareas, ...completadas]
   if (visibles.length) {
+    /* Tareas marcadas "Para reunión" (temas pendientes de la próxima reunión). */
+    const { data: enReunion } = await service.from('reunion_temas')
+      .select('tarea_id').eq('estado', 'pendiente').in('tarea_id', visibles.map(t => t.id))
+    const marcadas = new Set((enReunion ?? []).map((r: { tarea_id: string }) => r.tarea_id))
+    for (const t of visibles) if (marcadas.has(t.id)) t.paraReunion = true
     const { data: origins } = await service.from('strategy_actions')
       .select('task_id,data,sheet_id,hoja:strategy_records!strategy_actions_sheet_id_fkey(title,marca_id,marca:marcas(slug))')
       .in('task_id', visibles.map(t=>t.id))

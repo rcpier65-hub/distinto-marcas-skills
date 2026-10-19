@@ -16,11 +16,12 @@ import {
   PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core'
-import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2, MoreHorizontal, Play, Pause, CalendarDays, ArrowRightLeft, CornerDownRight } from 'lucide-react'
+import { Mic, Plus, Check, X, ArrowRight, Bot, Hand, Send as SendIcon, Sparkles, Timer, Archive, RotateCcw, Filter, Trash2, MoreHorizontal, Play, Pause, CalendarDays, ArrowRightLeft, CornerDownRight, Presentation } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
 import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane, traspasarTarea } from '../_actions'
 import { iniciarTarea, pausarTarea, setEstadoTarea, setFechasTarea } from '../_plan-actions'
+import { marcarTareaParaReunion } from '../_reunion-actions'
 import { Gantt, CalendarioTareas, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { type EstadoTarea } from '@/lib/tareas/pro-types'
 
@@ -353,6 +354,21 @@ export function TareasView({
     router.refresh()
   }, [tareas, equipo, router])
 
+  /* "Para reunión" (Pedro 19-oct-2026): la tarea entra/sale de los temas de la
+     próxima reunión de su marca. Optimista en el tablero y en el Archivo. */
+  const onReunion = useCallback(async (id: string, activa: boolean) => {
+    const marcar = (cur: Tarea[]) => cur.map((t) => t.id === id ? { ...t, paraReunion: activa } : t)
+    setTareas(marcar); setCompletadas(marcar)
+    const r = await marcarTareaParaReunion(id, activa)
+    if (!r.ok) {
+      const revertir = (cur: Tarea[]) => cur.map((t) => t.id === id ? { ...t, paraReunion: !activa } : t)
+      setTareas(revertir); setCompletadas(revertir)
+      toast.error(r.error ?? 'No se pudo actualizar')
+      return
+    }
+    toast.success(activa ? `Agregada a la próxima reunión${r.marca ? ` con ${r.marca}` : ''}` : 'Quitada de la reunión')
+  }, [])
+
   const onSetFocus = useCallback(async (id: string, lane: FocusLane | null) => {
     const prev = tareas
     setTareas((cur) => cur.map((t) => t.id === id ? { ...t, focusLane: lane } : t))
@@ -517,7 +533,7 @@ export function TareasView({
               {columnas.map((c) => (
                 <Columna key={c.categoria} columna={c} esCEO={esCEO} soloLectura={soloLectura} todasCategorias={todasCategorias}
                   onComplete={onCompletar} onDelete={onEliminar} onMover={onMover}
-                  equipo={equipo} onTraspasar={onTraspasar}
+                  equipo={equipo} onTraspasar={onTraspasar} onReunion={onReunion}
                   plan={planPorId} hoy={hoyLima} onPlanCambio={() => router.refresh()} />
               ))}
             </div>
@@ -546,6 +562,7 @@ export function TareasView({
           soloLectura={soloLectura}
           onClose={() => setArchivoOpen(false)}
           onRestaurar={onRestaurar}
+          onReunion={onReunion}
         />
       )}
 
@@ -636,7 +653,8 @@ function FlyerEl({ flyer }: { flyer: Flyer }) {
 }
 
 /* ============================ Archivo (historial) ============================ */
-function ArchivoDrawer({ completadas, esCEO, soloLectura, onClose, onRestaurar }: {
+function ArchivoDrawer({ completadas, esCEO, soloLectura, onClose, onRestaurar, onReunion }: {
+  onReunion: (id: string, activa: boolean) => void
   soloLectura: Set<string>
   completadas: Tarea[]
   esCEO: boolean
@@ -688,6 +706,11 @@ function ArchivoDrawer({ completadas, esCEO, soloLectura, onClose, onRestaurar }
                       {t.completadaAt && <span>· {fechaRelativa(t.completadaAt)}</span>}
                     </div>
                   </div>
+                  <button disabled={soloLectura.has(t.id)} onClick={() => onReunion(t.id, !t.paraReunion)}
+                    title={t.paraReunion ? 'Está en la próxima reunión · clic para quitarla' : 'Presentar en la próxima reunión'}
+                    style={{ height: 26, padding: '0 8px', borderRadius: 7, border: `1px solid ${t.paraReunion ? '#ddd6fe' : 'transparent'}`, background: t.paraReunion ? '#f5f3ff' : '#fff', color: '#6d28d9', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, fontSize: 10.5, fontWeight: 700, fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+                    <Presentation size={12} strokeWidth={2.2} /> {t.paraReunion ? 'En reunión' : 'Reunión'}
+                  </button>
                   <button disabled={soloLectura.has(t.id)} onClick={() => onRestaurar(t.id)} title="Devolver al tablero" style={{ width: 26, height: 26, borderRadius: 7, border: 'none', background: '#fff', color: '#6d28d9', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
                     <RotateCcw size={13} strokeWidth={2.2} />
                   </button>
@@ -718,10 +741,11 @@ function fechaRelativa(iso: string): string {
 }
 
 /* ============================ Columna ============================ */
-function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio, equipo, onTraspasar }: {
+function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onDelete, onMover, plan, hoy, onPlanCambio, equipo, onTraspasar, onReunion }: {
   columna: { categoria: string; color: string; items: Tarea[] }
   equipo: { id: string; nombre: string }[]
   onTraspasar: (id: string, miembroId: string) => void
+  onReunion: (id: string, activa: boolean) => void
   soloLectura: Set<string>
   esCEO: boolean
   todasCategorias: string[]
@@ -749,7 +773,7 @@ function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onD
         {columna.items.map((t) => (
           <CardArrastrable key={t.id} tarea={t} esCEO={esCEO} readOnly={soloLectura.has(t.id)} otras={todasCategorias.filter((c) => c !== t.categoria)}
             onComplete={onComplete} onDelete={onDelete} onMover={onMover}
-            equipo={equipo} onTraspasar={onTraspasar}
+            equipo={equipo} onTraspasar={onTraspasar} onReunion={onReunion}
             planInfo={plan?.[t.id]} hoy={hoy} onPlanCambio={onPlanCambio} />
         ))}
       </div>
@@ -762,10 +786,11 @@ function Columna({ columna, esCEO, soloLectura, todasCategorias, onComplete, onD
    cronómetro "en proceso" que se guarda al terminar (para métricas).
    Fila 1: responsable · ✓ Lista · ⋯ (mover, archivar, eliminar)
    Fila 2: ▶ Iniciar / ⏸ 12:34 (corriendo) / ▶ Reanudar · 12m · fecha */
-function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio, equipo, onTraspasar }: {
+function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, onMover, planInfo, hoy, onPlanCambio, equipo, onTraspasar, onReunion }: {
   tarea: Tarea; esCEO: boolean; readOnly: boolean; otras: string[]
   equipo: { id: string; nombre: string }[]
   onTraspasar: (id: string, miembroId: string) => void
+  onReunion: (id: string, activa: boolean) => void
   onComplete: (id: string, fromRect?: DOMRect) => void; onDelete: (id: string) => void; onMover: (id: string, cat: string) => void
   planInfo?: PlanInfo; hoy?: string; onPlanCambio?: () => void
 }) {
@@ -789,6 +814,12 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
           {tarea.texto}
         </p>
         {tarea.strategy && <details style={{fontSize:11,color:'#816699',marginTop:8}}><summary>Contexto de planificación · {tarea.strategy.priority}</summary><p style={{whiteSpace:'pre-wrap'}}>{tarea.strategy.deliverable}</p><p style={{whiteSpace:'pre-wrap'}}>{tarea.strategy.references}</p><a href={tarea.strategy.href}>Abrir hoja: {tarea.strategy.title} ↗</a></details>}
+        {tarea.paraReunion && (
+          <button type="button" disabled={readOnly} onClick={() => onReunion(tarea.id, false)} title="Está en los temas de la próxima reunión · clic para quitarla"
+            className="mk-chip-reunion" style={{ ...chipCard, height: 22, marginTop: 7, marginRight: 6, background: '#f5f3ff', color: '#6d28d9', borderColor: '#ddd6fe' }}>
+            <Presentation size={11} strokeWidth={2.4} /> Para reunión
+          </button>
+        )}
         {tarea.traspasadaDeNombre && (
           <div title={tarea.traspasadaAt ? `Traspasada el ${new Date(tarea.traspasadaAt).toLocaleString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Traspasada'}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10.5, fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: 999 }}>
@@ -821,7 +852,7 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
         <div style={{ height: 1, background: '#f1f3f7', margin: '9px -11px 0' }} />
         <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><PlanChips key={`${tarea.id}:${planInfo?.estado}:${planInfo?.enProcesoDesde}:${planInfo?.tiempoSeg}`} tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} /></fieldset>
       </div>
-      <style>{'.mk-tarea-card:hover{box-shadow:0 6px 18px rgba(15,23,42,0.08)!important}.mk-btn-lista:hover:not(:disabled){background:#dcfce7!important}.mk-btn-mas:hover:not(:disabled){background:#f1f5f9!important;color:#0f172a!important}@keyframes mkVivo{0%,100%{opacity:1}50%{opacity:.3}}.mk-dot-vivo{animation:mkVivo 1.2s ease-in-out infinite}'}</style>
+      <style>{'.mk-tarea-card:hover{box-shadow:0 6px 18px rgba(15,23,42,0.08)!important}.mk-btn-lista:hover:not(:disabled){background:#dcfce7!important}.mk-btn-mas:hover:not(:disabled){background:#f1f5f9!important;color:#0f172a!important}.mk-chip-reunion:hover:not(:disabled){background:#ede9fe!important}@keyframes mkVivo{0%,100%{opacity:1}50%{opacity:.3}}.mk-dot-vivo{animation:mkVivo 1.2s ease-in-out infinite}'}</style>
       {menu && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 12px 32px rgba(15,23,42,0.16)', padding: 6, minWidth: 190 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, padding: '3px 8px 5px' }}>
@@ -853,6 +884,9 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
             </>
           )}
           <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
+          <button onClick={() => { onReunion(tarea.id, !tarea.paraReunion); setMenu(false) }} style={{ ...menuItem, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Presentation size={13} /> {tarea.paraReunion ? 'Quitar de la reunión' : 'Para la próxima reunión'}
+          </button>
           <button onClick={eliminar} style={{ ...menuItem, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 7 }}>
             <Trash2 size={13} /> Eliminar tarea
           </button>

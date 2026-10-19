@@ -993,3 +993,27 @@
 @media(min-width:900px) and (max-height:660px) {
  .st-workspace.st-overview{height:auto;min-height:calc(100dvh - 52px);}.st-overview .st-dashboard{flex:initial;grid-template-rows:106px 54px 257px 36px;}
 }
+
+/* Temas para la próxima reunión (Pedro 19-oct-2026) */
+.st-next-meeting .st-mt-count{font-style:normal;font-size:10.5px;font-weight:650;color:#7b4fd6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-next-meeting .st-mt-count.st-mt-empty{font-weight:500;color:#9a8aad;}
+.st-mt{display:flex;flex-direction:column;gap:14px;width:min(560px,86vw);}
+.st-mt-when{display:flex;align-items:center;gap:7px;margin:0;padding:9px 12px;border-radius:10px;background:#f6f2fc;color:#665276;font-size:12.5px;font-weight:600;}
+.st-mt section h3{display:flex;align-items:center;gap:7px;margin:0 0 6px;font-size:13px;color:var(--st-ink,#262039);}
+.st-mt section h3 span{font-size:11px;font-weight:700;color:#7b4fd6;background:#f0e9ff;border-radius:999px;padding:1px 8px;}
+.st-mt ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.st-mt-item{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border:1px solid #eee8f2;border-radius:10px;background:#fff;}
+.st-mt-ico{flex-shrink:0;margin-top:2px;color:#a194b3;}
+.st-mt-ico.st-mt-done{color:#16a34a;}
+.st-mt-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:1.35;word-break:break-word;}
+.st-mt-text a{color:inherit;text-decoration:none;}.st-mt-text a:hover{text-decoration:underline;}
+.st-mt-text small{font-size:11px;color:#8a7f97;}
+.st-modal .st-mt-remove{padding:4px!important;color:#a194b3;}
+.st-modal .st-mt-remove:hover{color:#dc2626;background:#fef2f2!important;}
+.st-mt-hint{margin:0;font-size:12px;color:#8a7f97;line-height:1.45;}
+.st-mt-add{display:flex;gap:8px;margin-top:8px;}
+.st-mt-add input{flex:1;min-width:0;border:1px solid #e8e3ef;border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit;outline:none;}
+.st-mt-add input:focus{border-color:#8055e8;box-shadow:0 0 0 3px rgba(128,85,232,.12);}
+.st-mt-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid #f0ecf4;padding-top:14px;}
+.st-mt-last{margin:0;font-size:11.5px;color:#8a7f97;}
+.st-mt-last a{color:#7b4fd6;}

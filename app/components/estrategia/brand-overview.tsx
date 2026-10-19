@@ -12,7 +12,6 @@ import {
   MessageCircle,
   TriangleAlert,
   Users,
-  Video,
 } from "lucide-react";
 import type { BrandPayload } from "@/lib/estrategia/load";
 import {
@@ -30,6 +29,7 @@ import { Modal, PrettyDate, Empty } from "./common";
 import { Agenda } from "./agenda";
 import { ExistingWork, workKinds } from "./existing-work";
 import { SocialCard } from "./social-card";
+import { MeetingTopics } from "./meeting-topics";
 import { useWorkPeriod } from "./use-work-period";
 
 type BrandObservation = {
@@ -329,26 +329,7 @@ export function BrandOverview({
                 </p>
               )}
             </div>
-            <button
-              className="st-next-meeting"
-              onClick={() => setDetail("calendar")}
-            >
-              <Video size={17} />
-              <span>
-                <small>Próxima reunión</small>
-                <strong title={meeting?.title}>
-                  {meeting ? (
-                    <>
-                      <PrettyDate value={meeting.date} /> ·{" "}
-                      {meeting.time?.slice(0, 5)} · {meeting.title}
-                    </>
-                  ) : (
-                    "Por programar"
-                  )}
-                </strong>
-              </span>
-              <ChevronRight size={14} />
-            </button>
+            <MeetingTopics slug={b.brand.slug} brandName={b.brand.nombre} meeting={meeting} />
           </section>
         </div>
         <div className="st-dashboard-bottom">

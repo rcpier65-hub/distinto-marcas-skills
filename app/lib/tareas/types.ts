@@ -20,4 +20,6 @@ export type Tarea = {
   traspasadaDeNombre?: string | null
   traspasadaAt?: string | null
   strategy?: { title:string; href:string; deliverable:string; priority:string; references:string }
+  /* Marcada para la próxima reunión con su marca (Pedro 19-oct-2026). */
+  paraReunion?: boolean
 }
