@@ -2,8 +2,9 @@
 // y desconexión (DELETE). Solo administración.
 import { actor, brandAccess, failure, StrategyError } from "@/lib/estrategia/access";
 import { todayLima } from "@/lib/estrategia/model";
-import { monthOffset, reportPeriod } from "@/lib/social-reports/model";
-import { desconectar, enlaceCliente, tiktokReporte } from "@/lib/tiktok/server";
+import { reportPeriod } from "@/lib/social-reports/model";
+import { desconectar, enlaceCliente } from "@/lib/tiktok/server";
+import { borrarGuardado, obtener } from "@/lib/social-reports/snapshots";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 async function ctx(req: Request, slug: string) {
@@ -14,13 +15,11 @@ async function ctx(req: Request, slug: string) {
 export async function GET(req: Request) {
   try {
     const q = new URL(req.url).searchParams;
-    const { brand } = await ctx(req, q.get("marca") ?? "");
+    const { a, brand } = await ctx(req, q.get("marca") ?? "");
     const mes = q.get("mes") ?? todayLima().slice(0, 7);
-    let desde: string, hasta: string;
-    try { const p = reportPeriod(mes, todayLima()); desde = p.current.start; hasta = p.current.end; }
-    catch { throw new StrategyError("Elige un mes válido."); }
-    if (desde === hasta) hasta = monthOffset(mes, 1) + "-01";
-    return Response.json(await tiktokReporte(brand.id, desde, hasta), { headers: { "Cache-Control": "private, no-store" } });
+    try { reportPeriod(mes, todayLima()); } catch { throw new StrategyError("Elige un mes válido."); }
+    const g = await obtener<Record<string, unknown>>(brand.id, mes, "tiktok", { id: a.user.id, nombre: (a.member as { nombre?: string } | null)?.nombre ?? null });
+    return Response.json({ ...g.data, guardadoEn: g.fetchedAt, guardadoPor: g.fetchedBy }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     return failure(e);
   }
@@ -38,6 +37,7 @@ export async function DELETE(req: Request) {
   try {
     const { brand } = await ctx(req, new URL(req.url).searchParams.get("marca") ?? "");
     await desconectar(brand.id);
+    await borrarGuardado(brand.id, "tiktok");
     return Response.json({ ok: true });
   } catch (e) {
     return failure(e);

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   ArrowUpRight,
   BarChart3,
@@ -113,7 +114,29 @@ export function SocialReportView({
   brandName?: string;
 }) {
   const [month, setMonth] = useState(today.slice(0, 7)),
-    [revision, setRevision] = useState(0);
+    [revision, setRevision] = useState(0),
+    [actualizando, setActualizando] = useState(false);
+  /* Actualizar = consultar Meta/TikTok y GUARDAR para todos. Sin tocarlo, todos
+     ven la última versión guardada (Pedro 18-oct-2026). */
+  async function actualizarDatos() {
+    setActualizando(true);
+    try {
+      const r = await fetch("/api/meta/reporte-redes/actualizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marca: slug, mes: month }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw Error(j.error || "No se pudo actualizar.");
+      if (j.fallos?.length) toast.warning(`Actualizado con avisos: ${j.fallos.join(" · ")}`, { duration: 9000 });
+      else toast.success("Datos actualizados y guardados");
+      setRevision((n) => n + 1);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setActualizando(false);
+    }
+  }
   return (
     <div className={styles.report}>
       <div className={styles.toolbar}>
@@ -134,11 +157,13 @@ export function SocialReportView({
             />
           </label>
           <button
-            onClick={() => setRevision((n) => n + 1)}
-            aria-label="Volver a consultar el reporte"
+            onClick={() => void actualizarDatos()}
+            disabled={actualizando}
+            aria-label="Actualizar los datos desde Meta y TikTok"
+            title="Consulta Meta y TikTok y guarda esta versión para todos"
           >
-            <RefreshCw size={15} />
-            Consultar
+            <RefreshCw size={15} className={actualizando ? "animate-spin" : ""} />
+            {actualizando ? "Actualizando…" : "Actualizar datos"}
           </button>
         </div>
       </div>
@@ -179,7 +204,7 @@ function ExportPdf({ slug, month, brand, report }: { slug: string; month: string
   );
 }
 function ReportBody({ slug, month, brandName }: { slug: string; month: string; brandName: string }) {
-  const { data, error } = useReport<SocialReport>(slug, month, "report");
+  const { data, error } = useReport<SocialReport & { guardadoEn?: string; guardadoPor?: string | null }>(slug, month, "report");
   const [showPosts, setShowPosts] = useState(false);
   const [trend, setTrend] = useState<TrendMetric | null>(null);
   if (error)
@@ -226,6 +251,13 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
             {date(period.current.start)} —{" "}
             {date(addDays(period.current.end, -1))}
           </p>
+          {data.guardadoEn && (
+            <small style={{ display: "block", opacity: 0.85, marginBottom: 2 }}>
+              Datos actualizados el{" "}
+              {new Date(data.guardadoEn).toLocaleString("es-PE", { timeZone: "America/Lima", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              {data.guardadoPor ? ` por ${data.guardadoPor}` : ""} · se mantienen hasta que toques “Actualizar datos”
+            </small>
+          )}
           <small>
             Comparado con {date(period.previous.start)} —{" "}
             {date(addDays(period.previous.end, -1))}

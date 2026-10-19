@@ -489,13 +489,14 @@ export async function socialReport(
   brandId: string,
   month: string,
   detail: "report" | "posts" = "report",
+  opts: { forzar?: boolean } = {},
 ) {
   const period = reportPeriod(month, todayLima()),
     ctx = await context(brandId),
     stamp = signature(ctx.binding, ctx.agency);
   const key = [brandId, month, detail, stamp, todayLima()].join(":"),
     hit = cache.get(key);
-  if (hit && hit.until > Date.now()) return hit.promise;
+  if (!opts.forzar && hit && hit.until > Date.now()) return hit.promise;
   const promise = (async () => {
     const token = await metaAccessToken();
     let result: SocialReport | PostReport;

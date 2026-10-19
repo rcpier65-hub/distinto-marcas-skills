@@ -5,7 +5,7 @@ import {
   failure,
   StrategyError,
 } from "@/lib/estrategia/access";
-import { socialReport, socialTrend } from "@/lib/social-reports/server";
+import { obtener, type Kind } from "@/lib/social-reports/snapshots";
 import { reportPeriod } from "@/lib/social-reports/model";
 import { todayLima } from "@/lib/estrategia/model";
 export const dynamic = "force-dynamic";
@@ -32,10 +32,9 @@ export async function GET(req: Request) {
       throw new StrategyError("Elige un mes válido de los últimos dos años.");
     }
     const brand = await brandAccess(a, q.marca);
-    const body =
-      q.detalle === "tendencia"
-        ? await socialTrend(brand.id, q.mes)
-        : await socialReport(brand.id, q.mes, q.detalle);
+    const kind: Kind = q.detalle === "tendencia" ? "trend" : q.detalle;
+    const g = await obtener<Record<string, unknown>>(brand.id, q.mes, kind, { id: a.user.id, nombre: (a.member as { nombre?: string } | null)?.nombre ?? null });
+    const body = { ...g.data, guardadoEn: g.fetchedAt, guardadoPor: g.fetchedBy };
     return Response.json(body, {
       headers: { "Cache-Control": "private, no-store" },
     });

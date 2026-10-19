@@ -92,6 +92,8 @@ export async function completarConexion(state: string, code: string) {
     updated_at: new Date().toISOString(),
   });
   if (error) throw Error("No se pudo guardar la cuenta de TikTok.");
+  // La versión guardada del reporte sin TikTok deja de valer: se consultará de nuevo.
+  await db().from("social_report_snapshots").delete().eq("brand_id", st.brand_id).eq("kind", "tiktok");
   const { data: marca } = await db().from("marcas").select("slug, nombre").eq("id", st.brand_id).maybeSingle();
   return { brandId: st.brand_id as string, slug: marca?.slug as string, nombre: marca?.nombre as string, viaLink: !!st.via_link, faltan, username: perfil?.username ?? null };
 }

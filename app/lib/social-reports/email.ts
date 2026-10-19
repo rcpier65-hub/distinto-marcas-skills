@@ -8,7 +8,7 @@ import nodemailer from "nodemailer";
 import { createServiceClient } from "@/lib/supabase/service";
 import { todayLima } from "@/lib/estrategia/model";
 import { monthOffset, exactSum, delta, type SocialReport } from "./model";
-import { socialReport } from "./server";
+import { obtener } from "./snapshots";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = () => createServiceClient() as any;
@@ -135,7 +135,7 @@ export async function enviarReporte(opts: {
   try {
     if (!correoConfigurado()) throw Error("El correo de envío no está configurado en el servidor.");
     if (!para.length) throw Error("No hay correos válidos para enviar.");
-    const reporte = (await socialReport(opts.marca.id, opts.mes, "report")) as SocialReport;
+    const reporte = (await obtener<SocialReport>(opts.marca.id, opts.mes, "report", { id: null, nombre: "Envío de reporte" })).data;
     const pdf = await pdfReporte(opts.marca.slug, opts.mes);
     await transporte().sendMail({
       from: `"Distinto Studio" <${process.env.SMTP_USER}>`,

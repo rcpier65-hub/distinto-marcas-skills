@@ -3,12 +3,10 @@
 // sin firma válida responde 404. Pedro 18-oct-2026.
 import { notFound } from "next/navigation";
 import { firmaValida, marcaCorreo } from "@/lib/social-reports/email";
-import { socialReport, socialTrend } from "@/lib/social-reports/server";
-import type { SocialReport } from "@/lib/social-reports/model";
+import type { SocialReport, SocialTrend } from "@/lib/social-reports/model";
+import { obtener } from "@/lib/social-reports/snapshots";
+import type { TikTokReporte } from "@/lib/tiktok/server";
 import { SocialReportDoc } from "@/components/estrategia/social-report-pdf";
-import { tiktokReporte } from "@/lib/tiktok/server";
-import { reportPeriod } from "@/lib/social-reports/model";
-import { todayLima } from "@/lib/estrategia/model";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +23,11 @@ export default async function Page({
   if (!/^\d{4}-\d{2}$/.test(mes) || !firmaValida(slug, mes, Number(q.exp), q.f ?? "")) notFound();
   const marca = await marcaCorreo(slug);
   if (!marca) notFound();
-  const periodo = reportPeriod(mes, todayLima());
+  const por = { id: null, nombre: "Envío de reporte" };
   const [report, trend, tiktok] = await Promise.all([
-    socialReport(marca.id, mes, "report") as Promise<SocialReport>,
-    socialTrend(marca.id, mes).catch(() => null),
-    tiktokReporte(marca.id, periodo.current.start, periodo.current.end).catch(() => null),
+    obtener<SocialReport>(marca.id, mes, "report", por).then((g) => g.data),
+    obtener<SocialTrend>(marca.id, mes, "trend", por).then((g) => g.data).catch(() => null),
+    obtener<TikTokReporte>(marca.id, mes, "tiktok", por).then((g) => g.data).catch(() => null),
   ]);
   return (
     <div id="reporte-redes-doc" style={{ background: "#fff" }}>
