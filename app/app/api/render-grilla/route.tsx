@@ -156,8 +156,11 @@ export async function GET(request: Request) {
   let browser: Browser | null = null
   try {
     browser = await puppeteer.launch({
+      /* El Chromium Debian del VPS no arranca con chromium.args (pensados para Vercel). */
       args: [
-        ...chromium.args,
+        ...(process.platform === 'linux' && process.env.CHROMIUM_EXECUTABLE_PATH
+          ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--headless=new']
+          : chromium.args),
         '--hide-scrollbars',
         '--disable-web-security',
       ],

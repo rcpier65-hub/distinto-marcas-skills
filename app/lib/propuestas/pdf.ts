@@ -13,7 +13,11 @@ export async function proposalPdf(data: ProposalData, number: string) {
 export async function renderProposalPdf(html: string) {
   chromium.setGraphicsMode = false
   const browser = await puppeteer.launch({
-    args: chromium.args, headless: true,
+    /* El Chromium Debian del VPS no arranca con chromium.args (pensados para Vercel). */
+    args: process.platform === 'linux' && process.env.CHROMIUM_EXECUTABLE_PATH
+      ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--headless=new']
+      : chromium.args,
+    headless: true,
     executablePath: process.env.VERCEL && !process.env.CHROMIUM_EXECUTABLE_PATH
       ? await chromium.executablePath('https://github.com/Sparticuz/chromium/releases/download/v138.0.0/chromium-v138.0.0-pack.x64.tar')
       : process.env.CHROMIUM_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
