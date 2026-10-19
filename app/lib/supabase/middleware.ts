@@ -16,6 +16,7 @@ export async function updateSession(request: NextRequest) {
     p.startsWith('/excalidraw/') ||
     p.startsWith('/imprimir/') ||   // PDF interno del servidor (firma HMAC propia, 5 min)
     p.startsWith('/tiktok/') || p === '/api/tiktok/callback' ||   // conexión TikTok (state/firma propios)
+    ['/funciones', '/integraciones', '/privacidad', '/terminos', '/eliminar-datos'].includes(p.replace(/\/$/, '')) || p.startsWith('/legal/') || p.startsWith('/agencia/') ||   // sitio público
     p === '/reservar/diagnostico' || p === '/api/reservas' || p === '/api/reservas/disponibilidad' ||
     p === '/api/version' ||
     p.startsWith('/api/cron') ||

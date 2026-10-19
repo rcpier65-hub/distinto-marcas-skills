@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
   // Estos paquetes los carga Node directamente desde node_modules en runtime.
   serverExternalPackages: ['@sparticuz/chromium-min', 'puppeteer-core'],
 
+  // Páginas legales del sitio público (mismo texto que distintostudio.com).
+  async rewrites() {
+    return [
+      { source: '/privacidad', destination: '/legal/privacidad.html' },
+      { source: '/terminos', destination: '/legal/terminos.html' },
+    ]
+  },
+
   // Identificador único por despliegue. Se inyecta en el bundle del cliente
   // (NEXT_PUBLIC_*) y se compara contra /api/version en runtime para detectar
   // cuándo hay una versión nueva publicada y recargar la app sola (ver

@@ -31,7 +31,7 @@ import type { MarcaNav } from '@/lib/mock-marcas'
 import type { Permisos } from '@/lib/team/types'
 import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
 
-const NO_SHELL_ROUTES = ['/login', '/mockup', '/portal']
+const NO_SHELL_ROUTES = ['/login', '/mockup', '/portal', '/funciones', '/integraciones', '/privacidad', '/terminos', '/eliminar-datos', '/tiktok']
 
 export type PermisosSimple = {
   modulos: Permisos
