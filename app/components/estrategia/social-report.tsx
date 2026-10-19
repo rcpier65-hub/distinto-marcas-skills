@@ -20,10 +20,11 @@ import {
   type SocialReport,
 } from "@/lib/social-reports/model";
 import styles from "./social-report.module.css";
-import { FacebookLogo, InstagramLogo, MetaLogo, TikTokLogo } from "./social-icons";
+import { FacebookLogo, InstagramLogo, MetaLogo } from "./social-icons";
 import { TrendModal, useTrend, type TrendMetric } from "./social-trend";
 import { SocialReportPdf } from "./social-report-pdf";
 import { EnviarCorreoBoton } from "./social-email";
+import { TikTokSection, useTikTok } from "./social-tiktok";
 import { Download, TrendingUp } from "lucide-react";
 
 const names = { facebook: "Facebook", instagram: "Instagram" };
@@ -154,7 +155,8 @@ export function SocialReportView({
 function ExportPdf({ slug, month, brand, report }: { slug: string; month: string; brand: string; report: SocialReport }) {
   const [on, setOn] = useState(false);
   const { data: trend, error } = useTrend(slug, month, on);
-  const listo = on && (trend || error);
+  const tk = useTikTok(slug, month, on);
+  const listo = on && (trend || error) && (tk.data || tk.error);
   useEffect(() => {
     if (!listo) return;
     const antes = document.title;
@@ -172,7 +174,7 @@ function ExportPdf({ slug, month, brand, report }: { slug: string; month: string
         <Download size={15} />
         {on ? "Preparando PDF…" : "Exportar PDF"}
       </button>
-      {on && listo && <SocialReportPdf brand={brand} report={report} trend={trend ?? null} />}
+      {on && listo && <SocialReportPdf brand={brand} report={report} trend={trend ?? null} tiktok={tk.data ?? null} />}
     </>
   );
 }
@@ -446,14 +448,7 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
           evidencia.
         </p>
       </section>
-      <div className={styles.tiktok}>
-        <TikTokLogo size={26} />
-        <strong>TikTok · pendiente de conexión</strong>
-        <span>
-          La API de Meta cubre Facebook e Instagram. TikTok necesita su propia
-          integración.
-        </span>
-      </div>
+      <TikTokSection slug={slug} month={month} />
       <footer className={styles.footnote}>
         Consulta:{" "}
         {new Date(data.checkedAt).toLocaleString("es-PE", {

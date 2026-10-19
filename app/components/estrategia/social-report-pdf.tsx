@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { addDays, delta, exactSum, type Channel, type MetricKey, type SocialReport, type SocialTrend } from "@/lib/social-reports/model";
 import { FacebookLogo, InstagramLogo, MetaLogo, TikTokLogo } from "./social-icons";
 import { LineChart, seriesFor } from "./social-trend";
+import type { TikTokReporte } from "@/lib/tiktok/server";
 
 const C = { tinta: "#1f1a2e", gris: "#6b6580", suave: "#9a93a8", linea: "#ebe6f3", fondo: "#f8f6fc", morado: "#7c3aed" };
 const GRAD = "linear-gradient(135deg,#5b3fd0,#8b5cf6 55%,#b45cf0)";
@@ -26,7 +27,7 @@ function cambio(a: number | null, b: number | null, invertir = false) {
   return { txt: `${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1)}%`, color: Math.abs(d) < 0.05 ? C.gris : bueno ? "#15803d" : "#c2410c" };
 }
 
-export function SocialReportPdf(props: { brand: string; report: SocialReport; trend: SocialTrend | null }) {
+export function SocialReportPdf(props: { brand: string; report: SocialReport; trend: SocialTrend | null; tiktok?: TikTokReporte | null }) {
   /* Solo se monta en el navegador, después del clic en "Exportar PDF". */
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -40,7 +41,7 @@ body>*:not(#reporte-redes-pdf){display:none!important}#reporte-redes-pdf{display
   );
 }
 
-export function SocialReportDoc({ brand, report, trend }: { brand: string; report: SocialReport; trend: SocialTrend | null }) {
+export function SocialReportDoc({ brand, report, trend, tiktok = null }: { brand: string; report: SocialReport; trend: SocialTrend | null; tiktok?: TikTokReporte | null }) {
   const { period, channels, ads } = report;
   const views = exactSum(channels.map((c) => c.current.views)), viewsPrev = exactSum(channels.map((c) => c.previous.views));
   const followers = exactSum(channels.map((c) => c.followers));
@@ -114,9 +115,26 @@ export function SocialReportDoc({ brand, report, trend }: { brand: string; repor
               )}
             </ul>
           </Bloque>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, border: `1px dashed ${C.linea}`, borderRadius: 12, padding: "10px 14px", fontSize: 10.5, color: C.gris }}>
-            <TikTokLogo size={18} /> TikTok se incorporará al reporte cuando la cuenta esté conectada.
-          </div>
+          {tiktok?.conectado && tiktok.perfil ? (
+            <Bloque titulo="TikTok" nota={tiktok.perfil.username ? `@${tiktok.perfil.username}` : undefined} icono={<TikTokLogo size={16} />}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+                <Mini label="Seguidores" valor={int(tiktok.perfil.follower_count)} />
+                <Mini label="Likes totales" valor={int(tiktok.perfil.likes_count)} />
+                <Mini label="Videos del mes" valor={int(tiktok.mes?.videos ?? null)} />
+                <Mini label="Vistas de esos videos" valor={int(tiktok.mes?.views ?? null)} />
+              </div>
+              {tiktok.mes && tiktok.mes.top.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 9.5, color: C.gris, lineHeight: 1.5 }}>
+                  <b style={{ color: C.tinta }}>Videos con más vistas:</b>{" "}
+                  {tiktok.mes.top.slice(0, 3).map((v) => `${(v.title || "Video").slice(0, 48)} (${int(v.views)})`).join(" · ")}
+                </div>
+              )}
+            </Bloque>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, border: `1px dashed ${C.linea}`, borderRadius: 12, padding: "10px 14px", fontSize: 10.5, color: C.gris }}>
+              <TikTokLogo size={18} /> TikTok se incorporará al reporte cuando la cuenta esté conectada.
+            </div>
+          )}
           <p style={{ fontSize: 9, color: C.suave, lineHeight: 1.5, margin: 0 }}>
             Datos de la API oficial de Meta consultados el {hoy}. Los seguidores son el total al consultar; el resto corresponde al periodo indicado.
             “—” significa dato no disponible, nunca cero. El alcance no se suma entre redes.

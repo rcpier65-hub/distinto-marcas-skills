@@ -76,6 +76,15 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
       if (t) { setTab(t); window.scrollTo({ top: 0, behavior: "smooth" }); }
     };
     window.addEventListener("st:abrir-pestana", abrir);
+    /* Vuelta desde TikTok tras conectar la cuenta → abrir Reportes. */
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("tiktok") === "conectado") {
+      window.history.replaceState(null, "", window.location.pathname);
+      setTimeout(() => {
+        setTab("Reportes");
+        toast.success("TikTok conectado");
+      }, 0);
+    }
     return () => window.removeEventListener("st:abrir-pestana", abrir);
   }, []);
   useEffect(() => {

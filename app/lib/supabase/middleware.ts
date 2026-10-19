@@ -15,6 +15,7 @@ export async function updateSession(request: NextRequest) {
   const sinAuthUsuario =
     p.startsWith('/excalidraw/') ||
     p.startsWith('/imprimir/') ||   // PDF interno del servidor (firma HMAC propia, 5 min)
+    p.startsWith('/tiktok/') || p === '/api/tiktok/callback' ||   // conexión TikTok (state/firma propios)
     p === '/reservar/diagnostico' || p === '/api/reservas' || p === '/api/reservas/disponibilidad' ||
     p === '/api/version' ||
     p.startsWith('/api/cron') ||
