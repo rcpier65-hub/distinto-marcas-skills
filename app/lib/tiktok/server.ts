@@ -139,10 +139,11 @@ export async function desconectar(brandId: string) {
 /* ── Lectura (Display API) ── */
 export type TikTokPerfil = {
   username: string | null; display_name: string | null; avatar_url: string | null; profile_deep_link: string | null;
+  bio_description: string | null; is_verified: boolean | null; profile_web_link: string | null;
   follower_count: number | null; following_count: number | null; likes_count: number | null; video_count: number | null;
 };
 async function userInfo(at: string): Promise<TikTokPerfil> {
-  const fields = "open_id,avatar_url,display_name,username,profile_deep_link,follower_count,following_count,likes_count,video_count";
+  const fields = "open_id,avatar_url,display_name,username,bio_description,is_verified,profile_web_link,profile_deep_link,follower_count,following_count,likes_count,video_count";
   const r = await fetch(`${API}/user/info/?fields=${fields}`, { headers: { Authorization: `Bearer ${at}` }, cache: "no-store", signal: AbortSignal.timeout(15000) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error?.code !== "ok") throw Error(j.error?.message || "TikTok no devolvió el perfil.");
@@ -150,6 +151,7 @@ async function userInfo(at: string): Promise<TikTokPerfil> {
   const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return {
     username: u.username ?? null, display_name: u.display_name ?? null, avatar_url: u.avatar_url ?? null, profile_deep_link: u.profile_deep_link ?? null,
+    bio_description: u.bio_description ?? null, is_verified: typeof u.is_verified === "boolean" ? u.is_verified : null, profile_web_link: u.profile_web_link ?? null,
     follower_count: n(u.follower_count), following_count: n(u.following_count), likes_count: n(u.likes_count), video_count: n(u.video_count),
   };
 }

@@ -111,13 +111,29 @@ export function TikTokSection({ slug, month }: { slug: string; month: string }) 
     <div style={card}>
       {header(
         <div style={{ display: "flex", gap: 8 }}>
-          {p?.profile_deep_link && <a href={p.profile_deep_link} target="_blank" rel="noopener noreferrer" style={btn()}>Ver perfil <ArrowUpRight size={14} /></a>}
+          {(p?.profile_web_link || p?.profile_deep_link) && <a href={p.profile_web_link || p.profile_deep_link || undefined} target="_blank" rel="noopener noreferrer" style={btn()}>Ver perfil <ArrowUpRight size={14} /></a>}
           <button type="button" onClick={() => void quitar()} disabled={quitando} style={{ ...btn(), color: "#b42318", borderColor: "#f3d0cc" }} title="Desconectar TikTok">
             <Unplug size={15} />
           </button>
         </div>,
       )}
       {data.error && <p role="alert" style={{ color: "#b42318", fontSize: 13, marginTop: 12 }}>{data.error}</p>}
+      {p && (
+        /* Perfil (user.info.basic + user.info.profile): foto, nombre, usuario,
+           biografía, verificación y enlace al perfil. */
+        <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 16, padding: "12px 14px", borderRadius: 14, background: "#f7f7f8" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {p.avatar_url ? <img src={p.avatar_url} alt="" referrerPolicy="no-referrer" style={{ width: 52, height: 52, borderRadius: 999, objectFit: "cover", flexShrink: 0 }} /> : <TikTokLogo size={52} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
+              {p.display_name || "Cuenta de TikTok"}
+              {p.is_verified && <span title="Cuenta verificada" style={{ background: "#20d5ec", color: "#fff", borderRadius: 999, width: 16, height: 16, fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>✓</span>}
+            </div>
+            <div style={{ fontSize: 12.5, color: "#767084" }}>{p.username ? `@${p.username}` : ""}</div>
+            {p.bio_description && <div style={{ fontSize: 12.5, color: "#3f3a4a", marginTop: 3, whiteSpace: "pre-line" }}>{p.bio_description}</div>}
+          </div>
+        </div>
+      )}
       {p && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 16 }}>
           {[
