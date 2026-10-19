@@ -844,6 +844,12 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
             className="mk-btn-lista" style={{ ...btnCard, width: 'auto', padding: '0 9px', gap: 4, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
             <Check size={12} strokeWidth={3} /> <span style={{ fontSize: 11, fontWeight: 700 }}>Lista</span>
           </button>
+          <button disabled={readOnly} onClick={() => onReunion(tarea.id, !tarea.paraReunion)}
+            title={tarea.paraReunion ? 'En la próxima reunión · clic para quitarla' : 'Llevar a la próxima reunión'}
+            aria-label={tarea.paraReunion ? 'Quitar de la próxima reunión' : 'Llevar a la próxima reunión'} aria-pressed={!!tarea.paraReunion}
+            className="mk-btn-reunion" style={{ ...btnCard, ...(tarea.paraReunion ? { background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe' } : {}) }}>
+            <Presentation size={14} strokeWidth={2.3} />
+          </button>
           <button disabled={readOnly} onClick={() => setMenu((v) => !v)} title="Más opciones" className="mk-btn-mas" style={btnCard}>
             <MoreHorizontal size={15} strokeWidth={2.4} />
           </button>
@@ -852,7 +858,7 @@ function CardArrastrable({ tarea, esCEO, readOnly, otras, onComplete, onDelete, 
         <div style={{ height: 1, background: '#f1f3f7', margin: '9px -11px 0' }} />
         <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><PlanChips key={`${tarea.id}:${planInfo?.estado}:${planInfo?.enProcesoDesde}:${planInfo?.tiempoSeg}`} tareaId={tarea.id} planInfo={planInfo} hoy={hoy} onCambio={onPlanCambio} /></fieldset>
       </div>
-      <style>{'.mk-tarea-card:hover{box-shadow:0 6px 18px rgba(15,23,42,0.08)!important}.mk-btn-lista:hover:not(:disabled){background:#dcfce7!important}.mk-btn-mas:hover:not(:disabled){background:#f1f5f9!important;color:#0f172a!important}.mk-chip-reunion:hover:not(:disabled){background:#ede9fe!important}@keyframes mkVivo{0%,100%{opacity:1}50%{opacity:.3}}.mk-dot-vivo{animation:mkVivo 1.2s ease-in-out infinite}'}</style>
+      <style>{'.mk-tarea-card:hover{box-shadow:0 6px 18px rgba(15,23,42,0.08)!important}.mk-btn-lista:hover:not(:disabled){background:#dcfce7!important}.mk-btn-mas:hover:not(:disabled){background:#f1f5f9!important;color:#0f172a!important}.mk-chip-reunion:hover:not(:disabled){background:#ede9fe!important}.mk-btn-reunion:hover:not(:disabled){background:#f5f3ff!important;color:#6d28d9!important}@keyframes mkVivo{0%,100%{opacity:1}50%{opacity:.3}}.mk-dot-vivo{animation:mkVivo 1.2s ease-in-out infinite}'}</style>
       {menu && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 30, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 12px 32px rgba(15,23,42,0.16)', padding: 6, minWidth: 190 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, padding: '3px 8px 5px' }}>
