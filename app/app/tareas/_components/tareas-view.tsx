@@ -22,6 +22,7 @@ import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane, traspasarTarea } from '../_actions'
 import { iniciarTarea, pausarTarea, setEstadoTarea, setFechasTarea } from '../_plan-actions'
 import { marcarTareaParaReunion } from '../_reunion-actions'
+import { ahoraServidor, desfaseActual, segundosTranscurridos, sincronizarReloj } from '@/lib/tiempo/reloj'
 import { Gantt, CalendarioTareas, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { type EstadoTarea } from '@/lib/tareas/pro-types'
 
@@ -929,14 +930,18 @@ function fmtCorto(seg: number): string {
 }
 
 /* Segundero en vivo: total guardado + lo que va de la sesión actual. */
+/* Cuenta con la hora del servidor (lib/tiempo/reloj): si la computadora va
+   adelantada o atrasada, el segundero ya no salta al recargar. */
 function useSegundos(desde: string | null, acumulado: number): number {
   const [ahora, setAhora] = useState(() => Date.now())
+  const [desfase, setDesfase] = useState(desfaseActual)
   useEffect(() => {
     if (!desde) return
+    void sincronizarReloj().then(setDesfase)
     const t = setInterval(() => setAhora(Date.now()), 1000)
     return () => clearInterval(t)
   }, [desde])
-  return acumulado + (desde ? Math.max(0, Math.round((ahora - new Date(desde).getTime()) / 1000)) : 0)
+  return segundosTranscurridos(desde, acumulado, ahora, desfase)
 }
 
 function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
@@ -959,7 +964,7 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
   async function iniciar() {
     if (cargando) return
     const antes = { estado, desde }
-    setEstado('en_proceso'); setDesde(new Date().toISOString())  // optimista
+    setEstado('en_proceso'); setDesde(new Date(ahoraServidor()).toISOString())  // optimista, con hora del servidor
     setCargando(true)
     const r = await iniciarTarea(tareaId)
     setCargando(false)

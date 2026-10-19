@@ -17,6 +17,7 @@
    - `?chat=<team_member_id>` en la URL abre esa conversación (lo usa el push). */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { desfaseActual } from '@/lib/tiempo/reloj'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { ArrowLeft, Check, CheckCheck, Compass, ImagePlus, ListChecks, Loader2, MessageCircle, Palette, Paperclip, Scissors, Send, Smile, Users, X } from 'lucide-react'
@@ -156,7 +157,7 @@ function LineaActividad({ a, size = 11 }: { a: ActividadChat; size?: number }) {
   const ahora = useAhora()
   const Icono = a.tipo === 'editando' ? Scissors : a.tipo === 'disenando' ? Palette : ListChecks
   const verbo = a.tipo === 'editando' ? 'Editando' : a.tipo === 'disenando' ? 'Diseñando' : 'Trabajando en'
-  const tiempo = a.desde ? duracionCorta(ahora - new Date(a.desde).getTime()) : null
+  const tiempo = a.desde ? duracionCorta(ahora + desfaseActual() - new Date(a.desde).getTime()) : null
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: size, color: '#059669', minWidth: 0 }}>
       <Icono size={size + 1} style={{ flexShrink: 0 }} />

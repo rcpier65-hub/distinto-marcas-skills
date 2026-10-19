@@ -7,6 +7,7 @@ import { listarTareasFlotantes, type TareaFlotante } from '@/app/tareas/_floatin
 import { completarTarea } from '@/app/tareas/_actions'
 import { iniciarTarea, pausarTarea } from '@/app/tareas/_plan-actions'
 import { listarRecordatorios, marcarRecordatorio, type Recordatorio } from '@/app/recordatorios/_actions'
+import { desfaseActual, segundosTranscurridos, sincronizarReloj } from '@/lib/tiempo/reloj'
 
 export function PendientesFlotantes({ usuario, compact = false }: { usuario: string; compact?: boolean }) {
   const [tareas, setTareas] = useState<TareaFlotante[]>([])
@@ -17,6 +18,8 @@ export function PendientesFlotantes({ usuario, compact = false }: { usuario: str
   const collapsed = compact ? !dockOpen : cerrado
   const [busy, setBusy] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
+  /* Hora del servidor para el segundero (ver lib/tiempo/reloj). */
+  const [desfase, setDesfase] = useState(desfaseActual)
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
   const recargar = useCallback(async () => {
     if (document.hidden) return
@@ -42,7 +45,7 @@ export function PendientesFlotantes({ usuario, compact = false }: { usuario: str
     return () => { cancelAnimationFrame(frame); clearInterval(t); window.removeEventListener('distinto-timer', recargar); window.removeEventListener('distinto-recordatorios', recargar); window.removeEventListener('focus', recargar); window.removeEventListener('resize', ajustar); document.removeEventListener('visibilitychange', vis) }
   }, [recargar, usuario])
   const corriendo = tareas.some(t => t.en_proceso_desde)
-  useEffect(() => { if (!corriendo) return; const t = setInterval(() => setAhora(Date.now()), 1000); return () => clearInterval(t) }, [corriendo])
+  useEffect(() => { if (!corriendo) return; void sincronizarReloj().then(setDesfase); const t = setInterval(() => setAhora(Date.now()), 1000); return () => clearInterval(t) }, [corriendo])
   async function controlar(t: TareaFlotante) {
     if (busy) return
     setBusy(t.id)
@@ -70,7 +73,7 @@ export function PendientesFlotantes({ usuario, compact = false }: { usuario: str
     </div>
     {!collapsed && <div className="min-h-0 max-h-[45vh] overflow-y-auto p-3 space-y-3">
       {tareas.map(t => {
-        const seg = (t.tiempo_seg ?? 0) + (t.en_proceso_desde ? Math.max(0, Math.floor((ahora - new Date(t.en_proceso_desde).getTime()) / 1000)) : 0)
+        const seg = segundosTranscurridos(t.en_proceso_desde, t.tiempo_seg ?? 0, ahora, desfase)
         const tiempo = `${Math.floor(seg/3600)}:${String(Math.floor(seg/60)%60).padStart(2,'0')}:${String(seg%60).padStart(2,'0')}`
         const empezar = t.estado === 'sin_empezar'
         return <div key={t.id} className="rounded-xl border p-2 space-y-2">
