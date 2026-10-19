@@ -8,7 +8,9 @@ export async function GET(request: Request) {
   const pedido = searchParams.get('next') ?? '/dashboard'
   /* Solo rutas internas; redirección relativa porque detrás del proxy del VPS
      el origin de request.url es http://localhost:3000. */
-  const next = pedido.startsWith('/') && !pedido.startsWith('//') ? pedido : '/dashboard'
+  const base = 'http://interno.local'
+  const destino = /[\\\s]/.test(pedido) ? null : new URL(pedido, base)
+  const next = pedido.startsWith('/') && destino?.origin === base ? destino.pathname + destino.search + destino.hash : '/dashboard'
   const ir = (destino: string) => new NextResponse(null, { status: 307, headers: { Location: destino } })
 
   if (code) {
