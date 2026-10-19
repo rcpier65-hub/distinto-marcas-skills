@@ -46,7 +46,7 @@ export function TikTokSection({ slug, month }: { slug: string; month: string }) 
       const j = await r.json();
       if (!r.ok) throw Error(j.error || "No se pudo crear el enlace.");
       await navigator.clipboard.writeText(j.enlace);
-      toast.success("Enlace copiado. Envíaselo al cliente: vence en 7 días.");
+      toast.success("Enlace copiado. Envíaselo al cliente: vence en 3 días y sirve una sola vez.");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

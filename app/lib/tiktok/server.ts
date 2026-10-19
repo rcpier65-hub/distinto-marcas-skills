@@ -30,7 +30,7 @@ export function enlaceValido(slug: string, exp: number, f: string) {
   const a = Buffer.from(firmaEnlace(slug, exp)), b = Buffer.from(f || "");
   return a.length === b.length && timingSafeEqual(a, b);
 }
-export function enlaceCliente(slug: string, dias = 7) {
+export function enlaceCliente(slug: string, dias = 3) {
   const exp = Date.now() + dias * 86400000;
   return `${appUrl()}/tiktok/conectar/${encodeURIComponent(slug)}?${new URLSearchParams({ exp: String(exp), f: firmaEnlace(slug, exp) })}`;
 }
@@ -68,6 +68,12 @@ export async function completarConexion(state: string, code: string) {
   if (!st || st.used_at || Date.parse(st.expires_at) < Date.now()) throw Error("El enlace de conexión venció. Vuelve a intentarlo.");
   await db().from("tiktok_oauth_states").update({ used_at: new Date().toISOString() }).eq("state", state);
   const t = await token({ code, grant_type: "authorization_code", redirect_uri: redirectUri() });
+  /* Un enlace para el cliente NUNCA reemplaza una cuenta ya conectada: para
+     cambiarla, administración debe desconectarla primero desde la app. */
+  if (st.via_link) {
+    const { data: previa } = await db().from("tiktok_brand_accounts").select("open_id").eq("brand_id", st.brand_id).maybeSingle();
+    if (previa && previa.open_id !== t.open_id) throw Error("Esta marca ya tiene otra cuenta de TikTok conectada. Pide a Distinto Studio que la desconecte primero.");
+  }
   const faltan = TIKTOK_SCOPES.split(",").filter((s) => !t.scope.split(",").includes(s));
   const perfil = await userInfo(t.access_token).catch(() => null);
   const { error } = await db().from("tiktok_brand_accounts").upsert({

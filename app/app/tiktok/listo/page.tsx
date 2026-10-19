@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Conexión con TikTok" };
 const MSG: Record<string, string> = {
+  conectada: "Esta marca ya tiene una cuenta de TikTok conectada. Si necesitas cambiarla, pide a Distinto Studio que la desconecte primero.",
   enlace: "Este enlace venció o no es válido. Pide uno nuevo a tu contacto en Distinto Studio.",
   cancelado: "La conexión se canceló en TikTok. Puedes volver a abrir el enlace cuando quieras.",
   config: "La conexión con TikTok no está disponible en este momento. Avísale a Distinto Studio.",
