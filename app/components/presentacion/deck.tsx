@@ -17,10 +17,14 @@ import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
 import type { SesionGuardada } from "@/lib/presentacion/server";
 import { display, sans } from "./fuentes";
 import { Proceso } from "./proceso";
-import { Explicadores } from "./explicadores";
+import { Explicadores, TEMAS } from "./explicadores";
+import { TEMAS_ADS, TEMAS_SOCIAL } from "./explicadores-servicios";
+import { PlanSocialAds, PreguntasServicio, ProcesoServicio } from "./servicios-ui";
+import { PREGUNTAS_ADS, PREGUNTAS_SOCIAL, PROCESO_ADS, PROCESO_SOCIAL, REUNIONES_ADS, REUNIONES_SOCIAL, SERVICIOS, type Servicio } from "@/lib/presentacion/servicios";
 import "./presentacion.css";
 
-const ETAPAS = ["Inicio", "Te escuchamos", "Cómo trabajamos", "Preguntas", "Tu web", "Propuesta"] as const;
+const ETAPAS = ["Inicio", "Te escuchamos", "Cómo trabajamos", "Preguntas", "Tu plan", "Propuesta"] as const;
+const GRUPOS_WEB = ["Tu web", "Tecnología", "Lo que tienes hoy"];
 const ORDEN: Nivel[] = ["basico", "intermedio", "avanzado"];
 
 export function Deck({ inicial }: { inicial: SesionGuardada }) {
@@ -30,6 +34,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const [guardado, setGuardado] = useState<"ok" | "pendiente" | "error">("ok");
   const [propuesta, setPropuesta] = useState<{ id: string; numero: number; revision: number; editada?: boolean } | null>(inicial.propuestaId ? { id: inicial.propuestaId, numero: 0, revision: 0 } : null);
   const [descargando, setDescargando] = useState(false);
+  const [procElegido, setProcServ] = useState<Servicio>(inicial.data.servicios?.[0] ?? "web");
   const [generando, setGenerando] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const notasRef = useRef<HTMLTextAreaElement>(null);
@@ -128,11 +133,16 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
 
   const n = nivelDeSesion(s);
   const numeroPropuesta = propuesta?.numero ?? 0;
-  const htmlPropuesta = useMemo(() => {
+  const datosPropuesta = useMemo(() => {
     let k = 0;
-    const d = aPropuesta(s, hoyLima(), () => `00000000-0000-4000-8000-${String(++k).padStart(12, "0")}`);
-    return proposalHtml(d, numeroPropuesta ? proposalNumber({ numero: numeroPropuesta, data: d }) : "BORRADOR");
-  }, [s, numeroPropuesta]);
+    return aPropuesta(s, hoyLima(), () => `00000000-0000-4000-8000-${String(++k).padStart(12, "0")}`);
+  }, [s]);
+  const htmlPropuesta = useMemo(() => proposalHtml(datosPropuesta, numeroPropuesta ? proposalNumber({ numero: numeroPropuesta, data: datosPropuesta }) : "BORRADOR"), [datosPropuesta, numeroPropuesta]);
+  const resumenMensual = datosPropuesta.services.filter((x) => !x.optional && x.frequency === "mensual");
+  const conWeb = s.servicios.includes("web");
+  /* Pestaña de «Cómo trabajamos»: si se quita un servicio, cae al primero activo. */
+  const procServ: Servicio = s.servicios.includes(procElegido) ? procElegido : s.servicios[0];
+  const temasDe = (x: Servicio) => (x === "web" ? TEMAS : x === "social" ? TEMAS_SOCIAL : TEMAS_ADS);
   const anim = reducir ? {} : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 }, transition: { duration: 0.32, ease: [0.2, 0.7, 0.2, 1] as const } };
 
   return (
@@ -142,11 +152,18 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
         <img src="/agencia/distinto-horizontal.svg" alt="Distinto" width={112} height={26} />
         <nav className="pr-etapas" aria-label="Etapas de la presentación">
           {ETAPAS.map((e, i) => (
-            <button key={e} type="button" className={i === etapa ? "pr-on" : ""} aria-current={i === etapa ? "step" : undefined} onClick={() => ir(i)}>
-              <span>{i + 1}</span>{e}
+            <button key={e} type="button" className={i === etapa ? "pr-on" : ""} aria-current={i === etapa ? "step" : undefined} aria-label={`${i + 1}. ${e}`} title={e} onClick={() => ir(i)}>
+              <span>{i + 1}</span><em>{e}</em>
             </button>
           ))}
         </nav>
+        <div className="pr-servs" role="group" aria-label="Servicios de la reunión">
+          {SERVICIOS.map((x) => {
+            const on = s.servicios.includes(x.id);
+            return <button key={x.id} type="button" aria-pressed={on} className={on ? "pr-serv pr-serv-on" : "pr-serv"} title={on && s.servicios.length === 1 ? "Debe quedar al menos un servicio" : undefined}
+              onClick={() => cambiar((y) => ({ ...y, servicios: on ? (y.servicios.length > 1 ? y.servicios.filter((z) => z !== x.id) : y.servicios) : (SERVICIOS.map((z) => z.id).filter((z) => z === x.id || y.servicios.includes(z)) as Servicio[]) }))}>{x.corto}</button>;
+          })}
+        </div>
         <div className="pr-top-acciones">
           <span className={`pr-guardado pr-g-${guardado}`}>{guardado === "ok" ? "Guardado" : guardado === "pendiente" ? "Guardando…" : "Sin conexión: no se guardó"}</span>
           <button type="button" className="pr-btn pr-btn-ghost" onClick={() => setNotasAbiertas((v) => !v)} aria-pressed={notasAbiertas}>{notasAbiertas ? "Ocultar notas" : "Notas"}</button>
@@ -161,9 +178,9 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
             <motion.section key={etapa} className="pr-etapa" {...anim}>
               {etapa === 0 && (
                 <div className="pr-portada">
-                  <p className="pr-portada-para">Propuesta de desarrollo web para</p>
+                  <p className="pr-portada-para">Propuesta de {SERVICIOS.filter((x) => s.servicios.includes(x.id)).map((x) => x.nombre.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " y $1")} para</p>
                   <h1>{empresa}</h1>
-                  <p className="pr-portada-sub">Una web pensada para tu negocio: primero te escuchamos, después te mostramos cómo la construimos y cerramos con una propuesta a tu medida.</p>
+                  <p className="pr-portada-sub">{conWeb && s.servicios.length === 1 ? "Una web pensada para tu negocio: primero te escuchamos, después te mostramos cómo la construimos y cerramos con una propuesta a tu medida." : "Primero te escuchamos, después te mostramos cómo trabajamos con casos reales y cerramos con una propuesta a tu medida."}</p>
                   <button type="button" className="pr-btn pr-btn-main" onClick={() => ir(1)}>Empezar</button>
                 </div>
               )}
@@ -171,7 +188,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
               {etapa === 1 && (
                 <div className="pr-escuchar">
                   <h2>Cuéntanos sobre tu proyecto</h2>
-                  {[...new Set(PREGUNTAS.map((q) => q.grupo))].map((g) => (
+                  {[...new Set(PREGUNTAS.map((q) => q.grupo))].filter((g) => conWeb || !GRUPOS_WEB.includes(g)).map((g) => (
                     <fieldset key={g} className="pr-grupo">
                       <legend>{g}</legend>
                       {PREGUNTAS.filter((q) => q.grupo === g).map((q) => (
@@ -224,16 +241,31 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                       ))}
                     </fieldset>
                   ))}
+                  {s.servicios.includes("social") && <PreguntasServicio titulo="Tus redes" preguntas={PREGUNTAS_SOCIAL} valores={s.social as Record<string, unknown>} cambiar={(id, v) => cambiar((x) => ({ ...x, social: { ...x.social, [id]: v } }))} />}
+                  {s.servicios.includes("ads") && <PreguntasServicio titulo="Tu publicidad" preguntas={PREGUNTAS_ADS} valores={s.ads as Record<string, unknown>} cambiar={(id, v) => cambiar((x) => ({ ...x, ads: { ...x.ads, [id]: v } }))} />}
                 </div>
               )}
 
-              {etapa === 2 && <Proceso />}
+              {etapa === 2 && (
+                <div className="pr-proc-servs">
+                  {s.servicios.length > 1 && (
+                    <div className="pr-proc-tabs" role="tablist" aria-label="Servicio">
+                      {SERVICIOS.filter((x) => s.servicios.includes(x.id)).map((x) => <button key={x.id} type="button" role="tab" aria-selected={procServ === x.id} className={procServ === x.id ? "pr-on" : ""} onClick={() => setProcServ(x.id)}>{x.nombre}</button>)}
+                    </div>
+                  )}
+                  {procServ === "web" && <Proceso />}
+                  {procServ === "social" && <ProcesoServicio titulo="Cómo trabajamos tus redes" fases={PROCESO_SOCIAL} reuniones={REUNIONES_SOCIAL} servicio="social" />}
+                  {procServ === "ads" && <ProcesoServicio titulo="Cómo trabajamos tu publicidad" fases={PROCESO_ADS} reuniones={REUNIONES_ADS} servicio="ads" />}
+                </div>
+              )}
 
               {etapa === 3 && (
                 <div className="pr-faq">
                   <h2>Lo que más nos preguntan</h2>
                   <p className="pr-x-intro">Toca un tema y te lo explicamos paso a paso.</p>
-                  <Explicadores />
+                  {s.servicios.length === 1 ? <Explicadores temas={temasDe(s.servicios[0])} /> : SERVICIOS.filter((x) => s.servicios.includes(x.id)).map((x) => (
+                    <div key={x.id} className="pr-x-bloque"><h3 className="pr-faq-sub">{x.nombre}</h3><Explicadores temas={temasDe(x.id)} /></div>
+                  ))}
                   <h3 className="pr-faq-sub">Otras preguntas frecuentes</h3>
                   <div className="pr-faq-lista">
                     {FAQ.map((f) => (
@@ -248,9 +280,11 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
 
               {etapa === 4 && (
                 <div className="pr-tuweb">
-                  <h2>Así podría ser tu web</h2>
-                  <Medidor nivel={n.nivel} motivos={n.motivos} reducir={!!reducir} />
-                  <div className="pr-check">
+                  <h2>{conWeb && s.servicios.length === 1 ? "Así podría ser tu web" : "Así podría ser tu plan"}</h2>
+                  <PlanSocialAds s={s} cambiar={cambiar} />
+                  {conWeb && s.servicios.length > 1 && <h3 className="pr-faq-sub">Desarrollo web</h3>}
+                  {conWeb && <Medidor nivel={n.nivel} motivos={n.motivos} reducir={!!reducir} />}
+                  {conWeb && <div className="pr-check">
                     {[...new Set(CHECKLIST.map((c) => c.grupo))].map((g) => (
                       <fieldset key={g} className="pr-grupo">
                         <legend>{g}</legend>
@@ -291,7 +325,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                       ))}
                       {s.extras.length < 20 && <button type="button" className="pr-chip" onClick={() => cambiar((y) => ({ ...y, extras: [...y.extras, { texto: "", estado: "incluido" }] }))}>+ Agregar ítem</button>}
                     </fieldset>
-                  </div>
+                  </div>}
                 </div>
               )}
 
@@ -299,8 +333,15 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                 <div className="pr-cierre pr-cierre-doc">
                   <div className="pr-cierre-lado">
                     <h2>Tu propuesta</h2>
+                    {resumenMensual.length > 0 && (
+                      <div className="pr-cierre-mensual">
+                        <small>Servicios mensuales</small>
+                        <ul>{resumenMensual.map((x) => <li key={x.id}><span>{x.name}</span><b>{x.price == null ? "Por definir" : `S/ ${new Intl.NumberFormat("es-PE").format(x.price)}`}</b></li>)}</ul>
+                      </div>
+                    )}
+                    {conWeb && <>
                     <div className="pr-cierre-nivel">
-                      <small>Nivel</small>
+                      <small>Desarrollo web · nivel</small>
                       <strong>{n.nombre}</strong>
                       <dl>
                         <div><dt>Referencia</dt><dd>{n.rango}</dd></div>
@@ -312,7 +353,8 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                       placeholder={n.desde === n.hasta ? String(n.desde) : `Entre ${n.desde} y ${n.hasta}`}
                       value={s.precio ?? ""} onChange={(e) => { const v = e.target.value; cambiar((x) => ({ ...x, precio: v === "" ? null : Math.max(0, Number(v)) })); }} />
                     {s.precio != null && (s.precio < n.desde || s.precio > n.hasta) && <p className="pr-aviso">Fuera del rango del nivel {n.nombre} ({n.rango}).</p>}
-                    <p className="pr-quiet">Tus notas de la reunión no aparecen en el documento. Las condiciones son las de siempre: 50% al inicio y 50% contra entrega.</p>
+                    </>}
+                    <p className="pr-quiet">Tus notas de la reunión no aparecen en el documento. Formas de pago de siempre: proyecto 50% / 50% y servicios mensuales con el primer mes 50% / 50%.</p>
                     {propuesta?.editada && <p className="pr-aviso">Esta propuesta ya se editó en Planes y Propuestas: se mantiene esa versión y el PDF sale con esos cambios.</p>}
                     <div className="pr-cierre-acciones">
                       <button type="button" className="pr-btn pr-btn-main" onClick={descargar} disabled={descargando || generando}>{descargando ? "Generando PDF…" : "Descargar PDF"}</button>
@@ -355,11 +397,11 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
             </details>
             <textarea ref={notasRef} value={s.notas} maxLength={4000} placeholder="Lo que nos cuenta el cliente: objetivos, ideas, referencias, dudas…"
               onChange={(e) => cambiar((x) => ({ ...x, notas: e.target.value }))} aria-label="Notas de la reunión" />
-            <div className="pr-notas-nivel">
+            {conWeb && <div className="pr-notas-nivel">
               <small>Nivel estimado</small>
               <strong>{n.nombre}</strong>
               <span>{n.rango} · {n.plazo}</span>
-            </div>
+            </div>}
           </aside>
         )}
       </div>

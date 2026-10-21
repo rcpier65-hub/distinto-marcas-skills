@@ -22,9 +22,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const { user, db } = await proposalActor(req)
-    const body = z.object({ cliente: sesionSchema.shape.cliente }).parse(await proposalBody(req))
+    const body = z.object({ cliente: sesionSchema.shape.cliente, servicios: sesionSchema.shape.servicios }).parse(await proposalBody(req))
     if (!body.cliente.empresa && !body.cliente.nombre) throw new ProposalError('Escribe el nombre del cliente o de su empresa.')
-    const data = sesionSchema.parse({ cliente: body.cliente })
+    const data = sesionSchema.parse({ cliente: body.cliente, servicios: body.servicios })
     const { data: fila, error } = await tabla(db).insert({ created_by: user.id, data }).select(campos).single()
     if (error) throw error
     return Response.json({ sesion: fila }, sinCache)

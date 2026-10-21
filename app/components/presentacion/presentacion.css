@@ -532,3 +532,101 @@
 .pr-doc-vista { height: calc(100vh - 200px); min-height: 520px; border-radius: 16px; background: #eceaf1; padding: 14px; box-shadow: inset 0 0 0 1px var(--linea); }
 .pr-doc-vista iframe { width: 100%; height: 100%; border: 0; border-radius: 6px; background: #fff; box-shadow: 0 18px 40px -24px rgba(15, 11, 22, .5); }
 @media (max-width: 1000px) { .pr-cierre-doc { grid-template-columns: 1fr; } }
+
+/* Multiservicio (Pedro 21-oct-2026) */
+.pr-servs { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 12px; background: #f3ebfb; flex-shrink: 0; }
+.pr-servs-lista { display: flex; flex-wrap: wrap; gap: 6px; background: none; padding: 0; margin: 4px 0 16px; }
+.pr-servs-lista > span { font-size: 13px; color: var(--suave); margin-right: 4px; }
+.pr-serv { border: 1.5px solid transparent; background: transparent; border-radius: 9px; padding: 6px 10px; font-size: 12.5px; font-weight: 700; color: var(--suave); cursor: pointer; }
+.pr-servs-lista .pr-serv { border-color: var(--linea); background: #fff; padding: 8px 14px; font-size: 14px; }
+.pr-serv-on, .pr-servs-lista .pr-serv-on { background: var(--tinta); color: #fff; border-color: var(--tinta); }
+.pr-ayuda { display: block; font-size: 12px; font-weight: 500; color: var(--suave); margin-top: 4px; }
+.pr-monto { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--linea); border-radius: 12px; padding: 4px 12px; background: #fff; font-weight: 700; }
+.pr-monto input { width: 120px; border: 0; outline: 0; font: 700 18px var(--pr-sans), sans-serif; padding: 6px 0; background: transparent; }
+.pr-monto span { color: var(--suave); font-size: 13px; }
+.pr-proc-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.pr-proc-tabs button { border: 1.5px solid var(--linea); background: #fff; border-radius: 10px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--tinta); }
+.pr-proc-tabs .pr-on { background: var(--amarillo); border-color: var(--amarillo); }
+/* Proceso de Social / Publicidad */
+.pr-sv-proceso { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 18px; height: calc(100vh - 300px); min-height: 460px; }
+.pr-sv-fases { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; align-content: start; overflow: auto; }
+.pr-sv-fases button { width: 100%; display: grid; grid-template-columns: 34px 1fr; gap: 2px 10px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--linea); background: #fff; cursor: pointer; color: var(--tinta); }
+.pr-sv-fases span { grid-row: span 2; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #f3ebfb; color: var(--profundo); font-weight: 700; }
+.pr-sv-fases b { font-family: var(--pr-display); font-size: 17px; font-weight: 600; }
+.pr-sv-fases small { font-size: 12px; color: var(--suave); }
+.pr-sv-fases .pr-sv-fase-on { border-color: var(--tinta); box-shadow: inset 5px 0 0 var(--amarillo); }
+.pr-sv-fases .pr-sv-fase-on span { background: var(--tinta); color: var(--amarillo); }
+.pr-sv-pasos { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; align-content: start; overflow: auto; padding: 2px; }
+.pr-sv-pasos article, .pr-sv-reuniones article { background: #fff; border: 1.5px solid var(--linea); border-radius: 16px; padding: 18px; display: grid; gap: 10px; align-content: start; }
+.pr-sv-pasos header, .pr-sv-reuniones header { display: flex; align-items: center; gap: 10px; }
+.pr-sv-pasos header span, .pr-sv-reuniones header span { width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; display: grid; place-items: center; background: var(--amarillo); font-weight: 700; font-size: 13px; }
+.pr-sv-pasos h3, .pr-sv-reuniones h3 { margin: 0; font-size: 18px; }
+.pr-sv-pasos p { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--suave); }
+.pr-sv-pasos dl { margin: 0; display: grid; gap: 6px; border-top: 1px dashed var(--linea); padding-top: 10px; }
+.pr-sv-pasos dt { font-size: 11.5px; font-weight: 700; color: var(--suave); }
+.pr-sv-pasos dd { margin: 0; font-size: 13.5px; font-weight: 600; }
+.pr-sv-sistema dd { color: var(--profundo); }
+.pr-sv-reuniones { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; max-height: calc(100vh - 300px); overflow: auto; padding: 2px; }
+.pr-sv-reuniones small { font-size: 12.5px; color: var(--suave); }
+.pr-sv-quienes { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--profundo); }
+.pr-sv-reuniones ul { margin: 0; padding-left: 18px; list-style: disc; display: grid; gap: 4px; font-size: 14px; }
+.pr-sv-sale { margin: 0; font-size: 13.5px; background: #faf7fd; border-radius: 10px; padding: 8px 10px; }
+/* Caso real */
+.pr-caso { display: grid; gap: 14px; }
+.pr-caso-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.pr-caso-barra label { font-size: 13px; font-weight: 700; display: inline-flex; gap: 8px; align-items: center; }
+.pr-caso-barra select { border: 1.5px solid var(--linea); border-radius: 10px; padding: 7px 10px; font: 600 14px var(--pr-sans), sans-serif; background: #fff; }
+.pr-caso-barra small { flex-basis: 100%; font-size: 12.5px; color: var(--suave); }
+.pr-caso-titulo { font-size: 26px; margin: 0; }
+.pr-caso-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.pr-caso-red, .pr-caso-top, .pr-caso-mapa { background: #fff; border: 1.5px solid var(--linea); border-radius: 16px; padding: 18px; }
+.pr-caso-red b, .pr-caso-top b, .pr-caso-mapa b { font-family: var(--pr-display); font-size: 19px; font-weight: 600; }
+.pr-caso-red dl { margin: 12px 0 0; display: grid; gap: 8px; }
+.pr-caso-red dl div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1px solid #f2eef7; padding-bottom: 6px; }
+.pr-caso-red dt { font-size: 13px; color: var(--suave); }
+.pr-caso-red dd { margin: 0; font-size: 19px; font-weight: 700; display: inline-flex; gap: 8px; align-items: baseline; }
+.pr-sube, .pr-baja { font-style: normal; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 8px; }
+.pr-sube { background: #e8f6ee; color: #1a7f45; }
+.pr-baja { background: #fdecec; color: #b42318; }
+.pr-caso-top ol { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13.5px; }
+.pr-caso-top li span { display: block; }
+.pr-caso-top li em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--profundo); }
+.pr-caso-frase { font-family: var(--pr-display); font-size: 20px; margin: 10px 0 6px; }
+.pr-caso-mapa ul { margin: 0; padding-left: 18px; list-style: disc; display: grid; gap: 4px; font-size: 13.5px; color: var(--suave); }
+/* Planes */
+.pr-plan-sec { margin: 8px 0 26px; }
+.pr-plan-sec h3 { font-size: 22px; margin: 0 0 12px !important; }
+.pr-planes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.pr-plan { display: grid; gap: 6px; align-content: start; text-align: left; padding: 16px; border-radius: 16px; border: 1.5px solid var(--linea); background: #fff; cursor: pointer; color: var(--tinta); font: inherit; }
+.pr-plan-on { border-color: var(--tinta); box-shadow: inset 0 -5px 0 var(--amarillo); }
+.pr-plan-cab { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.pr-plan-cab b { font-family: var(--pr-display); font-size: 17px; font-weight: 600; line-height: 1.2; }
+.pr-plan-cab span { font-size: 11px; font-weight: 700; background: var(--amarillo); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.pr-plan strong { font-size: 22px; }
+.pr-plan strong small { font-size: 12px; color: var(--suave); font-weight: 600; }
+.pr-plan p { margin: 0; font-size: 12.5px; color: var(--suave); }
+.pr-plan ul { margin: 4px 0 0; padding-left: 16px; list-style: disc; display: grid; gap: 3px; font-size: 12.5px; }
+.pr-plan-min { font-size: 11.5px; color: var(--suave); }
+.pr-plan-pauta { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--profundo); }
+.pr-ads-resumen { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .pr-ads-resumen, .pr-sv-proceso { grid-template-columns: 1fr; height: auto; } }
+.pr-cierre-mensual { border: 1.5px solid var(--linea); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; background: #fff; }
+.pr-cierre-mensual small { font-size: 12px; font-weight: 700; color: var(--suave); }
+.pr-cierre-mensual ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.pr-cierre-mensual li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+/* Explicadores de Social/Publicidad */
+.pr-x-bloque + .pr-x-bloque { margin-top: 8px; }
+.pr-x-curva { width: 100%; max-width: 420px; color: var(--tinta); }
+.pr-x-flujo { display: grid; grid-template-columns: 1fr auto 1.4fr; gap: 18px; align-items: center; max-width: 1100px; }
+.pr-x-flujo > div:first-child, .pr-x-flujo-destinos > div { border: 2px solid var(--tinta); border-radius: 18px; padding: 20px; background: #fff; display: grid; gap: 4px; }
+.pr-x-flujo b { font-family: var(--pr-display); font-size: 22px; font-weight: 600; }
+.pr-x-flujo span { font-size: 14px; color: var(--suave); }
+.pr-x-flujo-flechas { display: grid; gap: 54px; font-weight: 700; color: var(--profundo); font-size: 14px; }
+.pr-x-flujo-destinos { display: grid; gap: 14px; }
+@media (max-width: 900px) { .pr-x-flujo { grid-template-columns: 1fr; } .pr-x-flujo-flechas { display: none; } }
+/* Barra superior más compacta con los servicios a la vista */
+.pr-top { gap: 12px; padding: 10px 18px; }
+.pr-etapas button { padding: 7px 8px; gap: 6px; font-size: 12.5px; }
+.pr-top-acciones .pr-btn { padding: 8px 12px; font-size: 12.5px; }
+.pr-etapas button em { font-style: normal; }
+@media (max-width: 1500px) { .pr-etapas button:not(.pr-on) em { display: none; } }

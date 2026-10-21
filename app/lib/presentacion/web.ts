@@ -4,6 +4,7 @@
    la pantalla (en vivo) y la API (al generar la propuesta). */
 import { z } from "zod";
 import { emptyProposal, serviceFromTemplate, type ProposalData, type ProposalService } from "../propuestas/model";
+import { serviciosMensuales, SERVICIOS, type RespuestasAds, type RespuestasSocial } from "./servicios";
 import { esTienda, estimarNivel, NIVELES, tieneCatalogo, type Nivel, type RespuestasWeb } from "./niveles";
 
 export type { RespuestasWeb, Nivel };
@@ -195,6 +196,17 @@ export const sesionSchema = z.object({
   referencias: z.array(z.object({ url: texto(500).default(""), motivo: texto(400).default("") })).max(15).default([]),
   checklist: z.record(z.string().max(40), z.enum(["incluido", "opcional", "no"])).default({}),
   /* Lo que no está en la lista: se escribe en la reunión. */
+  /* Servicios de la reunión: web, social media y/o publicidad (multiservicio). */
+  servicios: z.array(z.enum(["web", "social", "ads"])).min(1).max(3).default(["web"]),
+  social: z.object({
+    redes: z.array(z.string().max(20)).max(8).optional(), gestion: z.enum(["nadie", "dueno", "equipo", "agencia"]).optional(),
+    objetivo: z.enum(["ventas", "citas", "reconocimiento", "comunidad"]).optional(), frecuencia: z.enum(["nunca", "a-veces", "semanal", "diario"]).optional(),
+    material: z.enum(["si", "poco", "no"]).optional(), grabar: z.boolean().optional(), tienda: z.boolean().optional(), plan: z.string().max(60).nullable().optional(),
+  }).default({}),
+  ads: z.object({
+    experiencia: z.enum(["nunca", "boost", "campanas"]).optional(), inversion: z.number().min(0).max(10000000).nullable().optional(),
+    plataformas: z.array(z.string().max(20)).max(5).optional(), objetivo: z.enum(["mensajes", "ventas-web", "leads", "trafico"]).optional(), medicion: z.enum(["si", "no", "no-sabe"]).optional(),
+  }).default({}),
   /* Inversión acordada en la reunión (dentro del rango del nivel). */
   precio: z.number().min(0).max(1000000).nullable().default(null),
   extras: z.array(z.object({ texto: texto(200).default(""), estado: z.enum(["incluido", "opcional", "no"]).default("incluido") })).max(20).default([]),
@@ -311,20 +323,28 @@ export function aPropuesta(s: Sesion, hoy: string, uid: () => string): ProposalD
   const plazo = PREGUNTAS.find((q) => q.id === "plazo")?.opciones?.find((o) => o.id === s.respuestas.plazo);
   const refs = s.referencias.filter((r) => r.url.trim()).map((r) => `• ${enlaceSeguro(r.url) ?? r.url.trim()}${r.motivo.trim() ? ` — ${r.motivo.trim()}` : ""}`);
   const objetivo = [
-    t("objetivo") || `Diseñar y desarrollar la web de ${empresa} para presentar su negocio con claridad y convertir visitas en clientes.`,
+    t("objetivo") || (s.servicios.includes("web") ? `Diseñar y desarrollar la web de ${empresa} para presentar su negocio con claridad y convertir visitas en clientes.` : `Hacer crecer la presencia digital de ${empresa} y convertirla en clientes.`),
     t("negocio") && `Sobre el negocio: ${t("negocio")}`,
     t("publico") && `Cliente ideal: ${t("publico")}`,
     plazo && `Plazo deseado: ${plazo.etiqueta}.`,
     refs.length ? `Webs de referencia:\n${refs.join("\n")}` : "",
   ].filter(Boolean).join("\n\n");
+  const conWeb = s.servicios.includes("web");
+  const mensual = serviciosMensuales({ servicios: s.servicios, social: s.social as RespuestasSocial, ads: s.ads as RespuestasAds }, uid);
+  const nombres = SERVICIOS.filter((x) => s.servicios.includes(x.id)).map((x) => x.nombre);
+  const pago = [
+    conWeb && (mensual.services.length ? "Desarrollo web: 50% al inicio del proyecto y 50% contra entrega final." : "50% al inicio del proyecto y 50% contra entrega final."),
+    mensual.services.length && "Servicios mensuales: primer mes 50% al inicio y 50% al finalizar el mes. Meses siguientes: pago mensual al cierre de cada mes trabajado.",
+  ].filter(Boolean).join("\n");
   return {
     ...p,
-    title: `Desarrollo web · ${empresa}`,
+    title: `${nombres.join(" + ")} · ${empresa}`,
+    minimum: mensual.minimo,
     date: hoy,
     client: { ...p.client, name: empresa, contact: s.cliente.nombre, industry: s.cliente.rubro, email: s.cliente.contacto.includes("@") ? s.cliente.contacto : "", phone: s.cliente.contacto.includes("@") ? "" : s.cliente.contacto },
-    objective: objetivo.slice(0, 4000),
-    services: [base, ...opcionales],
-    payment: "50% al inicio del proyecto y 50% contra entrega final.",
+    objective: [objetivo, ...mensual.notas].join("\n\n").slice(0, 4000),
+    services: [...(conWeb ? [base, ...opcionales] : []), ...mensual.services],
+    payment: pago,
     externalCosts: "Dominio, hosting, licencias y costos de plataformas los paga el cliente directamente al proveedor.",
     status: "borrador",
   };

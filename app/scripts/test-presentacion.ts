@@ -149,4 +149,26 @@ void (async () => {
   assert.ok(pe.services.some((x) => x.name === "Intranet" && x.optional));
   assert.equal(pe.services.filter((x) => x.optional).length, 1);
   console.log("✓ presentación: checklist ampliado y extras");
+
+  /* Multiservicio: web + social + publicidad en una sola propuesta. */
+  const soloSocial = aPropuesta(sesionSchema.parse({ cliente: { empresa: "Kintu" }, servicios: ["social"] }), "2026-10-21", () => "id");
+  assert.equal(soloSocial.services.length, 1);
+  assert.equal(soloSocial.services[0].sourceId, "sm-contenido");
+  assert.equal(soloSocial.services[0].frequency, "mensual");
+  assert.equal(soloSocial.minimum, "mín. 3 meses");
+  assert.match(soloSocial.title, /^Social Media · Kintu/);
+  const mix = aPropuesta(sesionSchema.parse({ cliente: { empresa: "Retoz" }, servicios: ["web", "social", "ads"], precio: 1800, ads: { inversion: 4000 } }), "2026-10-21", () => "id");
+  assert.match(mix.title, /Desarrollo web \+ Social Media \+ Publicidad digital/);
+  assert.ok(mix.services.some((x) => x.sourceId === "web-nivel-basico" && x.frequency === "unico"));
+  assert.ok(mix.services.some((x) => x.sourceId === "sm-forneed"));
+  assert.ok(!mix.services.some((x) => x.sourceId === "solo-paid"), "Forneed ya incluye pauta: no se cobra Paid Media aparte");
+  assert.ok(mix.services.some((x) => /Fee por inversión/.test(x.name) && x.price === 100));
+  assert.match(mix.payment, /Desarrollo web: 50%/); assert.match(mix.payment, /Servicios mensuales/);
+  const adsSolo = aPropuesta(sesionSchema.parse({ cliente: { empresa: "X" }, servicios: ["ads"], ads: { inversion: 1500 } }), "2026-10-21", () => "id");
+  assert.ok(adsSolo.services.some((x) => x.sourceId === "solo-paid" && x.price === 600));
+  assert.ok(!adsSolo.services.some((x) => /Fee/.test(x.name)));
+  const elegido = aPropuesta(sesionSchema.parse({ cliente: { empresa: "X" }, servicios: ["social", "ads"], social: { plan: "sm-contenido" } }), "2026-10-21", () => "id");
+  assert.ok(elegido.services.some((x) => x.sourceId === "solo-paid"), "Contenido no incluye pauta: se suma Paid Media");
+  assert.equal(sesionSchema.parse({}).servicios.join(), "web");
+  console.log("✓ presentación: propuesta multiservicio");
 })().catch((e) => { console.error(e); process.exit(1); });

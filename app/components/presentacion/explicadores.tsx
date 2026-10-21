@@ -7,13 +7,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
-type Paso = { titulo: string; contenido: React.ReactNode };
-type Tema = { id: string; pregunta: string; resumen: string; icono: React.ReactNode; pasos: () => Paso[] };
+export type Paso = { titulo: string; contenido: React.ReactNode };
+export type Tema = { id: string; pregunta: string; resumen: string; icono: React.ReactNode; pasos: () => Paso[] };
 
 const slug = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "").slice(0, 30) || "tuempresa";
 
 /* Íconos de línea propios (24×24) para no depender de otra librería. */
-const Ico = ({ d }: { d: string }) => <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+export const Ico = ({ d }: { d: string }) => <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
 
 /* ---------- Dominio ---------- */
 function Dominio1() {
@@ -301,12 +301,12 @@ export const TEMAS: Tema[] = [
 ];
 
 /* Tarjetas de temas + visor a pantalla completa. */
-export function Explicadores() {
+export function Explicadores({ temas = TEMAS }: { temas?: Tema[] }) {
   const [abierto, setAbierto] = useState<string | null>(null);
   return (
     <>
       <div className="pr-x-temas">
-        {TEMAS.map((t) => (
+        {temas.map((t) => (
           <button key={t.id} type="button" className="pr-x-tema" onClick={() => setAbierto(t.id)}>
             <span className="pr-x-ico">{t.icono}</span>
             <b>{t.pregunta}</b>
@@ -315,12 +315,12 @@ export function Explicadores() {
           </button>
         ))}
       </div>
-      <AnimatePresence>{abierto && <Visor key={abierto} tema={TEMAS.find((t) => t.id === abierto)!} cerrar={() => setAbierto(null)} cambiar={setAbierto} />}</AnimatePresence>
+      <AnimatePresence>{abierto && temas.some((t) => t.id === abierto) && <Visor key={abierto} temas={temas} tema={temas.find((t) => t.id === abierto)!} cerrar={() => setAbierto(null)} cambiar={setAbierto} />}</AnimatePresence>
     </>
   );
 }
 
-function Visor({ tema, cerrar, cambiar }: { tema: Tema; cerrar: () => void; cambiar: (id: string) => void }) {
+function Visor({ temas: TEMAS, tema, cerrar, cambiar }: { temas: Tema[]; tema: Tema; cerrar: () => void; cambiar: (id: string) => void }) {
   const pasos = useMemo(() => tema.pasos(), [tema]);
   const [i, setI] = useState(0);
   const reducir = useReducedMotion();
@@ -329,7 +329,7 @@ function Visor({ tema, cerrar, cambiar }: { tema: Tema; cerrar: () => void; camb
     if (i < pasos.length - 1) setI(i + 1);
     else if (idx < TEMAS.length - 1) cambiar(TEMAS[idx + 1].id);
     else cerrar();
-  }, [i, pasos.length, idx, cambiar, cerrar]);
+  }, [i, pasos.length, idx, cambiar, cerrar, TEMAS]);
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest("input, textarea, select")) { if (e.key === "Escape") cerrar(); return; }

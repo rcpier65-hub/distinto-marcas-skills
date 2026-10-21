@@ -6,14 +6,16 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { display, sans } from "./fuentes";
 import "./presentacion.css";
+import { SERVICIOS, type Servicio } from "@/lib/presentacion/servicios";
 
-type Fila = { id: string; data: { cliente: { nombre: string; empresa: string; rubro: string } }; propuesta_id: string | null; updated_at: string };
+type Fila = { id: string; data: { cliente: { nombre: string; empresa: string; rubro: string }; servicios?: Servicio[] }; propuesta_id: string | null; updated_at: string };
 
 export function ListaPresentaciones() {
   const router = useRouter();
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [form, setForm] = useState({ nombre: "", empresa: "", rubro: "", contacto: "" });
   const [ocupado, setOcupado] = useState(false);
+  const [servicios, setServicios] = useState<Servicio[]>(["web"]);
 
   useEffect(() => {
     let vivo = true;
@@ -25,7 +27,7 @@ export function ListaPresentaciones() {
     e.preventDefault();
     setOcupado(true);
     try {
-      const r = await fetch("/api/presentaciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente: form }) });
+      const r = await fetch("/api/presentaciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente: form, servicios }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "No se pudo crear");
       router.push(`/presentaciones/${j.sesion.id}`);
@@ -39,7 +41,15 @@ export function ListaPresentaciones() {
         <p>Abre una reunión de venta: escuchamos al cliente, mostramos cómo trabajamos y salimos con la propuesta armada.</p>
       </header>
       <form className="pr-nueva" onSubmit={crear}>
-        <h2>Nueva reunión · Desarrollo web</h2>
+        <h2>Nueva reunión</h2>
+        <div className="pr-servs pr-servs-lista" role="group" aria-label="Servicios que vamos a presentar">
+          <span>Vamos a presentar:</span>
+          {SERVICIOS.map((x) => {
+            const on = servicios.includes(x.id);
+            return <button key={x.id} type="button" aria-pressed={on} className={on ? "pr-serv pr-serv-on" : "pr-serv"}
+              onClick={() => setServicios((v) => (on ? (v.length > 1 ? v.filter((z) => z !== x.id) : v) : SERVICIOS.map((z) => z.id).filter((z) => z === x.id || v.includes(z))))}>{x.nombre}</button>;
+          })}
+        </div>
         <div className="pr-nueva-campos">
           <label>Empresa<input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })} maxLength={200} placeholder="Ferretería Sol" /></label>
           <label>Persona de contacto<input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} maxLength={160} placeholder="Ana Pérez" /></label>
@@ -56,7 +66,7 @@ export function ListaPresentaciones() {
               <li key={f.id}>
                 <Link href={`/presentaciones/${f.id}`}>
                   <strong>{f.data.cliente.empresa || f.data.cliente.nombre}</strong>
-                  <span>{f.data.cliente.rubro || "Desarrollo web"}</span>
+                  <span>{SERVICIOS.filter((x) => (f.data.servicios ?? ["web"]).includes(x.id)).map((x) => x.corto).join(" + ")}{f.data.cliente.rubro ? ` · ${f.data.cliente.rubro}` : ""}</span>
                   <small>{new Date(f.updated_at).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}{f.propuesta_id ? " · propuesta generada" : ""}</small>
                 </Link>
               </li>
