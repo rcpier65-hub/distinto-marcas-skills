@@ -33,10 +33,11 @@ import { api, Modal, Field, Empty, Jump, Stat, PrettyDate } from "./common";
 import { Agenda } from "./agenda";
 import { BrandOverview } from "./brand-overview";
 import { BrandMap } from "./brand-map";
+import { AdsPanel } from "./ads-panel";
 import { designFinished } from "@/lib/estrategia/activity-status";
 import "./strategy.css";
 
-const nav = ["Resumen", "Mapa de marca", "Planificación", "Campañas", "Oportunidades", "Marca"];
+const nav = ["Resumen", "Mapa de marca", "Publicidad", "Planificación", "Campañas", "Oportunidades", "Marca"];
 const kindLabel = {
   sheet: "hoja de planificación",
   campaign: "campaña",
@@ -347,6 +348,10 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
           <SocialReportView slug={brand.slug} today={b.today} brandName={brand.nombre} />
         )}
         {tab === "Mapa de marca" && <BrandMap slug={brand.slug} brandName={brand.nombre} />}
+        {tab === "Publicidad" && (
+          <AdsPanel slug={brand.slug} brandName={brand.nombre}
+            planes={live.filter((r) => r.kind === "sheet").map((r) => ({ id: r.id, title: r.title }))} />
+        )}
         {tab === "Resumen" && (
           <BrandOverview
             b={b}
