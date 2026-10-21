@@ -175,7 +175,10 @@ export function TrendModal({ slug, month, initial, close }: { slug: string; mont
   const main = series[0];
   const first = main?.values.find((v) => v !== null) ?? null;
   const last = main ? [...main.values].reverse().find((v) => v !== null) ?? null : null;
-  const lastIdx = main ? main.values.length - 1 - [...main.values].reverse().findIndex((v) => v !== null) : -1;
+  /* Sin ningún dato en los 6 meses (p. ej. seguidores de Instagram o inversión
+     sin cuenta publicitaria) no hay «último mes»: -1, no un índice fuera de rango. */
+  const desdeFin = main ? [...main.values].reverse().findIndex((v) => v !== null) : -1;
+  const lastIdx = main && desdeFin >= 0 ? main.values.length - 1 - desdeFin : -1;
   const growth = first !== null && last !== null && first > 0 && metric !== "netFollows" ? ((last - first) / first) * 100 : null;
   return (
     <dialog ref={ref} onCancel={close} onClick={(e) => { if (e.target === ref.current) close(); }}
@@ -215,7 +218,7 @@ export function TrendModal({ slug, month, initial, close }: { slug: string; mont
           <>
             <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
               <div>
-                <div style={{ fontSize: 12, color: "#767084" }}>{lastIdx >= 0 ? monthLong(data.months[lastIdx].month) : ""}</div>
+                <div style={{ fontSize: 12, color: "#767084" }}>{lastIdx >= 0 && data.months[lastIdx] ? monthLong(data.months[lastIdx].month) : "Sin datos en estos meses"}</div>
                 <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.02em" }}>{fmtTrend(last, metric, data.currency)}</div>
               </div>
               {growth !== null && (
