@@ -1,0 +1,98 @@
+{
+  "frase": "Pon una sonrisa en el aire: ambientadores italianos Little Joe para tu auto, con personalidad y que duran de verdad.",
+  "estado": "borrador",
+  "ramas": {
+    "posicionamiento": {
+      "resumen": "El ambientador de auto premium y con personalidad del Perú: calidad italiana, diseño icónico y duración real.",
+      "puntos": [
+        "Distribución oficial de Little Joe (Italia, +80 países) en Perú",
+        "Premium accesible: S/24.90, sobre los baratos y por debajo del lujo",
+        "Asociado al regalo/detalle y a la pasión por el fútbol peruano",
+        "No es «olor a taxi» ni a químico: sin alcohol y eco-friendly"
+      ],
+      "propuesta": false
+    },
+    "propuesta": {
+      "resumen": "Un ambientador que dura hasta 45 días, cuida tu auto y te representa, por menos de S/25.",
+      "puntos": [
+        "25–45 días: rinde como 4 ambientadores baratos",
+        "Sin alcohol, EVA no tóxico: no daña los interiores",
+        "Diseño con personalidad: la mascota Joe y ediciones coleccionables",
+        "Ideal para regalar sin gastar de más",
+        "Delivery en Lima en 3 días, envío a provincias y gratis desde 4 unidades"
+      ],
+      "propuesta": false
+    }
+  },
+  "maletas": {
+    "problema": {
+      "resumen": "Los ambientadores comunes duran una semana, huelen a químico o «a taxi» y no dicen nada de quien maneja.",
+      "puntos": [
+        "Gasta seguido en ambientadores que se acaban rápido",
+        "Olor invasivo o artificial dentro del auto",
+        "Los de clubes de fútbol suelen ser piratas y de baja calidad",
+        "Cuesta encontrar un regalo bonito y útil sin gastar mucho"
+      ],
+      "propuesta": false
+    },
+    "solucion": {
+      "resumen": "Little Joe: aroma italiano que dura 25–45 días, se coloca en la rejilla o el espejo y le pone personalidad al auto.",
+      "puntos": [
+        "Little Joe Standard y Thumbs Up (S/24.90)",
+        "Ediciones oficiales de Universitario, Alianza Lima y Sporting Cristal",
+        "Little Dog para quienes viajan con mascotas, Little Joya y tarjetas aromáticas",
+        "Ediciones limitadas por temporada (Navidad, San Valentín)"
+      ],
+      "propuesta": false
+    },
+    "cliente": {
+      "resumen": "Personas de 22 a 45 años con auto propio, en Lima y provincias, que cuidan los detalles y compran para sí o para regalar.",
+      "puntos": [
+        "Joven profesional con su primer auto, estética cute, cansada de los ambientadores baratos",
+        "Hincha que quiere mostrar su club con un producto oficial",
+        "Mamá o pareja que compra detalles por WhatsApp para regalar",
+        "NSE B/B+/A-, activos en Instagram y TikTok"
+      ],
+      "propuesta": false
+    },
+    "objeciones": {
+      "resumen": "Precio, duración real, miedo a no acertar con el aroma y dudas sobre originalidad y entrega.",
+      "puntos": [
+        "«¿S/24.90 por un ambientador?» → rinde como 4 baratos",
+        "«¿De verdad dura 45 días?» → comparativa y reseñas reales",
+        "«¿Y si no me gusta el olor?» → guía y variedad de aromas",
+        "«¿Es oficial o pirata?» → también se vende en la tienda oficial de Universitario",
+        "«¿Llega a provincias? ¿Cuánto demora?» → Lima 3 días y envío nacional"
+      ],
+      "propuesta": false
+    },
+    "testimonios": {
+      "resumen": "Por reunir: reseñas reales sobre duración, aroma y regalo, y contenido de clientes que etiquetan a la marca.",
+      "puntos": [
+        "Pedir reseñas con foto a compradores recientes por WhatsApp",
+        "Republicar a clientes que etiquetan a la marca",
+        "Prueba social disponible hoy: marca italiana en +80 países y producto oficial de Universitario"
+      ],
+      "propuesta": true
+    },
+    "garantia": {
+      "resumen": "Por definir con el cliente: qué respaldo ofrecemos si el aroma no convence o el producto llega dañado.",
+      "puntos": [
+        "Confirmar la política de cambio (aroma o producto dañado)",
+        "Producto original con el respaldo de la marca italiana",
+        "Envío gratis desde 4 unidades para animar a probar"
+      ],
+      "propuesta": true
+    },
+    "unica": {
+      "resumen": "El ambientador de auto con mascota propia, calidad italiana y ediciones oficiales de los clubes peruanos.",
+      "puntos": [
+        "Joe: mascota con fans y voz propia",
+        "Ediciones oficiales de Universitario, Alianza Lima y Sporting Cristal",
+        "Hecho en Italia, sin alcohol y eco-friendly",
+        "Duración real frente a la competencia barata"
+      ],
+      "propuesta": false
+    }
+  }
+}
