@@ -51,6 +51,16 @@ export function PropuestasWorkspace({ userId }: { userId: string }) {
   // Carga remota al montar; los estados se actualizan cuando responde la API.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [load])
+  /* ?propuesta=<id>: abre esa propuesta al cargar (la usa «Generar propuesta»
+     de las presentaciones comerciales, Pedro 21-oct-2026). */
+  const abrioEnlace = useRef(false)
+  useEffect(() => {
+    if (abrioEnlace.current || !proposals.length) return
+    const id = new URLSearchParams(window.location.search).get('propuesta')
+    const r = id ? proposals.find(p => p.id === id) : null
+    abrioEnlace.current = true
+    if (r) open(r)
+  }, [proposals])
   useEffect(() => {
     try {
       const raw = localStorage.getItem(key)

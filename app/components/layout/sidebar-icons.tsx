@@ -11,6 +11,9 @@ export function PlanesIcon() {
   )
 }
 
+/* Presentaciones comerciales (Pedro 21-oct-2026). */
+export function PresentacionIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden><rect x="1.5" y="2" width="11" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M7 9.5V12M4.5 12H9.5M4 7L6 5L7.5 6.2L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+
 export function HomeIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 6L7 2.5L11.5 6V11.5H8.5V8H5.5V11.5H2.5V6Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }
 export function CalendarIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="3" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M2 6H12M5 2V4M9 2V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> }
 export function VideoIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="4" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M9 6L12 4.5V9.5L9 8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /></svg> }

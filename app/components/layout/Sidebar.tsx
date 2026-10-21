@@ -9,6 +9,7 @@ import type { Notificacion } from '@/lib/notificaciones/get-notificaciones'
 import { tieneAcceso, type Permisos, type ModuloPermiso } from '@/lib/team/types'
 import { IsotipoDistinto } from '@/components/brand/isotipo-distinto'
 import {
+  PresentacionIcon,
   PlanesIcon,
   HomeIcon,
   CalendarIcon,
@@ -163,6 +164,9 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           <NavItem href="/inicio" icon={<HomeIcon />} label="Inicio" active={isActive('/inicio') || isActive('/cockpit')} shortcut="1" />
           {esPedro && (
             <NavItem href="/planes" icon={<PlanesIcon />} label="Planes" active={isActive('/planes')} shortcut="P" />
+          )}
+          {esPedro && (
+            <NavItem href="/presentaciones" icon={<PresentacionIcon />} label="Presentaciones" active={isActive('/presentaciones')} />
           )}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
           <NavItem href="/recordatorios" icon={<NoteIcon />} label="Recordatorios" active={isActive('/recordatorios')} />
