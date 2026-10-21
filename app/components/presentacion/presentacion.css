@@ -178,7 +178,7 @@
 .pr-cierre h3 { font-size: 18px; margin: 4px 0 10px; }
 .pr-lista-check, .pr-lista-op { margin: 0 0 18px; padding-left: 20px; display: grid; gap: 6px; font-size: 14.5px; }
 .pr-lista-op { color: var(--suave); }
-.pr-cierre-acciones { margin-top: 18px; }
+.pr-cierre-acciones { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* Lista de presentaciones */
 .pr-lista { max-width: 980px; margin: 0 auto; padding: 40px 24px 60px; display: grid; gap: 32px; }

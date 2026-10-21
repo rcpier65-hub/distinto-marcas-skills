@@ -7,7 +7,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { CHECKLIST, FAQ, PREGUNTAS, checklistInicial, nivelDeSesion, type Estado, type Sesion } from "@/lib/presentacion/web";
+import { CHECKLIST, FAQ, PREGUNTAS, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { crearCola } from "@/lib/presentacion/cola";
 import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
 import type { SesionGuardada } from "@/lib/presentacion/server";
 import { display, sans } from "./fuentes";
@@ -28,25 +29,36 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const reducir = useReducedMotion();
   const empresa = s.cliente.empresa || s.cliente.nombre || "tu negocio";
 
-  /* Autoguardado: 800 ms después del último cambio. */
-  const primera = useRef(true);
+  /* Autoguardado: 800 ms después del último cambio, un envío a la vez y con
+     el dato más reciente. Al salir de la página se envía lo pendiente. */
+  const enviar = useCallback(async (data: Sesion, keepalive = false) => {
+    try {
+      const r = await fetch("/api/presentaciones", { method: "PUT", keepalive, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id, data }) });
+      return r.ok;
+    } catch { return false; }
+  }, [inicial.id]);
+  const [cola] = useState(() => crearCola<Sesion>((d) => enviar(d)));
+  useEffect(() => cola.alCambiar(setGuardado), [cola]);
   useEffect(() => {
-    if (primera.current) { primera.current = false; return; }
-    const t = setTimeout(async () => {
-      try {
-        const r = await fetch("/api/presentaciones", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id, data: s }) });
-        setGuardado(r.ok ? "ok" : "error");
-      } catch { setGuardado("error"); }
-    }, 800);
-    return () => clearTimeout(t);
-  }, [s, inicial.id]);
-  const cambiar = useCallback((f: (x: Sesion) => Sesion) => { setGuardado("pendiente"); setS(f); }, []);
+    const salir = () => { const v = cola.tomarPendiente(); if (v) void enviar(v, true); };
+    const oculto = () => { if (document.visibilityState === "hidden") void cola.vaciar(); };
+    const avisar = (e: BeforeUnloadEvent) => { if (cola.hayPendiente()) e.preventDefault(); };
+    window.addEventListener("pagehide", salir);
+    document.addEventListener("visibilitychange", oculto);
+    window.addEventListener("beforeunload", avisar);
+    return () => { window.removeEventListener("pagehide", salir); document.removeEventListener("visibilitychange", oculto); window.removeEventListener("beforeunload", avisar); salir(); };
+  }, [cola, enviar]);
+  const cambiar = useCallback((f: (x: Sesion) => Sesion) => {
+    setS((x) => { const nuevo = f(x); cola.programar(nuevo); return nuevo; });
+  }, [cola]);
+  const responder = (clave: keyof RespuestasWeb, valor: unknown) => cambiar((x) => aplicarRespuesta(x, clave, valor));
 
   const ir = useCallback((n: number) => setEtapa(Math.max(0, Math.min(ETAPAS.length - 1, n))), []);
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.altKey || e.metaKey || e.ctrlKey) return;
       if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); setEtapa((x) => Math.min(ETAPAS.length - 1, x + 1)); }
       if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); setEtapa((x) => Math.max(0, x - 1)); }
     };
@@ -57,15 +69,17 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const pantallaCompleta = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
-      else await raiz.current?.requestFullscreen();
+      /* Toda la página (no solo la presentación) para que se vean los avisos. */
+      else await document.documentElement.requestFullscreen();
     } catch { toast.error("Tu navegador no permitió la pantalla completa."); }
   };
 
   const generar = async () => {
     setGenerando(true);
     try {
-      /* Guarda lo último antes de generar. */
-      await fetch("/api/presentaciones", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id, data: s }) });
+      /* Guarda lo último antes de generar; si no se pudo, no genera con datos viejos. */
+      cola.programar(s);
+      if (!(await cola.vaciar())) throw new Error("No se pudieron guardar los últimos cambios. Revisa la conexión y vuelve a intentar.");
       const r = await fetch("/api/presentaciones/propuesta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "No se pudo generar la propuesta");
@@ -128,10 +142,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                                 const activo = (s.respuestas as Record<string, unknown>)[q.clave!] === o.id;
                                 return (
                                   <button key={o.id} type="button" role="radio" aria-checked={activo} className={activo ? "pr-chip pr-chip-on" : "pr-chip"}
-                                    onClick={() => cambiar((x) => {
-                                      const respuestas = { ...x.respuestas, [q.clave!]: activo ? undefined : o.id };
-                                      return { ...x, respuestas, checklist: { ...checklistInicial(respuestas), ...x.checklist, ...(q.clave === "tipo" ? checklistInicial(respuestas) : {}) } };
-                                    })}>{o.etiqueta}</button>
+                                    onClick={() => responder(q.clave!, activo ? undefined : o.id)}>{o.etiqueta}</button>
                                 );
                               })}
                             </div>
@@ -141,7 +152,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                               {([["Sí", true], ["No", false]] as const).map(([t, v]) => {
                                 const activo = (s.respuestas as Record<string, unknown>)[q.clave!] === v;
                                 return <button key={t} type="button" role="radio" aria-checked={activo} className={activo ? "pr-chip pr-chip-on" : "pr-chip"}
-                                  onClick={() => cambiar((x) => ({ ...x, respuestas: { ...x.respuestas, [q.clave!]: activo ? undefined : v } }))}>{t}</button>;
+                                  onClick={() => responder(q.clave!, activo ? undefined : v)}>{t}</button>;
                               })}
                             </div>
                           )}
@@ -222,9 +233,11 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                   </div>
                   <p className="pr-quiet">El monto final y las condiciones te llegan en la propuesta formal después de esta reunión.</p>
                   <div className="pr-cierre-acciones">
-                    {propuesta ? (
+                    {propuesta ? (<>
                       <Link className="pr-btn pr-btn-main" href={`/planes?propuesta=${propuesta.id}`}>Abrir la propuesta{propuesta.numero ? ` n.º ${propuesta.numero}` : ""}</Link>
-                    ) : (
+                      {/* Si se borró en Planes, se puede volver a generar (el servidor lo detecta). */}
+                      <button type="button" className="pr-btn pr-btn-ghost" onClick={generar} disabled={generando}>{generando ? "Revisando…" : "Volver a generar"}</button>
+                    </>) : (
                       <button type="button" className="pr-btn pr-btn-main" onClick={generar} disabled={generando}>{generando ? "Generando…" : "Generar propuesta"}</button>
                     )}
                   </div>

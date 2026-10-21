@@ -21,6 +21,8 @@ export async function POST(req: Request) {
     if (s.propuesta_id) {
       const { data: p } = await any.from('propuestas_comerciales').select('id,numero').eq('id', s.propuesta_id).eq('created_by', user.id).maybeSingle()
       if (p) return Response.json({ propuestaId: p.id, numero: p.numero, existente: true })
+      /* La propuesta se borró en Planes: se libera la reunión para generar otra. */
+      await any.from('presentacion_sesiones').update({ propuesta_id: null }).eq('id', id).eq('created_by', user.id).eq('propuesta_id', s.propuesta_id)
     }
     const data = proposalSchema.parse(aPropuesta(sesionSchema.parse(s.data), todayLima(), randomUUID))
     const propuestaId = randomUUID()

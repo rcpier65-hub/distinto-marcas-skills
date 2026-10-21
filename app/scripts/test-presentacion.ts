@@ -53,3 +53,47 @@ proposalSchema.parse(p);
 assert.equal(checklistInicial({ tipo: "tienda" }).carrito, "incluido");
 assert.equal(sesionSchema.safeParse({ ...s, notas: "x".repeat(4001) }).success, false);
 console.log("✓ presentación: checklist y propuesta");
+
+// Revisión final: cambiar el tipo de web baja el nivel y respeta ediciones manuales.
+import { aplicarRespuesta } from "../lib/presentacion/web";
+import { crearCola } from "../lib/presentacion/cola";
+{
+  let x = sesionVacia({ nombre: "", empresa: "X", rubro: "", contacto: "" });
+  x = aplicarRespuesta(x, "tipo", "tienda");
+  assert.equal(nivelDe(x), "intermedio");
+  x = { ...x, checklist: { ...x.checklist, whatsapp: "no", blog: "opcional" } };
+  x = aplicarRespuesta(x, "tipo", "presentacion");
+  assert.equal(nivelDe(x), "basico");
+  assert.equal(x.checklist.carrito ?? "no", "no");
+  assert.equal(x.checklist.whatsapp, "no");
+  assert.equal(x.checklist.blog, "opcional");
+  x = aplicarRespuesta(x, "pagos", true);
+  assert.equal(x.checklist.pagos, "incluido");
+  x = aplicarRespuesta(x, "pagos", undefined);
+  assert.equal(x.checklist.pagos ?? "no", "no");
+}
+function nivelDe(x: Parameters<typeof aPropuesta>[0]) { return aPropuesta(x, "2026-10-21", uid).services[0].sourceId.replace("web-nivel-", ""); }
+
+// Cola de guardado: un envío a la vez, el último dato gana, flush envía lo pendiente.
+void (async () => {
+  const enviados: number[] = [];
+  let soltar: () => void = () => {};
+  const cola = crearCola<number>(async (v) => { enviados.push(v); await new Promise<void>((r) => { soltar = r; }); return true; }, 10);
+  const estados: string[] = [];
+  cola.alCambiar((e) => estados.push(e));
+  cola.programar(1); cola.programar(2);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.deepEqual(enviados, [2]);
+  cola.programar(3);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.deepEqual(enviados, [2], "no envía mientras hay uno en curso");
+  soltar(); await new Promise((r) => setTimeout(r, 30));
+  assert.deepEqual(enviados, [2, 3], "al terminar envía el último pendiente");
+  soltar(); await new Promise((r) => setTimeout(r, 5));
+  assert.equal(estados.at(-1), "ok");
+  const ok = await (async () => { cola.programar(4); const p = cola.vaciar(); soltar(); return p; })();
+  assert.equal(ok, true); assert.deepEqual(enviados, [2, 3, 4]);
+  const fallo = crearCola<number>(async () => false, 5);
+  fallo.programar(1); assert.equal(await fallo.vaciar(), false);
+  console.log("✓ presentación: revisión final");
+})().catch((e) => { console.error(e); process.exit(1); });

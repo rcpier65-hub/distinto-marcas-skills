@@ -126,6 +126,25 @@ export function checklistInicial(r: RespuestasWeb): Record<string, Estado> {
   return c;
 }
 
+/* Responder una pregunta actualiza las sugerencias del checklist: los ítems
+   que seguían como los sugirió la respuesta anterior pasan a la nueva
+   sugerencia; los que Pedro cambió a mano se respetan. Así, pasar de «Tienda»
+   a «Presentar la empresa» quita carrito y pagos y el nivel baja. */
+export function aplicarRespuesta(s: Sesion, clave: keyof RespuestasWeb, valor: unknown): Sesion {
+  const antes = checklistInicial(s.respuestas);
+  const respuestas = { ...s.respuestas, [clave]: valor } as RespuestasWeb;
+  if (valor === undefined) delete (respuestas as Record<string, unknown>)[clave];
+  const ahora = checklistInicial(respuestas);
+  const checklist: Record<string, Estado> = { ...s.checklist };
+  for (const k of new Set([...Object.keys(antes), ...Object.keys(ahora)])) {
+    const actual = checklist[k] ?? "no";
+    const sugerido = antes[k] ?? "no";
+    if (actual !== sugerido) continue; // edición manual: se respeta
+    if (ahora[k]) checklist[k] = ahora[k]; else delete checklist[k];
+  }
+  return { ...s, respuestas, checklist };
+}
+
 /* Lo marcado como incluido en el checklist también cuenta para el nivel. */
 export function respuestasEfectivas(s: Sesion): RespuestasWeb {
   const r: RespuestasWeb = { ...s.respuestas };
