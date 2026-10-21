@@ -199,18 +199,24 @@ export async function guardarVentasEquipo(marcaSlug: string, mes: string, pedido
 /* ══════════ Publicidad: historial mensual (Pedro 21-oct-2026) ══════════
    Presupuesto por mes y métricas de Meta, compartidos con el panel de
    Publicidad del espacio de marca (tabla pauta_mensual). */
-async function marcaIdPorSlug(slug: string): Promise<string | null> {
-  const { createServiceClient } = await import('@/lib/supabase/service')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (createServiceClient() as any).from('marcas').select('id').eq('slug', slug).maybeSingle()
-  return data?.id ?? null
+/* Misma autorización que el panel de Publicidad: equipo con acceso a la marca
+   (y, para el presupuesto, solo dirección). Devuelve el id de la marca. */
+async function marcaPauta(marcaSlug: string, soloDireccion: boolean): Promise<{ id: string } | { error: string }> {
+  const err = await soloEquipo(); if (err) return { error: err }
+  try {
+    const { actor, brandAccess } = await import('@/lib/estrategia/access')
+    const a = await actor()
+    const brand = await brandAccess(a, marcaSlug)
+    if (soloDireccion && !a.manager) return { error: 'Solo dirección puede cambiar el presupuesto.' }
+    return { id: brand.id }
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Sin acceso a esta marca' } }
 }
 
 export async function guardarPresupuestoPauta(marcaSlug: string, mes: string, monto: number | null): Promise<Res> {
-  const err = await soloEquipo(); if (err) return { ok: false, error: err }
   if (!mesOk(mes)) return { ok: false, error: 'Mes inválido' }
   if (monto !== null && (!Number.isFinite(monto) || monto < 0 || monto > 10_000_000)) return { ok: false, error: 'Monto inválido' }
-  const id = await marcaIdPorSlug(marcaSlug); if (!id) return { ok: false, error: 'Marca no encontrada' }
+  const m = await marcaPauta(marcaSlug, true); if ('error' in m) return { ok: false, error: m.error }
+  const id = m.id
   try {
     const { guardarPresupuesto } = await import('@/lib/pauta/historial')
     await guardarPresupuesto(id, mes, monto)
@@ -220,8 +226,8 @@ export async function guardarPresupuestoPauta(marcaSlug: string, mes: string, mo
 }
 
 export async function actualizarPautaReportes(marcaSlug: string): Promise<Res> {
-  const err = await soloEquipo(); if (err) return { ok: false, error: err }
-  const id = await marcaIdPorSlug(marcaSlug); if (!id) return { ok: false, error: 'Marca no encontrada' }
+  const m = await marcaPauta(marcaSlug, false); if ('error' in m) return { ok: false, error: m.error }
+  const id = m.id
   try {
     const { createServiceClient } = await import('@/lib/supabase/service')
     const { configSchema } = await import('@/lib/pauta/model')
