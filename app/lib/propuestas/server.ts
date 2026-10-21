@@ -24,7 +24,9 @@ export async function proposalRateLimit(db: SupabaseClient<ProposalDatabase>, us
 }
 export async function proposalActor(request: Request) {
   const origin = request.headers.get('origin')
-  if (request.method !== 'GET' && origin && origin !== new URL(request.url).origin) throw new ProposalError('Origen no permitido', 403)
+  // Detrás de Traefik request.url es localhost: se compara con el host externo.
+  const host = request.headers.get('host') || new URL(request.url).host
+  if (request.method !== 'GET' && origin && URL.parse(origin)?.host !== host) throw new ProposalError('Origen no permitido', 403)
   const user = await getUser()
   if (!user) throw new ProposalError('Inicia sesión para continuar.', 401)
   if (!esPedroEmail(user.email)) throw new ProposalError('Solo la dirección puede gestionar propuestas.', 403)
