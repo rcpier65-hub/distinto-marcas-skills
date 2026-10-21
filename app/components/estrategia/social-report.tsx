@@ -314,7 +314,7 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
           {ads && (
             <Change current={ads.current.spend} previous={ads.previous.spend} />
           )}
-          <small>Meta Ads · {ads?.currency || "sin cuenta seleccionada"}</small>
+          <small>{ads?.cuentas ? ads.cuentas.map((c) => `${c.nombre} ${money(c.gastoPen, "PEN")}`).join(" · ") : `Meta Ads · ${ads?.currency || "sin cuenta seleccionada"}`}</small>
           <em><TrendingUp size={12} /> Ver crecimiento</em>
         </button>
         <button type="button" className={styles.kpiButton} onClick={() => setTrend("conversations")}>
@@ -422,6 +422,16 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
                 <span>Costo por conversación</span>
               </div>
             </div>
+            {ads.cuentas && (
+              <div className={styles.adsValues}>
+                {ads.cuentas.map((c) => (
+                  <div key={c.nombre}>
+                    <strong>{money(c.gastoPen, "PEN")}</strong>
+                    <span>{c.nombre}{c.moneda === "USD" && c.gasto !== null ? ` · ${money(c.gasto, "USD")}` : ""} · {integer(c.conversaciones)} conversaciones</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <p>
               {ads.note ||
                 "Conversaciones atribuidas por Meta a los anuncios; pueden proceder de WhatsApp, Messenger o Instagram."}{" "}

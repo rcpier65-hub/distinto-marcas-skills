@@ -34,7 +34,7 @@ import { Agenda } from "./agenda";
 import { BrandOverview } from "./brand-overview";
 import { BrandMap } from "./brand-map";
 import { AdsPanel } from "./ads-panel";
-import { Reporte360 } from "./reporte-360";
+import { ReporteAnuncios } from "./reporte-anuncios";
 import { designFinished } from "@/lib/estrategia/activity-status";
 import "./strategy.css";
 
@@ -337,6 +337,17 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
               Reportes de redes
             </button>
           )}
+          {b.me.manager && (
+            <button
+              className={tab === "Reporte de anuncios" ? "st-active" : ""}
+              onClick={() => {
+                setTab("Reporte de anuncios");
+                setCampaignId("");
+              }}
+            >
+              Reporte de anuncios
+            </button>
+          )}
         </nav>
       </header>
       {b.warnings.length > 0 && (
@@ -345,11 +356,11 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
         </div>
       )}
       <div className="st-body">
+        {tab === "Reporte de anuncios" && b.me.manager && <ReporteAnuncios slug={brand.slug} hoy={b.today} />}
         {tab === "Reportes" && b.me.manager && (
           <SocialReportView slug={brand.slug} today={b.today} brandName={brand.nombre} />
         )}
         {tab === "Mapa de marca" && <BrandMap slug={brand.slug} brandName={brand.nombre} />}
-        {tab === "Publicidad" && brand.slug === "oral-bueaty" && b.me.manager && <Reporte360 slug={brand.slug} hoy={b.today} />}
         {tab === "Publicidad" && (
           <AdsPanel slug={brand.slug} brandName={brand.nombre}
             planes={live.filter((r) => r.kind === "sheet").map((r) => ({ id: r.id, title: r.title }))} />

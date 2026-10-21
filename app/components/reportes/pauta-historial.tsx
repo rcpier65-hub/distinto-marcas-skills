@@ -12,7 +12,13 @@ import type { MesPauta } from '@/lib/pauta/historial'
 import { labelMes } from '@/lib/reportes/typhouse'
 import { actualizarPautaReportes, guardarPresupuestoPauta } from '@/app/reportes/_actions'
 
-export function PautaHistorial({ slug, meses, mesActual }: { slug: string; meses: MesPauta[]; mesActual: string }) {
+type Res = { ok: true } | { ok: false; error: string }
+/* Por defecto usa las acciones del módulo Reportes (con código). Dentro del
+   espacio de marca se le pasan acciones que van por la API de la marca. */
+export function PautaHistorial({ slug, meses, mesActual, onActualizar, onPresupuesto }: {
+  slug: string; meses: MesPauta[]; mesActual: string
+  onActualizar?: () => Promise<Res>; onPresupuesto?: (mes: string, monto: number | null) => Promise<Res>
+}) {
   const router = useRouter()
   const [pend, start] = useTransition()
   const [editando, setEditando] = useState<string | null>(null)
@@ -30,14 +36,14 @@ export function PautaHistorial({ slug, meses, mesActual }: { slug: string; meses
   const tope = Math.max(1, ...grafico.map((m) => Math.max(m.metricas?.gasto ?? 0, m.presupuesto ?? 0)))
 
   const actualizar = () => start(async () => {
-    const r = await actualizarPautaReportes(slug)
+    const r = await (onActualizar ? onActualizar() : actualizarPautaReportes(slug))
     if (!r.ok) { toast.error(r.error); return }
     toast.success('Historial de publicidad actualizado'); router.refresh()
   })
   const guardar = (mes: string) => start(async () => {
     const t = valor.trim().replace(',', '.')
     const monto = t === '' ? null : Number(t)
-    const r = await guardarPresupuestoPauta(slug, mes, monto)
+    const r = await (onPresupuesto ? onPresupuesto(mes, monto) : guardarPresupuestoPauta(slug, mes, monto))
     if (!r.ok) { toast.error(r.error); return }
     setEditando(null); toast.success('Presupuesto guardado'); router.refresh()
   })

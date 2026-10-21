@@ -44,6 +44,9 @@ export type SocialReport = {
     current: AdPeriod;
     previous: AdPeriod;
     note: string | null;
+    /* Marcas con una cuenta por sede (Oral Beauty: Lima USD + Rioja PEN). Se
+       suman en soles con el tipo de cambio SUNAT del mes. */
+    cuentas?: { nombre: string; moneda: string; gasto: number | null; gastoPen: number | null; conversaciones: number | null }[];
   } | null;
   warnings: string[];
 };

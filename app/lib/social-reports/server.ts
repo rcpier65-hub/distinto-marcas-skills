@@ -6,6 +6,7 @@ import {
   type BrandBinding,
 } from "@/lib/meta-mcp/server";
 import { StrategyError } from "@/lib/estrategia/access";
+import { tipoCambioSunatMes } from "@/lib/integrations/tipo-cambio";
 import { todayLima } from "@/lib/estrategia/model";
 import {
   addDays,
@@ -221,6 +222,33 @@ async function ads(id: string, r: Range, token: string, currency: string) {
         : null,
   };
 }
+/* Marcas con varias cuentas publicitarias, una por sede (Pedro 21-oct-2026). */
+const CUENTAS_MULTIPLES: Record<string, { nombre: string; cuenta: string }[]> = {
+  "805f6d80-46a8-4261-9c13-8ff8b6ff3fbe": [
+    { nombre: "Lima", cuenta: "8397325756961575" },
+    { nombre: "Rioja", cuenta: "2044444659791967" },
+  ],
+};
+const tcCache = new Map<string, Promise<number | null>>();
+const tcMes = (mes: string) => { if (!tcCache.has(mes)) tcCache.set(mes, tipoCambioSunatMes(mes)); return tcCache.get(mes)!; };
+/* Suma las cuentas de la marca en soles. null si la marca tiene una sola cuenta. */
+async function adsMultiples(marcaId: string, r: Range, token: string) {
+  const lista = CUENTAS_MULTIPLES[marcaId];
+  if (!lista) return null;
+  const tc = await tcMes(r.start.slice(0, 7));
+  const cuentas = await Promise.all(lista.map(async (c) => {
+    const prof = await graph(`act_${c.cuenta}`, { fields: "account_id,currency" }, token);
+    if (prof?.account_id !== c.cuenta || typeof prof.currency !== "string") return { nombre: c.nombre, moneda: "?", gasto: null, gastoPen: null, conversaciones: null };
+    const a = await ads(c.cuenta, r, token, prof.currency);
+    const gastoPen = a.spend === null ? null : prof.currency === "PEN" ? a.spend : prof.currency === "USD" && tc ? Math.round(a.spend * tc * 100) / 100 : null;
+    return { nombre: c.nombre, moneda: prof.currency, gasto: a.spend, gastoPen, conversaciones: a.conversations };
+  }));
+  const conDato = cuentas.filter((c) => c.gastoPen !== null);
+  const spend = conDato.length ? Math.round(conDato.reduce((x, c) => x + (c.gastoPen ?? 0), 0) * 100) / 100 : null;
+  const convs = cuentas.filter((c) => c.conversaciones !== null);
+  const conversations = convs.length ? convs.reduce((x, c) => x + (c.conversaciones ?? 0), 0) : null;
+  return { period: { spend, conversations, costPerConversation: spend !== null && conversations ? spend / conversations : null } as AdPeriod, cuentas };
+}
 async function loadReport(
   binding: BrandBinding,
   month: string,
@@ -309,6 +337,16 @@ async function loadReport(
       });
     })(),
     (async () => {
+      const [mc, mp] = await Promise.all([adsMultiples(binding.marca_id, period.current, token), adsMultiples(binding.marca_id, period.previous, token)]);
+      if (mc && mp) {
+        adReport = {
+          name: CUENTAS_MULTIPLES[binding.marca_id].map((c) => c.nombre).join(" + "),
+          currency: "PEN", timezone: "Según cada cuenta Meta", current: mc.period, previous: mp.period,
+          note: mc.period.spend === null ? "Meta no devolvió gasto en ninguna de las cuentas para este periodo." : "Suma de las cuentas por sede; los dólares se convierten a soles con el tipo de cambio SUNAT del mes.",
+          cuentas: mc.cuentas,
+        };
+        return;
+      }
       const id = binding.ad_account_id;
       if (!id) return;
       const profile = await graph(
@@ -607,6 +645,8 @@ async function trendMonth(
       point.netFollows.facebook = net(v);
     })(),
     (async () => {
+      const multi = await adsMultiples(binding.marca_id, r, token);
+      if (multi) { point.spend = multi.period.spend; point.conversations = multi.period.conversations; return; }
       if (!binding.ad_account_id || !currency) return;
       const a = await ads(binding.ad_account_id, r, token, currency);
       point.spend = a.spend;
@@ -627,8 +667,8 @@ export async function socialTrend(
   const pt = ctx.binding.facebook_page_id
     ? await pageToken(ctx.binding.facebook_page_id, token)
     : null;
-  let currency: string | null = null;
-  if (ctx.binding.ad_account_id) {
+  let currency: string | null = CUENTAS_MULTIPLES[ctx.binding.marca_id] ? "PEN" : null;
+  if (!currency && ctx.binding.ad_account_id) {
     const prof = await graph(
       `act_${ctx.binding.ad_account_id}`,
       { fields: "account_id,currency" },
