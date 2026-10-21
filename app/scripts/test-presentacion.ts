@@ -55,7 +55,7 @@ assert.equal(sesionSchema.safeParse({ ...s, notas: "x".repeat(4001) }).success, 
 console.log("✓ presentación: checklist y propuesta");
 
 // Revisión final: cambiar el tipo de web baja el nivel y respeta ediciones manuales.
-import { aplicarRespuesta, enlaceSeguro } from "../lib/presentacion/web";
+import { aplicarRespuesta, enlaceSeguro, respuestasEfectivas } from "../lib/presentacion/web";
 import { crearCola } from "../lib/presentacion/cola";
 {
   let x = sesionVacia({ nombre: "", empresa: "X", rubro: "", contacto: "" });
@@ -130,4 +130,16 @@ void (async () => {
   assert.equal(estimarNivel(conPlazo.respuestas).nivel, "basico");
   assert.match(aPropuesta(conPlazo, "2026-10-21", () => "id").objective, /Plazo deseado: De aquí a un mes/);
   console.log("✓ presentación: plazo estandarizado");
+
+  const ck = checklistInicial({ tipo: "tienda", productos: "101-200", variantes: true });
+  assert.equal(ck.reclamaciones, "incluido"); assert.equal(ck.buscador, "incluido"); assert.equal(ck.variantesCheck, "incluido"); assert.equal(ck.legales, "incluido");
+  assert.equal(new Set(CHECKLIST.map((c) => c.id)).size, CHECKLIST.length);
+  const conMay = sesionSchema.parse({ checklist: { mayoristas: "incluido" } });
+  assert.equal(estimarNivel(respuestasEfectivas(conMay)).nivel, "avanzado");
+  const conExtras = sesionSchema.parse({ cliente: { empresa: "X" }, extras: [{ texto: "Cotizador de fletes", estado: "incluido" }, { texto: "Intranet", estado: "opcional" }, { texto: "", estado: "opcional" }] });
+  const pe = aPropuesta(conExtras, "2026-10-21", () => "id");
+  assert.match(pe.services[0].scope, /Cotizador de fletes/);
+  assert.ok(pe.services.some((x) => x.name === "Intranet" && x.optional));
+  assert.equal(pe.services.filter((x) => x.optional).length, 1);
+  console.log("✓ presentación: checklist ampliado y extras");
 })().catch((e) => { console.error(e); process.exit(1); });

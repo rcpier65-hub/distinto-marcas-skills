@@ -98,27 +98,54 @@ export const GUIA_NOTAS: string[][] = [
 
 export type Estado = "incluido" | "opcional" | "no";
 /* Lo que una web puede tener. `clave` conecta el ítem con el nivel. */
-export const CHECKLIST: { id: string; grupo: string; etiqueta: string; clave?: keyof RespuestasWeb }[] = [
-  { id: "inicio", grupo: "Páginas", etiqueta: "Inicio" },
-  { id: "nosotros", grupo: "Páginas", etiqueta: "Nosotros" },
-  { id: "servicios", grupo: "Páginas", etiqueta: "Servicios o productos" },
-  { id: "contacto", grupo: "Páginas", etiqueta: "Contacto con mapa" },
-  { id: "catalogo", grupo: "Venta", etiqueta: "Catálogo de productos" },
-  { id: "carrito", grupo: "Venta", etiqueta: "Carrito de compras", clave: "tipo" },
-  { id: "pagos", grupo: "Venta", etiqueta: "Pagos online (tarjeta, Yape, Plin)", clave: "pagos" },
-  { id: "envios", grupo: "Venta", etiqueta: "Envíos y costos por zona", clave: "envios" },
-  { id: "whatsapp", grupo: "Contacto", etiqueta: "Botón de WhatsApp" },
-  { id: "formulario", grupo: "Contacto", etiqueta: "Formulario de contacto" },
-  { id: "reservas", grupo: "Contacto", etiqueta: "Reservas o agenda en línea", clave: "reservas" },
-  { id: "blog", grupo: "Contenido", etiqueta: "Blog o noticias", clave: "blog" },
-  { id: "idiomas", grupo: "Contenido", etiqueta: "Varios idiomas", clave: "idiomas" },
-  { id: "seo", grupo: "Crecimiento", etiqueta: "SEO básico (aparecer en Google)" },
-  { id: "medicion", grupo: "Crecimiento", etiqueta: "Medición (Analytics y píxeles)" },
-  { id: "integraciones", grupo: "Crecimiento", etiqueta: "Integraciones (inventario, facturación, ERP)", clave: "integraciones" },
-  { id: "dominio", grupo: "Infraestructura", etiqueta: "Dominio (lo paga el cliente)" },
-  { id: "hosting", grupo: "Infraestructura", etiqueta: "Hosting o servidor (lo paga el cliente)" },
-  { id: "capacitacion", grupo: "Después de lanzar", etiqueta: "Capacitación para administrar la web" },
-  { id: "mantenimiento", grupo: "Después de lanzar", etiqueta: "Mantenimiento mensual" },
+/* Lo que una web puede tener, armado con lo que tienen los proyectos reales
+   de distintostudio.com (Pedro 21-oct-2026). `clave` conecta el ítem con el
+   nivel; `detalle` explica qué es y, si aplica, dónde ya lo hicimos. */
+export const CHECKLIST: { id: string; grupo: string; etiqueta: string; detalle?: string; clave?: keyof RespuestasWeb }[] = [
+  { id: "inicio", grupo: "Páginas", etiqueta: "Inicio", detalle: "Portada con mensaje principal, llamada a la acción y resumen de la empresa." },
+  { id: "nosotros", grupo: "Páginas", etiqueta: "Nosotros / Empresa", detalle: "Historia, equipo, certificaciones y por qué elegirlos." },
+  { id: "servicios", grupo: "Páginas", etiqueta: "Servicios o líneas de producto", detalle: "Una sección o página por servicio o colección (ej. Max, Onix y Amber en Novaelec)." },
+  { id: "faq", grupo: "Páginas", etiqueta: "Preguntas frecuentes", detalle: "Resuelve dudas antes de que escriban (ej. Logística Los Olivos)." },
+  { id: "testimonios", grupo: "Páginas", etiqueta: "Clientes y testimonios", detalle: "Logos de clientes y opiniones reales para generar confianza." },
+  { id: "tarifario", grupo: "Páginas", etiqueta: "Tarifario o lista de precios", detalle: "Precios o rangos visibles para filtrar consultas." },
+  { id: "contacto", grupo: "Páginas", etiqueta: "Contacto con mapa y horarios", detalle: "Dirección, mapa de Google, horarios, teléfonos y redes." },
+  { id: "catalogo", grupo: "Catálogo y venta", etiqueta: "Catálogo de productos por categorías", detalle: "Productos organizados por categoría, marca u ocasión." },
+  { id: "ficha", grupo: "Catálogo y venta", etiqueta: "Fichas de producto con galería", detalle: "Fotos, descripción, especificaciones y productos relacionados." },
+  { id: "variantesCheck", grupo: "Catálogo y venta", etiqueta: "Variantes (tallas, colores, aromas)", detalle: "Elegir variante con su foto, precio y stock propio." },
+  { id: "pdf", grupo: "Catálogo y venta", etiqueta: "Catálogos PDF descargables", detalle: "Catálogos para arquitectos o distribuidores (ej. Novaelec)." },
+  { id: "buscador", grupo: "Catálogo y venta", etiqueta: "Buscador y filtros", detalle: "Buscar por nombre y filtrar por categoría, marca o precio (ej. Typhouse)." },
+  { id: "carrito", grupo: "Catálogo y venta", etiqueta: "Carrito de compras", detalle: "Agregar, quitar y revisar antes de pagar.", clave: "tipo" },
+  { id: "pagos", grupo: "Catálogo y venta", etiqueta: "Pagos online (tarjeta, Yape, Plin)", detalle: "Pasarela conectada; el dinero llega a la cuenta del cliente.", clave: "pagos" },
+  { id: "envios", grupo: "Catálogo y venta", etiqueta: "Envíos y costos por zona", detalle: "Tarifas por distrito o provincia y recojo en tienda.", clave: "envios" },
+  { id: "envioGratis", grupo: "Catálogo y venta", etiqueta: "Envío gratis desde un monto", detalle: "Barra que avisa cuánto falta para el envío gratis (ej. Typhouse)." },
+  { id: "packs", grupo: "Catálogo y venta", etiqueta: "Packs, combos y promociones", detalle: "Combos multimarca y ofertas listas para elegir." },
+  { id: "cupones", grupo: "Catálogo y venta", etiqueta: "Cupones de descuento", detalle: "Códigos por campaña, primera compra o influencers." },
+  { id: "cuentas", grupo: "Catálogo y venta", etiqueta: "Cuentas de cliente", detalle: "Registro, historial de pedidos y direcciones guardadas." },
+  { id: "mayoristas", grupo: "Catálogo y venta", etiqueta: "Zona de distribuidores o mayoristas", detalle: "Precios y pedidos especiales para empresas (ej. Typhouse).", clave: "medida" },
+  { id: "whatsapp", grupo: "Contacto y atención", etiqueta: "Botón de WhatsApp", detalle: "Botón flotante con mensaje listo." },
+  { id: "formulario", grupo: "Contacto y atención", etiqueta: "Formulario de contacto o cotización", detalle: "Llega al correo y puede conectarse al CRM." },
+  { id: "chat", grupo: "Contacto y atención", etiqueta: "Chat de bienvenida", detalle: "Mensaje automático que invita a escribir (ej. Logística Los Olivos)." },
+  { id: "reservas", grupo: "Contacto y atención", etiqueta: "Reservas, citas o visitas", detalle: "Agenda en línea (ej. «Agenda tu visita» al showroom de Novaelec).", clave: "reservas" },
+  { id: "tracking", grupo: "Contacto y atención", etiqueta: "Seguimiento de pedidos o carga", detalle: "Acceso al estado del envío (ej. Tracking de Los Olivos).", clave: "integraciones" },
+  { id: "reclamaciones", grupo: "Contacto y atención", etiqueta: "Libro de reclamaciones virtual", detalle: "Obligatorio en Perú para quien vende a consumidores." },
+  { id: "video", grupo: "Contenido y diseño", etiqueta: "Video de portada", detalle: "Video a pantalla completa en la portada (ej. Novaelec)." },
+  { id: "animaciones", grupo: "Contenido y diseño", etiqueta: "Animaciones y efectos al desplazar", detalle: "Movimientos sutiles que dan sensación premium." },
+  { id: "textos", grupo: "Contenido y diseño", etiqueta: "Redacción de textos", detalle: "Escribimos los textos orientados a vender y a Google." },
+  { id: "fotos", grupo: "Contenido y diseño", etiqueta: "Fotos o sesión de producto", detalle: "Producción de fotos propias o edición de las existentes." },
+  { id: "blog", grupo: "Contenido y diseño", etiqueta: "Blog o noticias", detalle: "Artículos que atraen visitas desde Google.", clave: "blog" },
+  { id: "idiomas", grupo: "Contenido y diseño", etiqueta: "Varios idiomas", detalle: "Versión en inglés u otro idioma.", clave: "idiomas" },
+  { id: "seo", grupo: "Crecimiento", etiqueta: "SEO básico (aparecer en Google)", detalle: "Títulos, descripciones, velocidad y Search Console." },
+  { id: "medicion", grupo: "Crecimiento", etiqueta: "Medición (Analytics y píxeles)", detalle: "Google Analytics y píxel de Meta con eventos de contacto o compra." },
+  { id: "catalogoAds", grupo: "Crecimiento", etiqueta: "Catálogo para anuncios (Meta y Google Shopping)", detalle: "Productos sincronizados para anunciarlos." },
+  { id: "captacion", grupo: "Crecimiento", etiqueta: "Captación de correos", detalle: "Ventana o formulario con cupón de bienvenida." },
+  { id: "integraciones", grupo: "Crecimiento", etiqueta: "Integraciones (inventario, facturación, ERP, CRM)", detalle: "Conexión con los sistemas que ya usa la empresa.", clave: "integraciones" },
+  { id: "legales", grupo: "Legal", etiqueta: "Privacidad, términos y cookies", detalle: "Páginas legales y aviso de cookies." },
+  { id: "dominio", grupo: "Infraestructura", etiqueta: "Dominio (lo paga el cliente)", detalle: "tuempresa.com o .pe a nombre del cliente." },
+  { id: "hosting", grupo: "Infraestructura", etiqueta: "Hosting o plataforma (lo paga el cliente)", detalle: "Servidor, Shopify o WordPress según el proyecto." },
+  { id: "correos", grupo: "Infraestructura", etiqueta: "Correos corporativos", detalle: "nombre@tuempresa.com configurados." },
+  { id: "capacitacion", grupo: "Después de lanzar", etiqueta: "Capacitación para administrar la web", detalle: "Sesión grabada para editar textos, fotos y productos." },
+  { id: "soporte", grupo: "Después de lanzar", etiqueta: "Soporte de 30 días tras el lanzamiento", detalle: "Ajustes menores y dudas después de publicar." },
+  { id: "mantenimiento", grupo: "Después de lanzar", etiqueta: "Mantenimiento mensual", detalle: "Actualizaciones, respaldos, cambios y mejoras." },
 ];
 
 /* Dudas comunes, fieles a lo publicado en distintostudio.com. */
@@ -167,6 +194,8 @@ export const sesionSchema = z.object({
   /* Webs de referencia del cliente: enlace + por qué le gusta. */
   referencias: z.array(z.object({ url: texto(500).default(""), motivo: texto(400).default("") })).max(15).default([]),
   checklist: z.record(z.string().max(40), z.enum(["incluido", "opcional", "no"])).default({}),
+  /* Lo que no está en la lista: se escribe en la reunión. */
+  extras: z.array(z.object({ texto: texto(200).default(""), estado: z.enum(["incluido", "opcional", "no"]).default("incluido") })).max(20).default([]),
 });
 export type Sesion = z.infer<typeof sesionSchema>;
 
@@ -183,10 +212,12 @@ export const sesionVacia = (c: Sesion["cliente"]): Sesion => sesionSchema.parse(
 /* Checklist sugerido a partir de las respuestas (se puede cambiar a mano). */
 export function checklistInicial(r: RespuestasWeb): Record<string, Estado> {
   const tienda = esTienda(r);
-  const c: Record<string, Estado> = { inicio: "incluido", servicios: "incluido", contacto: "incluido", whatsapp: "incluido", formulario: "incluido", seo: "incluido", medicion: "incluido", capacitacion: "incluido", dominio: "incluido", hosting: "incluido" };
+  const c: Record<string, Estado> = { inicio: "incluido", servicios: "incluido", contacto: "incluido", whatsapp: "incluido", formulario: "incluido", seo: "incluido", medicion: "incluido", capacitacion: "incluido", dominio: "incluido", hosting: "incluido", legales: "incluido", soporte: "incluido" };
   if (r.tipo !== "landing") c.nosotros = "incluido";
-  if (tienda || tieneCatalogo(r)) c.catalogo = "incluido";
-  if (tienda) { c.carrito = "incluido"; c.pagos = "incluido"; c.envios = "incluido"; }
+  if (tienda || tieneCatalogo(r)) { c.catalogo = "incluido"; c.ficha = "incluido"; }
+  if (r.variantes) c.variantesCheck = "incluido";
+  if (r.productos === "101-200" || r.productos === "mas-200") c.buscador = "incluido";
+  if (tienda) { c.carrito = "incluido"; c.pagos = "incluido"; c.envios = "incluido"; c.reclamaciones = "incluido"; }
   if (r.pagos) c.pagos = "incluido";
   if (r.envios) c.envios = "incluido";
   if (r.blog) c.blog = "incluido";
@@ -221,6 +252,9 @@ export function respuestasEfectivas(s: Sesion): RespuestasWeb {
   const si = (id: string) => s.checklist[id] === "incluido";
   if (si("carrito") && !esTienda(r)) r.tipo = "tienda";
   for (const k of ["pagos", "envios", "blog", "reservas", "idiomas", "integraciones"] as const) if (si(k)) r[k] = true;
+  if (si("tracking")) r.integraciones = true;
+  if (si("mayoristas")) r.medida = true;
+  if (si("variantesCheck")) r.variantes = true;
   return r;
 }
 
@@ -236,7 +270,8 @@ export function aPropuesta(s: Sesion, hoy: string, uid: () => string): ProposalD
   const n = nivelDeSesion(s);
   const p = emptyProposal();
   const etiqueta = (id: string) => CHECKLIST.find((c) => c.id === id)?.etiqueta ?? id;
-  const incluidos = CHECKLIST.filter((c) => s.checklist[c.id] === "incluido").map((c) => c.etiqueta);
+  const extras = s.extras.filter((x) => x.texto.trim());
+  const incluidos = [...CHECKLIST.filter((c) => s.checklist[c.id] === "incluido").map((c) => c.etiqueta), ...extras.filter((x) => x.estado === "incluido").map((x) => x.texto.trim())];
   const base: ProposalService = {
     ...serviceFromTemplate(n.catalogoId, uid()),
     summary: `${n.resumen} Inversión de referencia: ${n.rango}. Plazo: ${n.plazo}`,
@@ -250,6 +285,11 @@ export function aPropuesta(s: Sesion, hoy: string, uid: () => string): ProposalD
     name: etiqueta(id), category: "Web · opcional", summary: "Opcional a cotizar según el alcance final.",
     frequency: "unico", optional: true, price: null,
   }));
+  for (const x of extras.filter((e) => e.estado === "opcional")) opcionales.push({
+    ...serviceFromTemplate("personalizado", uid()),
+    name: x.texto.trim(), category: "Web · opcional", summary: "Opcional a cotizar según el alcance final.",
+    frequency: "unico", optional: true, price: null,
+  });
   const respuestasTexto = PREGUNTAS.filter((q) => q.tipo === "texto" && s.textos[q.id]?.trim()).map((q) => `${q.texto} ${s.textos[q.id].trim()}`);
   const refs = s.referencias.filter((r) => r.url.trim()).map((r) => `- ${enlaceSeguro(r.url) ?? r.url.trim()}${r.motivo.trim() ? ` — ${r.motivo.trim()}` : ""}`);
   const plazo = PREGUNTAS.find((q) => q.id === "plazo")?.opciones?.find((o) => o.id === s.respuestas.plazo);

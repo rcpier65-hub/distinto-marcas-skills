@@ -212,7 +212,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                           const v: Estado = s.checklist[c.id] ?? "no";
                           return (
                             <div key={c.id} className={`pr-item pr-item-${v}`}>
-                              <span>{c.etiqueta}</span>
+                              <span>{c.etiqueta}{c.detalle && <small>{c.detalle}</small>}</span>
                               <div className="pr-tri" role="radiogroup" aria-label={c.etiqueta}>
                                 {(["incluido", "opcional", "no"] as const).map((e) => (
                                   <button key={e} type="button" role="radio" aria-checked={v === e} className={v === e ? "pr-tri-on" : ""}
@@ -226,6 +226,25 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                         })}
                       </fieldset>
                     ))}
+                    <fieldset className="pr-grupo">
+                      <legend>Algo más que necesite</legend>
+                      {s.extras.map((x, i) => (
+                        <div key={i} className={`pr-item pr-item-${x.estado}`}>
+                          <input className="pr-extra" value={x.texto} maxLength={200} placeholder="Ej.: cotizador de fletes, intranet para clientes…" aria-label={`Ítem adicional ${i + 1}`}
+                            onChange={(e) => cambiar((y) => ({ ...y, extras: y.extras.map((z, j) => (j === i ? { ...z, texto: e.target.value } : z)) }))} />
+                          <div className="pr-tri" role="radiogroup" aria-label={x.texto || `Ítem adicional ${i + 1}`}>
+                            {(["incluido", "opcional", "no"] as const).map((e) => (
+                              <button key={e} type="button" role="radio" aria-checked={x.estado === e} className={x.estado === e ? "pr-tri-on" : ""}
+                                onClick={() => cambiar((y) => ({ ...y, extras: y.extras.map((z, j) => (j === i ? { ...z, estado: e } : z)) }))}>
+                                {e === "incluido" ? "Incluido" : e === "opcional" ? "Opcional" : "No"}
+                              </button>
+                            ))}
+                            <button type="button" aria-label={`Quitar ítem ${i + 1}`} onClick={() => cambiar((y) => ({ ...y, extras: y.extras.filter((_, j) => j !== i) }))}>×</button>
+                          </div>
+                        </div>
+                      ))}
+                      {s.extras.length < 20 && <button type="button" className="pr-chip" onClick={() => cambiar((y) => ({ ...y, extras: [...y.extras, { texto: "", estado: "incluido" }] }))}>+ Agregar ítem</button>}
+                    </fieldset>
                   </div>
                 </div>
               )}
@@ -245,10 +264,10 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                     </div>
                     <div>
                       <h3>Incluye</h3>
-                      <ul className="pr-lista-check">{CHECKLIST.filter((c) => s.checklist[c.id] === "incluido").map((c) => <li key={c.id}>{c.etiqueta}</li>)}</ul>
-                      {CHECKLIST.some((c) => s.checklist[c.id] === "opcional") && (<>
+                      <ul className="pr-lista-check">{CHECKLIST.filter((c) => s.checklist[c.id] === "incluido").map((c) => <li key={c.id}>{c.etiqueta}</li>)}{s.extras.filter((x) => x.estado === "incluido" && x.texto.trim()).map((x, i) => <li key={`e${i}`}>{x.texto}</li>)}</ul>
+                      {(CHECKLIST.some((c) => s.checklist[c.id] === "opcional") || s.extras.some((x) => x.estado === "opcional" && x.texto.trim())) && (<>
                         <h3>Opcionales a cotizar</h3>
-                        <ul className="pr-lista-op">{CHECKLIST.filter((c) => s.checklist[c.id] === "opcional").map((c) => <li key={c.id}>{c.etiqueta}</li>)}</ul>
+                        <ul className="pr-lista-op">{CHECKLIST.filter((c) => s.checklist[c.id] === "opcional").map((c) => <li key={c.id}>{c.etiqueta}</li>)}{s.extras.filter((x) => x.estado === "opcional" && x.texto.trim()).map((x, i) => <li key={`e${i}`}>{x.texto}</li>)}</ul>
                       </>)}
                     </div>
                   </div>
