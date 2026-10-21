@@ -353,6 +353,14 @@ async function loadReport(
   };
 }
 
+/* VIDEO/REELS (Instagram) o video (Facebook) → «video». */
+function tipoMedia(t: unknown): Post["mediaType"] {
+  const v = String(t ?? "").toLowerCase();
+  if (!v) return null;
+  if (v.includes("video") || v.includes("reel")) return "video";
+  if (v.includes("carousel") || v.includes("album")) return "carrusel";
+  return "imagen";
+}
 // Bound pagination and never follow provider URLs, which can include credentials.
 async function postsFor(
   network: "instagram" | "facebook",
@@ -371,7 +379,8 @@ async function postsFor(
         fields:
           network === "instagram"
             ? "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count"
-            : "id,message,created_time,permalink_url,full_picture",
+            /* Sin comments: leerlos exige pages_read_user_content, que la app no tiene, y hace fallar toda la lista. */
+            : "id,message,created_time,permalink_url,full_picture,shares,attachments{media_type}",
         since: r.start,
         until: r.end,
         limit: "50",
@@ -412,6 +421,8 @@ async function postsFor(
         views: null,
         likes: network === "instagram" ? number(p.like_count) : null,
         comments: network === "instagram" ? number(p.comments_count) : null,
+        shares: network === "facebook" ? number(p.shares?.count ?? 0) : null,
+        mediaType: tipoMedia(network === "instagram" ? p.media_type : p.attachments?.data?.[0]?.media_type),
       });
     }
     const paging = raw.paging as
@@ -431,7 +442,7 @@ async function postsFor(
         (a.likes ?? -1) -
         (a.comments ?? 0),
     );
-    const top = distinct.filter((p) => p.likes !== null).slice(0, 3);
+    const top = distinct.filter((p) => p.likes !== null).slice(0, 6);
     await Promise.all(
       top.map(async (p) => {
         const raw = await graph(`${p.id}/insights`, { metric: "views" }, token);
@@ -477,7 +488,7 @@ async function postsFor(
     posts: candidates
       .filter((p) => p.views !== null)
       .sort((a, b) => b.views! - a.views!)
-      .slice(0, 3),
+      .slice(0, 6),
     note: `Ordenadas por visualizaciones de ${candidates.length} publicaciones del periodo. Cifras acumuladas hasta hoy.${truncated || distinct.length > 30 ? " Se analizaron las 30 publicaciones más recientes; no es el ranking completo del mes." : ""}${failed ? " Meta no entregó la lista completa." : ""}${candidates.some((p) => p.views === null) ? " Algunas publicaciones no tienen estadísticas disponibles y no participan del ranking." : ""}`,
   };
 }

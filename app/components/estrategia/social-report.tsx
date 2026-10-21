@@ -587,7 +587,7 @@ function PostCards({ slug, month }: { slug: string; month: string }) {
             </p>
           )}
           <div className={styles.posts}>
-            {group.posts.map((post) => (
+            {group.posts.slice(0, 3).map((post) => (
               <article key={post.id} className={styles.post}>
                 {post.image ? (
                   <div className={styles.postImage}>

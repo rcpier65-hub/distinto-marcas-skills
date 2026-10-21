@@ -1,4 +1,5 @@
 "use client";
+import { MejoresDelMes } from "./social-best";
 /* Crecimiento mes a mes de un indicador del reporte de redes (gráfica de líneas).
    Se abre al hacer clic en un indicador; permite cambiar de métrica sin salir.
    Pedro 18-oct-2026: "hacer clic en visualizaciones y ver por periodos de mes
@@ -258,6 +259,8 @@ export function TrendModal({ slug, month, initial, close }: { slug: string; mont
             </p>
           </>
         )}
+        {/* Las publicaciones que explican el número (Pedro 21-oct-2026). */}
+        <MejoresDelMes slug={slug} month={month} orden={metric === "views" ? "vistas" : "interaccion"} />
       </div>
     </dialog>
   );

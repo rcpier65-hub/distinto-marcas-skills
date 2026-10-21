@@ -57,6 +57,10 @@ export type Post = {
   views: number | null;
   likes: number | null;
   comments: number | null;
+  /* Tipo de pieza (Pedro 21-oct: «ver el video más viral»). Ausente en
+     versiones guardadas antes de este cambio. */
+  mediaType?: "video" | "imagen" | "carrusel" | null;
+  shares?: number | null;
 };
 export type PostReport = {
   groups: { network: "facebook" | "instagram"; posts: Post[]; note: string }[];
