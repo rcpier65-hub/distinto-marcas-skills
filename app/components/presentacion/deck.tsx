@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { CHECKLIST, FAQ, PREGUNTAS, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
 import { crearCola } from "@/lib/presentacion/cola";
 import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
 import type { SesionGuardada } from "@/lib/presentacion/server";
@@ -26,6 +26,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const [propuesta, setPropuesta] = useState<{ id: string; numero: number } | null>(inicial.propuestaId ? { id: inicial.propuestaId, numero: 0 } : null);
   const [generando, setGenerando] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
+  const notasRef = useRef<HTMLTextAreaElement>(null);
   const reducir = useReducedMotion();
   const empresa = s.cliente.empresa || s.cliente.nombre || "tu negocio";
 
@@ -256,7 +257,23 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
           <aside className="pr-notas" aria-label="Notas de la reunión">
             <h2>Notas de la reunión</h2>
             <p className="pr-notas-cliente">{s.cliente.empresa}{s.cliente.nombre ? ` · ${s.cliente.nombre}` : ""}</p>
-            <textarea value={s.notas} maxLength={4000} placeholder="Lo que nos cuenta el cliente: objetivos, ideas, referencias, dudas…"
+            <details className="pr-guia" open>
+              <summary>Preguntas guía · {ETAPAS[etapa]}</summary>
+              <ul>
+                {(GUIA_NOTAS[etapa] ?? []).map((q) => {
+                  const hecha = s.notas.includes(q);
+                  return (
+                    <li key={q}>
+                      <button type="button" className={hecha ? "pr-guia-hecha" : ""} disabled={hecha} title={hecha ? "Ya está en tus notas" : "Agregar a las notas"}
+                        onClick={() => { cambiar((x) => ({ ...x, notas: `${x.notas.trimEnd()}${x.notas.trim() ? "\n\n" : ""}${q}\n– ` })); requestAnimationFrame(() => { const t = notasRef.current; if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); t.scrollTop = t.scrollHeight; } }); }}>
+                        {q}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+            <textarea ref={notasRef} value={s.notas} maxLength={4000} placeholder="Lo que nos cuenta el cliente: objetivos, ideas, referencias, dudas…"
               onChange={(e) => cambiar((x) => ({ ...x, notas: e.target.value }))} aria-label="Notas de la reunión" />
             <div className="pr-notas-nivel">
               <small>Nivel estimado</small>

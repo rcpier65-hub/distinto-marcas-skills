@@ -48,6 +48,47 @@ export const PREGUNTAS: Pregunta[] = [
   { id: "presupuesto", grupo: "Tiempos", texto: "¿Tienes un presupuesto aproximado?", tipo: "texto" },
 ];
 
+/* Preguntas guía del panel de notas, por etapa de la presentación (Pedro
+   21-oct-2026). Son abiertas: sirven para conducir la conversación mientras el
+   cliente comparte su pantalla; lo que responde se anota a mano. */
+export const GUIA_NOTAS: string[][] = [
+  [
+    "¿Cómo nació el negocio y qué vendes hoy?",
+    "¿Por qué buscas una web justo ahora?",
+    "¿Cómo te llegan los clientes hoy (redes, WhatsApp, recomendados)?",
+    "¿Qué debería hacer alguien al entrar: comprar, escribir, agendar?",
+    "¿Quién es tu competencia y qué hacen bien en su web?",
+    "Muéstranos lo que tienes hoy: ¿qué te gusta y qué no?",
+  ],
+  [
+    "¿Qué te diferencia de los demás de tu rubro?",
+    "¿Cuál es el producto o servicio que más quieres vender?",
+    "¿Qué preguntas te hacen siempre los clientes antes de comprar?",
+    "¿Qué resultado te haría decir que la web funcionó?",
+  ],
+  [
+    "¿Quién nos dará la información y aprobará cada fase?",
+    "¿Cuánto tiempo puedes dedicar a revisar cada avance?",
+    "¿Has trabajado antes con otra agencia? ¿Qué no funcionó?",
+  ],
+  [
+    "¿Qué duda te queda sobre el proceso o los plazos?",
+    "¿Quién actualizará la web cuando esté lista?",
+    "¿Necesitas capacitación para administrarla?",
+  ],
+  [
+    "¿Necesitas pagos en línea, reservas o formularios?",
+    "¿Se conecta con algo que ya usas (WhatsApp, CRM, facturación)?",
+    "¿En qué idiomas debe estar?",
+    "¿Qué es imprescindible para el lanzamiento y qué puede esperar?",
+  ],
+  [
+    "¿Quién más participa en la decisión?",
+    "¿Cuándo te gustaría empezar?",
+    "¿Cómo prefieres recibir la propuesta: correo o WhatsApp?",
+  ],
+];
+
 export type Estado = "incluido" | "opcional" | "no";
 /* Lo que una web puede tener. `clave` conecta el ítem con el nivel. */
 export const CHECKLIST: { id: string; grupo: string; etiqueta: string; clave?: keyof RespuestasWeb }[] = [
