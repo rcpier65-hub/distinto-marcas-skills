@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NIVELES } from "@/lib/presentacion/niveles";
-import { PROYECTOS, type NodoMapa, type Proyecto, type Seccion } from "@/lib/presentacion/proyectos";
+import { LANZAMIENTO, PROYECTOS, type NodoMapa, type Proyecto, type Seccion } from "@/lib/presentacion/proyectos";
 
 const FASES = [
   { id: "brief", titulo: "Brief", texto: "Una reunión y un documento donde dejamos claro qué quieres lograr, a quién le hablas, qué tono tiene tu marca y qué debe hacer tu web.", correccion: "Lo revisas y ajustamos antes de diseñar." },
@@ -21,20 +21,20 @@ type Fase = (typeof FASES)[number]["id"];
 export function Proceso() {
   const [i, setI] = useState(0);
   const [pid, setPid] = useState(PROYECTOS[0].id);
-  const [celular, setCelular] = useState(false);
   const reducir = useReducedMotion();
   const f = FASES[i];
   const p = PROYECTOS.find((x) => x.id === pid) ?? PROYECTOS[0];
   return (
     <div className="pr-proceso">
-      <h2>Cómo construimos tu web</h2>
-      <div className="pr-proyectos" role="radiogroup" aria-label="Proyecto de ejemplo">
-        <span>Míralo con un proyecto real:</span>
-        {PROYECTOS.map((x) => (
-          <button key={x.id} type="button" role="radio" aria-checked={x.id === p.id} className={x.id === p.id ? "pr-proy pr-proy-on" : "pr-proy"} onClick={() => setPid(x.id)}>
-            <strong>{x.nombre}</strong><small>{x.tipo} · {NIVELES[x.nivel].nombre}</small>
-          </button>
-        ))}
+      <div className="pr-proc-top">
+        <h2>Cómo construimos tu web</h2>
+        <div className="pr-proyectos" role="radiogroup" aria-label="Proyecto de ejemplo">
+          <span>Proyecto real:</span>
+          {PROYECTOS.map((x) => (
+            <button key={x.id} type="button" role="radio" aria-checked={x.id === p.id} title={`${x.tipo} · ${NIVELES[x.nivel].nombre}`}
+              className={x.id === p.id ? "pr-proy pr-proy-on" : "pr-proy"} onClick={() => setPid(x.id)}>{x.nombre.split(" · ")[0]}</button>
+          ))}
+        </div>
       </div>
       <ol className="pr-fases">
         {FASES.map((x, j) => (
@@ -45,59 +45,191 @@ export function Proceso() {
           </li>
         ))}
       </ol>
-      <div className="pr-fase">
-        <div className="pr-fase-texto">
-          <h3>{f.titulo}</h3>
-          <p>{f.texto}</p>
-          {f.correccion && <p className="pr-ronda">{f.correccion}</p>}
-          {(f.id === "alta" || f.id === "lanzamiento") && (
-            <div className="pr-disp" role="radiogroup" aria-label="Dispositivo">
-              {([["Escritorio", false], ["Celular", true]] as const).map(([t, v]) => (
-                <button key={t} type="button" role="radio" aria-checked={celular === v} className={celular === v ? "pr-chip pr-chip-on" : "pr-chip"} onClick={() => setCelular(v)}>{t}</button>
-              ))}
-            </div>
-          )}
-          {f.id === "lanzamiento" && <a className="pr-ver-sitio" href={`https://${p.dominio}`} target="_blank" rel="noopener noreferrer">Abrir {p.dominio}</a>}
-        </div>
-        <div className="pr-lienzo">
-          <AnimatePresence mode="wait">
-            <motion.div key={`${p.id}-${f.id}-${celular}`} className={`pr-esquema pr-esq-${f.id}`}
-              initial={reducir ? false : { opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={reducir ? undefined : { opacity: 0 }} transition={{ duration: 0.25 }}>
-              <Esquema fase={f.id} p={p} celular={celular} />
-            </motion.div>
-          </AnimatePresence>
-        </div>
+      <div className="pr-fase-cab">
+        <p><strong>{f.titulo}.</strong> {f.texto}</p>
+        {f.correccion && <span className="pr-ronda">{f.correccion}</span>}
+      </div>
+      <div className="pr-lienzo">
+        <AnimatePresence mode="wait">
+          <motion.div key={`${p.id}-${f.id}`} className={`pr-esquema pr-esq-${f.id}`}
+            initial={reducir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={reducir ? undefined : { opacity: 0 }} transition={{ duration: 0.22 }}>
+            <Esquema fase={f.id} p={p} />
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
-function Esquema({ fase, p, celular }: { fase: Fase; p: Proyecto; celular: boolean }) {
-  if (fase === "brief") {
+function Decisiones({ titulo, items }: { titulo: string; items: string[] }) {
+  return (
+    <aside className="pr-decide">
+      <h4>{titulo}</h4>
+      <ol>{items.map((x) => <li key={x}>{x}</li>)}</ol>
+    </aside>
+  );
+}
+
+function Esquema({ fase, p }: { fase: Fase; p: Proyecto }) {
+  if (fase === "brief") return <BriefDoc p={p} />;
+  if (fase === "mapa") {
     return (
-      <div className="pr-doc">
-        <b>Brief · {p.nombre}</b>
-        {p.brief.map((x) => <div key={x.campo} className="pr-doc-fila"><span>{x.campo}</span><p>{x.valor}</p></div>)}
+      <div className="pr-mapa">
+        <div className="pr-mapa-cab">
+          <b>Mapa del sitio · {p.nombre}</b>
+          <span>{contarPaginas(p.mapa)} páginas · {p.plataforma}</span>
+        </div>
+        <Mapa raiz={p.mapa} />
+        <div className="pr-recorrido" aria-label="Recorrido principal del visitante">
+          <small>Recorrido principal</small>
+          <ol>{p.recorrido.map((x) => <li key={x}>{x}</li>)}</ol>
+        </div>
       </div>
     );
   }
-  if (fase === "mapa") return <Mapa raiz={p.mapa} />;
   if (fase === "baja" || fase === "media") {
     return (
-      <div className={`pr-w pr-w-${fase}`} tabIndex={0} aria-label={`Página de ${p.nombre} en ${fase} fidelidad, se puede desplazar`}>
-        {p.secciones.map((s, k) => <Bloque key={k} s={s} baja={fase === "baja"} />)}
+      <div className="pr-con-lado">
+        <div className={`pr-w pr-w-${fase}`} tabIndex={0} aria-label={`Página de ${p.nombre} en ${fase} fidelidad, se puede desplazar`}>
+          {p.secciones.map((s, k) => <Bloque key={k} s={s} baja={fase === "baja"} />)}
+        </div>
+        <Decisiones titulo={fase === "baja" ? "Decidimos la estructura" : "Decidimos el contenido"} items={p.decisiones[fase]} />
       </div>
     );
   }
-  const src = celular ? p.capturas.celular : p.capturas.escritorio;
+  if (fase === "alta") {
+    return (
+      <div className="pr-con-lado">
+        <div className="pr-dos">
+          <Captura src={p.capturas.escritorio} alt={`${p.nombre} en escritorio`} />
+          <Captura src={p.capturas.celular} alt={`${p.nombre} en celular`} celular />
+        </div>
+        <aside className="pr-decide">
+          <h4>Decidimos el diseño</h4>
+          <ol>{p.decisiones.alta.map((x) => <li key={x}>{x}</li>)}</ol>
+          <div className="pr-paleta">{p.brief.identidad.colores.map((c) => <i key={c.hex} style={{ background: c.hex }} title={`${c.hex} · ${c.uso}`} />)}</div>
+          <p className="pr-tipos">{p.brief.identidad.tipografias.map((t) => t.nombre).join(" + ")}</p>
+        </aside>
+      </div>
+    );
+  }
+  return (
+    <div className="pr-con-lado">
+      <div className="pr-real">
+        <div className="pr-navegador"><i /><i /><i /><span>{p.dominio}</span><em>En línea</em></div>
+        <div className="pr-real-scroll" tabIndex={0} aria-label={`${p.nombre} publicada, se puede desplazar`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={p.capturas.escritorio} alt={`${p.nombre} publicada`} />
+        </div>
+      </div>
+      <aside className="pr-decide pr-lanza">
+        <h4>Antes de publicar revisamos</h4>
+        {LANZAMIENTO.map((g) => (
+          <div key={g.grupo}><b>{g.grupo}</b><ul>{g.items.map((x) => <li key={x}>{x}</li>)}</ul></div>
+        ))}
+        <a className="pr-ver-sitio" href={`https://${p.dominio}`} target="_blank" rel="noopener noreferrer">Abrir {p.dominio}</a>
+      </aside>
+    </div>
+  );
+}
+
+function Captura({ src, alt, celular }: { src: string; alt: string; celular?: boolean }) {
   return (
     <div className={`pr-real ${celular ? "pr-real-cel" : ""}`}>
-      {fase === "lanzamiento" && <div className="pr-navegador"><i /><i /><i /><span>{p.dominio}</span><em>En línea</em></div>}
-      <div className="pr-real-scroll" tabIndex={0} aria-label={`Diseño final de ${p.nombre}, se puede desplazar`}>
+      <div className="pr-real-scroll" tabIndex={0} aria-label={`${alt}, se puede desplazar`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={`${p.nombre} en ${celular ? "celular" : "escritorio"}`} />
+        <img src={src} alt={alt} />
       </div>
     </div>
+  );
+}
+
+const contarPaginas = (n: NodoMapa): number => 1 + (n.hijos ?? []).reduce((a, h) => a + contarPaginas(h), 0);
+
+/* El brief como documento: lo que entregamos antes de diseñar. */
+function BriefDoc({ p }: { p: Proyecto }) {
+  const b = p.brief;
+  return (
+    <article className="pr-brief" tabIndex={0} aria-label={`Brief de ${p.nombre}, se puede desplazar`}>
+      <header className="pr-brief-cab">
+        <div><small>Brief del proyecto</small><h3>{p.nombre}</h3></div>
+        <dl>
+          <div><dt>Tipo</dt><dd>{p.tipo}</dd></div>
+          <div><dt>Nivel</dt><dd>{NIVELES[p.nivel].nombre}</dd></div>
+          <div><dt>Plataforma</dt><dd>{p.plataforma}</dd></div>
+          <div><dt>Dominio</dt><dd>{p.dominio}</dd></div>
+        </dl>
+      </header>
+
+      <section className="pr-b-dos">
+        <div><h4>El negocio</h4><p>{b.negocio}</p></div>
+        <div><h4>Objetivos de la web</h4><ol className="pr-b-num">{b.objetivos.map((x) => <li key={x}>{x}</li>)}</ol></div>
+      </section>
+
+      <section>
+        <h4>A quién le hablamos</h4>
+        <div className="pr-b-personas">
+          {b.publico.map((x) => (
+            <div key={x.perfil}><strong>{x.perfil}</strong><p><span>Busca</span>{x.busca}</p><p><span>Su duda</span>{x.duda}</p></div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pr-b-dos">
+        <div><h4>Lo que nos diferencia</h4><ul className="pr-b-check">{b.diferenciales.map((x) => <li key={x}>{x}</li>)}</ul></div>
+        <div>
+          <h4>Investigación</h4>
+          <p className="pr-b-sub">Cómo los buscan en Google</p>
+          <div className="pr-b-chips">{b.investigacion.busquedas.map((x) => <span key={x}>{x}</span>)}</div>
+          <p className="pr-b-sub">Lo que encontramos</p>
+          <ul className="pr-b-lista">{b.investigacion.hallazgos.map((x) => <li key={x}>{x}</li>)}</ul>
+        </div>
+      </section>
+
+      <section>
+        <h4>Referencias del rubro</h4>
+        <div className="pr-b-refs">
+          {b.referencias.map((r) => (
+            <a key={r.dominio} href={`https://${r.dominio}`} target="_blank" rel="noopener noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={r.img} alt={`Portada de ${r.nombre}`} loading="lazy" />
+              <strong>{r.nombre}</strong><span>{r.tomamos}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section className="pr-b-dos">
+        <div>
+          <h4>Identidad</h4>
+          <div className="pr-b-colores">{b.identidad.colores.map((c) => <div key={c.hex}><i style={{ background: c.hex }} /><b>{c.hex}</b><span>{c.uso}</span></div>)}</div>
+          <div className="pr-b-tipos">{b.identidad.tipografias.map((t) => <div key={t.nombre}><b>{t.nombre}</b><span>{t.uso}</span></div>)}</div>
+        </div>
+        <div>
+          <h4>Tono de voz</h4>
+          <p>{b.identidad.tono}</p>
+          <p className="pr-b-sub">Palabras que usamos</p>
+          <div className="pr-b-chips pr-b-si">{b.identidad.si.map((x) => <span key={x}>{x}</span>)}</div>
+          <p className="pr-b-sub">Lo que evitamos</p>
+          <div className="pr-b-chips pr-b-no">{b.identidad.no.map((x) => <span key={x}>{x}</span>)}</div>
+        </div>
+      </section>
+
+      <section className="pr-b-dos">
+        <div>
+          <h4>Contenidos y quién los entrega</h4>
+          <table className="pr-b-tabla"><tbody>{b.contenidos.map((c) => <tr key={c.item}><td>{c.item}</td><td><span className={`pr-b-q pr-b-q-${c.quien}`}>{c.quien}</span></td></tr>)}</tbody></table>
+        </div>
+        <div>
+          <h4>Funciones</h4>
+          <ul className="pr-b-check">{b.funciones.map((x) => <li key={x}>{x}</li>)}</ul>
+          <h4>Cómo medimos el éxito</h4>
+          <ul className="pr-b-lista">{b.exito.map((x) => <li key={x}>{x}</li>)}</ul>
+        </div>
+      </section>
+
+      <footer className="pr-brief-pie"><b>Aprobaciones:</b> {b.aprobacion}<small>Ejemplo reconstruido a partir de la web publicada.</small></footer>
+    </article>
   );
 }
 
@@ -105,11 +237,11 @@ function Mapa({ raiz }: { raiz: NodoMapa }) {
   const ramas = raiz.hijos ?? [];
   return (
     <div className="pr-arbol">
-      <div className="pr-nodo pr-raiz">{raiz.nombre}</div>
+      <div className="pr-nodo pr-raiz">{raiz.nombre}{raiz.cta && <small>{raiz.cta}</small>}</div>
       <div className="pr-ramas" style={{ gridTemplateColumns: `repeat(${ramas.length}, minmax(0, 1fr))` }}>
         {ramas.map((r) => (
           <div key={r.nombre} className="pr-rama">
-            <div className="pr-nodo">{r.nombre}</div>
+            <div className="pr-nodo">{r.nombre}{r.cta && <small>{r.cta}</small>}</div>
             {r.hijos && <div className="pr-hijos">{r.hijos.map((h) => <div key={h.nombre} className="pr-nodo pr-hijo">{h.nombre}</div>)}</div>}
           </div>
         ))}
