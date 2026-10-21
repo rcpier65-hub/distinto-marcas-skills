@@ -34,6 +34,7 @@ import { Agenda } from "./agenda";
 import { BrandOverview } from "./brand-overview";
 import { BrandMap } from "./brand-map";
 import { AdsPanel } from "./ads-panel";
+import { Reporte360 } from "./reporte-360";
 import { designFinished } from "@/lib/estrategia/activity-status";
 import "./strategy.css";
 
@@ -348,6 +349,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
           <SocialReportView slug={brand.slug} today={b.today} brandName={brand.nombre} />
         )}
         {tab === "Mapa de marca" && <BrandMap slug={brand.slug} brandName={brand.nombre} />}
+        {tab === "Publicidad" && brand.slug === "oral-bueaty" && b.me.manager && <Reporte360 slug={brand.slug} hoy={b.today} />}
         {tab === "Publicidad" && (
           <AdsPanel slug={brand.slug} brandName={brand.nombre}
             planes={live.filter((r) => r.kind === "sheet").map((r) => ({ id: r.id, title: r.title }))} />

@@ -1198,3 +1198,26 @@
 .st-bm-table thead th{background:#f8f5fd;font-size:11.5px;font-weight:700;color:#5b3cc4;}
 .st-bm-table tbody th{font-weight:700;color:#2b2140;background:#fdfbff;white-space:nowrap;}
 .st-bm-table tr:last-child th,.st-bm-table tr:last-child td{border-bottom:0;}
+
+/* Reporte 360 Oral Beauty (21-oct-2026) */
+.st-r360 { margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
+.st-r360-head { align-items: flex-start !important; flex-wrap: wrap; }
+.st-r360-head p { max-width: 720px; margin: 4px 0 0; }
+.st-r360-mes { border: 1px solid var(--st-line, #ece8f2); border-radius: 9px; padding: 7px 10px; font: inherit; font-size: 13px; }
+.st-r360-error { display: flex; gap: 7px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 10px; background: #fef2f2; color: #b42318; font-size: 13px; }
+.st-r360-sedes { margin: 0 !important; }
+.st-r360-totales { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; }
+@media (max-width: 700px) { .st-r360-totales { grid-template-columns: 1fr; } }
+.st-r360-total { border: 1px solid #ece6f5; border-radius: 14px; padding: 14px; display: grid; gap: 10px; background: #fdfbff; }
+.st-r360-total > strong { font-size: 14px; color: #2b2140; }
+.st-r360-embudo { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-r360-embudo span { display: grid; min-width: 78px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid #efe9f7; font-size: 11px; color: #8a7f97; }
+.st-r360-embudo b { font-size: 16px; color: #2b2140; }
+.st-r360-embudo i { font-style: normal; font-weight: 700; color: #6d28d9; }
+.st-r360-costos { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #6b6380; }
+.st-r360-costos b { color: #2b2140; }
+.st-r360-sub { margin: 6px 0 0; font-size: 14px; color: #2b2140; }
+.st-r360-tabla td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.st-r360-tabla tbody th small { display: block; font-weight: 500; color: #8a7f97; font-size: 11px; }
+.st-r360-tabla tbody th em { display: inline-block; margin-top: 3px; font-style: normal; font-size: 10.5px; font-weight: 700; color: #b45309; background: #fff7e6; border-radius: 999px; padding: 1px 8px; }
+.st-r360-alerta { background: #fffbf2; }
