@@ -522,3 +522,13 @@
 .pr-x-quien b { font-family: var(--pr-display); font-size: 24px; font-weight: 600; }
 .pr-x-quien ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; font-size: 15.5px; }
 .pr-x-quien li::before { content: "✓"; color: var(--morado); font-weight: 700; margin-right: 8px; }
+
+/* Propuesta: el mismo documento A4 que Planes y Propuestas (Pedro 21-oct-2026). */
+.pr-cierre-doc { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 28px; align-items: start; max-width: none; }
+.pr-cierre-lado { display: grid; gap: 4px; }
+.pr-cierre-lado h2 { margin-bottom: 14px !important; }
+.pr-cierre-lado .pr-cierre-acciones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.pr-aviso { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: #8a5a00; background: #fff4c7; border-radius: 10px; padding: 8px 10px; }
+.pr-doc-vista { height: calc(100vh - 200px); min-height: 520px; border-radius: 16px; background: #eceaf1; padding: 14px; box-shadow: inset 0 0 0 1px var(--linea); }
+.pr-doc-vista iframe { width: 100%; height: 100%; border: 0; border-radius: 6px; background: #fff; box-shadow: 0 18px 40px -24px rgba(15, 11, 22, .5); }
+@media (max-width: 1000px) { .pr-cierre-doc { grid-template-columns: 1fr; } }

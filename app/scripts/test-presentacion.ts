@@ -23,7 +23,7 @@ console.log("✓ presentación: niveles");
 
 // Checklist, sesión y propuesta.
 import { aPropuesta, checklistInicial, CHECKLIST, FAQ, PREGUNTAS, sesionSchema, sesionVacia } from "../lib/presentacion/web";
-import { proposalSchema } from "../lib/propuestas/model";
+import { proposalSchema, readyIssues } from "../lib/propuestas/model";
 let n = 0;
 const uid = () => `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`;
 assert.ok(PREGUNTAS.length >= 10 && CHECKLIST.length >= 12 && FAQ.length >= 8);
@@ -37,7 +37,8 @@ proposalSchema.parse(pv);
 const s = sesionVacia({ nombre: "Ana", empresa: "Ferretería Sol", rubro: "Ferretería", contacto: "ana@sol.pe" });
 s.respuestas = { tipo: "tienda", pagos: true };
 s.checklist = { ...checklistInicial(s.respuestas), blog: "opcional", idiomas: "no" };
-s.notas = "Quiere vender herramientas online.";
+s.notas = "Nota interna: cliente indeciso.";
+s.textos = { objetivo: "Vender herramientas online." };
 const p = aPropuesta(s, "2026-10-21", uid);
 const base = p.services.find((x) => !x.optional)!;
 assert.equal(base.sourceId, "web-nivel-intermedio");
@@ -46,7 +47,13 @@ assert.equal(base.frequency, "unico");
 assert.match(base.scope, /Carrito/);
 assert.ok(p.services.some((x) => x.optional && /Blog/.test(x.name) && x.price === null));
 assert.ok(!p.services.some((x) => /idioma/i.test(x.name)));
-assert.match(p.objective, /vender herramientas/);
+assert.match(p.objective, /Vender herramientas/);
+assert.doesNotMatch(p.objective, /Nota interna/);
+assert.match(base.deliverables, /baja, media y alta/);
+assert.match(p.payment, /50%/);
+const conPrecio = aPropuesta({ ...s, precio: 3200 }, "2026-10-21", uid);
+assert.equal(conPrecio.services.find((x) => !x.optional)!.price, 3200);
+assert.deepEqual(readyIssues(conPrecio), []);
 assert.equal(p.client.name, "Ferretería Sol");
 assert.equal(p.client.email, "ana@sol.pe");
 proposalSchema.parse(p);
@@ -121,7 +128,7 @@ void (async () => {
   assert.equal(enlaceSeguro("hola"), null);
   assert.equal(enlaceSeguro("www.a b.com"), null);
   const conRefs = sesionSchema.parse({ cliente: { empresa: "X" }, referencias: [{ url: "apple.com", motivo: "limpia" }, { url: "", motivo: "" }] });
-  assert.match(aPropuesta(conRefs, "2026-10-21", () => "id").objective, /Webs de referencia:\n- https:\/\/apple\.com\/ — limpia/);
+  assert.match(aPropuesta(conRefs, "2026-10-21", () => "id").objective, /Webs de referencia:\n• https:\/\/apple\.com\/ — limpia/);
   assert.equal(sesionSchema.parse({}).referencias.length, 0);
   console.log("✓ presentación: webs de referencia");
 

@@ -3,13 +3,16 @@
    Etapas: portada → escuchar → cómo trabajamos → preguntas → tu web →
    propuesta. Las notas de la reunión quedan a la vista del cliente («así nos
    ordenamos»). Todo se guarda solo mientras se conversa. */
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, aPropuesta, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
 import { crearCola } from "@/lib/presentacion/cola";
+import { proposalNumber, type ProposalData } from "@/lib/propuestas/model";
+import { proposalHtml } from "@/lib/propuestas/document";
+
+const hoyLima = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
 import type { SesionGuardada } from "@/lib/presentacion/server";
 import { display, sans } from "./fuentes";
@@ -25,7 +28,8 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const [etapa, setEtapa] = useState(0);
   const [notasAbiertas, setNotasAbiertas] = useState(true);
   const [guardado, setGuardado] = useState<"ok" | "pendiente" | "error">("ok");
-  const [propuesta, setPropuesta] = useState<{ id: string; numero: number } | null>(inicial.propuestaId ? { id: inicial.propuestaId, numero: 0 } : null);
+  const [propuesta, setPropuesta] = useState<{ id: string; numero: number; revision: number; editada?: boolean } | null>(inicial.propuestaId ? { id: inicial.propuestaId, numero: 0, revision: 0 } : null);
+  const [descargando, setDescargando] = useState(false);
   const [generando, setGenerando] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const notasRef = useRef<HTMLTextAreaElement>(null);
@@ -84,22 +88,51 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
     } catch { toast.error("Tu navegador no permitió la pantalla completa."); }
   };
 
+  /* Guarda la propuesta (la crea o la actualiza con lo último de la reunión). */
+  const guardarPropuesta = async () => {
+    cola.programar(s);
+    if (!(await cola.vaciar())) throw new Error("No se pudieron guardar los últimos cambios. Revisa la conexión y vuelve a intentar.");
+    const r = await fetch("/api/presentaciones/propuesta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "No se pudo guardar la propuesta");
+    const p = { id: j.propuestaId as string, numero: j.numero as number, revision: j.revision as number, editada: !!j.editadaEnPlanes };
+    setPropuesta(p);
+    return p;
+  };
   const generar = async () => {
     setGenerando(true);
     try {
-      /* Guarda lo último antes de generar; si no se pudo, no genera con datos viejos. */
-      cola.programar(s);
-      if (!(await cola.vaciar())) throw new Error("No se pudieron guardar los últimos cambios. Revisa la conexión y vuelve a intentar.");
-      const r = await fetch("/api/presentaciones/propuesta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id }) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "No se pudo generar la propuesta");
-      setPropuesta({ id: j.propuestaId, numero: j.numero });
-      toast.success(j.existente ? "Esta reunión ya tenía su propuesta." : "Propuesta creada en Planes y Propuestas.");
-    } catch (x) { toast.error(x instanceof Error ? x.message : "No se pudo generar la propuesta"); }
+      const p = await guardarPropuesta();
+      toast.success(p.editada ? "Esta propuesta se editó en Planes; se mantiene esa versión." : `Propuesta ${proposalNumber({ numero: p.numero, data: { date: hoyLima() } as ProposalData })} guardada.`);
+    } catch (x) { toast.error(x instanceof Error ? x.message : "No se pudo guardar la propuesta"); }
     finally { setGenerando(false); }
+  };
+  /* Mismo PDF que «Descargar PDF» de Planes y Propuestas. */
+  const descargar = async () => {
+    setDescargando(true);
+    try {
+      const p = await guardarPropuesta();
+      const r = await fetch("/api/propuestas/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, revision: p.revision }) });
+      if (!r.ok || !r.headers.get("content-type")?.includes("application/pdf")) {
+        const e = await r.json().catch(() => null);
+        throw new Error(e?.error || "No se pudo generar el PDF. La propuesta quedó guardada.");
+      }
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      a.href = url; a.download = `${proposalNumber({ numero: p.numero, data: { date: hoyLima() } as ProposalData })} - ${(s.cliente.empresa || s.cliente.nombre || "Cliente").replace(/[/\\]/g, "-")}.pdf`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success("PDF descargado.");
+    } catch (x) { toast.error(x instanceof Error ? x.message : "No se pudo generar el PDF"); }
+    finally { setDescargando(false); }
   };
 
   const n = nivelDeSesion(s);
+  const numeroPropuesta = propuesta?.numero ?? 0;
+  const htmlPropuesta = useMemo(() => {
+    let k = 0;
+    const d = aPropuesta(s, hoyLima(), () => `00000000-0000-4000-8000-${String(++k).padStart(12, "0")}`);
+    return proposalHtml(d, numeroPropuesta ? proposalNumber({ numero: numeroPropuesta, data: d }) : "BORRADOR");
+  }, [s, numeroPropuesta]);
   const anim = reducir ? {} : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 }, transition: { duration: 0.32, ease: [0.2, 0.7, 0.2, 1] as const } };
 
   return (
@@ -263,36 +296,31 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
               )}
 
               {etapa === 5 && (
-                <div className="pr-cierre">
-                  <h2>Tu propuesta</h2>
-                  <div className="pr-cierre-grid">
+                <div className="pr-cierre pr-cierre-doc">
+                  <div className="pr-cierre-lado">
+                    <h2>Tu propuesta</h2>
                     <div className="pr-cierre-nivel">
                       <small>Nivel</small>
                       <strong>{n.nombre}</strong>
-                      <p>{n.resumen}</p>
                       <dl>
-                        <div><dt>Inversión de referencia</dt><dd>{n.rango}</dd></div>
+                        <div><dt>Referencia</dt><dd>{n.rango}</dd></div>
                         <div><dt>Plazo</dt><dd>{n.plazo}</dd></div>
                       </dl>
                     </div>
-                    <div>
-                      <h3>Incluye</h3>
-                      <ul className="pr-lista-check">{CHECKLIST.filter((c) => s.checklist[c.id] === "incluido").map((c) => <li key={c.id}>{c.etiqueta}</li>)}{s.extras.filter((x) => x.estado === "incluido" && x.texto.trim()).map((x, i) => <li key={`e${i}`}>{x.texto}</li>)}</ul>
-                      {(CHECKLIST.some((c) => s.checklist[c.id] === "opcional") || s.extras.some((x) => x.estado === "opcional" && x.texto.trim())) && (<>
-                        <h3>Opcionales a cotizar</h3>
-                        <ul className="pr-lista-op">{CHECKLIST.filter((c) => s.checklist[c.id] === "opcional").map((c) => <li key={c.id}>{c.etiqueta}</li>)}{s.extras.filter((x) => x.estado === "opcional" && x.texto.trim()).map((x, i) => <li key={`e${i}`}>{x.texto}</li>)}</ul>
-                      </>)}
+                    <label className="pr-x-label" htmlFor="pr-precio">Inversión acordada (S/, sin IGV)</label>
+                    <input id="pr-precio" className="pr-x-input" type="number" inputMode="decimal" min={0} step={50}
+                      placeholder={n.desde === n.hasta ? String(n.desde) : `Entre ${n.desde} y ${n.hasta}`}
+                      value={s.precio ?? ""} onChange={(e) => { const v = e.target.value; cambiar((x) => ({ ...x, precio: v === "" ? null : Math.max(0, Number(v)) })); }} />
+                    {s.precio != null && (s.precio < n.desde || s.precio > n.hasta) && <p className="pr-aviso">Fuera del rango del nivel {n.nombre} ({n.rango}).</p>}
+                    <p className="pr-quiet">Tus notas de la reunión no aparecen en el documento. Las condiciones son las de siempre: 50% al inicio y 50% contra entrega.</p>
+                    {propuesta?.editada && <p className="pr-aviso">Esta propuesta ya se editó en Planes y Propuestas: se mantiene esa versión y el PDF sale con esos cambios.</p>}
+                    <div className="pr-cierre-acciones">
+                      <button type="button" className="pr-btn pr-btn-main" onClick={descargar} disabled={descargando || generando}>{descargando ? "Generando PDF…" : "Descargar PDF"}</button>
+                      <button type="button" className="pr-btn pr-btn-ghost" onClick={generar} disabled={generando || descargando}>{generando ? "Guardando…" : propuesta ? "Actualizar propuesta" : "Guardar propuesta"}</button>
                     </div>
                   </div>
-                  <p className="pr-quiet">El monto final y las condiciones te llegan en la propuesta formal después de esta reunión.</p>
-                  <div className="pr-cierre-acciones">
-                    {propuesta ? (<>
-                      <Link className="pr-btn pr-btn-main" href={`/planes?propuesta=${propuesta.id}`}>Abrir la propuesta{propuesta.numero ? ` n.º ${propuesta.numero}` : ""}</Link>
-                      {/* Si se borró en Planes, se puede volver a generar (el servidor lo detecta). */}
-                      <button type="button" className="pr-btn pr-btn-ghost" onClick={generar} disabled={generando}>{generando ? "Revisando…" : "Volver a generar"}</button>
-                    </>) : (
-                      <button type="button" className="pr-btn pr-btn-main" onClick={generar} disabled={generando}>{generando ? "Generando…" : "Generar propuesta"}</button>
-                    )}
+                  <div className="pr-doc-vista">
+                    <iframe title="Vista previa de la propuesta" srcDoc={htmlPropuesta} sandbox="" />
                   </div>
                 </div>
               )}

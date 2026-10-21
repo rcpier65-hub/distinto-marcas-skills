@@ -195,6 +195,8 @@ export const sesionSchema = z.object({
   referencias: z.array(z.object({ url: texto(500).default(""), motivo: texto(400).default("") })).max(15).default([]),
   checklist: z.record(z.string().max(40), z.enum(["incluido", "opcional", "no"])).default({}),
   /* Lo que no está en la lista: se escribe en la reunión. */
+  /* Inversión acordada en la reunión (dentro del rango del nivel). */
+  precio: z.number().min(0).max(1000000).nullable().default(null),
   extras: z.array(z.object({ texto: texto(200).default(""), estado: z.enum(["incluido", "opcional", "no"]).default("incluido") })).max(20).default([]),
 });
 export type Sesion = z.infer<typeof sesionSchema>;
@@ -266,42 +268,63 @@ export function nivelDeSesion(s: Sesion) {
 /* Propuesta borrador: un servicio del nivel con lo incluido como alcance, y
    cada opcional como servicio opcional «a cotizar». El precio final lo fija
    Pedro en Planes y Propuestas antes de enviarla. */
+/* Entregables que acompañan a toda web de Distinto (proceso de «Cómo trabajamos»). */
+export const ENTREGABLES_WEB = [
+  "Brief del proyecto y mapa del sitio aprobados",
+  "Diseño en baja, media y alta fidelidad, con una ronda de correcciones en cada etapa",
+  "Web desarrollada, adaptada a celular y publicada en tu dominio",
+  "Pruebas de formularios, enlaces y velocidad antes de publicar",
+  "Capacitación grabada para administrarla",
+];
+
+/* Propuesta con el mismo formato que las de Planes y Propuestas: un servicio
+   del nivel con alcance, entregables y exclusiones; opcionales a cotizar;
+   forma de pago de proyecto. Las notas de la reunión no van al documento. */
 export function aPropuesta(s: Sesion, hoy: string, uid: () => string): ProposalData {
   const n = nivelDeSesion(s);
   const p = emptyProposal();
+  const empresa = s.cliente.empresa || s.cliente.nombre || "Cliente";
   const etiqueta = (id: string) => CHECKLIST.find((c) => c.id === id)?.etiqueta ?? id;
   const extras = s.extras.filter((x) => x.texto.trim());
   const incluidos = [...CHECKLIST.filter((c) => s.checklist[c.id] === "incluido").map((c) => c.etiqueta), ...extras.filter((x) => x.estado === "incluido").map((x) => x.texto.trim())];
+  const plantilla = serviceFromTemplate(n.catalogoId, uid());
+  const precio = s.precio ?? (n.desde === n.hasta ? n.desde : null);
   const base: ProposalService = {
-    ...serviceFromTemplate(n.catalogoId, uid()),
-    summary: `${n.resumen} Inversión de referencia: ${n.rango}. Plazo: ${n.plazo}`,
+    ...plantilla,
+    summary: `${n.resumen} Plazo estimado: ${n.plazo}`,
     scope: incluidos.join("\n"),
-    price: n.desde === n.hasta ? n.desde : null,
+    deliverables: ENTREGABLES_WEB.join("\n"),
+    price: precio,
     frequency: "unico",
     optional: false,
   };
-  const opcionales: ProposalService[] = Object.entries(s.checklist).filter(([, v]) => v === "opcional").map(([id]) => ({
+  const opcional = (name: string): ProposalService => ({
     ...serviceFromTemplate("personalizado", uid()),
-    name: etiqueta(id), category: "Web · opcional", summary: "Opcional a cotizar según el alcance final.",
-    frequency: "unico", optional: true, price: null,
-  }));
-  for (const x of extras.filter((e) => e.estado === "opcional")) opcionales.push({
-    ...serviceFromTemplate("personalizado", uid()),
-    name: x.texto.trim(), category: "Web · opcional", summary: "Opcional a cotizar según el alcance final.",
+    name, category: "Web · opcional", summary: "Opcional a cotizar según el alcance final.",
     frequency: "unico", optional: true, price: null,
   });
-  const respuestasTexto = PREGUNTAS.filter((q) => q.tipo === "texto" && s.textos[q.id]?.trim()).map((q) => `${q.texto} ${s.textos[q.id].trim()}`);
-  const refs = s.referencias.filter((r) => r.url.trim()).map((r) => `- ${enlaceSeguro(r.url) ?? r.url.trim()}${r.motivo.trim() ? ` — ${r.motivo.trim()}` : ""}`);
+  const opcionales = [
+    ...CHECKLIST.filter((c) => s.checklist[c.id] === "opcional").map((c) => opcional(etiqueta(c.id))),
+    ...extras.filter((e) => e.estado === "opcional").map((e) => opcional(e.texto.trim())),
+  ];
+  const t = (id: string) => s.textos[id]?.trim() ?? "";
   const plazo = PREGUNTAS.find((q) => q.id === "plazo")?.opciones?.find((o) => o.id === s.respuestas.plazo);
-  if (plazo) respuestasTexto.push(`Plazo deseado: ${plazo.etiqueta}`);
-  if (refs.length) respuestasTexto.push(`Webs de referencia:\n${refs.join("\n")}`);
+  const refs = s.referencias.filter((r) => r.url.trim()).map((r) => `• ${enlaceSeguro(r.url) ?? r.url.trim()}${r.motivo.trim() ? ` — ${r.motivo.trim()}` : ""}`);
+  const objetivo = [
+    t("objetivo") || `Diseñar y desarrollar la web de ${empresa} para presentar su negocio con claridad y convertir visitas en clientes.`,
+    t("negocio") && `Sobre el negocio: ${t("negocio")}`,
+    t("publico") && `Cliente ideal: ${t("publico")}`,
+    plazo && `Plazo deseado: ${plazo.etiqueta}.`,
+    refs.length ? `Webs de referencia:\n${refs.join("\n")}` : "",
+  ].filter(Boolean).join("\n\n");
   return {
     ...p,
-    title: `Desarrollo web · ${s.cliente.empresa || s.cliente.nombre || "Cliente"}`,
+    title: `Desarrollo web · ${empresa}`,
     date: hoy,
-    client: { ...p.client, name: s.cliente.empresa || s.cliente.nombre, contact: s.cliente.nombre, industry: s.cliente.rubro, email: s.cliente.contacto.includes("@") ? s.cliente.contacto : "", phone: s.cliente.contacto.includes("@") ? "" : s.cliente.contacto },
-    objective: [s.notas.trim(), ...respuestasTexto].filter(Boolean).join("\n\n").slice(0, 4000),
+    client: { ...p.client, name: empresa, contact: s.cliente.nombre, industry: s.cliente.rubro, email: s.cliente.contacto.includes("@") ? s.cliente.contacto : "", phone: s.cliente.contacto.includes("@") ? "" : s.cliente.contacto },
+    objective: objetivo.slice(0, 4000),
     services: [base, ...opcionales],
+    payment: "50% al inicio del proyecto y 50% contra entrega final.",
     externalCosts: "Dominio, hosting, licencias y costos de plataformas los paga el cliente directamente al proveedor.",
     status: "borrador",
   };
