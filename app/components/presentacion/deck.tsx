@@ -5,6 +5,7 @@
    ordenamos»). Todo se guarda solo mientras se conversa. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
@@ -67,6 +68,13 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
     return () => window.removeEventListener("keydown", tecla);
   }, []);
 
+  /* Salir al sistema: guarda lo pendiente, quita la pantalla completa y vuelve a la lista. */
+  const router = useRouter();
+  const salir = async () => {
+    await cola.vaciar();
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    router.push("/presentaciones");
+  };
   const pantallaCompleta = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
@@ -109,6 +117,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
           <span className={`pr-guardado pr-g-${guardado}`}>{guardado === "ok" ? "Guardado" : guardado === "pendiente" ? "Guardando…" : "Sin conexión: no se guardó"}</span>
           <button type="button" className="pr-btn pr-btn-ghost" onClick={() => setNotasAbiertas((v) => !v)} aria-pressed={notasAbiertas}>{notasAbiertas ? "Ocultar notas" : "Notas"}</button>
           <button type="button" className="pr-btn pr-btn-ghost" onClick={pantallaCompleta}>Pantalla completa</button>
+          <button type="button" className="pr-btn pr-btn-main" onClick={salir}>Salir</button>
         </div>
       </header>
 

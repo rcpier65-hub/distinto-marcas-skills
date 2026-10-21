@@ -2,8 +2,8 @@
    amarillo resaltador, tinta y crema; Fredoka para titulares, Montserrat para
    texto. Lo memorable es el medidor de nivel; lo demás, sobrio. */
 .pr, .pr-lista {
-  --morado: #ba41f7; --profundo: #7b2cbf; --amarillo: #f2cc2c; --tinta: #0f0b16; --crema: #f6f1ea;
-  --linea: #e6dccd; --suave: #5a5466; --papel: #fffdf9;
+  --morado: #ba41f7; --profundo: #7b2cbf; --amarillo: #f2cc2c; --tinta: #0f0b16; --crema: #ffffff;
+  --linea: #ebe6f2; --suave: #5a5466; --papel: #ffffff;
   font-family: var(--pr-sans), system-ui, sans-serif; color: var(--tinta);
 }
 .pr { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--crema); }
@@ -16,8 +16,8 @@
 .pr-top { display: flex; align-items: center; gap: 20px; padding: 12px 24px; border-bottom: 1px solid var(--linea); background: var(--papel); }
 .pr-etapas { display: flex; gap: 2px; margin: 0 auto; overflow-x: auto; scrollbar-width: none; }
 .pr-etapas button { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--suave); cursor: pointer; white-space: nowrap; }
-.pr-etapas button span { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; background: #eee6da; color: var(--suave); }
-.pr-etapas button.pr-on { color: var(--tinta); background: #f3ead9; }
+.pr-etapas button span { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; background: #efe9f6; color: var(--suave); }
+.pr-etapas button.pr-on { color: var(--tinta); background: #f3ebfb; }
 .pr-etapas button.pr-on span { background: var(--tinta); color: var(--amarillo); }
 .pr-top-acciones { display: flex; align-items: center; gap: 8px; }
 .pr-guardado { font-size: 11.5px; color: var(--suave); white-space: nowrap; }
@@ -33,16 +33,22 @@
 /* Cuerpo: escena + notas */
 .pr-cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
 .pr-cuerpo.pr-sin-notas { grid-template-columns: minmax(0, 1fr); }
-.pr-escena { min-height: 0; display: flex; flex-direction: column; }
+.pr-escena { min-height: 0; display: flex; flex-direction: column;
+  /* Patrón de marca de distintostudio.com: anillos morados, luz amarilla y retícula de puntos. */
+  background-color: #fff;
+  background-image: radial-gradient(ellipse at 100% 0%, transparent 0 105px, rgba(165, 43, 227, .12) 106px 108px, transparent 109px 138px, rgba(165, 43, 227, .075) 139px 141px, transparent 142px),
+    radial-gradient(ellipse at 0% 100%, rgba(242, 204, 44, .12), transparent 44%),
+    radial-gradient(circle at 1px 1px, rgba(116, 54, 148, .13) 1px, transparent 1.5px);
+  background-size: auto, auto, 28px 28px; background-repeat: no-repeat, no-repeat, repeat; }
 .pr-etapa { flex: 1; min-height: 0; overflow-y: auto; padding: 40px clamp(24px, 5vw, 72px); }
 .pr-etapa h2 { font-size: clamp(28px, 3.2vw, 42px); line-height: 1.1; margin-bottom: 28px; max-width: 22ch; }
-.pr-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px clamp(24px, 5vw, 72px); border-top: 1px solid var(--linea); font-size: 12.5px; color: var(--suave); }
+.pr-nav { background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px clamp(24px, 5vw, 72px); border-top: 1px solid var(--linea); font-size: 12.5px; color: var(--suave); }
 .pr-quiet { color: var(--suave); font-size: 13.5px; }
 
 .pr-notas { border-left: 1px solid var(--linea); background: var(--papel); display: flex; flex-direction: column; padding: 24px 22px; gap: 10px; min-height: 0; }
 .pr-notas h2 { font-size: 20px; }
 .pr-notas-cliente { margin: 0; font-size: 12.5px; color: var(--suave); }
-.pr-guia { border: 1px solid var(--linea); border-radius: 12px; background: #fffdf8; padding: 8px 10px; max-height: 38%; overflow: auto; flex-shrink: 0; }
+.pr-guia { border: 1px solid var(--linea); border-radius: 12px; background: #faf7fd; padding: 8px 10px; max-height: 38%; overflow: auto; flex-shrink: 0; }
 .pr-guia summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--tinta); list-style: none; }
 .pr-guia summary::-webkit-details-marker { display: none; }
 .pr-guia summary::after { content: "–"; float: right; color: var(--suave); }
@@ -50,11 +56,11 @@
 .pr-guia ul { list-style: none; margin: 8px 0 2px; padding: 0; display: grid; gap: 4px; }
 .pr-guia button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; font-size: 13px; line-height: 1.35; color: var(--tinta); padding: 6px 8px 6px 22px; border-radius: 8px; position: relative; }
 .pr-guia button::before { content: "+"; position: absolute; left: 8px; color: #7c3aed; font-weight: 700; }
-.pr-guia button:hover, .pr-guia button:focus-visible { background: #f4ecdf; }
+.pr-guia button:hover, .pr-guia button:focus-visible { background: #f3ecfa; }
 .pr-guia button:focus-visible { outline: 2px solid #7c3aed; outline-offset: 1px; }
 .pr-guia .pr-guia-hecha { color: var(--suave); text-decoration: line-through; cursor: default; }
 .pr-guia .pr-guia-hecha::before { content: "✓"; color: #16a34a; }
-.pr-notas textarea { flex: 1; min-height: 160px; resize: none; border: 0; outline: 0; font: 14px/26px var(--pr-sans), sans-serif; color: var(--tinta); padding: 2px 4px; background: repeating-linear-gradient(transparent 0 25px, #ece3d4 25px 26px); }
+.pr-notas textarea { flex: 1; min-height: 160px; resize: none; border: 0; outline: 0; font: 14px/26px var(--pr-sans), sans-serif; color: var(--tinta); padding: 2px 4px; background: repeating-linear-gradient(transparent 0 25px, #eee8f5 25px 26px); }
 .pr-notas-nivel { border-top: 1px solid var(--linea); padding-top: 12px; display: grid; gap: 2px; }
 .pr-notas-nivel small { font-size: 11.5px; color: var(--suave); }
 .pr-notas-nivel strong { font-family: var(--pr-display); font-size: 22px; }
@@ -86,7 +92,7 @@
 .pr-enlace-abrir { align-self: center; font-size: 13px; font-weight: 700; color: #7c3aed; text-decoration: underline; text-underline-offset: 3px; }
 .pr-enlace-off { color: var(--suave); text-decoration: none; opacity: .5; }
 .pr-enlace-quitar { all: unset; cursor: pointer; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; font-size: 18px; color: var(--suave); }
-.pr-enlace-quitar:hover, .pr-enlace-quitar:focus-visible { background: #f4ecdf; color: var(--tinta); }
+.pr-enlace-quitar:hover, .pr-enlace-quitar:focus-visible { background: #f3ecfa; color: var(--tinta); }
 .pr-enlace-viejo { margin: 0; font-size: 13px; color: var(--suave); white-space: pre-wrap; }
 @media (max-width: 760px) { .pr-pregunta { grid-template-columns: 1fr; } }
 
@@ -94,7 +100,7 @@
 .pr-proceso { max-width: 1180px; }
 .pr-fases { list-style: none; margin: 0 0 28px; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .pr-fases button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; border-radius: 14px; border: 1.5px solid var(--linea); background: var(--papel); font-size: 13.5px; font-weight: 700; cursor: pointer; text-align: left; color: var(--tinta); }
-.pr-fases button span { font-family: var(--pr-display); font-size: 22px; color: #c8bba7; }
+.pr-fases button span { font-family: var(--pr-display); font-size: 22px; color: #c9bcd9; }
 .pr-fases button.pr-hecha span { color: var(--profundo); }
 .pr-fases button.pr-on { border-color: var(--tinta); background: var(--tinta); color: #fff; }
 .pr-fases button.pr-on span { color: var(--amarillo); }
@@ -104,10 +110,10 @@
 .pr-fase-texto h3 { font-size: 30px; margin-bottom: 12px; }
 .pr-fase-texto p { margin: 0; font-size: 16px; line-height: 1.6; color: var(--suave); }
 .pr-fase-texto .pr-ronda { margin-top: 16px; display: inline-block; font-size: 13.5px; font-weight: 700; color: var(--tinta); background: var(--amarillo); border-radius: 8px; padding: 6px 10px; }
-.pr-lienzo { min-height: 460px; border-radius: 20px; background: #efe6d8; padding: 24px; display: flex; align-items: center; justify-content: center; }
+.pr-lienzo { min-height: 460px; border-radius: 20px; background: #f5f0fa; padding: 24px; display: flex; align-items: center; justify-content: center; }
 .pr-esquema { width: 100%; max-width: 760px; }
 
-.pr-doc { background: #fff; border-radius: 6px; padding: 26px 30px; box-shadow: 0 1px 0 #d9ccb7, 0 18px 30px -24px rgba(15, 11, 22, .5); display: grid; gap: 14px; }
+.pr-doc { background: #fff; border-radius: 6px; padding: 26px 30px; box-shadow: 0 1px 0 #e3dbee, 0 18px 30px -24px rgba(15, 11, 22, .5); display: grid; gap: 14px; }
 .pr-doc b { font-family: var(--pr-display); font-size: 20px; }
 .pr-doc-fila { display: grid; grid-template-columns: 120px 1fr; gap: 6px 14px; font-size: 12.5px; font-weight: 700; color: var(--profundo); }
 .pr-doc-fila p { margin: 0; font-size: 13.5px; font-weight: 500; line-height: 1.5; color: var(--tinta); }
@@ -131,10 +137,10 @@
 
 /* Wireframes (baja y media) */
 .pr-w { background: #fff; border-radius: 10px; max-height: 520px; overflow: auto; box-shadow: 0 18px 34px -24px rgba(15, 11, 22, .55); color: #3d3a42; font-size: 12px; }
-.pr-w-bloque { position: relative; border-bottom: 1px solid #efebe5; padding: 16px 20px; }
-.pr-w-baja .pr-w-bloque { border-bottom: 1.5px dashed #d6cfc4; }
+.pr-w-bloque { position: relative; border-bottom: 1px solid #efedf2; padding: 16px 20px; }
+.pr-w-baja .pr-w-bloque { border-bottom: 1.5px dashed #d8d4de; }
 .pr-w-nombre { position: absolute; top: 6px; right: 8px; font-size: 10.5px; font-weight: 700; color: var(--profundo); background: #f4ecff; border-radius: 6px; padding: 2px 7px; z-index: 1; }
-.pr-w-l { display: block; height: 9px; border-radius: 4px; background: #dcd6cd; margin: 5px 0; }
+.pr-w-l { display: block; height: 9px; border-radius: 4px; background: #dddae2; margin: 5px 0; }
 .pr-w-l.pr-w-h1 { height: 18px; width: 80%; }
 .pr-w-l.pr-w-h2 { height: 13px; width: 55%; }
 .pr-w-l.pr-w-p { width: 90%; }
@@ -149,16 +155,16 @@
 .pr-w .pr-w-xs { font-size: 11px; line-height: 1.35; }
 .pr-w .pr-w-fuerte { font-weight: 700; margin-top: 4px; }
 .pr-w .pr-w-eti { font-size: 10px; letter-spacing: .04em; color: #8a8492; }
-.pr-w-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 84px; height: 26px; padding: 0 12px; border-radius: 7px; background: #cfc9c0; font-style: normal; font-size: 11px; font-weight: 700; color: #2b2930; margin-top: 6px; }
+.pr-w-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 84px; height: 26px; padding: 0 12px; border-radius: 7px; background: #d0cdd6; font-style: normal; font-size: 11px; font-weight: 700; color: #2b2930; margin-top: 6px; }
 .pr-w-btn-s { min-width: 54px; height: 22px; font-size: 10px; }
-.pr-w-baja .pr-w-btn { background: transparent; border: 1.5px dashed #b9b2a7; }
-.pr-w-img { width: 100%; aspect-ratio: 4 / 3; border-radius: 7px; background: #e6e1d9; }
-.pr-w-baja .pr-w-img { background: linear-gradient(to top right, transparent calc(50% - 1px), #cfc8bd 50%, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #cfc8bd 50%, transparent calc(50% + 1px)); border: 1.5px dashed #c9c1b5; }
-.pr-w-t-aviso { padding: 6px 20px; background: #e9e5df; }
+.pr-w-baja .pr-w-btn { background: transparent; border: 1.5px dashed #bab6c2; }
+.pr-w-img { width: 100%; aspect-ratio: 4 / 3; border-radius: 7px; background: #e8e6ec; }
+.pr-w-baja .pr-w-img { background: linear-gradient(to top right, transparent calc(50% - 1px), #cfccd6 50%, transparent calc(50% + 1px)), linear-gradient(to top left, transparent calc(50% - 1px), #cfccd6 50%, transparent calc(50% + 1px)); border: 1.5px dashed #c9c5d0; }
+.pr-w-t-aviso { padding: 6px 20px; background: #eae8ee; }
 .pr-w-aviso { text-align: center; }
 .pr-w-baja .pr-w-aviso .pr-w-l { margin: 3px auto; width: 50%; }
 .pr-w-menu { display: flex; align-items: center; gap: 14px; }
-.pr-w-menu b { min-width: 64px; height: 14px; border-radius: 4px; background: #d9d4cc; font-size: 13px; }
+.pr-w-menu b { min-width: 64px; height: 14px; border-radius: 4px; background: #dbd8e0; font-size: 13px; }
 .pr-w-media .pr-w-menu b { background: none; }
 .pr-w-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-left: auto; }
 .pr-w-baja .pr-w-links .pr-w-l { width: 34px; margin: 0; }
@@ -171,28 +177,28 @@
 .pr-w-fondo .pr-w-hero-txt { position: relative; padding: 14px; max-width: 70%; }
 .pr-w-split { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: center; }
 .pr-w-grid { display: grid; gap: 12px; margin-top: 8px; }
-.pr-w-t-motivos { background: #ebe7e1; }
+.pr-w-t-motivos { background: #ecebef; }
 .pr-w-motivos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center; }
-.pr-w-baja .pr-w-t-motivos { background: repeating-linear-gradient(45deg, #f4f1ec 0 8px, #ece8e2 8px 16px); }
+.pr-w-baja .pr-w-t-motivos { background: repeating-linear-gradient(45deg, #f4f3f6 0 8px, #eceaef 8px 16px); }
 .pr-w-pila { display: grid; gap: 8px; }
 .pr-w-pila > div { background: #fff; border-radius: 7px; padding: 8px 10px; }
 .pr-w-logos { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 8px; }
-.pr-w-logos i { height: 26px; border-radius: 6px; background: #e6e1d9; }
-.pr-w-cita { border: 1px solid #ebe6df; border-radius: 8px; padding: 10px; text-align: left; }
-.pr-w-avatar { display: block; width: 24px; height: 24px; border-radius: 50%; background: #dcd6cd; margin-bottom: 6px; }
+.pr-w-logos i { height: 26px; border-radius: 6px; background: #e8e6ec; }
+.pr-w-cita { border: 1px solid #ebe9ef; border-radius: 8px; padding: 10px; text-align: left; }
+.pr-w-avatar { display: block; width: 24px; height: 24px; border-radius: 50%; background: #dddae2; margin-bottom: 6px; }
 .pr-w-faq { display: grid; gap: 6px; margin-top: 6px; }
-.pr-w-faq > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #ebe6df; border-radius: 7px; padding: 7px 10px; }
+.pr-w-faq > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #ebe9ef; border-radius: 7px; padding: 7px 10px; }
 .pr-w-form { display: grid; gap: 6px; }
-.pr-w-form > div { border: 1px solid #ddd6cc; border-radius: 6px; padding: 6px 8px; min-height: 26px; }
+.pr-w-form > div { border: 1px solid #dedbe3; border-radius: 6px; padding: 6px 8px; min-height: 26px; }
 .pr-w-mosaico { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-auto-rows: 70px; gap: 8px; margin-top: 10px; text-align: left; }
-.pr-w-mosaico > div { background: #e6e1d9; border-radius: 6px; display: flex; align-items: flex-end; padding: 6px 8px; }
+.pr-w-mosaico > div { background: #e8e6ec; border-radius: 6px; display: flex; align-items: flex-end; padding: 6px 8px; }
 .pr-w-mosaico > .pr-w-larga { grid-row: span 2; }
-.pr-w-baja .pr-w-mosaico > div { background: transparent; border: 1.5px dashed #c9c1b5; }
-.pr-w-prod { border: 1px solid #ebe6df; border-radius: 8px; padding: 8px; text-align: left; display: grid; gap: 3px; }
+.pr-w-baja .pr-w-mosaico > div { background: transparent; border: 1.5px dashed #c9c5d0; }
+.pr-w-prod { border: 1px solid #ebe9ef; border-radius: 8px; padding: 8px; text-align: left; display: grid; gap: 3px; }
 .pr-w-prod s { color: #9a94a2; }
 .pr-w-cats { display: grid; gap: 8px; margin-top: 8px; }
 .pr-w-pie { display: grid; gap: 14px; }
-.pr-w-media .pr-w-t-pie { background: #f1eee9; }
+.pr-w-media .pr-w-t-pie { background: #f2f1f4; }
 
 /* Alta y lanzamiento: la web real */
 .pr-real { border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 18px 34px -24px rgba(15, 11, 22, .55); }
@@ -201,8 +207,8 @@
 .pr-real-cel { width: 300px; margin: 0 auto; border: 8px solid var(--tinta); border-radius: 34px; }
 .pr-real-cel .pr-real-scroll { max-height: 560px; }
 @media (max-width: 760px) { .pr-w-split, .pr-w-lado, .pr-w-motivos { grid-template-columns: 1fr; } .pr-w-logos { grid-template-columns: repeat(3, 1fr); } }
-.pr-navegador { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #f1ece4; font-size: 11.5px; color: var(--suave); }
-.pr-navegador i { width: 9px; height: 9px; border-radius: 50%; background: #d8cdbd; }
+.pr-navegador { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #f2eef7; font-size: 11.5px; color: var(--suave); }
+.pr-navegador i { width: 9px; height: 9px; border-radius: 50%; background: #d9d0e4; }
 .pr-navegador span { margin-left: 8px; background: #fff; border-radius: 6px; padding: 3px 10px; }
 .pr-navegador em { margin-left: auto; font-style: normal; font-weight: 700; color: #1a7f45; }
 /* Baja: solo estructura con borde punteado. */
