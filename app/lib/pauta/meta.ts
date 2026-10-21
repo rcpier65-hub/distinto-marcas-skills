@@ -6,6 +6,7 @@ import { brandBinding, metaAccessToken } from "@/lib/meta-mcp/server";
 import { StrategyError } from "@/lib/estrategia/access";
 import { reportPeriod, addDays } from "@/lib/social-reports/model";
 import { todayLima } from "@/lib/estrategia/model";
+import { presupuestoDelMes } from "./historial";
 import { alertas, metricas, num, ritmo, type Anuncio, type ConfigPauta, type Metricas, type Alerta } from "./model";
 
 type J = Record<string, unknown>;
@@ -57,7 +58,7 @@ export async function consultarPauta(brandId: string, config: ConfigPauta): Prom
     graph(`act_${id}/insights`, { fields: CAMPOS, level: "account", time_range: actualRango }, token),
     p.previous.days ? graph(`act_${id}/insights`, { fields: CAMPOS, level: "account", time_range: rango(p.previous.start, p.previous.end) }, token) : Promise.resolve({ data: [] }),
     graph(`act_${id}/ads`, {
-      fields: `id,name,effective_status,campaign{name,objective,daily_budget},adset{name,daily_budget},creative{thumbnail_url,title,body},ad_review_feedback,insights.time_range(${actualRango}){${CAMPOS}}`,
+      fields: `id,name,effective_status,campaign{name,objective,daily_budget},adset{name,daily_budget},creative.thumbnail_width(720).thumbnail_height(720){thumbnail_url,image_url,title,body,instagram_permalink_url,effective_object_story_id},ad_review_feedback,insights.time_range(${actualRango}){${CAMPOS}}`,
       filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ESTADOS }]),
       limit: "60",
     }, token),
@@ -76,7 +77,10 @@ export async function consultarPauta(brandId: string, config: ConfigPauta): Prom
       id: String(a.id), nombre: String(a.name ?? "Anuncio"), estado: String(a.effective_status ?? ""),
       campana: String(camp.name ?? ""), conjunto: String(set.name ?? ""), objetivo: typeof camp.objective === "string" ? camp.objective : null,
       presupuestoDiario: moneda(set.daily_budget) ?? moneda(camp.daily_budget),
-      miniatura: typeof cr.thumbnail_url === "string" ? cr.thumbnail_url : null,
+      /* image_url es la imagen original; thumbnail_url (pedido a 720 px) cubre videos y carruseles. */
+      miniatura: typeof cr.image_url === "string" ? cr.image_url : typeof cr.thumbnail_url === "string" ? cr.thumbnail_url : null,
+      enlace: typeof cr.instagram_permalink_url === "string" ? cr.instagram_permalink_url
+        : typeof cr.effective_object_story_id === "string" ? `https://www.facebook.com/${cr.effective_object_story_id}` : null,
       titulo: typeof cr.title === "string" ? cr.title : null,
       texto: typeof cr.body === "string" ? cr.body.slice(0, 400) : null,
       motivoRechazo: motivo,
@@ -84,7 +88,9 @@ export async function consultarPauta(brandId: string, config: ConfigPauta): Prom
     };
   }).sort((x, y) => (y.mes.gasto ?? 0) - (x.mes.gasto ?? 0));
 
-  const r = ritmo(actual.gasto, config.presupuestoMensual, hoy);
+  /* El presupuesto vive en el historial mensual (pauta_mensual), compartido con Reportes. */
+  const presupuesto = (await presupuestoDelMes(brandId, p.month)) ?? config.presupuestoMensual;
+  const r = ritmo(actual.gasto, presupuesto, hoy);
   return {
     cuenta: { id, nombre: String(cuenta.name ?? "Cuenta publicitaria"), moneda: String(cuenta.currency ?? ""), estado: num(cuenta.account_status) },
     periodo: { mes: p.month, desde: p.current.start, hasta: addDays(p.current.end, -1), anteriorDesde: p.previous.start, anteriorHasta: addDays(p.previous.end, -1), parcial: p.partial },

@@ -8,6 +8,8 @@ import { z } from "zod";
 import { actor, brandAccess, failure, StrategyError, type Actor } from "@/lib/estrategia/access";
 import { configSchema } from "@/lib/pauta/model";
 import { consultarPauta } from "@/lib/pauta/meta";
+import { actualizarHistorial, guardarPresupuesto, presupuestoDelMes } from "@/lib/pauta/historial";
+import { todayLima } from "@/lib/estrategia/model";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,8 +29,11 @@ async function estado(a: Actor, marcaId: string) {
   ]);
   if (p.error || b.error) throw new Error((p.error ?? b.error)!.message);
   const yo = (a.member as { id?: string } | null)?.id ?? null;
+  /* El presupuesto que se muestra es el del mes actual en el historial (Reportes). */
+  const config = configSchema.parse(p.data?.config ?? {});
+  config.presupuestoMensual = (await presupuestoDelMes(marcaId, todayLima().slice(0, 7))) ?? config.presupuestoMensual;
   return {
-    config: configSchema.parse(p.data?.config ?? {}),
+    config,
     datos: p.data?.datos ?? null,
     datosAt: p.data?.datos_at ?? null,
     datosPor: p.data?.datos_por ?? null,
@@ -37,13 +42,17 @@ async function estado(a: Actor, marcaId: string) {
   };
 }
 
-async function actualizar(a: Actor, marcaId: string, config: z.infer<typeof configSchema>) {
+async function actualizar(a: Actor, marcaId: string, config: z.infer<typeof configSchema>): Promise<string | null> {
   const datos = await consultarPauta(marcaId, config);
+  /* También guarda el historial mensual que se ve en Reportes. */
+  let aviso: string | null = null;
+  try { await actualizarHistorial(marcaId, config.resultado); } catch (e) { aviso = `El panel se actualizó, pero no el historial mensual: ${e instanceof Error ? e.message : "error"}`; }
   const { error } = await a.service.from("marca_pauta").upsert({
     marca_id: marcaId, config, datos, datos_at: datos.consultado,
     datos_por: (a.member as { nombre?: string } | null)?.nombre ?? null, updated_at: new Date().toISOString(),
   });
   if (error) throw new Error(error.message);
+  return aviso;
 }
 
 export async function GET(req: Request) {
@@ -66,15 +75,18 @@ export async function POST(req: Request) {
 
     if (q.accion === "actualizar") {
       const { data } = await db.from("marca_pauta").select("config").eq("marca_id", brand.id).maybeSingle();
-      await actualizar(a, brand.id, configSchema.parse(data?.config ?? {}));
+      aviso = await actualizar(a, brand.id, configSchema.parse(data?.config ?? {}));
     }
 
     if (q.accion === "config") {
       if (!a.manager) throw new StrategyError("Solo dirección puede cambiar el presupuesto y las metas.", 403);
-      const { error } = await db.from("marca_pauta").upsert({ marca_id: brand.id, config: q.config, updated_at: new Date().toISOString() });
+      /* El presupuesto se guarda en el historial del mes actual (lo comparte Reportes). */
+      await guardarPresupuesto(brand.id, todayLima().slice(0, 7), q.config.presupuestoMensual);
+      const config = { ...q.config, presupuestoMensual: null };
+      const { error } = await db.from("marca_pauta").upsert({ marca_id: brand.id, config, updated_at: new Date().toISOString() });
       if (error) throw new Error(error.message);
       /* Recalcula con la nueva configuración; si Meta falla, la configuración queda guardada igual. */
-      try { await actualizar(a, brand.id, q.config); } catch (e) { aviso = `Configuración guardada. ${e instanceof Error ? e.message : ""} Toca «Actualizar» más tarde.`; }
+      try { aviso = await actualizar(a, brand.id, config); } catch (e) { aviso = `Configuración guardada. ${e instanceof Error ? e.message : ""} Toca «Actualizar» más tarde.`; }
     }
 
     if (q.accion === "nota") {

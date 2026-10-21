@@ -85,6 +85,8 @@ export type Anuncio = {
   id: string; nombre: string; estado: string; campana: string; conjunto: string; objetivo: string | null;
   presupuestoDiario: number | null; miniatura: string | null; texto: string | null; titulo: string | null;
   motivoRechazo: string | null; mes: Metricas;
+  /* Enlace a la publicación (Instagram o Facebook), si Meta lo entrega. */
+  enlace?: string | null;
 };
 export type Alerta = { nivel: "alta" | "media"; texto: string };
 

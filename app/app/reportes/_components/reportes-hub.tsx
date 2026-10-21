@@ -11,6 +11,8 @@ import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { EditorMes } from './editor-mes'
 import { EditorDirecto } from './editor-directo'
 import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
+import { PautaHistorial } from '@/components/reportes/pauta-historial'
+import type { MesPauta } from '@/lib/pauta/historial'
 
 /* Marcas con reporte DIRECTO automático (Shopify + Facebook). */
 const DIRECTO = new Set(['little-joe'])
@@ -18,7 +20,12 @@ const DIRECTO = new Set(['little-joe'])
 export type ReporteHubItem = { slug: string; nombre: string; meses: MesReporte[] }
 export type MarcaChip = { slug: string; nombre: string; emoji: string | null }
 
-export function ReportesHub({ reportes, marcas }: { reportes: ReporteHubItem[]; marcas: MarcaChip[] }) {
+export function ReportesHub({ reportes: conReporte, marcas, pauta = {}, mesActual }: { reportes: ReporteHubItem[]; marcas: MarcaChip[]; pauta?: Record<string, MesPauta[]>; mesActual: string }) {
+  /* Las marcas que solo tienen historial de publicidad también aparecen como tarjeta. */
+  const reportes: ReporteHubItem[] = [
+    ...conReporte,
+    ...marcas.filter((m) => pauta[m.slug]?.length && !conReporte.some((r) => r.slug === m.slug)).map((m) => ({ slug: m.slug, nombre: m.nombre, meses: [] as MesReporte[] })),
+  ]
   const [slug, setSlug] = useState(reportes[0]?.slug ?? marcas[0]?.slug ?? '')
   const [menu, setMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -50,7 +57,7 @@ export function ReportesHub({ reportes, marcas }: { reportes: ReporteHubItem[]; 
               <MarcaLogo slug={r.slug} nombre={r.nombre} emoji={emoji(r.slug)} size={40} />
               <span>
                 <span className="block text-[14px] font-bold text-slate-900">{r.nombre}</span>
-                <span className="block text-[12px] text-slate-500">{r.meses.length} meses{ultimo ? ` · hasta ${labelMes(ultimo)}` : ''}</span>
+                <span className="block text-[12px] text-slate-500">{r.meses.length ? `${r.meses.length} meses${ultimo ? ` · hasta ${labelMes(ultimo)}` : ''}` : 'Publicidad'}</span>
               </span>
               {activa && <span className="absolute top-2 right-2 w-4 h-4 rounded-full inline-flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}><Check className="w-2.5 h-2.5" strokeWidth={3.5} /></span>}
             </button>
@@ -88,7 +95,7 @@ export function ReportesHub({ reportes, marcas }: { reportes: ReporteHubItem[]; 
       </div>
 
       <div key={slug} className="space-y-6 rep-marca">
-        {sel
+        {sel && sel.meses.length
           ? <ReporteMarcaView nombre={sel.nombre} meses={sel.meses} />
           : (
             <div className="rounded-[20px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
@@ -96,6 +103,7 @@ export function ReportesHub({ reportes, marcas }: { reportes: ReporteHubItem[]; 
               <div className="text-[13px] text-slate-500 mt-1">Cárgale su primer mes abajo y su reporte aparece al instante (también en su portal).</div>
             </div>
           )}
+        <PautaHistorial key={`pauta-${slug}`} slug={slug} meses={pauta[slug] ?? []} mesActual={mesActual} />
         {DIRECTO.has(slug)
           ? <EditorDirecto marcaSlug={slug} meses={sel?.meses ?? []} />
           : <EditorMes marcaSlug={slug} marcaNombre={nombreSel} meses={sel?.meses ?? []} />}

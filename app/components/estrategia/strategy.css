@@ -1129,3 +1129,22 @@
 .st-ads-log-text small{color:#8a7f97;}
 .st-ads .st-mt-add{display:flex;gap:8px;}
 .st-ads .st-mt-add input{flex:1;min-width:0;border:1px solid #e8e3ef;border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit;outline:none;}
+.st-workspace .st-ad-eye,.st-ad-eye{position:absolute;top:8px;right:8px;width:34px;height:34px;padding:0!important;border-radius:999px!important;border:0!important;background:rgba(255,255,255,.95)!important;color:#5b3cc4;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;}
+.st-workspace .st-ad-eye:hover{background:#fff!important;color:#3f2a96;transform:scale(1.06);}
+.st-ad-thumb img{transition:transform .25s;}.st-ad:hover .st-ad-thumb img{transform:scale(1.03);}
+.st-ad-nospend{margin:4px 0 0;padding-top:8px;border-top:1px solid #f1ecf7;font-size:11.5px;color:#8a7f97;}
+.st-ad-view{display:flex;flex-direction:column;gap:12px;width:min(860px,90vw);}
+.st-ad-formats{margin:0!important;}
+.st-ad-view-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start;}
+@media (max-width:760px){.st-ad-view-grid{grid-template-columns:1fr;}}
+.st-ad-frame{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:480px;border-radius:14px;background:#f4f0fa;overflow:hidden;}
+.st-ad-frame iframe{width:100%;height:600px;border:0;background:#fff;}
+.st-ad-frame img{max-width:100%;max-height:520px;object-fit:contain;}
+.st-ad-frame small{font-size:12px;color:#8a7f97;padding:0 12px;text-align:center;}
+.st-ad-view-info{display:flex;flex-direction:column;gap:8px;min-width:0;}
+.st-ad-view-info>small{font-size:11.5px;color:#8a7f97;}
+.st-ad-view-info strong{font-size:15px;color:#2b2140;}
+.st-ad-view-info p{margin:0;font-size:13px;line-height:1.55;color:#3f3753;white-space:pre-wrap;}
+.st-ad-view-info dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0;padding:10px;border-radius:12px;background:#faf7ff;}
+.st-ad-view-info dt{font-size:10.5px;color:#8a7f97;}.st-ad-view-info dd{margin:0;font-size:13.5px;font-weight:700;color:#2b2140;}
+.st-ad-view-info a{display:inline-flex;align-items:center;gap:6px;color:#5b3cc4;font-weight:600;font-size:13px;}

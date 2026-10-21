@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, FileText, History, ImageOff, Megaphone, RefreshCw, Settings2, Target, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, ExternalLink, Eye, FileText, History, ImageOff, Megaphone, RefreshCw, Settings2, Target, Trash2 } from "lucide-react";
 import { Modal, PrettyDate } from "./common";
 import { MetaLogo } from "./social-icons";
 import { RESULTADOS, type ConfigPauta, type Metricas, type Resultado, type Anuncio, type Alerta } from "@/lib/pauta/model";
@@ -37,6 +37,7 @@ export function AdsPanel({ slug, brandName, planes }: { slug: string; brandName:
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [config, setConfig] = useState(false);
   const [nota, setNota] = useState("");
+  const [viendo, setViendo] = useState<Anuncio | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -69,7 +70,8 @@ export function AdsPanel({ slug, brandName, planes }: { slug: string; brandName:
   const din = (v: number | null, dec = 2) => v === null || !d ? "—" : new Intl.NumberFormat("es-PE", { style: "currency", currency: d.cuenta.moneda || "USD", maximumFractionDigits: dec }).format(v);
   const ent = (v: number | null) => v === null ? "—" : new Intl.NumberFormat("es-PE", { maximumFractionDigits: 0 }).format(v);
   const pct = (v: number | null) => v === null ? "—" : `${v.toFixed(2)}%`;
-  const activos = d?.anuncios.filter((a) => a.estado === "ACTIVE").length ?? 0;
+  /* Solo se listan los anuncios activos; rechazados y con problemas quedan en las alertas. */
+  const activos = d?.anuncios.filter((a) => a.estado === "ACTIVE") ?? [];
   const fechaCorta = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString("es-PE", { day: "numeric", month: "short" });
 
   return (
@@ -131,10 +133,10 @@ export function AdsPanel({ slug, brandName, planes }: { slug: string; brandName:
           </section>
 
           <section className="st-card">
-            <div className="st-row"><h3><MetaLogo size={16} /> Anuncios en Meta</h3><span className="st-ads-count">{activos} activo{activos === 1 ? "" : "s"} · {d.anuncios.length} en total</span></div>
-            {d.anuncios.length ? (
+            <div className="st-row"><h3><MetaLogo size={16} /> Anuncios en Meta</h3><span className="st-ads-count">{activos.length} activo{activos.length === 1 ? "" : "s"}</span></div>
+            {activos.length ? (
               <div className="st-ads-grid">
-                {d.anuncios.map((a) => {
+                {activos.map((a) => {
                   const est = ESTADO_ANUNCIO[a.estado] ?? { texto: a.estado, clase: "" };
                   return (
                     <article key={a.id} className="st-ad">
@@ -144,25 +146,26 @@ export function AdsPanel({ slug, brandName, planes }: { slug: string; brandName:
                           <img src={a.miniatura} alt="" loading="lazy" referrerPolicy="no-referrer" />
                         ) : <ImageOff size={20} />}
                         <span className={`st-ad-state ${est.clase}`}>{est.texto}</span>
+                        <button type="button" className="st-ad-eye" onClick={() => setViendo(a)} aria-label={`Ver anuncio ${a.nombre}`} title="Ver anuncio"><Eye size={16} /></button>
                       </div>
                       <div className="st-ad-body">
                         <strong title={a.nombre}>{a.nombre}</strong>
                         <small title={`${a.campana} › ${a.conjunto}`}>{a.campana} › {a.conjunto}</small>
                         {a.texto && <p className="st-ad-copy">{a.texto}</p>}
                         {a.motivoRechazo && <p className="st-ad-reject">{a.motivoRechazo}</p>}
-                        <dl>
+                        {a.mes.gasto === null ? <p className="st-ad-nospend">Sin gasto este mes todavía.</p> : <dl>
                           <div><dt>Gasto mes</dt><dd>{din(a.mes.gasto)}</dd></div>
                           <div><dt>{res.etiqueta}</dt><dd>{ent(a.mes.resultados)}</dd></div>
                           <div><dt>Costo</dt><dd>{din(a.mes.costoResultado)}</dd></div>
                           <div><dt>Frec.</dt><dd className={(a.mes.frecuencia ?? 0) >= 3.5 ? "st-ads-warn" : ""}>{a.mes.frecuencia?.toFixed(1) ?? "—"}</dd></div>
-                        </dl>
+                        </dl>}
                         {a.presupuestoDiario !== null && <small>Presupuesto diario {din(a.presupuestoDiario)}</small>}
                       </div>
                     </article>
                   );
                 })}
               </div>
-            ) : <p className="st-mt-hint">No hay anuncios activos, en revisión ni rechazados en esta cuenta.</p>}
+            ) : <p className="st-mt-hint">No hay anuncios activos en esta cuenta en este momento.</p>}
           </section>
         </>
       )}
@@ -197,6 +200,7 @@ export function AdsPanel({ slug, brandName, planes }: { slug: string; brandName:
         </section>
       </div>
 
+      {viendo && <VistaAnuncio anuncio={viendo} slug={slug} dinero={din} cerrar={() => setViendo(null)} />}
       {config && <ConfigModal inicial={e.config} moneda={d?.cuenta.moneda ?? ""} cerrar={() => setConfig(false)} guardar={async (c) => { if (await enviar("config", { accion: "config", config: c })) setConfig(false); }} ocupado={ocupado === "config"} />}
     </section>
   );
@@ -237,6 +241,64 @@ function ConfigModal({ inicial, moneda, cerrar, guardar, ocupado }: { inicial: C
         <p className="st-mt-hint">Al guardar se vuelven a consultar los datos de Meta con esta configuración.</p>
         <div className="st-bm-actions"><button type="button" onClick={cerrar}>Cancelar</button><button type="submit" className="st-primary" disabled={ocupado}>{ocupado ? "Guardando…" : "Guardar"}</button></div>
       </form>
+    </Modal>
+  );
+}
+
+/* «Ojito»: vista previa oficial de Meta (iframe) en el formato elegido, con el
+   texto completo y el enlace a la publicación. */
+const FORMATOS = [
+  { id: "INSTAGRAM_STANDARD", etiqueta: "Instagram feed" },
+  { id: "INSTAGRAM_STORY", etiqueta: "Historia" },
+  { id: "INSTAGRAM_REELS", etiqueta: "Reels" },
+  { id: "MOBILE_FEED_STANDARD", etiqueta: "Facebook" },
+] as const;
+function VistaAnuncio({ anuncio, slug, dinero, cerrar }: { anuncio: Anuncio; slug: string; dinero: (v: number | null) => string; cerrar: () => void }) {
+  const [formato, setFormato] = useState<string>(FORMATOS[0].id);
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    const t = setTimeout(async () => {
+      setSrc(null); setError(null);
+      try {
+        const r = await fetch(`/api/estrategia/pauta/vista?marca=${encodeURIComponent(slug)}&anuncio=${anuncio.id}&formato=${formato}`, { cache: "no-store" });
+        const out = await r.json();
+        if (!vivo) return;
+        if (!r.ok) setError(out.error || "Sin vista previa"); else setSrc(out.src);
+      } catch { if (vivo) setError("No se pudo cargar la vista previa"); }
+    }, 0);
+    return () => { vivo = false; clearTimeout(t); };
+  }, [anuncio.id, formato, slug]);
+  return (
+    <Modal title={anuncio.nombre} close={cerrar}>
+      <div className="st-ad-view">
+        <nav className="st-tabs st-ad-formats">
+          {FORMATOS.map((f) => <button key={f.id} type="button" className={formato === f.id ? "st-active" : ""} onClick={() => setFormato(f.id)}>{f.etiqueta}</button>)}
+        </nav>
+        <div className="st-ad-view-grid">
+          <div className="st-ad-frame">
+            {src ? <iframe src={src} title={`Vista previa de ${anuncio.nombre}`} sandbox="allow-scripts allow-same-origin allow-popups" />
+              : error ? (anuncio.miniatura
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <><img src={anuncio.miniatura} alt="" referrerPolicy="no-referrer" /><small>{error}</small></>
+                : <small>{error}</small>)
+              : <small>Cargando vista previa de Meta…</small>}
+          </div>
+          <div className="st-ad-view-info">
+            <small>{anuncio.campana} › {anuncio.conjunto}</small>
+            {anuncio.titulo && <strong>{anuncio.titulo}</strong>}
+            {anuncio.texto && <p>{anuncio.texto}</p>}
+            <dl>
+              <div><dt>Gasto del mes</dt><dd>{dinero(anuncio.mes.gasto)}</dd></div>
+              <div><dt>Costo por resultado</dt><dd>{dinero(anuncio.mes.costoResultado)}</dd></div>
+              <div><dt>Presupuesto diario</dt><dd>{dinero(anuncio.presupuestoDiario)}</dd></div>
+              <div><dt>Frecuencia</dt><dd>{anuncio.mes.frecuencia?.toFixed(2) ?? "—"}</dd></div>
+            </dl>
+            {anuncio.enlace && <a className="st-text-button" href={anuncio.enlace} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Ver la publicación</a>}
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 }

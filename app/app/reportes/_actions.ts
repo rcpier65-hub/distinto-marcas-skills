@@ -195,3 +195,41 @@ export async function guardarVentasEquipo(marcaSlug: string, mes: string, pedido
     return { ok: true }
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
 }
+
+/* ══════════ Publicidad: historial mensual (Pedro 21-oct-2026) ══════════
+   Presupuesto por mes y métricas de Meta, compartidos con el panel de
+   Publicidad del espacio de marca (tabla pauta_mensual). */
+async function marcaIdPorSlug(slug: string): Promise<string | null> {
+  const { createServiceClient } = await import('@/lib/supabase/service')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (createServiceClient() as any).from('marcas').select('id').eq('slug', slug).maybeSingle()
+  return data?.id ?? null
+}
+
+export async function guardarPresupuestoPauta(marcaSlug: string, mes: string, monto: number | null): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  if (!mesOk(mes)) return { ok: false, error: 'Mes inválido' }
+  if (monto !== null && (!Number.isFinite(monto) || monto < 0 || monto > 10_000_000)) return { ok: false, error: 'Monto inválido' }
+  const id = await marcaIdPorSlug(marcaSlug); if (!id) return { ok: false, error: 'Marca no encontrada' }
+  try {
+    const { guardarPresupuesto } = await import('@/lib/pauta/historial')
+    await guardarPresupuesto(id, mes, monto)
+    await refrescarReportes()
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+}
+
+export async function actualizarPautaReportes(marcaSlug: string): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  const id = await marcaIdPorSlug(marcaSlug); if (!id) return { ok: false, error: 'Marca no encontrada' }
+  try {
+    const { createServiceClient } = await import('@/lib/supabase/service')
+    const { configSchema } = await import('@/lib/pauta/model')
+    const { actualizarHistorial } = await import('@/lib/pauta/historial')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (createServiceClient() as any).from('marca_pauta').select('config').eq('marca_id', id).maybeSingle()
+    await actualizarHistorial(id, configSchema.parse(data?.config ?? {}).resultado)
+    await refrescarReportes()
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+}

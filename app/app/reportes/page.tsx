@@ -11,6 +11,8 @@ import { getReportes } from '@/lib/reportes/registry'
 import { pinReportesOk } from './_actions'
 import { PinGate } from '@/components/reportes/pin-gate'
 import { ReportesHub, type MarcaChip } from './_components/reportes-hub'
+import { historialDeMarcas } from '@/lib/pauta/historial'
+import { todayLima } from '@/lib/estrategia/model'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Reportes' }
@@ -47,7 +49,7 @@ async function ReportesHubServer() {
   const service = createServiceClient() as any
   const { data } = await service
     .from('marcas')
-    .select('slug, nombre, emoji_marca')
+    .select('id, slug, nombre, emoji_marca')
     .eq('activa', true)
     .order('nombre')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,6 +59,10 @@ async function ReportesHubServer() {
     emoji: (m.emoji_marca ?? null) as string | null,
   }))
   const nombres = Object.fromEntries(marcas.map((m) => [m.slug, m.nombre]))
-  const reportes = await getReportes(nombres)
-  return <ReportesHub reportes={reportes} marcas={marcas} />
+  /* Publicidad: historial mensual de pauta por marca (Pedro 21-oct-2026). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ids = ((data ?? []) as any[]).map((m) => ({ id: m.id as string, slug: m.slug as string }))
+  const [reportes, porId] = await Promise.all([getReportes(nombres), historialDeMarcas(ids.map((m) => m.id))])
+  const pauta = Object.fromEntries(ids.filter((m) => porId[m.id]?.length).map((m) => [m.slug, porId[m.id]]))
+  return <ReportesHub reportes={reportes} marcas={marcas} pauta={pauta} mesActual={todayLima().slice(0, 7)} />
 }
