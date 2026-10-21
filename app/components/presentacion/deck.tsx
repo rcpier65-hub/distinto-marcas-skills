@@ -14,6 +14,7 @@ import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
 import type { SesionGuardada } from "@/lib/presentacion/server";
 import { display, sans } from "./fuentes";
 import { Proceso } from "./proceso";
+import { Explicadores } from "./explicadores";
 import "./presentacion.css";
 
 const ETAPAS = ["Inicio", "Te escuchamos", "Cómo trabajamos", "Preguntas", "Tu web", "Propuesta"] as const;
@@ -198,6 +199,9 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
               {etapa === 3 && (
                 <div className="pr-faq">
                   <h2>Lo que más nos preguntan</h2>
+                  <p className="pr-x-intro">Toca un tema y te lo explicamos paso a paso.</p>
+                  <Explicadores />
+                  <h3 className="pr-faq-sub">Otras preguntas frecuentes</h3>
                   <div className="pr-faq-lista">
                     {FAQ.map((f) => (
                       <details key={f.p}>
