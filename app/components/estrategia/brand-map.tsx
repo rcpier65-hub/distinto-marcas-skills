@@ -1,16 +1,24 @@
 "use client";
-/* Mapa de marca (Pedro 21-oct-2026): mapa mental con la marca al centro,
-   posicionamiento y propuesta de valor a la izquierda y las 7 maletas de la
-   persuasión a la derecha. Clic en cualquier nodo abre el detalle; dirección
-   lo edita ahí. En celular se muestra como lista. */
+/* Mapa de marca (Pedro 21-oct-2026): "profesional, desglosable y fácil de
+   entender". Arriba la arquitectura de marca (marca paraguas y sus marcas de
+   producto); al elegir una, su mapa mental: posicionamiento y propuesta a la
+   izquierda, las 7 maletas de la persuasión a la derecha, y su ficha (pregunta
+   que responde, territorio, mensaje). Abajo, secciones desglosables (rutas,
+   comparativos, qué no debe liderar, fuentes). Clic en un nodo abre el
+   detalle; dirección lo edita ahí. En celular se muestra como lista. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BadgeCheck, CircleHelp, Compass, Gem, Luggage, PencilLine, Sparkles } from "lucide-react";
+import {
+  AlertOctagon, BadgeCheck, BookOpen, ChevronDown, CircleHelp, Compass, Gem, Layers, Lightbulb, ListChecks,
+  Luggage, MessageSquareQuote, PencilLine, Route, Sparkles, Stethoscope, Table2,
+} from "lucide-react";
 import { Modal, PrettyDate } from "./common";
-import { MALETAS, RAMAS, mapaVacio, nodoVacio, type MapaMarca, type Nodo } from "@/lib/marca-mapa/model";
+import { MALETAS, RAMAS, mapaVacio, nodoVacio, type Bloque, type MapaMarca, type Nodo } from "@/lib/marca-mapa/model";
 
 type Datos = { mapa: MapaMarca; existe: boolean; actualizado: string | null; actualizadoPor: string | null; puedeEditar: boolean };
-type Sel = { tipo: "centro" } | { tipo: "rama"; id: (typeof RAMAS)[number]["id"] } | { tipo: "maleta"; id: (typeof MALETAS)[number]["id"] };
+type RamaId = (typeof RAMAS)[number]["id"];
+type MaletaId = (typeof MALETAS)[number]["id"];
+type Sel = { tipo: "centro" } | { tipo: "rama"; id: RamaId } | { tipo: "maleta"; id: MaletaId };
 
 /* Lienzo de diseño (se escala al ancho disponible). */
 const W = 1180, H = 800;
@@ -25,10 +33,31 @@ const curva = (x1: number, y1: number, x2: number, y2: number) => {
   return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
 };
 
+/* La marca enfocada: -1 = marca principal; 0.. = marca de producto. */
+function vista(m: MapaMarca, foco: number, brandName: string) {
+  const s = foco >= 0 ? m.submarcas[foco] : null;
+  const base = s ?? m;
+  return {
+    nombre: s ? s.nombre : brandName,
+    principal: !s,
+    lema: s ? s.concepto : m.frase,
+    perfil: base,
+    ramas: base.ramas,
+    maletas: base.maletas,
+    bloques: s ? s.bloques : [],
+  };
+}
+
+const ICONOS: Record<Bloque["icono"], React.ReactNode> = {
+  idea: <Lightbulb size={16} />, diagnostico: <Stethoscope size={16} />, ruta: <Route size={16} />, tabla: <Table2 size={16} />,
+  mensajes: <MessageSquareQuote size={16} />, alerta: <AlertOctagon size={16} />, fuentes: <BookOpen size={16} />, lineas: <Layers size={16} />,
+};
+
 export function BrandMap({ slug, brandName }: { slug: string; brandName: string }) {
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<Sel | null>(null);
+  const [foco, setFoco] = useState(-1);
   const caja = useRef<HTMLDivElement>(null);
   const [escala, setEscala] = useState(1);
 
@@ -68,9 +97,19 @@ export function BrandMap({ slug, brandName }: { slug: string; brandName: string 
   if (!datos) return <section className="st-card st-bm-empty"><p>Cargando mapa de marca…</p></section>;
 
   const m = datos.mapa;
-  const porValidar = [...RAMAS.map((r) => m.ramas[r.id]), ...MALETAS.map((x) => m.maletas[x.id])].filter((n) => n.propuesta && !nodoVacio(n)).length;
-  const vacios = [...RAMAS.map((r) => m.ramas[r.id]), ...MALETAS.map((x) => m.maletas[x.id])].filter(nodoVacio).length;
+  const f = foco < m.submarcas.length ? foco : -1;
+  const v = vista(m, f, brandName);
+  const nodos = [...RAMAS.map((r) => v.ramas[r.id]), ...MALETAS.map((x) => v.maletas[x.id])];
+  const porValidar = nodos.filter((n) => n.propuesta && !nodoVacio(n)).length;
+  const vacios = nodos.filter(nodoVacio).length;
   const compacto = escala < 0.62;
+  const p = v.perfil;
+  const ficha = [
+    { t: "Pregunta que responde", x: p.pregunta },
+    { t: "Territorio", x: p.territorio },
+    { t: "Rol", x: p.rol },
+    { t: "Rol emocional", x: p.rolEmocional },
+  ].filter((x) => x.x);
 
   const NodoCard = ({ titulo, n, pregunta, numero, onClick, className, style }: { titulo: string; n: Nodo; pregunta: string; numero?: number; onClick: () => void; className: string; style?: React.CSSProperties }) => (
     <button type="button" className={`st-bm-node ${className} ${nodoVacio(n) ? "st-bm-vacio" : ""}`} style={style} onClick={onClick} aria-label={`Abrir ${titulo}`}>
@@ -81,7 +120,7 @@ export function BrandMap({ slug, brandName }: { slug: string; brandName: string 
       </span>
       <span className="st-bm-text">{nodoVacio(n) ? pregunta : n.resumen || n.puntos[0]}</span>
       {!compacto && className.includes("st-bm-rama") && n.puntos.length > 0 && (
-        <ul>{n.puntos.slice(0, 3).map((p, i) => <li key={i}>{p}</li>)}</ul>
+        <ul>{n.puntos.slice(0, 3).map((x, i) => <li key={i}>{x}</li>)}</ul>
       )}
     </button>
   );
@@ -103,6 +142,52 @@ export function BrandMap({ slug, brandName }: { slug: string; brandName: string 
         </div>
       </div>
 
+      {m.ideaCentral && (
+        <div className="st-bm-idea"><Lightbulb size={18} /><div><small>Idea central</small><p>{m.ideaCentral}</p></div></div>
+      )}
+
+      {/* Arquitectura de marca: marca paraguas arriba, marcas de producto abajo. */}
+      {m.submarcas.length > 0 && (
+        <div className="st-bm-arq" role="tablist" aria-label="Marcas">
+          <button type="button" role="tab" aria-selected={f === -1} className={`st-bm-arq-card st-bm-arq-top ${f === -1 ? "st-bm-arq-on" : ""}`} onClick={() => setFoco(-1)}>
+            <small>Marca paraguas</small>
+            <strong>{brandName}</strong>
+            {m.concepto && <span>{m.concepto}</span>}
+          </button>
+          <div className="st-bm-arq-links" aria-hidden="true"><i /></div>
+          <div className="st-bm-arq-row" style={{ gridTemplateColumns: `repeat(${m.submarcas.length}, minmax(0, 1fr))` }}>
+            {m.submarcas.map((s, i) => (
+              <button key={s.id} type="button" role="tab" aria-selected={f === i} className={`st-bm-arq-card ${f === i ? "st-bm-arq-on" : ""}`} onClick={() => setFoco(i)}>
+                <small>Marca de producto</small>
+                <strong>{s.nombre}</strong>
+                {s.concepto && <em>{s.concepto}</em>}
+                {s.rol && <span>{s.rol}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ficha de la marca enfocada. */}
+      {(ficha.length > 0 || p.mensaje || p.palabras.length > 0) && (
+        <div className="st-bm-ficha">
+          {ficha.map((x) => <div key={x.t} className="st-bm-ficha-item"><small>{x.t}</small><p>{x.x}</p></div>)}
+          {(p.mensaje || p.ejemplos.length > 0) && (
+            <div className="st-bm-ficha-item st-bm-ficha-msg">
+              <small>Mensaje maestro</small>
+              {p.mensaje && <strong>«{p.mensaje}»</strong>}
+              {p.ejemplos.length > 0 && <ul>{p.ejemplos.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+            </div>
+          )}
+          {(p.palabras.length > 0 || p.evitar) && (
+            <div className="st-bm-ficha-item">
+              {p.palabras.length > 0 && <><small>Palabras clave</small><div className="st-bm-tags">{p.palabras.map((w) => <span key={w}>{w}</span>)}</div></>}
+              {p.evitar && <p className="st-bm-evitar"><AlertOctagon size={12} /> No convertirla en: {p.evitar}</p>}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Mapa mental (escritorio y tablet) */}
       <div className="st-bm-canvas-wrap" ref={caja}>
         <div className="st-bm-canvas" style={{ width: W, height: H, transform: `scale(${escala})`, marginBottom: (escala - 1) * H }}>
@@ -116,14 +201,14 @@ export function BrandMap({ slug, brandName }: { slug: string; brandName: string 
             ))}
           </svg>
 
-          <button type="button" className="st-bm-center" style={{ left: CENTRO.x, top: CENTRO.y, width: CENTRO.w, height: CENTRO.h }} onClick={() => setSel({ tipo: "centro" })} aria-label="Abrir la frase de la marca">
+          <button type="button" className="st-bm-center" style={{ left: CENTRO.x, top: CENTRO.y, width: CENTRO.w, height: CENTRO.h }} onClick={() => setSel({ tipo: "centro" })} aria-label={`Abrir la frase de ${v.nombre}`}>
             <Sparkles size={18} />
-            <strong>{brandName}</strong>
-            <span>{m.frase || "Escribe la frase que resume la marca"}</span>
+            <strong>{v.nombre}</strong>
+            <span>{v.lema || "Escribe la frase que resume la marca"}</span>
           </button>
 
           {RAMAS.map((r) => (
-            <NodoCard key={r.id} titulo={r.titulo} n={m.ramas[r.id]} pregunta={r.pregunta} className={`st-bm-rama st-bm-${r.id}`}
+            <NodoCard key={r.id} titulo={r.titulo} n={v.ramas[r.id]} pregunta={r.pregunta} className={`st-bm-rama st-bm-${r.id}`}
               style={{ left: RAMA_POS[r.id].x, top: RAMA_POS[r.id].y, width: RAMA.w, height: RAMA.h }} onClick={() => setSel({ tipo: "rama", id: r.id })} />
           ))}
 
@@ -134,7 +219,7 @@ export function BrandMap({ slug, brandName }: { slug: string; brandName: string 
           </div>
 
           {MALETAS.map((x, i) => (
-            <NodoCard key={x.id} titulo={x.titulo} n={m.maletas[x.id]} pregunta={x.pregunta} numero={i + 1} className="st-bm-hoja"
+            <NodoCard key={x.id} titulo={x.titulo} n={v.maletas[x.id]} pregunta={x.pregunta} numero={i + 1} className="st-bm-hoja"
               style={{ left: HOJA.x, top: HOJA.y0 + i * HOJA.paso, width: HOJA.w, height: HOJA.h }} onClick={() => setSel({ tipo: "maleta", id: x.id })} />
           ))}
         </div>
@@ -143,30 +228,67 @@ export function BrandMap({ slug, brandName }: { slug: string; brandName: string 
       {/* Lista (celular) */}
       <div className="st-bm-list">
         <button type="button" className="st-bm-center" onClick={() => setSel({ tipo: "centro" })}>
-          <Sparkles size={18} /><strong>{brandName}</strong><span>{m.frase || "Escribe la frase que resume la marca"}</span>
+          <Sparkles size={18} /><strong>{v.nombre}</strong><span>{v.lema || "Escribe la frase que resume la marca"}</span>
         </button>
-        {RAMAS.map((r) => <NodoCard key={r.id} titulo={r.titulo} n={m.ramas[r.id]} pregunta={r.pregunta} className={`st-bm-rama st-bm-${r.id}`} onClick={() => setSel({ tipo: "rama", id: r.id })} />)}
+        {RAMAS.map((r) => <NodoCard key={r.id} titulo={r.titulo} n={v.ramas[r.id]} pregunta={r.pregunta} className={`st-bm-rama st-bm-${r.id}`} onClick={() => setSel({ tipo: "rama", id: r.id })} />)}
         <div className="st-bm-hub"><Luggage size={17} /><strong>7 maletas</strong><small>de la persuasión</small></div>
-        {MALETAS.map((x, i) => <NodoCard key={x.id} titulo={x.titulo} n={m.maletas[x.id]} pregunta={x.pregunta} numero={i + 1} className="st-bm-hoja" onClick={() => setSel({ tipo: "maleta", id: x.id })} />)}
+        {MALETAS.map((x, i) => <NodoCard key={x.id} titulo={x.titulo} n={v.maletas[x.id]} pregunta={x.pregunta} numero={i + 1} className="st-bm-hoja" onClick={() => setSel({ tipo: "maleta", id: x.id })} />)}
       </div>
+
+      {v.bloques.length > 0 && (
+        <div className="st-bm-blocks">{v.bloques.map((b) => <BloqueVista key={b.id} b={b} abierto />)}</div>
+      )}
+
+      {m.bloques.length > 0 && (
+        <div className="st-bm-blocks">
+          <h3 className="st-bm-blocks-title"><ListChecks size={16} /> Estrategia de la marca</h3>
+          {m.bloques.map((b) => <BloqueVista key={b.id} b={b} />)}
+        </div>
+      )}
 
       <p className="st-bm-source"><CircleHelp size={13} /> Las 7 maletas vienen de <em>The Brain Audit</em> (Sean D&apos;Souza): mientras una duda siga «dando vueltas en la cinta», el cliente no compra. Cada anuncio debería bajar al menos una.</p>
 
-      {sel && <Detalle sel={sel} datos={datos} brandName={brandName} cerrar={() => setSel(null)} guardar={guardar} />}
+      {sel && <Detalle key={`${f}:${JSON.stringify(sel)}`} sel={sel} foco={f} datos={datos} nombre={v.nombre} cerrar={() => setSel(null)} guardar={guardar} />}
     </section>
   );
 }
 
-function Detalle({ sel, datos, brandName, cerrar, guardar }: { sel: Sel; datos: Datos; brandName: string; cerrar: () => void; guardar: (m: MapaMarca) => Promise<boolean> }) {
+/* Sección desglosable: texto, lista y/o tabla. */
+function BloqueVista({ b, abierto }: { b: Bloque; abierto?: boolean }) {
+  return (
+    <details className="st-bm-block" open={abierto}>
+      <summary>
+        <span className={`st-bm-block-ico st-bm-ico-${b.icono}`}>{ICONOS[b.icono]}</span>
+        <strong>{b.titulo}</strong>
+        <ChevronDown size={16} className="st-bm-block-chev" />
+      </summary>
+      <div className="st-bm-block-body">
+        {b.texto && <p>{b.texto}</p>}
+        {b.items.length > 0 && <ul>{b.items.map((x, i) => <li key={i}>{x}</li>)}</ul>}
+        {b.tabla && (
+          <div className="st-bm-table-wrap">
+            <table className="st-bm-table">
+              <thead><tr>{b.tabla.columnas.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>
+              <tbody>{b.tabla.filas.map((fila, i) => <tr key={i}>{fila.map((c, j) => j === 0 ? <th key={j} scope="row">{c}</th> : <td key={j}>{c}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function Detalle({ sel, foco, datos, nombre, cerrar, guardar }: { sel: Sel; foco: number; datos: Datos; nombre: string; cerrar: () => void; guardar: (m: MapaMarca) => Promise<boolean> }) {
   const m = datos.mapa;
+  const v = vista(m, foco, nombre);
   const info = sel.tipo === "centro"
-    ? { titulo: brandName, pregunta: "La frase que resume la marca en una línea.", icono: <Sparkles size={16} /> }
+    ? { titulo: nombre, pregunta: v.principal ? "La frase que resume la marca en una línea." : "El concepto que guía a esta marca.", icono: <Sparkles size={16} /> }
     : sel.tipo === "rama"
       ? { ...RAMAS.find((r) => r.id === sel.id)!, icono: sel.id === "posicionamiento" ? <Compass size={16} /> : <Gem size={16} /> }
       : { ...MALETAS.find((x) => x.id === sel.id)!, icono: <Luggage size={16} /> };
-  const nodo: Nodo | null = sel.tipo === "rama" ? m.ramas[sel.id] : sel.tipo === "maleta" ? m.maletas[sel.id] : null;
+  const nodo: Nodo | null = sel.tipo === "rama" ? v.ramas[sel.id] : sel.tipo === "maleta" ? v.maletas[sel.id] : null;
   const [editando, setEditando] = useState(false);
-  const [frase, setFrase] = useState(m.frase);
+  const [frase, setFrase] = useState(v.lema);
   const [estado, setEstado] = useState(m.estado);
   const [resumen, setResumen] = useState(nodo?.resumen ?? "");
   const [puntos, setPuntos] = useState((nodo?.puntos ?? []).join("\n"));
@@ -175,10 +297,13 @@ function Detalle({ sel, datos, brandName, cerrar, guardar }: { sel: Sel; datos: 
 
   const enviar = async () => {
     const copia: MapaMarca = structuredClone(m ?? mapaVacio());
-    if (sel.tipo === "centro") { copia.frase = frase.trim(); copia.estado = estado; }
-    else {
-      const n = { resumen: resumen.trim(), puntos: puntos.split("\n").map((p) => p.replace(/^[-•·]\s*/, "").trim()).filter(Boolean).slice(0, 12), propuesta };
-      if (sel.tipo === "rama") copia.ramas[sel.id] = n; else copia.maletas[sel.id] = n;
+    const destino = foco >= 0 ? copia.submarcas[foco] : copia;
+    if (sel.tipo === "centro") {
+      if (foco >= 0) copia.submarcas[foco].concepto = frase.trim();
+      else { copia.frase = frase.trim(); copia.estado = estado; }
+    } else {
+      const n = { resumen: resumen.trim(), puntos: puntos.split("\n").map((x) => x.replace(/^[-•·]\s*/, "").trim()).filter(Boolean).slice(0, 12), propuesta };
+      if (sel.tipo === "rama") destino.ramas[sel.id] = n; else destino.maletas[sel.id] = n;
     }
     setOcupado(true);
     const ok = await guardar(copia);
@@ -187,18 +312,18 @@ function Detalle({ sel, datos, brandName, cerrar, guardar }: { sel: Sel; datos: 
   };
 
   return (
-    <Modal title={info.titulo} close={cerrar}>
+    <Modal title={sel.tipo === "centro" ? info.titulo : `${info.titulo} · ${nombre}`} close={cerrar}>
       <div className="st-bm-detail">
         <p className="st-bm-q">{info.icono} {info.pregunta}</p>
         {!editando ? (
           <>
             {sel.tipo === "centro" ? (
-              <p className="st-bm-big">{m.frase || "Aún no hay una frase para esta marca."}</p>
+              <p className="st-bm-big">{v.lema || "Aún no hay una frase para esta marca."}</p>
             ) : nodo && !nodoVacio(nodo) ? (
               <>
                 {nodo.propuesta && <p className="st-bm-warnbox">Propuesta de la agencia: falta validarla con el cliente.</p>}
                 {nodo.resumen && <p className="st-bm-big">{nodo.resumen}</p>}
-                {nodo.puntos.length > 0 && <ul className="st-bm-points">{nodo.puntos.map((p, i) => <li key={i}>{p}</li>)}</ul>}
+                {nodo.puntos.length > 0 && <ul className="st-bm-points">{nodo.puntos.map((x, i) => <li key={i}>{x}</li>)}</ul>}
               </>
             ) : (
               <p className="st-bm-hint">Todavía no se completa esta parte del mapa.</p>
@@ -211,17 +336,19 @@ function Detalle({ sel, datos, brandName, cerrar, guardar }: { sel: Sel; datos: 
           <form className="st-bm-form" onSubmit={(e) => { e.preventDefault(); void enviar(); }}>
             {sel.tipo === "centro" ? (
               <>
-                <label>Frase de la marca<textarea rows={2} maxLength={200} value={frase} onChange={(e) => setFrase(e.target.value)} /></label>
-                <label>Estado del mapa
-                  <select value={estado} onChange={(e) => setEstado(e.target.value as MapaMarca["estado"])}>
-                    <option value="borrador">Borrador</option>
-                    <option value="validado">Validado con el cliente</option>
-                  </select>
-                </label>
+                <label>{v.principal ? "Frase de la marca" : "Concepto de la marca"}<textarea rows={2} maxLength={200} value={frase} onChange={(e) => setFrase(e.target.value)} /></label>
+                {v.principal && (
+                  <label>Estado del mapa
+                    <select value={estado} onChange={(e) => setEstado(e.target.value as MapaMarca["estado"])}>
+                      <option value="borrador">Borrador</option>
+                      <option value="validado">Validado con el cliente</option>
+                    </select>
+                  </label>
+                )}
               </>
             ) : (
               <>
-                <label>Resumen (1–2 frases)<textarea rows={3} maxLength={400} value={resumen} onChange={(e) => setResumen(e.target.value)} /></label>
+                <label>Resumen (1–2 frases)<textarea rows={4} maxLength={700} value={resumen} onChange={(e) => setResumen(e.target.value)} /></label>
                 <label>Puntos clave (uno por línea)<textarea rows={6} value={puntos} onChange={(e) => setPuntos(e.target.value)} /></label>
                 <label className="st-bm-check"><input type="checkbox" checked={propuesta} onChange={(e) => setPropuesta(e.target.checked)} /> Propuesta de la agencia, falta validar con el cliente</label>
               </>

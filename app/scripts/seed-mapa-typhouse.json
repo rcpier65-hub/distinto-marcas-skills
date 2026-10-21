@@ -1,98 +1,149 @@
 {
-  "frase": "Pon una sonrisa en el aire: ambientadores italianos Little Joe para tu auto, con personalidad y que duran de verdad.",
+  "frase": "Haz más tuyo tu auto.",
   "estado": "borrador",
+  "ideaCentral": "Typhouse selecciona, orienta y reúne; Little Joe expresa personalidad visible; Dr. Marcus construye atmósfera sensorial. Typhouse también cumple un rol de descubrimiento guiado para quienes todavía no saben qué elegir. Así cada marca ocupa un lugar propio y deja de competir por la misma promesa.",
+  "concepto": "La casa de marcas para hacer más tuyos los espacios que vives todos los días.",
+  "rol": "Selecciona, reúne y orienta para ayudar a cada persona a encontrar qué va con ella.",
+  "territorio": "Descubrimiento guiado + elección + confianza + estilo de vida.",
+  "pregunta": "¿Qué me conviene elegir y por dónde empiezo?",
+  "rolEmocional": "Curador / guía / casa",
+  "palabras": ["marcas", "elegir", "descubrir", "original", "estilo", "experiencia"],
+  "mensaje": "Haz más tuyo tu auto.",
+  "ejemplos": ["Encuentra algo que vaya contigo.", "¿No sabes cuál elegir? Te ayudamos.", "Dinos qué usas. Te ayudamos a encontrar qué sigue."],
+  "evitar": "Un marketplace genérico.",
   "ramas": {
     "posicionamiento": {
-      "resumen": "El ambientador de auto premium y con personalidad del Perú: calidad italiana, diseño icónico y duración real.",
+      "resumen": "Typhouse es la casa de marcas para hacer más tuyos los espacios que vives todos los días. Selecciona marcas internacionales de auto, hogar, tecnología y consumo y ayuda a cada persona a encontrar qué va con ella, incluso cuando todavía no sabe qué elegir.",
       "puntos": [
-        "Distribución oficial de Little Joe (Italia, +80 países) en Perú",
-        "Premium accesible: S/24.90, sobre los baratos y por debajo del lujo",
-        "Asociado al regalo/detalle y a la pasión por el fútbol peruano",
-        "No es «olor a taxi» ni a químico: sin alcohol y eco-friendly"
+        "Plataforma prioritaria: HAZ MÁS TUYO TU AUTO. Aroma, diseño, cuidado, tecnología y accesorios para que cada detalle del auto se sienta más propio.",
+        "Insight: «Mi auto es mi espacio. Quiero sentirlo mío.»",
+        "Categorías: auto (prioritaria), hogar, tecnología y consumo."
       ],
       "propuesta": false
     },
     "propuesta": {
-      "resumen": "Un ambientador que dura hasta 45 días, cuida tu auto y te representa, por menos de S/25.",
+      "resumen": "Promesa: «Encuentra algo que vaya contigo y haz más tuyo tu espacio.» Como acompañamiento: «No tienes que saber qué elegir para empezar.»",
       "puntos": [
-        "25–45 días: rinde como 4 ambientadores baratos",
-        "Sin alcohol, EVA no tóxico: no daña los interiores",
-        "Diseño con personalidad: la mascota Joe y ediciones coleccionables",
-        "Ideal para regalar sin gastar de más",
-        "Delivery en Lima en 3 días, envío a provincias y gratis desde 4 unidades"
+        "Diferencial: no ser un marketplace infinito; seleccionar, ordenar y recomendar para facilitar una elección con criterio.",
+        "Rol: descubrir, orientar y conectar a cada persona con la marca, categoría o producto que mejor encaja con ella, incluso si llega diciendo «no sé cuál elegir».",
+        "La asesoría real parte de una pregunta: «¿Qué aromatizante vienes usando?»"
       ],
       "propuesta": false
     }
   },
   "maletas": {
-    "problema": {
-      "resumen": "Los ambientadores comunes duran una semana, huelen a químico o «a taxi» y no dicen nada de quien maneja.",
-      "puntos": [
-        "Gasta seguido en ambientadores que se acaban rápido",
-        "Olor invasivo o artificial dentro del auto",
-        "Los de clubes de fútbol suelen ser piratas y de baja calidad",
-        "Cuesta encontrar un regalo bonito y útil sin gastar mucho"
-      ],
-      "propuesta": false
+    "problema": { "resumen": "Quiero personalizar y mejorar mi auto, pero encuentro productos dispersos y demasiadas opciones. Muchas veces no sé qué aroma, marca o producto elegir.", "puntos": ["El auto es uno de los espacios donde más tiempo pasamos, pero sus accesorios se compran de forma aislada.", "La variedad atrae, pero sin orientación también puede frenar la decisión."], "propuesta": false },
+    "solucion": { "resumen": "Typhouse reúne marcas y categorías seleccionadas y orienta la compra. En aromas, pregunta qué vienes usando para recomendar qué probar después; si es tu primera vez, te da una ruta clara para empezar.", "puntos": ["Personalizar, cuidar, equipar y disfrutar el auto dentro de una experiencia curada.", "Si la persona nunca ha usado uno: ruta «Empieza aquí» o Pack Primera Compra."], "propuesta": false },
+    "cliente": { "resumen": "Personas que ven su auto como parte de su estilo de vida, tanto quienes ya saben qué buscan como quienes necesitan orientación para empezar o cambiar de producto.", "puntos": ["Incluye compra personal, primera compra, cambio de producto y regalos."], "propuesta": false },
+    "objeciones": { "resumen": "«No sé cuál elegir», «no sé qué aroma me gustará», precio, originalidad, compatibilidad, envío y confianza frente a marketplaces.", "puntos": ["La objeción de elección se resuelve con recomendación guiada, no dejando al cliente solo frente al catálogo."], "propuesta": false },
+    "testimonios": { "resumen": "Prueba social sobre producto real, atención, envío, regalo, recompra y descubrimiento.", "puntos": ["Clasificar reseñas por motivo de compra, no reunirlas en un bloque genérico."], "propuesta": false },
+    "garantia": { "resumen": "Productos originales, marcas reconocidas, atención personalizada y envíos nacionales, según la comunicación vigente de Typhouse.", "puntos": ["Usar solo respaldos comprobables. No inventar garantías o promesas no definidas."], "propuesta": false },
+    "unica": { "resumen": "Una casa de marcas con criterio de selección y recomendación que convierte categorías dispersas en una experiencia de descubrimiento guiado y personalización.", "puntos": ["No solo muestra productos: ayuda a navegar entre ellos, reduce la incertidumbre y recomienda qué puede encajar mejor con cada persona."], "propuesta": false }
+  },
+  "submarcas": [
+    {
+      "id": "little-joe",
+      "nombre": "Little Joe",
+      "concepto": "Aroma que se ve.",
+      "rol": "Convierte el ambientador en un detalle visible del look del auto.",
+      "territorio": "Diseño + personalidad + aroma visible + coleccionabilidad.",
+      "pregunta": "¿Qué detalle expresa mi personalidad y se ve bien en mi auto?",
+      "rolEmocional": "Compañero / accesorio con carácter",
+      "palabras": ["diseño", "personaje", "color", "colección", "aroma", "look", "personalidad"],
+      "mensaje": "Aroma que se ve.",
+      "ejemplos": ["Que huela bien también puede verse bien.", "Elige el que va contigo.", "Un detalle pequeño. Mucha personalidad."],
+      "evitar": "Una ficha de duración.",
+      "ramas": {
+        "posicionamiento": { "resumen": "Little Joe convierte el aroma en parte del look de tu auto: personajes, colores, colecciones y fragancias para elegir un detalle visible que refleje tu personalidad.", "puntos": ["Compite menos en «cuántos días dura» y más en cómo se ve, cómo huele y cómo hace sentir tu auto.", "El producto no se esconde: forma parte de la estética del interior."], "propuesta": false },
+        "propuesta": { "resumen": "Un ambientador que también funciona como accesorio visual y expresión de personalidad.", "puntos": ["Diseño visible: se reconoce en la rejilla o dentro del auto.", "Personalidad: elegir un Joe se parece más a elegir un accesorio.", "Coleccionabilidad: líneas, colores, ediciones y clubes.", "Aroma como parte de la experiencia, no como única razón de compra.", "Humor y cercanía: habla como un amigo; personajes como contenido y conversación."], "propuesta": false }
+      },
+      "maletas": {
+        "problema": { "resumen": "Quiero que mi auto huela bien, pero muchos ambientadores se sienten genéricos, se esconden o no aportan nada al look del interior.", "puntos": ["Si cuido los detalles de mi auto, también quiero que el ambientador se vea bien y vaya conmigo."], "propuesta": false },
+        "solucion": { "resumen": "Little Joe combina aroma y diseño en un objeto visible: eliges personaje, color, colección y fragancia, y el ambientador también funciona como detalle decorativo.", "puntos": [], "propuesta": false },
+        "cliente": { "resumen": "Conductores que consideran su auto un espacio personal y cuidan tanto cómo se ve como cómo huele; valoran diseño, personalidad y poder elegir.", "puntos": ["También personas que buscan regalos pequeños, útiles y con intención."], "propuesta": false },
+        "objeciones": { "resumen": "«¿Por qué cuesta más que uno genérico?», «¿qué aroma me va a gustar?», «¿será muy intenso?», «¿cuál diseño va conmigo?», «¿es original?», «¿cómo se coloca?».", "puntos": ["Responder priorizando diseño, elección, experiencia y originalidad.", "La duración solo como dato secundario y respaldado."], "propuesta": false },
+        "testimonios": { "resumen": "Reseñas reales sobre diseño, aroma agradable, comentarios de terceros sobre el personaje, regalo, colección, facilidad de uso y cómo luce dentro del auto.", "puntos": ["Evitar depender solo de testimonios de duración."], "propuesta": false },
+        "garantia": { "resumen": "Producto original distribuido por Typhouse, atención antes y después de la compra y envíos nacionales.", "puntos": ["«No tóxico», «biodegradable», «aprobado UE» o procedencia italiana solo con respaldo verificable y redacción legal aprobada."], "propuesta": false },
+        "unica": { "resumen": "No solo aromatiza: SE VE. Personajes, líneas, colores, ediciones y fragancias convierten una categoría funcional en un detalle de estilo, identidad y colección.", "puntos": [], "propuesta": false }
+      },
+      "bloques": [
+        { "id": "lineas", "titulo": "Líneas dentro del universo Little Joe", "icono": "lineas", "texto": "", "items": [], "tabla": { "columnas": ["Línea", "Rol en el universo"], "filas": [
+          ["Standard", "El ícono central y más reconocible. Diseño-personaje + variedad de aromas."],
+          ["Thumbs Up", "Actitud, gesto positivo y personalidad más expresiva."],
+          ["Little Joya", "Código más delicado, colorido y de estilo; amplía el universo sin convertirlo en otra marca madre."],
+          ["Little Dog", "Conexión emocional y pet lovers; diseño con forma de perro."],
+          ["Ediciones / clubes", "Coleccionabilidad, identidad, temporada, pasión y cultura."]
+        ] } }
+      ]
     },
-    "solucion": {
-      "resumen": "Little Joe: aroma italiano que dura 25–45 días, se coloca en la rejilla o el espejo y le pone personalidad al auto.",
-      "puntos": [
-        "Little Joe Standard y Thumbs Up (S/24.90)",
-        "Ediciones oficiales de Universitario, Alianza Lima y Sporting Cristal",
-        "Little Dog para quienes viajan con mascotas, Little Joya y tarjetas aromáticas",
-        "Ediciones limitadas por temporada (Navidad, San Valentín)"
-      ],
-      "propuesta": false
-    },
-    "cliente": {
-      "resumen": "Personas de 22 a 45 años con auto propio, en Lima y provincias, que cuidan los detalles y compran para sí o para regalar.",
-      "puntos": [
-        "Joven profesional con su primer auto, estética cute, cansada de los ambientadores baratos",
-        "Hincha que quiere mostrar su club con un producto oficial",
-        "Mamá o pareja que compra detalles por WhatsApp para regalar",
-        "NSE B/B+/A-, activos en Instagram y TikTok"
-      ],
-      "propuesta": false
-    },
-    "objeciones": {
-      "resumen": "Precio, duración real, miedo a no acertar con el aroma y dudas sobre originalidad y entrega.",
-      "puntos": [
-        "«¿S/24.90 por un ambientador?» → rinde como 4 baratos",
-        "«¿De verdad dura 45 días?» → comparativa y reseñas reales",
-        "«¿Y si no me gusta el olor?» → guía y variedad de aromas",
-        "«¿Es oficial o pirata?» → también se vende en la tienda oficial de Universitario",
-        "«¿Llega a provincias? ¿Cuánto demora?» → Lima 3 días y envío nacional"
-      ],
-      "propuesta": false
-    },
-    "testimonios": {
-      "resumen": "Por reunir: reseñas reales sobre duración, aroma y regalo, y contenido de clientes que etiquetan a la marca.",
-      "puntos": [
-        "Pedir reseñas con foto a compradores recientes por WhatsApp",
-        "Republicar a clientes que etiquetan a la marca",
-        "Prueba social disponible hoy: marca italiana en +80 países y producto oficial de Universitario"
-      ],
-      "propuesta": true
-    },
-    "garantia": {
-      "resumen": "Por definir con el cliente: qué respaldo ofrecemos si el aroma no convence o el producto llega dañado.",
-      "puntos": [
-        "Confirmar la política de cambio (aroma o producto dañado)",
-        "Producto original con el respaldo de la marca italiana",
-        "Envío gratis desde 4 unidades para animar a probar"
-      ],
-      "propuesta": true
-    },
-    "unica": {
-      "resumen": "El ambientador de auto con mascota propia, calidad italiana y ediciones oficiales de los clubes peruanos.",
-      "puntos": [
-        "Joe: mascota con fans y voz propia",
-        "Ediciones oficiales de Universitario, Alianza Lima y Sporting Cristal",
-        "Hecho en Italia, sin alcohol y eco-friendly",
-        "Duración real frente a la competencia barata"
-      ],
-      "propuesta": false
+    {
+      "id": "dr-marcus",
+      "nombre": "Dr. Marcus",
+      "concepto": "Tu auto. Tu atmósfera.",
+      "rol": "Permite elegir qué sensación y atmósfera crear dentro del auto.",
+      "territorio": "Aroma + ambiente + formatos + elección sensorial.",
+      "pregunta": "¿Cómo quiero que se sienta y huela mi auto?",
+      "rolEmocional": "Creador de ambiente",
+      "palabras": ["aroma", "notas", "sensación", "ambiente", "intensidad", "formato"],
+      "mensaje": "Tu auto. Tu atmósfera.",
+      "ejemplos": ["Elige cómo quieres que se sienta tu auto.", "Un aroma para cada mood.", "Cambia el ambiente, no tu camino."],
+      "evitar": "Una copia seria de Little Joe.",
+      "ramas": {
+        "posicionamiento": { "resumen": "Dr. Marcus permite elegir cómo quieres que se sienta tu auto a través de diferentes fragancias, formatos y experiencias sensoriales.", "puntos": ["Se construye desde la elección de ambiente (fresco, limpio, elegante, intenso, relajado, deportivo o sofisticado), no desde personaje + colección."], "propuesta": false },
+        "propuesta": { "resumen": "Distintos aromas y formatos para crear una atmósfera elegida.", "puntos": ["Atmósfera: el aroma cambia la percepción del interior del auto.", "Elección sensorial: escoger por sensación, notas, intensidad o mood.", "Variedad de formatos: figuras, sprays, colgantes y más.", "Diseño funcional (Cosmic Cat, Speaker Shaped) sin copiar la coleccionabilidad de Little Joe.", "Lenguaje más sensorial y elegante, sin perder accesibilidad."], "propuesta": false }
+      },
+      "maletas": {
+        "problema": { "resumen": "No quiero que mi auto simplemente «huela a ambientador». Quiero decidir qué sensación transmite: fresco, limpio, elegante, intenso, relajado o diferente según mi gusto y momento.", "puntos": [], "propuesta": false },
+        "solucion": { "resumen": "Distintas fragancias y formatos para crear una atmósfera elegida: parte de «cómo quiero que se sienta mi espacio» y luego ayuda a escoger aroma y formato.", "puntos": [], "propuesta": false },
+        "cliente": { "resumen": "Personas orientadas a la experiencia sensorial del auto, que valoran elegir aroma, sensación y formato según su rutina o personalidad.", "puntos": ["Menos «coleccionistas» que el público de Little Joe; más exploradores de aroma y ambiente."], "propuesta": false },
+        "objeciones": { "resumen": "«No conozco la marca», «¿qué aroma elijo?», «¿qué formato me conviene?», «¿será demasiado fuerte?», «¿cómo se instala?».", "puntos": ["Educación simple: perfiles de aroma, intensidad, uso y formato."], "propuesta": false },
+        "testimonios": { "resumen": "Opiniones clasificadas por aroma y sensación: «fresco», «limpio», «elegante», «me gusta New Car», «queda bien en la rejilla».", "puntos": ["Evitar reseñas sin contexto y no inventar resultados."], "propuesta": false },
+        "garantia": { "resumen": "Typhouse aporta originalidad, atención, disponibilidad local y envío.", "puntos": ["Origen, fabricante, estándares y atributos solo cuando estén comprobados.", "No prometer duración ni seguridad sin respaldo específico por producto."], "propuesta": false },
+        "unica": { "resumen": "Amplitud de experiencias: distintos perfiles olfativos y formatos permiten elegir no solo QUÉ aroma, sino CÓMO vivirlo dentro del auto.", "puntos": [], "propuesta": false }
+      },
+      "bloques": []
     }
-  }
+  ],
+  "bloques": [
+    { "id": "descubrimiento", "titulo": "Descubrimiento guiado: «No tienes que saber qué elegir para empezar»", "icono": "ruta",
+      "texto": "Capa de adquisición y servicio que vuelve tangible el rol de Typhouse como curador. Nace del método real de atención: ante quien no sabe qué comprar, el equipo pregunta «¿Qué aromatizante vienes usando?». Insight de entrada: «Quiero algo para mi carro, pero no sé cuál elegir.» CTA recomendado: EMPIEZA AQUÍ.",
+      "items": [
+        "Si ya usa un aromatizante: preguntar qué usa, qué le gusta y qué quisiera mantener o cambiar; recomendar 2–3 opciones relevantes en lugar de todo el catálogo.",
+        "Si nunca ha usado uno: llevarlo a la ruta «Empieza aquí» o al Pack Primera Compra para reducir el riesgo de elegir a ciegas.",
+        "Mensaje: «Dinos qué usas. Te ayudamos a encontrar qué sigue.»"
+      ], "tabla": null },
+    { "id": "no-se-pisen", "titulo": "Cómo evitar que las marcas se pisen", "icono": "tabla", "texto": "", "items": [],
+      "tabla": { "columnas": ["", "Typhouse", "Little Joe", "Dr. Marcus"], "filas": [
+        ["Pregunta que responde", "¿Qué me conviene elegir y por dónde empiezo?", "¿Qué detalle expresa mi personalidad y se ve bien en mi auto?", "¿Cómo quiero que se sienta y huela mi auto?"],
+        ["Territorio", "Descubrimiento guiado y selección", "Expresión visible", "Atmósfera sensorial"],
+        ["Rol emocional", "Curador / guía / casa", "Compañero / accesorio con carácter", "Creador de ambiente"],
+        ["Demostración ideal", "Recomendador, «¿qué vienes usando?», primera compra, comparar categorías, regalos y packs", "Producto integrado al look del auto; colección; personajes", "Mood del interior, perfiles olfativos, elección por sensación"],
+        ["No convertirlo en…", "Marketplace genérico", "Una ficha de duración", "Una copia seria de Little Joe"]
+      ] } },
+    { "id": "guardrails", "titulo": "Qué NO debe liderar el posicionamiento", "icono": "alerta", "texto": "", "tabla": null,
+      "items": [
+        "Duración («25–45 días», «dura más que…»): prueba funcional solo si está verificada, nunca eje de marca.",
+        "Precio como identidad («por menos de S/25»): solo en performance u ofertas.",
+        "«Premium» sin prueba: reemplazar por hechos concretos (marca, origen, diseño, formatos, selección, originalidad).",
+        "Claims de salud o seguridad («no tóxico», «seguro para niños o mascotas», «hipoalergénico»): solo con respaldo documental y alcance exacto.",
+        "«Aroma italiano / natural / de las mejores casas de Europa»: solo con sustento técnico o comercial verificable del fabricante.",
+        "Que Typhouse adopte el slogan o la personalidad de Little Joe: debe seguir funcionando si mañana suma nuevas marcas y categorías."
+      ] },
+    { "id": "diagnostico", "titulo": "Por qué se reordenó el mapa", "icono": "diagnostico", "texto": "El mapa anterior mezclaba niveles de marca y concentraba la propuesta en Little Joe, precio y duración, lo que limitaba el crecimiento de Typhouse como casa de varias marcas y categorías.", "tabla": null,
+      "items": [
+        "Typhouse aparecía con la promesa de Little Joe («Pon una sonrisa en el aire») y parecía una extensión de una sola marca.",
+        "La duración era argumento central de problema, solución y propuesta: pasa a ser información funcional secundaria.",
+        "Little Joe y Dr. Marcus necesitan territorios distintos para no volverse intercambiables.",
+        "El valor de Typhouse está por encima del producto: selección, descubrimiento, confianza, experiencia y personalización.",
+        "La expansión a auto, hogar, tecnología y consumo pide un posicionamiento corporativo amplio, con el auto como territorio comercial prioritario."
+      ] },
+    { "id": "fuentes", "titulo": "Fuentes y validación", "icono": "fuentes", "tabla": null,
+      "texto": "«Aroma que se ve», «Tu auto. Tu atmósfera» y «Haz más tuyo tu auto» son propuestas de posicionamiento de Distinto para ordenar el mapa; no son citas oficiales existentes de las marcas.",
+      "items": [
+        "Brief y Estrategia de Marca Little Joe (líneas, diferenciación por diseño, valores; «Pon una sonrisa en el aire» como mensaje histórico de Little Joe).",
+        "Validación comercial del cliente: el método «¿Qué aromatizante vienes usando?» sustenta el descubrimiento guiado.",
+        "typhouse.pe: «La casa de las mejores marcas», categorías auto, hogar, tecnología y consumo; originales, marcas reconocidas, envíos a todo el Perú y atención personalizada.",
+        "typhouse.pe/pages/somos-typhouse y /pages/landing-little-joe: transición de Little Joe a Typhouse, líneas y packs actuales."
+      ] }
+  ]
 }
