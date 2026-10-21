@@ -4,7 +4,7 @@
    la pantalla (en vivo) y la API (al generar la propuesta). */
 import { z } from "zod";
 import { emptyProposal, serviceFromTemplate, type ProposalData, type ProposalService } from "../propuestas/model";
-import { estimarNivel, NIVELES, type Nivel, type RespuestasWeb } from "./niveles";
+import { esTienda, estimarNivel, NIVELES, tieneCatalogo, type Nivel, type RespuestasWeb } from "./niveles";
 
 export type { RespuestasWeb, Nivel };
 
@@ -13,7 +13,7 @@ export type Pregunta = {
   id: string;
   grupo: string;
   texto: string;
-  tipo: "texto" | "opcion" | "sino";
+  tipo: "texto" | "opcion" | "sino" | "enlaces";
   /* Respuesta que alimenta el nivel (si aplica). */
   clave?: keyof RespuestasWeb;
   opciones?: Opcion[];
@@ -27,15 +27,19 @@ export const PREGUNTAS: Pregunta[] = [
   { id: "tipo", grupo: "Tu web", texto: "¿Qué tipo de web necesitas?", tipo: "opcion", clave: "tipo", opciones: [
     { id: "presentacion", etiqueta: "Presentar la empresa" }, { id: "landing", etiqueta: "Landing para una campaña" },
     { id: "servicios", etiqueta: "Web de servicios" }, { id: "tienda", etiqueta: "Tienda online" },
+    { id: "mixta", etiqueta: "Empresa + tienda online" },
   ] },
   { id: "paginas", grupo: "Tu web", texto: "¿Cuántas páginas imaginas?", tipo: "opcion", clave: "paginas", opciones: [
     { id: "hasta-5", etiqueta: "Hasta 5" }, { id: "6-10", etiqueta: "6 a 10" }, { id: "mas-10", etiqueta: "Más de 10" },
   ] },
   { id: "productos", grupo: "Tu web", texto: "¿Vas a mostrar o vender productos? ¿Cuántos?", tipo: "opcion", clave: "productos", opciones: [
-    { id: "ninguno", etiqueta: "No" }, { id: "hasta-100", etiqueta: "Hasta 100" }, { id: "mas-100", etiqueta: "Más de 100" },
+    { id: "ninguno", etiqueta: "No" }, { id: "1-50", etiqueta: "1 a 50" }, { id: "51-100", etiqueta: "50 a 100" },
+    { id: "101-200", etiqueta: "100 a 200" }, { id: "mas-200", etiqueta: "Más de 200" },
   ] },
   { id: "variantes", grupo: "Tu web", texto: "¿Tus productos tienen tallas, colores o variantes?", tipo: "sino", clave: "variantes" },
-  { id: "muchasImagenes", grupo: "Tu web", texto: "¿Cada producto tiene muchas fotos?", tipo: "sino", clave: "muchasImagenes" },
+  { id: "fotos", grupo: "Tu web", texto: "¿Cuántas fotos tiene cada producto?", tipo: "opcion", clave: "fotos", opciones: [
+    { id: "1-3", etiqueta: "1 a 3" }, { id: "4-6", etiqueta: "4 a 6" }, { id: "7-10", etiqueta: "7 a 10" },
+  ] },
   { id: "plataforma", grupo: "Tecnología", texto: "¿Tienes preferencia de plataforma?", tipo: "opcion", clave: "plataforma", opciones: [
     { id: "shopify", etiqueta: "Shopify" }, { id: "wordpress", etiqueta: "WordPress" }, { id: "no-sabe", etiqueta: "Que nos recomienden" },
   ] },
@@ -43,8 +47,11 @@ export const PREGUNTAS: Pregunta[] = [
   { id: "tieneDominio", grupo: "Lo que tienes hoy", texto: "¿Tienes dominio (tuempresa.com)?", tipo: "sino", clave: "tieneDominio" },
   { id: "tieneHosting", grupo: "Lo que tienes hoy", texto: "¿Tienes hosting o servidor?", tipo: "sino", clave: "tieneHosting" },
   { id: "contenidos", grupo: "Contenidos", texto: "¿Tienes logo, textos y fotos listos?", tipo: "texto" },
-  { id: "referencias", grupo: "Contenidos", texto: "¿Qué webs te gustan y por qué?", tipo: "texto" },
-  { id: "plazo", grupo: "Tiempos", texto: "¿Para cuándo la necesitas?", tipo: "texto" },
+  { id: "referencias", grupo: "Contenidos", texto: "¿Qué webs te gustan y por qué?", tipo: "enlaces" },
+  { id: "plazo", grupo: "Tiempos", texto: "¿Para cuándo la necesitas?", tipo: "opcion", clave: "plazo", opciones: [
+    { id: "pronto", etiqueta: "Lo más pronto posible" }, { id: "15-dias", etiqueta: "En 15 días" }, { id: "1-mes", etiqueta: "De aquí a un mes" },
+    { id: "2-meses", etiqueta: "De aquí a 2 meses" }, { id: "sin-apuro", etiqueta: "Sin apuro" },
+  ] },
   { id: "presupuesto", grupo: "Tiempos", texto: "¿Tienes un presupuesto aproximado?", tipo: "texto" },
 ];
 
@@ -130,33 +137,55 @@ export const FAQ: { p: string; r: string }[] = [
 
 const texto = (max: number) => z.string().trim().max(max);
 const cliente = z.object({ nombre: texto(160).default(""), empresa: texto(200).default(""), rubro: texto(200).default(""), contacto: texto(180).default("") });
-const respuestas = z.object({
-  tipo: z.enum(["presentacion", "landing", "servicios", "tienda"]).optional(),
+/* Reuniones guardadas antes del 21-oct usaban «hasta/más de 100» y «muchas fotos sí/no». */
+const VIEJOS_PRODUCTOS: Record<string, string> = { "hasta-100": "51-100", "mas-100": "101-200" };
+const migrarRespuestas = (v: unknown) => {
+  if (!v || typeof v !== "object") return v;
+  const r = { ...(v as Record<string, unknown>) };
+  if (typeof r.productos === "string" && VIEJOS_PRODUCTOS[r.productos]) r.productos = VIEJOS_PRODUCTOS[r.productos];
+  if (typeof r.muchasImagenes === "boolean" && r.fotos === undefined) r.fotos = r.muchasImagenes ? "7-10" : "1-3";
+  delete r.muchasImagenes;
+  return r;
+};
+const respuestas = z.preprocess(migrarRespuestas, z.object({
+  tipo: z.enum(["presentacion", "landing", "servicios", "tienda", "mixta"]).optional(),
   paginas: z.enum(["hasta-5", "6-10", "mas-10"]).optional(),
-  productos: z.enum(["ninguno", "hasta-100", "mas-100"]).optional(),
+  productos: z.enum(["ninguno", "1-50", "51-100", "101-200", "mas-200"]).optional(),
+  fotos: z.enum(["1-3", "4-6", "7-10"]).optional(),
   plataforma: z.enum(["shopify", "wordpress", "no-sabe"]).optional(),
-  variantes: z.boolean().optional(), muchasImagenes: z.boolean().optional(), pagos: z.boolean().optional(), envios: z.boolean().optional(),
+  variantes: z.boolean().optional(), pagos: z.boolean().optional(), envios: z.boolean().optional(),
   blog: z.boolean().optional(), reservas: z.boolean().optional(), idiomas: z.boolean().optional(), integraciones: z.boolean().optional(),
+  plazo: z.enum(["pronto", "15-dias", "1-mes", "2-meses", "sin-apuro"]).optional(),
   medida: z.boolean().optional(), tieneWeb: z.boolean().optional(), tieneDominio: z.boolean().optional(), tieneHosting: z.boolean().optional(),
-});
+}));
 export const sesionSchema = z.object({
   cliente: cliente.prefault({}),
   respuestas: respuestas.default({}),
   /* Respuestas abiertas de la guía (id de pregunta → texto). */
   textos: z.record(z.string().max(40), texto(1000)).default({}),
   notas: texto(4000).default(""),
+  /* Webs de referencia del cliente: enlace + por qué le gusta. */
+  referencias: z.array(z.object({ url: texto(500).default(""), motivo: texto(400).default("") })).max(15).default([]),
   checklist: z.record(z.string().max(40), z.enum(["incluido", "opcional", "no"])).default({}),
 });
 export type Sesion = z.infer<typeof sesionSchema>;
+
+/* Enlace abrible solo si es http(s); sin protocolo se asume https. */
+export function enlaceSeguro(url: string): string | null {
+  const t = url.trim();
+  if (!t || /\s/.test(t)) return null;
+  const u = URL.parse(/^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`);
+  return u && (u.protocol === "https:" || u.protocol === "http:") && u.hostname.includes(".") ? u.href : null;
+}
 
 export const sesionVacia = (c: Sesion["cliente"]): Sesion => sesionSchema.parse({ cliente: c });
 
 /* Checklist sugerido a partir de las respuestas (se puede cambiar a mano). */
 export function checklistInicial(r: RespuestasWeb): Record<string, Estado> {
-  const tienda = r.tipo === "tienda";
+  const tienda = esTienda(r);
   const c: Record<string, Estado> = { inicio: "incluido", servicios: "incluido", contacto: "incluido", whatsapp: "incluido", formulario: "incluido", seo: "incluido", medicion: "incluido", capacitacion: "incluido", dominio: "incluido", hosting: "incluido" };
   if (r.tipo !== "landing") c.nosotros = "incluido";
-  if (tienda || r.productos === "hasta-100" || r.productos === "mas-100") c.catalogo = "incluido";
+  if (tienda || tieneCatalogo(r)) c.catalogo = "incluido";
   if (tienda) { c.carrito = "incluido"; c.pagos = "incluido"; c.envios = "incluido"; }
   if (r.pagos) c.pagos = "incluido";
   if (r.envios) c.envios = "incluido";
@@ -190,7 +219,7 @@ export function aplicarRespuesta(s: Sesion, clave: keyof RespuestasWeb, valor: u
 export function respuestasEfectivas(s: Sesion): RespuestasWeb {
   const r: RespuestasWeb = { ...s.respuestas };
   const si = (id: string) => s.checklist[id] === "incluido";
-  if (si("carrito") && r.tipo !== "tienda") r.tipo = "tienda";
+  if (si("carrito") && !esTienda(r)) r.tipo = "tienda";
   for (const k of ["pagos", "envios", "blog", "reservas", "idiomas", "integraciones"] as const) if (si(k)) r[k] = true;
   return r;
 }
@@ -222,6 +251,10 @@ export function aPropuesta(s: Sesion, hoy: string, uid: () => string): ProposalD
     frequency: "unico", optional: true, price: null,
   }));
   const respuestasTexto = PREGUNTAS.filter((q) => q.tipo === "texto" && s.textos[q.id]?.trim()).map((q) => `${q.texto} ${s.textos[q.id].trim()}`);
+  const refs = s.referencias.filter((r) => r.url.trim()).map((r) => `- ${enlaceSeguro(r.url) ?? r.url.trim()}${r.motivo.trim() ? ` — ${r.motivo.trim()}` : ""}`);
+  const plazo = PREGUNTAS.find((q) => q.id === "plazo")?.opciones?.find((o) => o.id === s.respuestas.plazo);
+  if (plazo) respuestasTexto.push(`Plazo deseado: ${plazo.etiqueta}`);
+  if (refs.length) respuestasTexto.push(`Webs de referencia:\n${refs.join("\n")}`);
   return {
     ...p,
     title: `Desarrollo web · ${s.cliente.empresa || s.cliente.nombre || "Cliente"}`,

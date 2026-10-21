@@ -78,6 +78,16 @@
 .pr-chip { border: 1.5px solid var(--linea); background: var(--papel); border-radius: 999px; padding: 8px 14px; font-size: 13.5px; font-weight: 600; cursor: pointer; color: var(--tinta); }
 .pr-chip:hover { border-color: var(--tinta); }
 .pr-chip-on { background: var(--tinta); border-color: var(--tinta); color: #fff; }
+.pr-enlaces { display: grid; gap: 10px; justify-items: start; }
+.pr-enlace { width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 6px 8px; padding: 10px; border: 1.5px solid var(--linea); border-radius: 12px; background: var(--papel); }
+.pr-enlace input { width: 100%; border: 0; border-bottom: 1px solid var(--linea); background: transparent; padding: 6px 4px; font: 14px/1.4 var(--pr-sans), sans-serif; color: var(--tinta); outline: 0; }
+.pr-enlace input:focus { border-bottom-color: var(--tinta); }
+.pr-enlace-motivo { grid-column: 1 / -1; }
+.pr-enlace-abrir { align-self: center; font-size: 13px; font-weight: 700; color: #7c3aed; text-decoration: underline; text-underline-offset: 3px; }
+.pr-enlace-off { color: var(--suave); text-decoration: none; opacity: .5; }
+.pr-enlace-quitar { all: unset; cursor: pointer; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; font-size: 18px; color: var(--suave); }
+.pr-enlace-quitar:hover, .pr-enlace-quitar:focus-visible { background: #f4ecdf; color: var(--tinta); }
+.pr-enlace-viejo { margin: 0; font-size: 13px; color: var(--suave); white-space: pre-wrap; }
 @media (max-width: 760px) { .pr-pregunta { grid-template-columns: 1fr; } }
 
 /* Proceso */

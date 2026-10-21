@@ -7,11 +7,11 @@ export type Nivel = "basico" | "intermedio" | "avanzado";
 
 /* Respuestas de la reunión que influyen en el nivel. */
 export type RespuestasWeb = {
-  tipo?: "presentacion" | "landing" | "servicios" | "tienda";
+  tipo?: "presentacion" | "landing" | "servicios" | "tienda" | "mixta";
   paginas?: "hasta-5" | "6-10" | "mas-10";
-  productos?: "ninguno" | "hasta-100" | "mas-100";
+  productos?: "ninguno" | "1-50" | "51-100" | "101-200" | "mas-200";
   variantes?: boolean;
-  muchasImagenes?: boolean;
+  fotos?: "1-3" | "4-6" | "7-10";
   pagos?: boolean;
   envios?: boolean;
   blog?: boolean;
@@ -23,6 +23,8 @@ export type RespuestasWeb = {
   tieneWeb?: boolean;
   tieneDominio?: boolean;
   tieneHosting?: boolean;
+  /* Para cuándo la necesita (no cambia el nivel). */
+  plazo?: "pronto" | "15-dias" | "1-mes" | "2-meses" | "sin-apuro";
 };
 
 export const NIVELES: Record<Nivel, { nombre: string; catalogoId: string; rango: string; desde: number; hasta: number; plazo: string; resumen: string }> = {
@@ -42,20 +44,26 @@ export const NIVELES: Record<Nivel, { nombre: string; catalogoId: string; rango:
 
 const ORDEN: Nivel[] = ["basico", "intermedio", "avanzado"];
 
+/* «Mixta» = web corporativa con tienda (Pedro 21-oct-2026): vende igual que una tienda. */
+export const esTienda = (r: RespuestasWeb) => r.tipo === "tienda" || r.tipo === "mixta";
+export const tieneCatalogo = (r: RespuestasWeb) => !!r.productos && r.productos !== "ninguno";
+
 /* Nivel = el más alto que exija alguna respuesta. Cada regla que sube el nivel
    deja un motivo legible para mostrarlo al cliente. */
 export function estimarNivel(r: RespuestasWeb): { nivel: Nivel; motivos: string[] } {
   const reglas: [boolean | undefined, Nivel, string][] = [
-    [r.tipo === "tienda", "intermedio", "Tienda online: carrito y proceso de compra"],
+    [esTienda(r), "intermedio", r.tipo === "mixta" ? "Web corporativa con tienda online" : "Tienda online: carrito y proceso de compra"],
     [r.pagos, "intermedio", "Pagos online integrados"],
     [r.envios, "intermedio", "Configuración de envíos"],
-    [r.productos === "hasta-100", "intermedio", "Catálogo de productos (hasta 100)"],
+    [r.productos === "1-50", "intermedio", "Catálogo de hasta 50 productos"],
+    [r.productos === "51-100", "intermedio", "Catálogo de 50 a 100 productos"],
     [r.blog, "intermedio", "Blog o sección de noticias"],
     [r.reservas, "intermedio", "Reservas o agenda en línea"],
     [r.idiomas, "intermedio", "Web en más de un idioma"],
     [r.paginas === "6-10" || r.paginas === "mas-10", "intermedio", "Más de 5 páginas"],
-    [r.productos === "mas-100", "avanzado", "Más de 100 productos"],
-    [r.variantes && r.muchasImagenes, "avanzado", "Muchas variantes e imágenes por producto"],
+    [r.productos === "101-200", "avanzado", "Catálogo de 100 a 200 productos"],
+    [r.productos === "mas-200", "avanzado", "Más de 200 productos"],
+    [r.variantes && r.fotos === "7-10", "avanzado", "Variantes y de 7 a 10 fotos por producto"],
     [r.integraciones, "avanzado", "Integraciones con otros sistemas (inventario, facturación, ERP)"],
     [r.medida, "avanzado", "Funciones a medida"],
   ];

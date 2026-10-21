@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
 import { crearCola } from "@/lib/presentacion/cola";
 import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
 import type { SesionGuardada } from "@/lib/presentacion/server";
@@ -146,6 +146,26 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                                     onClick={() => responder(q.clave!, activo ? undefined : o.id)}>{o.etiqueta}</button>
                                 );
                               })}
+                            </div>
+                          )}
+                          {q.tipo === "enlaces" && (
+                            <div className="pr-enlaces">
+                              {s.referencias.map((r, i) => {
+                                const href = enlaceSeguro(r.url);
+                                const editar = (campo: "url" | "motivo", v: string) => cambiar((x) => ({ ...x, referencias: x.referencias.map((y, j) => (j === i ? { ...y, [campo]: v } : y)) }));
+                                return (
+                                  <div key={i} className="pr-enlace">
+                                    <input id={i === 0 ? `q-${q.id}` : undefined} type="url" inputMode="url" placeholder="www.ejemplo.com" maxLength={500} value={r.url} onChange={(e) => editar("url", e.target.value)} aria-label={`Web de referencia ${i + 1}`} />
+                                    {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="pr-enlace-abrir">Abrir</a> : <span className="pr-enlace-abrir pr-enlace-off">Abrir</span>}
+                                    <button type="button" className="pr-enlace-quitar" aria-label={`Quitar web ${i + 1}`} onClick={() => cambiar((x) => ({ ...x, referencias: x.referencias.filter((_, j) => j !== i) }))}>×</button>
+                                    <input className="pr-enlace-motivo" placeholder="¿Por qué le gusta? (diseño, colores, cómo vende…)" maxLength={400} value={r.motivo} onChange={(e) => editar("motivo", e.target.value)} aria-label={`Motivo de la web ${i + 1}`} />
+                                  </div>
+                                );
+                              })}
+                              {s.referencias.length < 15 && (
+                                <button type="button" className="pr-chip" onClick={() => cambiar((x) => ({ ...x, referencias: [...x.referencias, { url: "", motivo: "" }] }))}>+ Agregar web</button>
+                              )}
+                              {s.textos[q.id]?.trim() && <p className="pr-enlace-viejo">{s.textos[q.id]}</p>}
                             </div>
                           )}
                           {q.tipo === "sino" && (

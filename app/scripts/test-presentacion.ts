@@ -8,12 +8,12 @@ assert.equal(estimarNivel({}).nivel, "basico");
 const tienda = estimarNivel({ tipo: "tienda" });
 assert.equal(tienda.nivel, "intermedio");
 assert.ok(tienda.motivos.some((m) => /carrito/i.test(m)));
-assert.equal(estimarNivel({ productos: "mas-100" }).nivel, "avanzado");
+assert.equal(estimarNivel({ productos: "mas-200" }).nivel, "avanzado");
 assert.equal(estimarNivel({ tipo: "presentacion", integraciones: true }).nivel, "avanzado");
 assert.equal(estimarNivel({ tipo: "presentacion", idiomas: true }).nivel, "intermedio");
 assert.equal(estimarNivel({ tipo: "landing", paginas: "hasta-5" }).nivel, "basico");
 assert.equal(estimarNivel({ tipo: "presentacion", paginas: "mas-10" }).nivel, "intermedio");
-for (const r of [{ tipo: "tienda" as const }, { productos: "mas-100" as const }, { idiomas: true }]) assert.ok(estimarNivel(r).motivos.length > 0);
+for (const r of [{ tipo: "tienda" as const }, { productos: "mas-200" as const }, { idiomas: true }]) assert.ok(estimarNivel(r).motivos.length > 0);
 assert.equal(NIVELES.basico.desde, 1800);
 assert.deepEqual([NIVELES.intermedio.desde, NIVELES.intermedio.hasta], [3000, 3500]);
 assert.deepEqual([NIVELES.avanzado.desde, NIVELES.avanzado.hasta], [5000, 8000]);
@@ -55,7 +55,7 @@ assert.equal(sesionSchema.safeParse({ ...s, notas: "x".repeat(4001) }).success, 
 console.log("✓ presentación: checklist y propuesta");
 
 // Revisión final: cambiar el tipo de web baja el nivel y respeta ediciones manuales.
-import { aplicarRespuesta } from "../lib/presentacion/web";
+import { aplicarRespuesta, enlaceSeguro } from "../lib/presentacion/web";
 import { crearCola } from "../lib/presentacion/cola";
 {
   let x = sesionVacia({ nombre: "", empresa: "X", rubro: "", contacto: "" });
@@ -96,4 +96,38 @@ void (async () => {
   const fallo = crearCola<number>(async () => false, 5);
   fallo.programar(1); assert.equal(await fallo.vaciar(), false);
   console.log("✓ presentación: revisión final");
+
+  /* Web mixta, rangos de productos y fotos (Pedro 21-oct-2026). */
+  assert.equal(estimarNivel({ tipo: "mixta" }).nivel, "intermedio");
+  assert.equal(checklistInicial({ tipo: "mixta" }).carrito, "incluido");
+  assert.equal(checklistInicial({ tipo: "mixta" }).nosotros, "incluido");
+  assert.equal(estimarNivel({ productos: "1-50" }).nivel, "intermedio");
+  assert.equal(estimarNivel({ productos: "51-100" }).nivel, "intermedio");
+  assert.equal(estimarNivel({ productos: "101-200" }).nivel, "avanzado");
+  assert.equal(estimarNivel({ variantes: true, fotos: "4-6" }).nivel, "basico");
+  assert.equal(estimarNivel({ variantes: true, fotos: "7-10" }).nivel, "avanzado");
+  assert.equal(checklistInicial({ productos: "1-50" }).catalogo, "incluido");
+  assert.equal(checklistInicial({ productos: "ninguno" }).catalogo, undefined);
+  const vieja = sesionSchema.parse({ respuestas: { productos: "mas-100", muchasImagenes: true, variantes: true } });
+  assert.equal(vieja.respuestas.productos, "101-200");
+  assert.equal(vieja.respuestas.fotos, "7-10");
+  assert.equal("muchasImagenes" in vieja.respuestas, false);
+  assert.equal(sesionSchema.parse({ respuestas: { productos: "hasta-100" } }).respuestas.productos, "51-100");
+  console.log("✓ presentación: web mixta, productos y fotos");
+
+  assert.equal(enlaceSeguro("apple.com"), "https://apple.com/");
+  assert.equal(enlaceSeguro("http://x.pe/a"), "http://x.pe/a");
+  assert.equal(enlaceSeguro("javascript:alert(1)"), null);
+  assert.equal(enlaceSeguro("hola"), null);
+  assert.equal(enlaceSeguro("www.a b.com"), null);
+  const conRefs = sesionSchema.parse({ cliente: { empresa: "X" }, referencias: [{ url: "apple.com", motivo: "limpia" }, { url: "", motivo: "" }] });
+  assert.match(aPropuesta(conRefs, "2026-10-21", () => "id").objective, /Webs de referencia:\n- https:\/\/apple\.com\/ — limpia/);
+  assert.equal(sesionSchema.parse({}).referencias.length, 0);
+  console.log("✓ presentación: webs de referencia");
+
+  const conPlazo = aplicarRespuesta(sesionSchema.parse({ cliente: { empresa: "X" } }), "plazo", "1-mes");
+  assert.equal(conPlazo.respuestas.plazo, "1-mes");
+  assert.equal(estimarNivel(conPlazo.respuestas).nivel, "basico");
+  assert.match(aPropuesta(conPlazo, "2026-10-21", () => "id").objective, /Plazo deseado: De aquí a un mes/);
+  console.log("✓ presentación: plazo estandarizado");
 })().catch((e) => { console.error(e); process.exit(1); });
