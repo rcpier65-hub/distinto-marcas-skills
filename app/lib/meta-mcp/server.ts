@@ -11,7 +11,7 @@ export const META_TOKEN_URL = 'https://graph.facebook.com/v26.0/oauth/access_tok
 export const META_CALLBACK_PATH = '/api/meta/ads-mcp/callback'
 export const META_STATE_COOKIE = 'distinto_meta_mcp_state'
 // Request reporting access. Never request campaign/catalog writes for this integration.
-export const META_SCOPES = ['ads_read','ads_mcp_management','business_management','pages_show_list','instagram_basic','pages_read_engagement','instagram_manage_insights','read_insights']
+export const META_SCOPES = ['ads_read','ads_mcp_management','business_management','pages_show_list','instagram_basic','pages_read_engagement','instagram_manage_insights','read_insights','pages_read_user_content','instagram_manage_comments']
 export type Tokens = { access_token: string; refresh_token?: string; token_type: string; expires_in?: number; scope?: string }
 export type ConnectionRow = { id: boolean; tokens_encrypted: string; token_context: string; expires_at: string | null; updated_at: string; scopes: string[] }
 export type BrandBinding = { marca_id:string; ad_account_id:string|null; facebook_page_id:string|null; instagram_user_id:string|null; display_data:{adAccountName?:string;facebookPageName?:string;instagramUsername?:string;currency?:string}; updated_at:string }
