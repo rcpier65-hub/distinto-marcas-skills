@@ -13,6 +13,9 @@
 // Las tareas "para publicar" (marca cliente) van a /publicaciones/[id]
 // que tiene el form completo. Routing en /diseno → openRow.
 
+import { actor } from '@/lib/estrategia/access'
+import { disenosParaReunion, puedeMarcarDiseno } from '@/lib/reuniones/diseno'
+import { DisenoReunionButton, DisenoReunionProvider } from '@/components/diseno/reunion-button'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
@@ -108,6 +111,10 @@ export default async function DisenoDetailPage({ params }: PageProps) {
   const tipoRaw = String((Array.isArray(pub.tipo_contenido) ? pub.tipo_contenido[0] : '') ?? '').toLowerCase()
   const tipoEntregable = /histor|stor/.test(tipoRaw) ? 'historia' : tipoRaw.includes('carrus') ? 'carrusel' : 'post'
 
+  const a = await actor()
+  const reunionIds = puedeMarcarDiseno(a) ? await disenosParaReunion(a) : null
+  const reunionMarcas = marcasRaw.filter((m) => m.id === pub.marca_id || (pub.marcas_extra ?? []).includes(m.id))
+
   return (
     <main className="container mx-auto p-6 max-w-6xl">
       <nav className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
@@ -115,6 +122,12 @@ export default async function DisenoDetailPage({ params }: PageProps) {
         <span>/</span>
         <span className="text-foreground font-medium truncate max-w-[260px]">{pub.nombre}</span>
       </nav>
+
+      {reunionIds && <div className="mb-4">
+        <DisenoReunionProvider initialIds={reunionIds}>
+          <DisenoReunionButton id={id} marcas={reunionMarcas} />
+        </DisenoReunionProvider>
+      </div>}
 
       {entregables.length > 0 && <EntregablesPanel tipo={tipoEntregable} iniciales={entregables} />}
 

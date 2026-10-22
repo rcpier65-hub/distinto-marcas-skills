@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron, Sparkles as IcoMagia, Loader2 as IcoCargando, Clock as IcoReloj, ChevronLeft as IcoAnt, ChevronRight as IcoSig, Plus as IcoMas, Link2 as IcoLink, Trash2 as IcoBorrar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { DisenoReunionButton } from '@/components/diseno/reunion-button'
 import { MarcaSelect } from '@/components/marca-select'
 import { calendarioMarcaParaDiseno, crearEntregables, type PubCalendario } from '@/app/diseno/_entregables-actions'
 import { useIsMobile } from '@/lib/hooks/use-is-mobile'
@@ -677,6 +678,7 @@ function TablaVista({
                       Abrir
                     </button>
                   </div>
+                  <div className="mt-1"><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
                 </Td>
                 <Td>
                   {entry.fechaEntrega ? (
@@ -1174,6 +1176,7 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, on
           </div>
         )
       )}
+      <DisenoReunionButton id={entry.id} marcas={entry.marcasTags} />
     </div>
   )
 }

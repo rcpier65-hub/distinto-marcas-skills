@@ -8,6 +8,9 @@
 //   - Trae descripcion + fecha_entrega (columnas nuevas, defensive
 //     retry sin ellas si la migration aún no se aplicó)
 
+import { actor } from '@/lib/estrategia/access'
+import { disenosParaReunion } from '@/lib/reuniones/diseno'
+import { DisenoReunionProvider } from '@/components/diseno/reunion-button'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { DisenoView } from '@/components/views/DisenoView'
@@ -262,7 +265,10 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     }
   })
 
+  const reunionIds = await disenosParaReunion(await actor())
+
   return (
+    <DisenoReunionProvider initialIds={reunionIds}>
     <DisenoFechasShell fechas={fechasImportantes}>
       <DisenoView
         entries={entries}
@@ -278,5 +284,6 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
         initialNuevo={initialNuevo}
       />
     </DisenoFechasShell>
+    </DisenoReunionProvider>
   )
 }

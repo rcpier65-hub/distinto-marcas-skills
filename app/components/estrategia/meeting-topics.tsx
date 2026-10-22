@@ -4,14 +4,14 @@
    al abrirlo lista lo que se presenta (tareas terminadas) y lo que se conversa
    (tareas pendientes y temas sueltos), permite agregar temas, empezar la
    reunión en Notas y reuniones con el orden del día y cerrarla como presentada. */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronRight, Circle, MessageSquareText, NotebookPen, Plus, Video, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, MessageSquareText, NotebookPen, Plus, Presentation, Video, X } from "lucide-react";
 import { api, Modal, PrettyDate } from "./common";
 
-type Tema = { id: string; tipo: "tarea" | "tema"; texto: string; hecha: boolean; responsable: string | null; tareaId: string | null };
+import type { TemaReunion as Tema } from "@/lib/reuniones/temas";
 type Datos = { temas: Tema[]; ultima: { fecha: string; total: number; notaId: string | null } | null };
 type Reunion = { date?: string | null; time?: string | null; title: string } | undefined;
 
@@ -24,40 +24,64 @@ export function MeetingTopics({ slug, brandName, meeting }: { slug: string; bran
   const [nuevo, setNuevo] = useState("");
   const [ocupado, setOcupado] = useState<string | null>(null);
 
+  const solicitud = useRef(0);
+  const leyendo = useRef(false);
+  const mutando = useRef(false);
+  const invalidar = useCallback(() => { solicitud.current++; }, []);
   const cargar = useCallback(async () => {
+    if (leyendo.current || mutando.current) return;
+    leyendo.current = true;
+    const version = ++solicitud.current;
     try {
       const r = await fetch(`${URL_TEMAS}?marca=${encodeURIComponent(slug)}`, { cache: "no-store" });
-      if (r.ok) setDatos(await r.json());
+      if (r.ok) {
+        const datos = await r.json();
+        if (version === solicitud.current) setDatos(datos);
+      }
     } catch {
       /* sin red: se conserva lo último cargado */
-    }
+    } finally { leyendo.current = false; }
   }, [slug]);
   useEffect(() => {
     /* Primera carga fuera del render del efecto; se recarga al volver a la pestaña
        (por ejemplo, después de marcar tareas en el tablero). */
     const primera = setTimeout(() => void cargar(), 0);
     const alVolver = () => { if (document.visibilityState === "visible") void cargar(); };
+    const intervalo = setInterval(alVolver, 30000);
     document.addEventListener("visibilitychange", alVolver);
-    return () => { clearTimeout(primera); document.removeEventListener("visibilitychange", alVolver); };
-  }, [cargar]);
+    window.addEventListener("focus", alVolver);
+    window.addEventListener("distinto:reunion-temas", alVolver);
+    return () => {
+      invalidar();
+      clearTimeout(primera); clearInterval(intervalo);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("focus", alVolver);
+      window.removeEventListener("distinto:reunion-temas", alVolver);
+    };
+  }, [cargar, invalidar]);
 
   const accion = async (clave: string, input: Record<string, unknown>) => {
+    solicitud.current++;
+    mutando.current = true;
     setOcupado(clave);
     try {
       const out = await api(URL_TEMAS, { marca: slug, ...input });
+      solicitud.current++;
       setDatos({ temas: out.temas, ultima: out.ultima });
+      window.dispatchEvent(new Event("distinto:reunion-temas"));
       return out;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo completar");
       return null;
     } finally {
+      mutando.current = false;
       setOcupado(null);
     }
   };
 
   const temas = datos?.temas ?? [];
-  const presentar = temas.filter((t) => t.hecha);
-  const conversar = temas.filter((t) => !t.hecha);
+  const presentar = temas.filter((t) => t.tipo === "diseno" || t.hecha);
+  const conversar = temas.filter((t) => t.tipo !== "diseno" && !t.hecha);
   const resumen = !datos
     ? "Cargando temas…"
     : temas.length
@@ -81,10 +105,10 @@ export function MeetingTopics({ slug, brandName, meeting }: { slug: string; bran
 
   const Fila = ({ t }: { t: Tema }) => (
     <li className="st-mt-item">
-      {t.tipo === "tema" ? <MessageSquareText size={15} className="st-mt-ico" /> : t.hecha ? <CheckCircle2 size={15} className="st-mt-ico st-mt-done" /> : <Circle size={15} className="st-mt-ico" />}
+      {t.tipo === "diseno" ? <Presentation size={15} className="st-mt-ico" /> : t.tipo === "tema" ? <MessageSquareText size={15} className="st-mt-ico" /> : t.hecha ? <CheckCircle2 size={15} className="st-mt-ico st-mt-done" /> : <Circle size={15} className="st-mt-ico" />}
       <span className="st-mt-text">
-        {t.tareaId ? <Link href={`/tareas?marca=${encodeURIComponent(slug)}${t.hecha ? `&tarea=${t.tareaId}` : ""}`}>{t.texto}</Link> : t.texto}
-        <small>{t.tipo === "tema" ? "Tema" : t.hecha ? "Terminada" : "En curso"}{t.responsable ? ` · ${t.responsable}` : ""}</small>
+        {t.href ? <Link href={t.href}>{t.texto}</Link> : t.tareaId ? <Link href={`/tareas?marca=${encodeURIComponent(slug)}${t.hecha ? `&tarea=${t.tareaId}` : ""}`}>{t.texto}</Link> : t.texto}
+        <small>{t.tipo === "diseno" ? "Diseño · " : ""}{t.tipo === "tema" ? "Tema" : t.hecha ? "Terminada" : "En curso"}{t.responsable ? ` · ${t.responsable}` : ""}</small>
       </span>
       <button className="st-icon st-mt-remove" aria-label="Quitar de la reunión" title="Quitar de la reunión" disabled={!!ocupado} onClick={() => accion(`quitar:${t.id}`, { accion: "quitar", id: t.id })}>
         <X size={14} />
@@ -94,7 +118,7 @@ export function MeetingTopics({ slug, brandName, meeting }: { slug: string; bran
 
   return (
     <>
-      <button className="st-next-meeting" onClick={() => setAbierto(true)} aria-label="Abrir temas para la próxima reunión">
+      <button className="st-next-meeting" onClick={() => { setAbierto(true); void cargar(); }} aria-label="Abrir temas para la próxima reunión">
         <Video size={17} />
         <span>
           <small>Próxima reunión</small>
@@ -128,7 +152,7 @@ export function MeetingTopics({ slug, brandName, meeting }: { slug: string; bran
 
             <section>
               <h3>Para presentar <span>{presentar.length}</span></h3>
-              {presentar.length ? <ul>{presentar.map((t) => <Fila key={t.id} t={t} />)}</ul> : <p className="st-mt-hint">Cuando termines una tarea, márcala con «Para la próxima reunión» en el menú ⋯ de su tarjeta (o desde el Archivo de tareas).</p>}
+              {presentar.length ? <ul>{presentar.map((t) => <Fila key={t.id} t={t} />)}</ul> : <p className="st-mt-hint">Marca los diseños con «Para presentar en reunión» en Diseño, o las tareas terminadas desde su menú «Para la próxima reunión».</p>}
             </section>
 
             <section>

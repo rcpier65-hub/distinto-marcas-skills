@@ -1,4 +1,5 @@
 import "server-only";
+import { designFinished } from "@/lib/estrategia/activity-status";
 /* Temas para la próxima reunión con una marca (Pedro 19-oct-2026): tareas
    marcadas "Para reunión" en el tablero + temas sueltos escritos a mano. Las
    tareas terminadas se presentan; las pendientes y los temas se conversan.
@@ -9,12 +10,14 @@ type Service = any;
 
 export type TemaReunion = {
   id: string;
-  tipo: "tarea" | "tema";
+  tipo: "tarea" | "diseno" | "tema";
   texto: string;
-  /* true = tarea terminada (para presentar). Los temas sueltos siempre false. */
+  /* Estado real del original; marcar para presentar nunca lo completa. */
   hecha: boolean;
   responsable: string | null;
   tareaId: string | null;
+  publicacionId: string | null;
+  href: string | null;
   creado: string;
 };
 export type TemasReunion = {
@@ -52,7 +55,7 @@ export async function marcaDeTarea(
 export async function listarTemas(service: Service, marcaId: string): Promise<TemasReunion> {
   const { data, error } = await service
     .from("reunion_temas")
-    .select("id,tarea_id,texto,created_at,tarea:tareas(texto,completada,team_member_id)")
+    .select("id,tarea_id,publicacion_id,texto,created_at,tarea:tareas(texto,completada,team_member_id),diseno:publicaciones!publicacion_id(nombre,marca_id,marcas_extra,estado_tarea,es_tarea_diseno,disenado,diseno_terminado_at,fecha_publicacion,disenador_nombre)")
     .eq("marca_id", marcaId)
     .eq("estado", "pendiente")
     .order("created_at", { ascending: true });
@@ -65,15 +68,21 @@ export async function listarTemas(service: Service, marcaId: string): Promise<Te
     const { data: miembros } = await service.from("team_members").select("id,nombre").in("id", ids);
     for (const m of miembros ?? []) nombres.set(m.id, m.nombre);
   }
-  const temas: TemaReunion[] = rows.map((r) => {
+  const temas: TemaReunion[] = rows.flatMap((r) => {
     const t = Array.isArray(r.tarea) ? r.tarea[0] : r.tarea;
+    const d = Array.isArray(r.diseno) ? r.diseno[0] : r.diseno;
+    // Si el diseño se reasigna, deja de aparecer en la marca anterior.
+    if (r.publicacion_id && (!d || ![d.marca_id, ...(d.marcas_extra ?? [])].includes(marcaId))) return [];
+
     return {
       id: r.id,
-      tipo: r.tarea_id ? "tarea" : "tema",
-      texto: t?.texto ?? r.texto,
-      hecha: Boolean(t?.completada),
-      responsable: t ? nombreCorto(nombres.get(t.team_member_id)) : null,
+      tipo: r.publicacion_id ? "diseno" : r.tarea_id ? "tarea" : "tema",
+      texto: d?.nombre ?? t?.texto ?? r.texto,
+      hecha: d ? designFinished(d) : Boolean(t?.completada),
+      responsable: d ? nombreCorto(d.disenador_nombre) : t ? nombreCorto(nombres.get(t.team_member_id)) : null,
       tareaId: r.tarea_id ?? null,
+      publicacionId: r.publicacion_id ?? null,
+      href: d ? `/${d.fecha_publicacion ? "publicaciones" : "diseno"}/${r.publicacion_id}` : null,
       creado: r.created_at,
     };
   });
@@ -101,11 +110,11 @@ export async function listarTemas(service: Service, marcaId: string): Promise<Te
    de Notas y reuniones trabaja en texto. */
 export function ordenDelDia(marca: string, temas: TemaReunion[], fecha: Date): string {
   const dia = fecha.toLocaleDateString("es-PE", { timeZone: "America/Lima", day: "numeric", month: "long", year: "numeric" });
-  const linea = (t: TemaReunion) => `- ${t.texto.replace(/\s+/g, " ").trim()}${t.responsable ? ` (${t.responsable})` : ""}`;
-  const presentar = temas.filter((t) => t.hecha);
-  const conversar = temas.filter((t) => !t.hecha);
+  const linea = (t: TemaReunion) => `- ${t.tipo === "diseno" ? `Diseño (${t.hecha ? "terminado" : "en curso"}): ` : ""}${t.texto.replace(/\s+/g, " ").trim()}${t.responsable ? ` (${t.responsable})` : ""}`;
+  const presentar = temas.filter((t) => t.tipo === "diseno" || t.hecha);
+  const conversar = temas.filter((t) => t.tipo !== "diseno" && !t.hecha);
   const partes = [`Reunión con ${marca} · ${dia}`];
-  if (presentar.length) partes.push("", "Para presentar (terminado)", ...presentar.map(linea));
+  if (presentar.length) partes.push("", "Para presentar", ...presentar.map(linea));
   if (conversar.length) partes.push("", "Para conversar", ...conversar.map(linea));
   partes.push("", "Notas de la reunión", "");
   return partes.join("\n");

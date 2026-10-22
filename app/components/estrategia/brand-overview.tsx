@@ -329,7 +329,7 @@ export function BrandOverview({
                 </p>
               )}
             </div>
-            <MeetingTopics slug={b.brand.slug} brandName={b.brand.nombre} meeting={meeting} />
+            <MeetingTopics key={b.brand.slug} slug={b.brand.slug} brandName={b.brand.nombre} meeting={meeting} />
           </section>
         </div>
         <div className="st-dashboard-bottom">
