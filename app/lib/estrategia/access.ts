@@ -92,6 +92,7 @@ export async function recordAccess(
   if (a.client) {
     if (
       write ||
+      r.archived ||
       r.kind !== "sheet" ||
       r.data.sharedWithClient !== true ||
       !a.clientBrands.some((b) => b.marca_id === r.marca_id)

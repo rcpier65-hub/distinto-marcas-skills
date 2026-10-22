@@ -120,6 +120,7 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const path = request.nextUrl.pathname
     const permitidoParaCliente =
+      /^\/marca\/[^/]+\/estrategia\/?$/.test(path) || // Client projection; page checks active brand, no staff API access.
       path.startsWith('/api/estrategia/hojas/') ||
       path === '/cliente' || path.startsWith('/cliente/') ||
       path.startsWith('/api/video') ||   // reproductor del portal (auth propia)

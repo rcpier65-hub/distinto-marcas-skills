@@ -23,6 +23,7 @@ import { TareasClienteView, type TareaClienteItem } from './tareas-cliente-view'
 import { TareasPlanView, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
+import { ClientQuickAccess } from '@/components/cliente/quick-access'
 import { guardarVentasCliente } from '../_reporte-actions'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
@@ -797,6 +798,8 @@ export function ClientePortalView({
               </button>
             </div>
           </header>
+
+          <ClientQuickAccess key={marcaId} marcaId={marcaId} marcaSlug={marcaSlug} />
 
           {/* Cliente multi-marca: selector en móvil (en PC va en el menú lateral). */}
           {marcasDisponibles.length > 1 && (
