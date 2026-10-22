@@ -29,7 +29,7 @@ const Canvas = dynamic(() => import("./canvas"), {
 export function SheetWorkspace({ initial }: { initial: any }) {
   const [data, setData] = useState(initial),
     [panel, setPanel] = useState(initial.me.client ? "Comentarios" : initial.sheet.data.description ? "Plan" : "Reunión"),
-    [open, setOpen] = useState(!initial.me.client),
+    [open, setOpen] = useState(!initial.me.client && !initial.sheet.boceto_publicacion_id),
     [status, setStatus] = useState("Guardado"),
     [clientId] = useState(() => crypto.randomUUID()),
     [follow, setFollow] = useState(""),
@@ -127,6 +127,7 @@ export function SheetWorkspace({ initial }: { initial: any }) {
           </div>
         </div>
         <div className="st-toolbar">
+          {!data.me.client && sheet.boceto_publicacion_id && <Link href={`/diseno/${sheet.boceto_publicacion_id}`}>Volver al diseño ↗</Link>}
           <div className="st-presence">
             {data.presence
               .filter((p: any) => p.client_id !== clientId)
@@ -173,6 +174,7 @@ export function SheetWorkspace({ initial }: { initial: any }) {
         </div>
       </header>
       <div className="st-sheet-status">
+        {sheet.boceto_publicacion_id && <span>Pega imágenes con Ctrl/Cmd + V, dibuja y añade notas. El boceto se guarda en Planificación.</span>}
         <span>
           {sheet.data.state || "Planificación"} ·{" "}
           {data.me.client ? "Lienzo compartido · solo lectura" : status}

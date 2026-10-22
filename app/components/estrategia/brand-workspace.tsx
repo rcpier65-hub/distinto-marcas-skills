@@ -197,13 +197,12 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
             {str(s.data, "objective") || "Objetivos por definir"}
           </div>
           <div className="st-mini-note">
-            {b.links.filter((l) => l.sheet_id === s.id).length} registros
-            vinculados
+            {s.boceto_publicacion_id ? "Vinculado a Diseño" : `${b.links.filter((l) => l.sheet_id === s.id).length} registros vinculados`}
           </div>
           <LayoutTemplate size={24} />
         </Link>
         <div className="st-row">
-          <span className="st-badge">{str(s.data, "state")}</span>
+          <span className="st-badge">{s.boceto_publicacion_id ? "Boceto · " : ""}{str(s.data, "state")}</span>
           <small>
             {b.team.find((t: any) => t.id === s.data.ownerId)?.nombre ||
               "Equipo"}
@@ -222,6 +221,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
         </small>
         <div className="st-toolbar">
           <button onClick={() => setEditing(s)}>Detalles</button>
+          {s.boceto_publicacion_id && <Link href={`/diseno/${s.boceto_publicacion_id}`}>Ver tarea de diseño ↗</Link>}
           <button
             onClick={() => duplicate(s)}
             aria-label={`Duplicar ${s.title}`}

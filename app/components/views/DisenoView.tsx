@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron, Sparkles as IcoMagia, Loader2 as IcoCargando, Clock as IcoReloj, ChevronLeft as IcoAnt, ChevronRight as IcoSig, Plus as IcoMas, Link2 as IcoLink, Trash2 as IcoBorrar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { DisenoBocetoButton } from '@/components/diseno/boceto-button'
 import { DisenoReunionButton } from '@/components/diseno/reunion-button'
 import { MarcaSelect } from '@/components/marca-select'
 import { calendarioMarcaParaDiseno, crearEntregables, type PubCalendario } from '@/app/diseno/_entregables-actions'
@@ -678,7 +679,7 @@ function TablaVista({
                       Abrir
                     </button>
                   </div>
-                  <div className="mt-1"><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
+                  <div className="mt-1 flex items-center gap-2"><DisenoBocetoButton href={entry.bocetoHref} /><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
                 </Td>
                 <Td>
                   {entry.fechaEntrega ? (
@@ -1176,7 +1177,7 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, on
           </div>
         )
       )}
-      <DisenoReunionButton id={entry.id} marcas={entry.marcasTags} />
+      <div className="flex items-center gap-2"><DisenoBocetoButton href={entry.bocetoHref} /><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
     </div>
   )
 }
@@ -1194,6 +1195,7 @@ function NuevaTareaModal({
   /* Pre-fill cuando se llega desde /grilla con ?marca=slug. */
   initialMarcaSlug?: string
 }) {
+  const [tieneBoceto, setTieneBoceto] = useState(false)
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [fechaDiseno, setFechaDiseno] = useState('')
@@ -1284,6 +1286,7 @@ function NuevaTareaModal({
     if (submitEnCurso.current) return
     if (!tipo) { toast.error('Elige el tipo: Post, Carrusel, Historia o Interno'); return }
     if (!nombre.trim()) { toast.error('Falta nombre'); return }
+    if (tieneBoceto && (!marcaSlug || marcaSlug === 'interno')) { toast.error('Selecciona la marca principal del boceto'); return }
     if (esParaPublicar && redes.length === 0) { toast.error('Elige al menos una red'); return }
     if (esParaPublicar && !marcaSlug) { toast.error('Selecciona la marca'); return }
     if (esParaPublicar && entregables.length === 0) { toast.error('Elige en el calendario los días que vas a diseñar'); return }
@@ -1308,6 +1311,7 @@ function NuevaTareaModal({
       solicitudId.current ??= crypto.randomUUID()
       const r = await crearDisenoTask({
         solicitudId: solicitudId.current,
+        tieneBoceto,
         paraHoy,
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
@@ -1367,6 +1371,7 @@ function NuevaTareaModal({
         .map((m) => ({ slug: m!.slug, nombre: m!.nombre, color: m!.color, emoji: m!.emoji ?? null }))
       onCreated({
         id: r.data!.id,
+        bocetoHref: r.data!.bocetoHref,
         marcaSlug: marca?.slug ?? 'interno',
         marcaNombre: marca?.nombre ?? 'Distinto · Interno',
         marcaColor: marca?.color ?? '#a78bfa',
@@ -1391,6 +1396,9 @@ function NuevaTareaModal({
         startedAt: null,
         archivedAt: null,
       })
+      // El action revalida el tablero. Una navegación completa evita que su
+      // refresco vuelva a abrir ?nuevo=1 y descarte la salida al lienzo.
+      if (r.data?.bocetoHref) window.location.assign(r.data.bocetoHref)
     } catch {
       toast.error('No pudimos confirmar el guardado. Reintenta: se recuperará la misma tarea sin duplicarla.')
     } finally {
@@ -1488,6 +1496,16 @@ function NuevaTareaModal({
             </div>
           </Seccion>
 
+          <Seccion titulo="¿Este diseño tiene boceto?">
+            <div className="flex gap-2" role="group" aria-label="¿Este diseño tiene boceto?">
+              {[false, true].map(value => <button key={String(value)} type="button" aria-pressed={tieneBoceto === value}
+                onClick={() => setTieneBoceto(value)} className={`rounded-lg border px-4 py-2 text-sm font-medium ${tieneBoceto === value ? 'border-violet-400 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-600'}`}>
+                {value ? 'Sí, con boceto' : 'No'}
+              </button>)}
+            </div>
+            {tieneBoceto && <p className="text-xs leading-relaxed text-slate-500">Al guardar se abrirá el lienzo para pegar imágenes, dibujar y añadir notas. También aparecerá en Planificación de la marca principal.</p>}
+          </Seccion>
+
           {/* 2 · Datos */}
           <Seccion titulo="Detalle">
             <Campo label="Nombre de la tarea" requerido>
@@ -1500,7 +1518,7 @@ function NuevaTareaModal({
                 placeholder="¿Qué hay que diseñar? Textos, referencias, medidas…" rows={3}
                 style={{ ...campo, height: 'auto', minHeight: 76, padding: '10px 12px', resize: 'vertical', lineHeight: 1.45 }} />
             </Campo>
-            <Campo label={esParaPublicar ? 'Marca' : 'Marca (opcional)'} requerido={esParaPublicar}>
+            <Campo label={esParaPublicar || tieneBoceto ? 'Marca' : 'Marca (opcional)'} requerido={esParaPublicar || tieneBoceto}>
               <MarcaSelect marcas={marcas} value={marcaSlug} onChange={setMarcaSlug} />
             </Campo>
             {marcaSlug && marcaSlug !== 'interno' && marcas.length > 1 && (
@@ -1654,7 +1672,7 @@ function NuevaTareaModal({
             style={{ height: 40, padding: '0 20px', fontSize: 14, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 11, fontFamily: 'inherit',
               background: 'linear-gradient(135deg,#7170ff,#ba41f7)', boxShadow: '0 8px 18px -8px rgba(113,112,255,0.8)',
               cursor: submitting ? 'wait' : !tipo ? 'not-allowed' : 'pointer', opacity: submitting || !tipo ? 0.55 : 1 }}>
-            {submitting ? 'Creando…' : tipoInfo ? `Crear ${tipoInfo.label.toLowerCase()}` : 'Crear tarea'}
+            {submitting ? 'Creando…' : tieneBoceto ? 'Crear y abrir boceto' : tipoInfo ? `Crear ${tipoInfo.label.toLowerCase()}` : 'Crear tarea'}
           </button>
         </div>
         <style>{'.mk-modal-x:hover{background:#f1f5f9!important;color:#0f172a!important}.mk-modal-diseno input:focus,.mk-modal-diseno textarea:focus{border-color:#7170ff!important;box-shadow:0 0 0 3px rgba(113,112,255,0.15)}@media (max-width:520px){.mk-modal-diseno [role=radiogroup]{grid-template-columns:repeat(2,minmax(0,1fr))!important}}'}</style>

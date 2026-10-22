@@ -1,3 +1,5 @@
+import { DisenoBocetoButton } from '@/components/diseno/boceto-button'
+import { bocetosDeDisenos } from '@/lib/diseno/boceto'
 // app/app/diseno/[id]/page.tsx
 //
 // Vista detalle de tarea de diseño STANDALONE (marca=interno).
@@ -112,6 +114,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
   const tipoEntregable = /histor|stor/.test(tipoRaw) ? 'historia' : tipoRaw.includes('carrus') ? 'carrusel' : 'post'
 
   const a = await actor()
+  const bocetoHref = (await bocetosDeDisenos(a, [id])).get(id)
   const reunionIds = puedeMarcarDiseno(a) ? await disenosParaReunion(a) : null
   const reunionMarcas = marcasRaw.filter((m) => m.id === pub.marca_id || (pub.marcas_extra ?? []).includes(m.id))
 
@@ -122,6 +125,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
         <span>/</span>
         <span className="text-foreground font-medium truncate max-w-[260px]">{pub.nombre}</span>
       </nav>
+      <DisenoBocetoButton href={bocetoHref} />
 
       {reunionIds && <div className="mb-4">
         <DisenoReunionProvider initialIds={reunionIds}>

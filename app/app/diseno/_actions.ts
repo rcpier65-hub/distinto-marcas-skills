@@ -12,6 +12,8 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
+import { actor } from '@/lib/estrategia/access'
+import { permitirBoceto, bocetosDeDisenos } from '@/lib/diseno/boceto'
 import { hoyLima } from '@/lib/fechas/hoy'
 import type { SubEstadoDiseno } from '@/lib/diseno/types'
 import { idDeSolicitudDiseno, insertarDisenoUnaVez } from '@/lib/diseno/create-task'
@@ -279,6 +281,7 @@ export async function obtenerCorreosDeMarca(slug: string): Promise<{
  */
 export async function crearDisenoTask(args: {
   solicitudId?: string
+  tieneBoceto?: boolean
   paraHoy?: boolean
   nombre: string
   descripcion?: string | null
@@ -308,7 +311,7 @@ export async function crearDisenoTask(args: {
      conectado). */
   horaReunion?: string | null       // "HH:mm" — input type=time
   invitadosEmails?: string[] | null
-}): Promise<ActionResult<{ id: string; extrasCreadas: number }>> {
+}): Promise<ActionResult<{ id: string; extrasCreadas: number; bocetoHref?: string }>> {
   const user = await requireUser()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
@@ -345,7 +348,13 @@ export async function crearDisenoTask(args: {
     }
   }
 
+  if (args.tieneBoceto) {
+    try { await permitirBoceto(await actor(), targetSlug || "") }
+    catch (e) { return { ok: false, error: e instanceof Error ? e.message : "No se pudo autorizar el boceto" } }
+  }
+
   const insert: Record<string, unknown> = {
+    ...(args.tieneBoceto ? { tiene_boceto: true } : {}),
     id,
     marca_id: marca.id,
     nombre,
@@ -438,7 +447,9 @@ export async function crearDisenoTask(args: {
     revalidatePath('/publicaciones/kanban')
     revalidatePath('/editor')  /* el editor también filtra por estado */
   }
-  return { ok: true, data: { id: data.id, extrasCreadas } }
+  const bocetoHref = args.tieneBoceto ? (await bocetosDeDisenos(await actor(), [data.id])).get(data.id) : undefined
+  if (bocetoHref) revalidatePath(`/marca/${targetSlug}/estrategia`)
+  return { ok: true, data: { id: data.id, extrasCreadas, bocetoHref } }
 }
 
 /* ===== Reunión de ENTREGA de un diseño (Pedro 30-sep-2026) =====

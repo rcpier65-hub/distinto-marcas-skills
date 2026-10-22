@@ -8,6 +8,7 @@
 //   - Trae descripcion + fecha_entrega (columnas nuevas, defensive
 //     retry sin ellas si la migration aún no se aplicó)
 
+import { bocetosDeDisenos } from '@/lib/diseno/boceto'
 import { actor } from '@/lib/estrategia/access'
 import { disenosParaReunion } from '@/lib/reuniones/diseno'
 import { DisenoReunionProvider } from '@/components/diseno/reunion-button'
@@ -211,6 +212,7 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     }
   } catch { /* sin tabla todavía */ }
 
+  const bocetos = await bocetosDeDisenos(await actor(), allRows.map(r => r.id))
   const entries: DisenoEntry[] = allRows.map((r: any) => {
     const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
     const slug = marca?.slug ?? 'unknown'
@@ -223,6 +225,7 @@ export default async function DisenoPage({ searchParams }: { searchParams: Promi
     const extrasTags = extrasIds.map((eid) => marcaById.get(eid)).filter(Boolean) as { slug: string; nombre: string; color: string; emoji: string | null }[]
     return {
       id: r.id,
+      bocetoHref: bocetos.get(r.id),
       marcaSlug: slug,
       marcaNombre: marca?.nombre ?? slug,
       marcaColor: marca?.color_primario_hex ?? '#737373',

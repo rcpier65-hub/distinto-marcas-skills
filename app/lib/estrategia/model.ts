@@ -13,6 +13,7 @@ export const recordKinds = [
 export type RecordKind = (typeof recordKinds)[number];
 export type RecordData = Record<string, unknown>;
 export type StrategyRecord = {
+  boceto_publicacion_id?: string | null;
   id: string;
   marca_id: string;
   kind: RecordKind;

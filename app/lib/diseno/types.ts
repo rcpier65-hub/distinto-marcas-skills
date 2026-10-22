@@ -15,6 +15,7 @@ export type EstadoPub =
 export type SubEstadoDiseno = 'sin_empezar' | 'en_progreso' | 'pausada' | 'listo' | 'enviado' | 'archivado'
 
 export type DisenoEntry = {
+  bocetoHref?: string
   id: string
   marcaSlug: string
   marcaNombre: string             // para el chip del kanban sin lookup
