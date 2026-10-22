@@ -49,6 +49,12 @@ try {
   assert.throws(() => decryptAccess(cipher, brands[1], 'catalogos'))
   assert.throws(() => decryptAccess(cipher, brands[0], 'reclamos'))
   await ok(service.from('marcas').insert(brands.map((id, i) => ({ id, slug: slugs[i], nombre: `QA Portal ${i}`, activa: true }))))
+  await ok(service.from('publicaciones').insert([
+    { marca_id: brands[0], nombre: 'QA diseño sin empezar', es_tarea_diseno: true, estado_tarea: 'sin_empezar' },
+    { marca_id: brands[0], nombre: 'QA diseño entregado', es_tarea_diseno: true, estado_tarea: 'listo', diseno_terminado_at: new Date().toISOString() },
+    { marca_id: brands[0], nombre: 'QA diseño archivado', es_tarea_diseno: true, estado_tarea: 'archivado' },
+    { marca_id: brands[0], nombre: 'QA diseño retirado', es_tarea_diseno: true, estado_tarea: 'listo', archived_at: new Date().toISOString() },
+  ]))
   for (const [resource, value] of Object.entries(passwords)) await db.query('insert into client_portal_access(marca_id,resource,ciphertext,pin_hash) values($1,$2,$3,$4)', [brands[0], resource, encryptAccess(value, brands[0], resource), hashAccessPin('8990')])
   const owner = await ok(service.from('team_members').select('id').eq('email', 'pedro@agenciadistinto.com').single())
   await ok(service.from('strategy_records').insert(Object.entries(ids).map(([kind, id]) => ({ id, marca_id: kind === 'foreign' ? brands[1] : brands[0], kind: 'sheet', title: `QA ${kind} ${id}`, data: { sharedWithClient: kind !== 'private', privateNotes: `INTERNAL-${id}` }, created_by: owner.id, archived: kind === 'archived' }))))
@@ -82,6 +88,7 @@ try {
     assert(!result.text.includes('INTERNAL-')); assert(!result.text.includes(passwords.catalogos)); assert(!result.text.includes('ciphertext'))
   }
   const own = await request(`/marca/${slugs[0]}/estrategia`, a)
+  assert(own.text.includes('\\"designs\\":2') && own.text.includes('\\"ready\\":1'), 'Summary counts must include unstarted designs and exclude archived ones')
   assert(own.text.includes(ids.shared)); assert(!own.text.includes(ids.private)); assert(!own.text.includes(ids.archived)); assert(!own.text.includes(ids.foreign)); assert(!own.text.includes(`PUBLIC-${id}`))
   const unlocked = await request(`/marca/${slugs[0]}/estrategia`, a, null, { cookie: `${a.cookie()}; reportes_pin=ok` })
   assert(unlocked.text.includes(`PUBLIC-${id}`)); assert(!unlocked.text.includes(`DRAFT-${id}`))
@@ -119,6 +126,7 @@ try {
 } finally {
   await Promise.allSettled(sessions.map(s => s.auth.signOut({ scope: 'local' })))
   await db.query('delete from client_portal_access where marca_id=any($1::uuid[])', [brands])
+  await ok(service.from('publicaciones').delete().in('marca_id', brands))
   await ok(service.from('strategy_records').delete().in('marca_id', brands))
   await ok(service.from('reportes_mensuales').delete().in('marca_slug', slugs))
   const remove = users.filter(id => id !== uiUser)

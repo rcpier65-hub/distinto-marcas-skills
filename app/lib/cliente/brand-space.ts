@@ -20,7 +20,7 @@ export async function loadClientBrandSpace(slug: string) {
   const month = today.slice(0, 7), start = `${month}-01`
   const next = new Date(`${start}T12:00:00Z`); next.setUTCMonth(next.getUTCMonth() + 1)
   const end = next.toISOString().slice(0, 10)
-  const pubs = () => db.from('publicaciones').select('id', { count: 'exact', head: true }).eq('marca_id', client.marcaId)
+  const pubs = () => db.from('publicaciones').select('id', { count: 'exact', head: true }).eq('marca_id', client.marcaId).is('archived_at', null)
   const [published, scheduled, designs, ready, sheets, meetings, report, unlocked] = await Promise.all([
     pubs().gte('publicado_at', `${start}T00:00:00-05:00`).lt('publicado_at', `${end}T00:00:00-05:00`),
     pubs().is('publicado_at', null).gte('fecha_publicacion', today).lt('fecha_publicacion', end).neq('estado', 'archivado'),
