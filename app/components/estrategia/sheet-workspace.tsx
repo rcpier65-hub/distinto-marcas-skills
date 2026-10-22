@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { ReviewLink } from '@/components/creative-review/link';
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -127,6 +128,7 @@ export function SheetWorkspace({ initial }: { initial: any }) {
           </div>
         </div>
         <div className="st-toolbar">
+          {!data.me.client && sheet.boceto_publicacion_id && <ReviewLink id={sheet.boceto_publicacion_id} />}
           {!data.me.client && sheet.boceto_publicacion_id && <Link href={`/diseno/${sheet.boceto_publicacion_id}`}>Volver al diseño ↗</Link>}
           <div className="st-presence">
             {data.presence

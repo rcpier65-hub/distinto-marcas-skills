@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { ReviewLink } from '@/components/creative-review/link';
 import { SocialReportView } from "./social-report";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -221,6 +222,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
         </small>
         <div className="st-toolbar">
           <button onClick={() => setEditing(s)}>Detalles</button>
+          {s.boceto_publicacion_id && <ReviewLink id={s.boceto_publicacion_id} compact />}
           {s.boceto_publicacion_id && <Link href={`/diseno/${s.boceto_publicacion_id}`}>Ver tarea de diseño ↗</Link>}
           <button
             onClick={() => duplicate(s)}
@@ -299,6 +301,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
             </div>
           </div>
           <div className="st-toolbar">
+            <Jump href={`/revision?marca=${brand.slug}`}>Revisiones</Jump>
             <Jump href={`/grilla/${brand.slug}`}>Ver grilla</Jump>
             <button
               onClick={reload}

@@ -4,6 +4,7 @@
    al abrirlo lista lo que se presenta (tareas terminadas) y lo que se conversa
    (tareas pendientes y temas sueltos), permite agregar temas, empezar la
    reunión en Notas y reuniones con el orden del día y cerrarla como presentada. */
+import { ReviewLink } from '@/components/creative-review/link';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -110,6 +111,7 @@ export function MeetingTopics({ slug, brandName, meeting }: { slug: string; bran
         {t.href ? <Link href={t.href}>{t.texto}</Link> : t.tareaId ? <Link href={`/tareas?marca=${encodeURIComponent(slug)}${t.hecha ? `&tarea=${t.tareaId}` : ""}`}>{t.texto}</Link> : t.texto}
         <small>{t.tipo === "diseno" ? "Diseño · " : ""}{t.tipo === "tema" ? "Tema" : t.hecha ? "Terminada" : "En curso"}{t.responsable ? ` · ${t.responsable}` : ""}</small>
       </span>
+      {t.tipo === "diseno" && t.publicacionId && <ReviewLink id={t.publicacionId} compact />}
       <button className="st-icon st-mt-remove" aria-label="Quitar de la reunión" title="Quitar de la reunión" disabled={!!ocupado} onClick={() => accion(`quitar:${t.id}`, { accion: "quitar", id: t.id })}>
         <X size={14} />
       </button>

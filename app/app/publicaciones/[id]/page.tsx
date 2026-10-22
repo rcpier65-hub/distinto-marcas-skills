@@ -1,3 +1,4 @@
+import { ReviewLink } from '@/components/creative-review/link';
 import { actor } from '@/lib/estrategia/access'
 import { DisenoBocetoButton } from '@/components/diseno/boceto-button'
 import { bocetosDeDisenos } from '@/lib/diseno/boceto'
@@ -116,7 +117,7 @@ export default async function PublicacionDetailPage({ params }: PageProps) {
         )}
         <span className="text-foreground font-medium truncate max-w-[260px]">{pub.nombre}</span>
       </nav>
-      <DisenoBocetoButton href={bocetoHref} />
+      <DisenoBocetoButton href={bocetoHref} /><ReviewLink id={id} />
 
       {marca && (
         <FechasMarcaBanner fechas={fechasMarca} marcaNombre={marca.nombre} marcaColor={marcaColor} />

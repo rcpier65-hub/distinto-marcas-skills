@@ -15,6 +15,8 @@
    - Dashboard arriba: editados/mes, por editar, con/sin guion, alertas
    - Color de alerta en fecha edición según calcularAlertaFecha */
 
+import Link from 'next/link';
+import { ReviewLink } from '@/components/creative-review/link';
 import { useMemo, useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -504,6 +506,7 @@ export function EditorView({ entries: initialEntries, editores, marcas, marcaMig
           <span style={{ color: 'var(--mk-text-primary)', fontWeight: 500 }}>Editor</span>
         </div>
         <div style={{ flex: 1 }} />
+        <Link href="/revision?area=video" className="mr-3 text-xs text-violet-600">Rebotes y versiones ↗</Link>
         {marcaMigrationPendiente && (
           <span style={{ fontSize: 'var(--mk-text-xs)', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '4px 10px', borderRadius: 'var(--mk-radius-sm)' }}>
             ⚠ Migration 026 pendiente
@@ -1039,7 +1042,7 @@ function Row({
       <Td>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <InlineText value={entry.nombreTarea} onSave={onSetNombre} />
+            <InlineText value={entry.nombreTarea} onSave={onSetNombre} /><ReviewLink id={entry.id} compact />
             {/* Texto chiquito "editando hoy" — solo cuando el editor está en
                 el filtro "Mi trabajo para hoy". El punto pulsa cyan si el
                 cronómetro está corriendo, o queda plomo si aún no empezó. */}

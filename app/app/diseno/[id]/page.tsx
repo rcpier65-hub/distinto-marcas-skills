@@ -1,3 +1,4 @@
+import { ReviewLink } from '@/components/creative-review/link';
 import { DisenoBocetoButton } from '@/components/diseno/boceto-button'
 import { bocetosDeDisenos } from '@/lib/diseno/boceto'
 // app/app/diseno/[id]/page.tsx
@@ -125,7 +126,7 @@ export default async function DisenoDetailPage({ params }: PageProps) {
         <span>/</span>
         <span className="text-foreground font-medium truncate max-w-[260px]">{pub.nombre}</span>
       </nav>
-      <DisenoBocetoButton href={bocetoHref} />
+      <DisenoBocetoButton href={bocetoHref} /><ReviewLink id={id} />
 
       {reunionIds && <div className="mb-4">
         <DisenoReunionProvider initialIds={reunionIds}>

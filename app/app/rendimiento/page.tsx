@@ -2,6 +2,7 @@
 // RENDIMIENTO DEL EQUIPO — solo Pedro (super admin). Pedro 30-sep-2026.
 // Vistas: equipo · persona · marcas · flujo. Período: día / semana / mes.
 
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -26,5 +27,5 @@ export default async function RendimientoPage({ searchParams }: { searchParams: 
   const service = createServiceClient() as any
   const datos = await cargarRendimiento(service, calcularRango(periodo, ref))
 
-  return <RendimientoView datos={datos} vista={vista} personaId={sp.persona ?? null} hoy={hoyLima()} />
+  return <><div className="px-6 pt-3"><Link className="text-sm text-violet-600" href="/revision">Ver tasa de rebote de Diseño y Video ↗</Link></div><RendimientoView datos={datos} vista={vista} personaId={sp.persona ?? null} hoy={hoyLima()} /></>
 }

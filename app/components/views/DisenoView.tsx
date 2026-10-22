@@ -14,6 +14,8 @@
  *   - Quitado: Diseñador, Publicación, Portada lista, Diseñado
  */
 
+import Link from 'next/link';
+import { ReviewLink } from '@/components/creative-review/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Palette as IcoPaleta, ImageIcon as IcoPost, GalleryHorizontalEnd as IcoCarrusel, CircleFadingPlus as IcoHistoria, Briefcase as IcoInterno, X as IcoX, CalendarDays as IcoCal, Video as IcoVideo, Sun as IcoHoy, Check as IcoCheck, ChevronDown as IcoChevron, Sparkles as IcoMagia, Loader2 as IcoCargando, Clock as IcoReloj, ChevronLeft as IcoAnt, ChevronRight as IcoSig, Plus as IcoMas, Link2 as IcoLink, Trash2 as IcoBorrar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -377,6 +379,7 @@ export function DisenoView({
             ⚠ Migration pendiente
           </span>
         )}
+        <Link href="/revision?area=diseno" className="mr-3 text-xs text-violet-600">Rebotes y versiones ↗</Link>
         {/* Toggle vista Tabla | Kanban. El botón "+ Nueva tarea" se
             movió del header al filter bar (línea de "Mi trabajo HOY")
             — Pedro pidió que esté a la altura de los filtros, no del
@@ -679,7 +682,7 @@ function TablaVista({
                       Abrir
                     </button>
                   </div>
-                  <div className="mt-1 flex items-center gap-2"><DisenoBocetoButton href={entry.bocetoHref} /><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
+                  <div className="mt-1 flex items-center gap-2"><DisenoBocetoButton href={entry.bocetoHref} /><ReviewLink id={entry.id} compact /><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
                 </Td>
                 <Td>
                   {entry.fechaEntrega ? (
@@ -1177,7 +1180,7 @@ function KanbanCard({ entry, onClick, onDragStart, onArchive, estaMarcadaHoy, on
           </div>
         )
       )}
-      <div className="flex items-center gap-2"><DisenoBocetoButton href={entry.bocetoHref} /><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
+      <div className="flex items-center gap-2"><DisenoBocetoButton href={entry.bocetoHref} /><ReviewLink id={entry.id} compact /><DisenoReunionButton id={entry.id} marcas={entry.marcasTags} /></div>
     </div>
   )
 }
