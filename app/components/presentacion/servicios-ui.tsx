@@ -46,8 +46,6 @@ export function PreguntasServicio({ titulo, preguntas, valores, cambiar }: { tit
 /* ---------- Proceso, reuniones y caso real ---------- */
 export function ProcesoServicio({ titulo, fases, reuniones, servicio }: { titulo: string; fases: Fase[]; reuniones: Reunion[]; servicio: "social" | "ads" }) {
   const [vista, setVista] = useState<"proceso" | "reuniones" | "caso">("proceso");
-  const [fi, setFi] = useState(0);
-  const f = fases[fi];
   const total = fases.reduce((a, x) => a + x.pasos.length, 0);
   return (
     <div className="pr-proceso pr-sv">
@@ -59,7 +57,17 @@ export function ProcesoServicio({ titulo, fases, reuniones, servicio }: { titulo
           ))}
         </div>
       </div>
-      {vista === "proceso" && (
+      {vista === "proceso" && <ProcesoVista fases={fases} />}
+      {vista === "reuniones" && <ReunionesVista reuniones={reuniones} />}
+      {vista === "caso" && <CasoReal servicio={servicio} />}
+    </div>
+  );
+}
+
+export function ProcesoVista({ fases }: { fases: Fase[] }) {
+  const [fi, setFi] = useState(0);
+  const f = fases[fi];
+  return (
         <div className="pr-sv-proceso">
           <ol className="pr-sv-fases">
             {fases.map((x, j) => (
@@ -82,8 +90,11 @@ export function ProcesoServicio({ titulo, fases, reuniones, servicio }: { titulo
             ))}
           </div>
         </div>
-      )}
-      {vista === "reuniones" && (
+  );
+}
+
+export function ReunionesVista({ reuniones }: { reuniones: Reunion[] }) {
+  return (
         <div className="pr-sv-reuniones">
           {reuniones.map((r, k) => (
             <article key={r.nombre}>
@@ -94,9 +105,6 @@ export function ProcesoServicio({ titulo, fases, reuniones, servicio }: { titulo
             </article>
           ))}
         </div>
-      )}
-      {vista === "caso" && <CasoReal servicio={servicio} />}
-    </div>
   );
 }
 
@@ -112,7 +120,7 @@ type Caso = {
 
 /* Datos reales de una marca de la cartera, desde la última versión guardada
    del reporte. El nombre va oculto por defecto: se muestra solo si Pedro lo activa. */
-function CasoReal({ servicio }: { servicio: "social" | "ads" }) {
+export function CasoReal({ servicio }: { servicio: "social" | "ads" }) {
   const [marcas, setMarcas] = useState<{ slug: string; nombre: string }[] | null>(null);
   const [slug, setSlug] = useState<string>("");
   const [caso, setCaso] = useState<Caso | null>(null);

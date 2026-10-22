@@ -20,7 +20,8 @@ import { Proceso } from "./proceso";
 import { Explicadores, TEMAS } from "./explicadores";
 import { TEMAS_ADS, TEMAS_SOCIAL } from "./explicadores-servicios";
 import { PlanSocialAds, PreguntasServicio, ProcesoServicio } from "./servicios-ui";
-import { PREGUNTAS_ADS, PREGUNTAS_SOCIAL, PROCESO_ADS, PROCESO_SOCIAL, REUNIONES_ADS, REUNIONES_SOCIAL, SERVICIOS, type Servicio } from "@/lib/presentacion/servicios";
+import { ShowcaseSocial } from "./showcase-social";
+import { PREGUNTAS_ADS, PREGUNTAS_SOCIAL, PROCESO_ADS, REUNIONES_ADS, SERVICIOS, type Servicio } from "@/lib/presentacion/servicios";
 import "./presentacion.css";
 
 const ETAPAS = ["Inicio", "Te escuchamos", "Cómo trabajamos", "Preguntas", "Tu plan", "Propuesta"] as const;
@@ -254,7 +255,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                     </div>
                   )}
                   {procServ === "web" && <Proceso />}
-                  {procServ === "social" && <ProcesoServicio titulo="Cómo trabajamos tus redes" fases={PROCESO_SOCIAL} reuniones={REUNIONES_SOCIAL} servicio="social" />}
+                  {procServ === "social" && <ShowcaseSocial />}
                   {procServ === "ads" && <ProcesoServicio titulo="Cómo trabajamos tu publicidad" fases={PROCESO_ADS} reuniones={REUNIONES_ADS} servicio="ads" />}
                 </div>
               )}
