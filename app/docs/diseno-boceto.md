@@ -11,6 +11,7 @@ El mismo lienzo aparece automáticamente en Planificación de la marca principal
 como «Boceto · [nombre de tarea]». Tiene enlace de vuelta al diseño; no hay
 copias ni tareas adicionales. Las etiquetas de marcas adicionales no comparten
 el lienzo con otras marcas. Se conserva la selección Para presentar en reunión.
+Los bocetos no reemplazan el plan de trabajo que aparece en el foco del Resumen.
 
 ## Datos y permisos
 

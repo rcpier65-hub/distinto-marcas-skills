@@ -55,6 +55,8 @@ try{
  assert.equal(scene.files[fileId].dataURL,image.dataURL);assert.equal(scene.elements.length,2)
  let plan=await request(`/api/estrategia?marca=${slugA}`,owner)
  assert.equal(plan.status,200);assert.equal(plan.out.records.filter(r=>r.boceto_publicacion_id===design).length,1)
+ const overview=await request(`/marca/${slugA}/estrategia`,owner)
+ assert(!String(overview.out).includes('Abrir plan y lienzo'),'A sketch must not replace the monthly work plan')
  const detail=await request(`/diseno/${design}`,owner);assert(String(detail.out).includes(href));assert(String(detail.out).includes('aria-label="Boceto"'))
  const html=await request(`/marca/${slugA}/estrategia`,client);assert(!String(html.out).includes('QA Boceto original'),'Private sketch must not appear in client payload')
  await ok(service.from('publicaciones').update({nombre:'QA Renombrado',estado_tarea:'en_progreso'}).eq('id',design))

@@ -78,7 +78,7 @@ export function BrandOverview({
     (r) => r.kind === "settings" && r.data.month === month,
   );
   const plan = live.find(
-    (r) => r.kind === "sheet" && (!r.data.end || String(r.data.end) >= b.today),
+    (r) => r.kind === "sheet" && !r.boceto_publicacion_id && (!r.data.end || String(r.data.end) >= b.today),
   );
   const pending = b.activities.filter((a) => operational(a) && !a.done);
   const late = pending.filter(
