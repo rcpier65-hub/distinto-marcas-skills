@@ -8,11 +8,12 @@ import s from "./sitio.module.css";
 const display = Fredoka({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-sitio-display" });
 const sans = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-sitio-sans" });
 
-export type Seccion = "inicio" | "funciones" | "integraciones" | "privacidad" | "terminos" | "eliminar-datos";
+export type Seccion = "inicio" | "funciones" | "integraciones" | "recursos" | "privacidad" | "terminos" | "eliminar-datos";
 const NAV: { id: Seccion; href: string; label: string }[] = [
   { id: "inicio", href: "/", label: "Inicio" },
   { id: "funciones", href: "/funciones", label: "Funciones" },
   { id: "integraciones", href: "/integraciones", label: "Integraciones" },
+  { id: "recursos", href: "/recursos", label: "Recursos" },
   { id: "privacidad", href: "/privacidad/", label: "Privacidad" },
   { id: "terminos", href: "/terminos/", label: "Términos" },
 ];
@@ -49,6 +50,7 @@ export function SiteFrame({ active, children }: { active: Seccion; children: Rea
               <h4>Plataforma</h4>
               <Link href="/funciones">Funciones</Link>
               <Link href="/integraciones">Integraciones</Link>
+              <Link href="/recursos">Recursos</Link>
               <Link href="/login">Iniciar sesión</Link>
             </div>
             <div>

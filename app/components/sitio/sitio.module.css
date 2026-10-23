@@ -10,6 +10,10 @@
 .page a { color: inherit; }
 .display { font-family: var(--font-sitio-display), var(--font-sitio-sans), sans-serif; }
 
+@media print {
+  .top, .foot { display: none !important; }
+}
+
 /* ── Menú superior (siempre visible, también en celular) ── */
 .top { position: sticky; top: 0; z-index: 40; background: rgba(246, 241, 234, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
 .topIn { max-width: 1160px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 18px; }
