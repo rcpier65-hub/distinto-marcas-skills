@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Excalidraw,
   MainMenu,
@@ -11,6 +11,7 @@ import {
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
 import { api } from "./common";
+import { SketchComments } from "@/components/creative-review/sketch-comments";
 import { mergeScene } from "@/lib/estrategia/model";
 if (typeof window !== "undefined")
   (window as any).EXCALIDRAW_ASSET_PATH = "/excalidraw/";
@@ -215,11 +216,14 @@ export default function Canvas({
     };
   }, [ex, url, backup, data.me.client, clientId]);
   const [activeAnchor, setActiveAnchor] = useState(focusAnchor);
+  const [commentMode, setCommentMode] = useState(false), [showComments, setShowComments] = useState(true), [commentCount, setCommentCount] = useState(0), [commentDraft, setCommentDraft] = useState(false);
   const [referenceBusy, setReferenceBusy] = useState(false);
   const [referenceMessage, setReferenceMessage] = useState("");
   const upload = useRef<HTMLInputElement>(null);
   const focused = useRef(false);
   const canvasContainer = useRef<HTMLDivElement>(null);
+  const [canvasNode, setCanvasNode] = useState<HTMLDivElement | null>(null);
+  const bindCanvas = useCallback((node: HTMLDivElement | null) => { canvasContainer.current = node; setCanvasNode(node); }, []);
   const anchors = (data.scene?.elements || []).filter((e: any) => !e.isDeleted && e.customData?.deliveryVersionId);
   const focusVersion = (id: string) => {
     setActiveAnchor(id);
@@ -304,20 +308,22 @@ export default function Canvas({
   return (
     <div className="st-canvas-wrap">
       {sheet.boceto_publicacion_id && !data.me.client && <div className="st-sketch-tools">
-        <label>Versión <select aria-label="Zona de la versión" value={activeAnchor} onChange={e => focusVersion(e.target.value)}>
+        <label>Versión <select aria-label="Zona de la versión" disabled={commentDraft} value={activeAnchor} onChange={e => focusVersion(e.target.value)}>
           <option value="">Todo el boceto</option>
           {anchors.map((e: any) => <option key={e.id} value={e.id}>{e.customData.deliveryLabel}</option>)}
         </select></label>
-        <button onClick={() => { ex?.setActiveTool({ type: 'rectangle' }); ex?.updateScene({ appState: { currentItemBackgroundColor: 'transparent', currentItemStrokeColor: '#9c36b5', currentItemStrokeWidth: 2, currentItemRoughness: 0 } }); }}>▧ Señalar zona</button>
-        <button onClick={() => ex?.setActiveTool({ type: 'arrow' })}>↗ Flecha</button>
-        <button onClick={() => ex?.setActiveTool({ type: 'freedraw' })}>✎ Dibujar</button>
+        <button className={commentMode ? 'st-selected' : ''} aria-pressed={commentMode} disabled={commentDraft} onClick={() => { setCommentMode(!commentMode); setShowComments(true); }}>▧ Comentar zona</button>
+        <button aria-pressed={showComments} disabled={commentDraft} onClick={() => setShowComments(!showComments)}>Comentarios · {commentCount}</button>
+        <button onClick={() => { setCommentMode(false); ex?.setActiveTool({ type: 'arrow' }); }}>↗ Flecha</button>
+        <button onClick={() => { setCommentMode(false); ex?.setActiveTool({ type: 'freedraw' }); }}>✎ Dibujar</button>
         <button disabled={referenceBusy} onClick={() => void pasteReference()}>Pegar captura</button>
         <button disabled={referenceBusy} onClick={() => void captureReference()}>Capturar pantalla</button>
         <button disabled={referenceBusy} onClick={() => upload.current?.click()}>+ Referencia</button>
         <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e => { const file = e.target.files?.[0]; if (file) void referenceAction(() => addReference(file)); e.target.value = ''; }} />
         {referenceMessage && <span role="status">{referenceMessage}</span>}
       </div>}
-    <div className="st-canvas" ref={canvasContainer}>
+    <div className="st-sketch-stage">
+    <div className="st-canvas" ref={bindCanvas}>
       <Excalidraw
         initialData={{
           elements: initial.elements,
@@ -387,6 +393,8 @@ export default function Canvas({
         Espacio + arrastrar para moverte · rueda + Ctrl para zoom · doble clic
         para escribir
       </div>
+    </div>
+    {sheet.boceto_publicacion_id && !data.me.client && <SketchComments ex={ex} publicationId={sheet.boceto_publicacion_id} canvasNode={canvasNode} mode={commentMode} show={showComments} activeAnchor={activeAnchor} onMode={setCommentMode} onShow={setShowComments} onCount={setCommentCount} onDraft={setCommentDraft} />}
     </div>
     </div>
   );

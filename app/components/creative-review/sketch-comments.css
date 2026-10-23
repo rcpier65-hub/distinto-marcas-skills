@@ -1,0 +1,43 @@
+.st-sketch-stage { display:flex; flex:1; min-height:0; min-width:0; }
+.sk-comments-overlay { position:absolute; inset:0; z-index:3; pointer-events:none; overflow:hidden; }
+.sk-comments-svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.sk-comment-target { fill:transparent; stroke:none; pointer-events:all; cursor:crosshair; touch-action:none; }
+.sk-note-zone { fill:#8b5cf610; stroke:#8b5cf6; stroke-width:2; stroke-dasharray:5 3; pointer-events:none; }
+.sk-note-zone.is-selected,.sk-note-zone.is-draft { fill:#8b5cf620; stroke:#7c3aed; stroke-width:2.5; stroke-dasharray:none; }
+.st-sheet button.sk-note-pin { position:absolute; transform:translate(-12px,-18px); display:flex; align-items:center; padding:0; gap:5px; border:0; background:transparent; color:#fff; pointer-events:auto; max-width:245px; text-align:left; box-shadow:none; }
+.sk-note-pin b { background:#7c3aed; min-width:27px; height:27px; display:grid; place-items:center; border-radius:50%; font-size:12px; border:2px solid #fff; box-shadow:0 2px 8px #29203125; }
+.sk-note-pin span { background:#fff; color:#3a285a; border:1px solid #d6c4f4; border-radius:8px; padding:5px 8px; max-width:200px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:11px; box-shadow:0 2px 10px #29203112; }
+.sk-note-pin.is-selected span { border-color:#7c3aed; }
+.sk-comment-hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); max-width:90%; width:max-content; padding:8px 12px; background:#372052; color:#fff; border-radius:10px; font-size:11px; box-shadow:0 3px 12px #29203125; }
+.sk-comments-panel { width:300px; max-width:40vw; flex-shrink:0; min-height:0; display:flex; flex-direction:column; background:#fff; border-left:1px solid #e9e2f1; }
+.sk-comments-panel header { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:16px; border-bottom:1px solid #eee7f5; }
+.sk-comments-panel header strong { font-size:15px; }
+.sk-comments-panel header strong span { font-size:11px; padding:3px 6px; background:#f0e9ff; color:#7944c2; border-radius:5px; }
+.sk-comments-panel small { display:block; font-size:10px; line-height:1.4; color:#94859d; margin-top:4px; }
+.st-sheet .sk-comments-panel header button { padding:0 4px; border:0; font-size:22px; line-height:1; }
+.sk-comments-list { flex:1; overflow:auto; padding:12px; min-height:50px; }
+.sk-comments-list article { border:1px solid #eee7f5; border-radius:10px; margin-bottom:10px; background:#fff; }
+.sk-comments-list article.is-selected { border-color:#ad83ee; background:#faf7ff; box-shadow:0 0 0 1px #ad83ee; }
+.st-sheet .sk-note-detail { display:flex; align-items:flex-start; gap:9px; text-align:left; width:100%; background:transparent; border:0; padding:12px; white-space:normal; }
+.sk-note-detail > div { min-width:0; }
+.sk-note-number { min-width:22px; height:22px; background:#ede4ff; border-radius:50%; display:grid; place-items:center; font-size:11px; color:#7944c2; }
+.sk-note-detail strong { font-size:12px; }
+.sk-note-detail p { margin:9px 0; font-size:13px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; color:#3b2c4e; }
+.sk-note-state { font-size:10px; color:#765b93; background:#f0eaf8; padding:3px 6px; border-radius:4px; }
+.sk-note-references { display:flex; gap:6px; padding:0 12px 12px; }
+.sk-note-references img { width:65px; height:55px; object-fit:cover; border-radius:6px; }
+.sk-comments-empty { padding:18px 4px; color:#8c7b99; font-size:12px; line-height:1.6; }
+.sk-comments-empty strong { color:#51405f; }
+.sk-comments-panel footer { border-top:1px solid #eee7f5; padding:12px 16px; font-size:10px; color:#8a7998; }
+.sk-comments-panel footer a { color:#8854cc; }
+.sk-comment-form { padding:14px; background:#faf7ff; border-bottom:1px solid #e4d5f8; overflow:auto; flex-shrink:0; max-height:70%; }
+.sk-comment-form > strong { font-size:12px; color:#7951ab; }
+.sk-comment-form label { display:block; font-size:11px; color:#7c688e; margin-top:12px; }
+.st-sheet .sk-comment-form input,.st-sheet .sk-comment-form textarea { display:block; width:100%; padding:9px; font-size:12px; margin-top:5px; background:#fff; }
+.st-sheet .sk-comment-form textarea { min-height:110px; resize:vertical; }
+.sk-comment-form > div { display:flex; justify-content:flex-end; gap:7px; margin-top:10px; }
+.st-sheet .sk-comment-form button,.st-sheet .sk-comments-empty button { padding:7px 9px; font-size:11px; }
+.st-sheet .sk-comment-form .sk-primary { background:#8550d7; color:#fff; border-color:#8550d7; }
+.sk-comment-error { padding:10px 14px; margin:0; color:#9c411c; background:#fff4ec; font-size:11px; }
+@media(max-width:850px) { .sk-comments-panel { width:250px; } .sk-note-pin span { max-width:130px; } }
+@media(max-width:600px) { .st-sketch-stage { flex-direction:column; } .sk-comments-panel { max-width:100%; width:100%; height:40%; border-left:0; border-top:1px solid #e9e2f1; } .st-sketch-stage > .st-canvas { min-height:220px; } .sk-comments-panel header { padding:8px 12px; } .sk-comment-form { max-height:90%; } .sk-comment-hint { font-size:10px; } }

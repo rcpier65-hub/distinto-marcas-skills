@@ -146,3 +146,25 @@ evitar duplicados incluso con dos pestañas. Respeta los elementos borrados y lo
 bocetos archivados. Mantiene una instantánea anterior, el límite de 15 MB y la
 reconciliación de cambios concurrentes. La descarga usa el proxy autorizado existente;
 las capturas se validan/decodifican y optimizan a WebP (máximo 1800 px).
+
+## Comentarios sobre el boceto
+
+El boceto de Diseño muestra las observaciones de revisión en un panel visible y
+como marcas numeradas con texto sobre la imagen. «Comentar zona» permite arrastrar
+sobre la imagen de una versión (en cualquier dirección) y escribir el cambio al
+soltar; un clic crea un punto. Se reutilizan `creative_review_notes` y la API de
+Revisión: no hay otra copia ni otra métrica. Los comentarios conservan su versión,
+página PDF o fotograma, autor y solicitante; los generales aparecen en el panel.
+El selector filtra por área de versión y bloquea el cambio si hay un borrador.
+
+Los comentarios se actualizan al recuperar foco/conexión y cada diez segundos con
+la pestaña visible. Si falla el guardado, el texto sigue en el formulario y se
+reutiliza su ID al reintentar. Cerrar con un borrador muestra la advertencia del
+navegador. Ocultar comentarios permite trabajar sobre las referencias; dibujar
+flechas o figuras en el lienzo sigue disponible y no crea comentarios por sí solo.
+El estado de lectura del lienzo se separa del de guardado: un fallo transitorio ya
+no deja «Sin conexión» pegado después de una lectura correcta.
+
+Prueba de coordenadas: `node scripts/test-sketch-comments.mjs`. Verifica arrastre
+inverso, límites, zoom/desplazamiento, rotación, volteo y aislamiento de páginas,
+versiones y fotogramas. Las pruebas de API siguen en `test-creative-review.mjs`.

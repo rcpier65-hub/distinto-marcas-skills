@@ -33,6 +33,7 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
     [panel, setPanel] = useState(initial.me.client ? "Comentarios" : initial.sheet.data.description ? "Plan" : "Reunión"),
     [open, setOpen] = useState(!initial.me.client && !initial.sheet.boceto_publicacion_id),
     [status, setStatus] = useState("Guardado"),
+    [connectionError, setConnectionError] = useState(""),
     [clientId] = useState(() => crypto.randomUUID()),
     [follow, setFollow] = useState(""),
     [selection, setSelection] = useState<string | null>(null),
@@ -58,15 +59,21 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
     if (order !== refreshOrder.current) return;
     if (n.scene) revision.current = n.scene.revision;
     setData((old: any) => ({ ...n, scene: n.scene || old.scene }));
+    setConnectionError("");
   }, [url]);
   useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible")
-        refresh().catch(() =>
-          setStatus("Sin conexión. Conservamos los cambios locales."),
-        );
-    }, 3000);
-    return () => clearInterval(id);
+    let reading = false;
+    const read = async () => {
+      if (reading || document.visibilityState !== "visible") return;
+      reading = true;
+      try { await refresh(); }
+      catch { setConnectionError("No se pudo actualizar. Reintentando… Los cambios del lienzo se conservan localmente."); }
+      finally { reading = false; }
+    };
+    const id = setInterval(() => void read(), 3000);
+    window.addEventListener("online", read);
+    window.addEventListener("focus", read);
+    return () => { clearInterval(id); window.removeEventListener("online", read); window.removeEventListener("focus", read); };
   }, [refresh]);
   const recording = useRecording(sheet.id, refresh),
     session = data.sessions.find((s: any) => s.id === sessionId);
@@ -180,7 +187,7 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
         {sheet.boceto_publicacion_id && <span>Pega imágenes con Ctrl/Cmd + V, dibuja y añade notas. El boceto se guarda en Planificación.</span>}
         <span>
           {sheet.data.state || "Planificación"} ·{" "}
-          {data.me.client ? "Lienzo compartido · solo lectura" : status}
+          {data.me.client ? "Lienzo compartido · solo lectura" : connectionError || status}
         </span>
         {recording.state !== "idle" ? (
           <span className="st-recording">
