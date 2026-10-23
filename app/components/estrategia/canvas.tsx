@@ -32,6 +32,7 @@ export default function Canvas({
   onStatus: (s: string) => void;
   onSelection: (id: string | null) => void;
 }) {
+  const [ready, setReady] = useState(false);
   const [ex, setEx] = useState<ExcalidrawImperativeAPI | null>(null),
     pending = useRef<any>(null),
     saving = useRef(false),
@@ -112,10 +113,10 @@ export default function Canvas({
     return scene;
   });
   useEffect(() => {
-    if (!ex || !initial.elements.length || focusAnchor) return;
+    if (!ex || !ready || !initial.elements.length || focusAnchor) return;
     const frame = requestAnimationFrame(() => ex.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 }));
     return () => cancelAnimationFrame(frame);
-  }, [ex, initial.elements.length, focusAnchor]);
+  }, [ex, ready, initial.elements.length, focusAnchor]);
   const remoteRevision = useRef(data.scene.revision);
   useEffect(() => {
     if (!ex || !loaded.current) return;
@@ -218,6 +219,7 @@ export default function Canvas({
   const [referenceMessage, setReferenceMessage] = useState("");
   const upload = useRef<HTMLInputElement>(null);
   const focused = useRef(false);
+  const canvasContainer = useRef<HTMLDivElement>(null);
   const anchors = (data.scene?.elements || []).filter((e: any) => !e.isDeleted && e.customData?.deliveryVersionId);
   const focusVersion = (id: string) => {
     setActiveAnchor(id);
@@ -226,13 +228,25 @@ export default function Canvas({
     else if (targets?.length) ex?.scrollToContent(targets, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 });
   };
   useEffect(() => {
-    if (!ex || focused.current || !focusAnchor) return;
-    const targets = ex.getSceneElements().filter(e => e.id === focusAnchor || e.id === `${focusAnchor}-references`);
-    if (!targets.length) return;
-    focused.current = true;
-    const frame = requestAnimationFrame(() => ex.scrollToContent(targets, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 }));
-    return () => cancelAnimationFrame(frame);
-  }, [ex, focusAnchor, data.scene]);
+    if (!ex || !ready || focused.current || !focusAnchor) return;
+    // Excalidraw restores elements before its viewport has finished measuring.
+    // Fit only after the engine and the actual canvas agree on their dimensions.
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    const fit = () => {
+      const state = ex.getAppState(), box = canvasContainer.current?.getBoundingClientRect();
+      if (!box || state.isLoading || state.width < 100 || state.height < 100 || Math.abs(state.width - box.width) > 4 || Math.abs(state.height - box.height) > 4) {
+        if (++attempts < 30) timer = setTimeout(fit, 100);
+        return;
+      }
+      const targets = ex.getSceneElements().filter(e => e.id === focusAnchor || e.id === `${focusAnchor}-references`);
+      if (!targets.length) return;
+      focused.current = true;
+      ex.scrollToContent(targets, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1, animate: false });
+    };
+    timer = setTimeout(fit, 100);
+    return () => clearTimeout(timer);
+  }, [ex, ready, focusAnchor, data.scene]);
   async function addReference(blob: Blob) {
     if (!ex) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) || blob.size > 20_000_000) throw Error('Usa una imagen PNG, JPG o WebP de hasta 20 MB.');
@@ -303,7 +317,7 @@ export default function Canvas({
         <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e => { const file = e.target.files?.[0]; if (file) void referenceAction(() => addReference(file)); e.target.value = ''; }} />
         {referenceMessage && <span role="status">{referenceMessage}</span>}
       </div>}
-    <div className="st-canvas">
+    <div className="st-canvas" ref={canvasContainer}>
       <Excalidraw
         initialData={{
           elements: initial.elements,
@@ -330,6 +344,7 @@ export default function Canvas({
             const ids = new Set(elements.map((e) => e.id));
             if (initial.elements.some((e: any) => !ids.has(e.id))) return;
             loaded.current = true;
+            setReady(true);
             lastSignature.current = signature(elements, files);
             if (initial.dirty) {
               pending.current = { elements, files };
