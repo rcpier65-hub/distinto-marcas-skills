@@ -2,7 +2,10 @@
 
 ## Uso
 
-- En `/cliente`, **Portal de marca** abre `/marca/[slug]/estrategia` para la marca activa del cliente. Se reutiliza la ruta del espacio existente. El equipo conserva su interfaz completa.
+- En `/cliente`, **Resumen de la marca** es la pantalla inicial y la primera opción del menú para todas las cuentas de cliente. La ruta `/marca/[slug]/estrategia` sigue funcionando y reutiliza el mismo resumen autorizado; el equipo conserva su interfaz completa.
+- TypHouse también tiene **Catálogos y accesos** en el menú, además de los accesos a catálogo y Libro de Reclamaciones dentro del resumen. Los enlaces y contraseñas siguen siendo exclusivos de TypHouse.
+- Planificación y Reportes permanecen visibles incluso si todavía no hay contenido compartido/publicado; muestran un estado vacío claro. Las descargas, calendario, diseño, tareas, soporte, influencers y selector de marcas se conservan.
+- Al iniciar sesión se muestra el Resumen. Al volver de una descarga se recupera la sección y publicación abiertas durante dos horas. La preferencia anterior se migra una sola vez al resumen, salvo si había una publicación abierta. Los enlaces de notificación siguen abriendo su publicación o agenda; `?vista=cal` permite ir directamente al calendario.
 - Clientes: Resumen, Planificación compartida y Reportes publicados. El resumen consulta publicaciones del mes, diseños activos y próximas reuniones existentes. No crea tareas, planes o agendas.
 - Las hojas solo aparecen con `sharedWithClient=true` y sin archivar. El cliente abre el lienzo y comentarios ya existentes en `/cliente/planificacion/[id]`. Las notas, sesiones de audio y acuerdos internos siguen fuera del payload.
 - Reportes reutiliza el componente mensual existente, su código de acceso y el criterio `computeDirecto().publicado`. Solo los meses publicados se serializan al cliente. Este acceso no abre el panel de configuración ni las API internas de Meta.
@@ -28,3 +31,11 @@
 ## Continuidad
 
 Base `3215460` (diseños para presentar en reunión), sobre la producción actual de Hostinger. No publicar en Vercel ni usar ramas históricas. Revalidar `/api/version` antes de publicar. Credenciales fuera del repositorio.
+
+## Verificación del 23 de octubre de 2026
+
+La base publicada `4499d0e` conservaba los cambios del 22 de octubre. Se reprodujo que el portal abría en Calendario, no ofrecía Resumen en su menú y ocultaba Planificación sin hojas compartidas. Se integró la proyección existente en la entrada principal, sin migraciones ni cambios de permisos. Ambos accesos del cliente usan el mismo filtro de reportes publicados y mantienen el candado.
+
+Compilación y TypeScript aprobados. `test-client-brand-space.mjs` verifica ahora el resumen en `/cliente` para marcas distintas, recursos de TypHouse y ausencia de meses borrador/hojas privadas también en la entrada principal; conserva sus comprobaciones de cifrado, límites, origen y aislamiento. La primera ejecución local detectó la clave de accesos ausente en el proceso de prueba; se reinició con la clave existente solo en memoria y la suite pasó. El componente antiguo mantiene los mismos cinco errores de lint previos, con una advertencia menos; página y resumen sin errores ni advertencias.
+
+Navegador: login abre Resumen, Catálogos y Planificación aparecen en menú, enlaces de reunión abren Agenda, revisión a 390 px sin desborde horizontal y cero errores de consola. La vista móvil temporal se retiró antes de publicar. Sin cambios en datos del cliente ni mensajes enviados.

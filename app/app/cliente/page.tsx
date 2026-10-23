@@ -8,8 +8,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getClienteActual } from '@/lib/cliente/get-cliente'
 import { ClientePortalView, type PubCliente } from './_components/cliente-portal-view'
-import { getReporteBySlug } from '@/lib/reportes/registry'
-import { pinReportesOk } from '@/app/reportes/_actions'
+import { loadClientBrandSpace } from '@/lib/cliente/brand-space'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,8 +34,7 @@ export default async function ClientePortalPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
-  const sharedSheetsPromise = service.from('strategy_records').select('id,title')
-    .eq('marca_id',cliente.marcaId).eq('kind','sheet').eq('archived',false).eq('data->>sharedWithClient','true')
+  const brandSpacePromise = loadClientBrandSpace(cliente.marcaSlug)
   const hoy = ymdLima(new Date())
 
   const COLS = `id, nombre, copy, guion, fecha_publicacion, fecha_entrega, estado, estado_tarea, es_tarea_diseno, plataformas, publicado_at, aprobado_cliente_at, portada_editada_url, portada_cruda_url, video_con_musica_url, drive_resultado_url, link_tiktok, link_instagram, enlace_musica, video_sin_musica_url`
@@ -121,15 +119,6 @@ export default async function ClientePortalPage() {
       categoria: (f.categoria ?? 'otro') as string,
     }))
     return { observaciones, reuniones, grabaciones, fechasImportantes }
-  }
-
-  /* Reporte mensual de SU marca (si existe) — protegido por código.
-     El desbloqueo (cookie 12h) se decide en el server: la data del reporte
-     solo se envía al navegador si ya ingresó el código. */
-  const cargarReporte = async () => {
-    const reporte = await getReporteBySlug(cliente.marcaSlug, cliente.marcaNombre)
-    const reporteDesbloqueado = reporte ? await pinReportesOk() : false
-    return { reporte, reporteDesbloqueado }
   }
 
   /* Reportes de SOPORTE de esta marca (los mandó el cliente desde su portal).
@@ -299,13 +288,13 @@ export default async function ClientePortalPage() {
   // Estos módulos solo dependen de la marca autenticada. Iniciarlos juntos
   // evita sumar la latencia de cada consulta antes de mostrar el portal.
   const [
-    { data: sharedSheets }, { data }, { data: disenosData },
+    brandSpace, { data }, { data: disenosData },
     { observaciones, reuniones, grabaciones, fechasImportantes },
-    { reporte, reporteDesbloqueado }, reportesSoporte,
+    reportesSoporte,
     { influencersActivo, influencersRows }, { tareasMarca, equipoTareas, tareasPlan },
   ] = await Promise.all([
-    sharedSheetsPromise, publicacionesPromise, disenosPromise,
-    cargarCoordinacion(), cargarReporte(), cargarSoporte(), cargarInfluencers(), cargarTareas(),
+    brandSpacePromise, publicacionesPromise, disenosPromise,
+    cargarCoordinacion(), cargarSoporte(), cargarInfluencers(), cargarTareas(),
   ])
 
   /* Merge por id, conservando el corte de publicaciones y los diseños activos. */
@@ -321,7 +310,9 @@ export default async function ClientePortalPage() {
 
   return (
     <ClientePortalView
-      planificacionHojas={sharedSheets??[]}
+      key={cliente.marcaId}
+      brandSpace={brandSpace}
+      planificacionHojas={brandSpace.sheets}
       marcaId={cliente.marcaId}
       observaciones={observaciones}
       reuniones={reuniones}
@@ -344,8 +335,8 @@ export default async function ClientePortalPage() {
       tareasMarca={tareasMarca}
       equipoTareas={equipoTareas}
       tareasPlan={tareasPlan}
-      reporteNombre={reporte?.nombre ?? null}
-      reporteMeses={reporte && reporteDesbloqueado ? reporte.meses : null}
+      reporteNombre={brandSpace.report?.name ?? null}
+      reporteMeses={brandSpace.report?.months ?? null}
     />
   )
 }

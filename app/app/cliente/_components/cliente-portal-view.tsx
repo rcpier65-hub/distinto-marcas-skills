@@ -7,7 +7,7 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX, ImageOff,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX, ImageOff, LayoutDashboard, KeyRound,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
 import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
@@ -24,6 +24,8 @@ import { TareasPlanView, type TareaPlan } from '@/components/tareas/tareas-plan-
 import { ReporteMarcaView } from '@/components/reportes/reporte-marca-view'
 import { PinGate } from '@/components/reportes/pin-gate'
 import { ClientQuickAccess } from '@/components/cliente/quick-access'
+import { ClientBrandOverview } from '@/components/cliente/brand-space'
+import type { ClientBrandSpaceData } from '@/lib/cliente/brand-space'
 import { guardarVentasCliente } from '../_reporte-actions'
 import type { MesReporte } from '@/lib/reportes/typhouse'
 import { createClient } from '@/lib/supabase/client'
@@ -236,6 +238,8 @@ function videoAppUrl(url: string | null): string | null {
    Observaciones se reemplaza por Soporte, y Reuniones+Grabación se unen en un
    solo módulo "Grabaciones y Reuniones" (igual al de la agencia, solo su marca). */
 const NAV = [
+  { id: 'resumen', label: 'Resumen de la marca', corto: 'Resumen', Icono: LayoutDashboard },
+  { id: 'accesos', label: 'Catálogos y accesos', corto: 'Catálogos', Icono: KeyRound },
   { id: 'planificacion', label: 'Planificación compartida', corto: 'Planificación', Icono: LayoutGrid },
   { id: 'cal', label: 'Calendario', corto: 'Calendario', Icono: CalendarDays },
   { id: 'stats', label: 'Estadísticas', corto: 'Stats', Icono: BarChart3 },
@@ -319,6 +323,7 @@ function SwitcherMarca({ marcas, activaId, color }: {
 }
 
 export function ClientePortalView({
+  brandSpace,
   marcaId, marcaNombre, marcaSlug, marcaEmoji, marcaColor, marcaLogoUrl, driveUrl, contacto, hoy, pubs: pubsIniciales, observaciones, reuniones, grabaciones, fechasImportantes = [],
   marcasDisponibles = [],
   reportesSoporte = [],
@@ -326,6 +331,7 @@ export function ClientePortalView({
   tareasMarca = [], equipoTareas = [], tareasPlan = [], planificacionHojas = [],
   reporteNombre = null, reporteMeses = null,
 }: {
+  brandSpace: ClientBrandSpaceData
   planificacionHojas?: {id:string;title:string}[]
   marcaId: string
   marcaNombre: string
@@ -368,11 +374,11 @@ export function ClientePortalView({
   const [aprobados, setAprobados] = useState<Record<string, string>>({})
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
-  const [vista, setVista] = useState<VistaId | 'drive' | 'tareas' | 'plan'>('cal')
+  const [vista, setVista] = useState<VistaId | 'drive' | 'tareas' | 'plan'>('resumen')
   /* ¿Esta marca tiene reporte mensual cargado? (si no, el ítem no aparece) */
   const tieneReporte = !!reporteNombre
-  const navVisible = NAV.filter(({ id }) =>
-    (id !== 'planificacion' || planificacionHojas.length>0) && (id !== 'reporte' || tieneReporte) && (id !== 'influencers' || influencersActivo))
+  const navVisible = useMemo(() => NAV.filter(({ id }) =>
+    (id !== 'accesos' || marcaSlug === 'little-joe') && (id !== 'influencers' || influencersActivo)), [marcaSlug, influencersActivo])
   /* Secciones plegables del menú lateral (como la app: ▼ WORKSPACE / MARCAS).
      Pedro 19-jul-2026. */
   const [secAbierta, setSecAbierta] = useState<{ marca: boolean; herram: boolean }>({ marca: true, herram: true })
@@ -581,7 +587,7 @@ export function ClientePortalView({
   /* RECORDAR dónde se quedó el cliente (Pedro 24-sep-2026: "puse descargar y
      volvió al inicio"). Guardamos sección, modo, día/semana/mes, video abierto
      y scroll; si vuelve dentro de 2 horas, lo dejamos donde estaba. Si pasó más
-     tiempo, arranca limpio en la Lista. */
+     tiempo, arranca en el Resumen. Las descargas conservan su publicación abierta. */
   const LS_PORTAL = `portal-cliente:${marcaId}`
   const restaurado = useRef(false)
   const modalIdRestaurar = useRef<string | null>(null)
@@ -589,12 +595,14 @@ export function ClientePortalView({
     if (restaurado.current) return
     restaurado.current = true
     const qs = new URLSearchParams(window.location.search)
-    if (qs.get('reunion') || qs.get('obs') || qs.get('pub') || qs.get('reporte')) return
+    if (qs.get('welcome') || qs.get('vista') || qs.get('reunion') || qs.get('obs') || qs.get('pub') || qs.get('reporte')) return
     try {
       const raw = localStorage.getItem(LS_PORTAL)
       const e = raw ? JSON.parse(raw) : null
       if (!e || Date.now() - (e.t ?? 0) > 2 * 3600_000) return
-      if (e.vista) setVista(e.vista)
+      const permitidas = [...navVisible.map(n => n.id), 'drive', 'tareas', 'plan']
+      if (e.version === 2 && permitidas.includes(e.vista)) setVista(e.vista)
+      else if (e.modalId) setVista('cal')
       if (e.calMode) setCalMode(e.calMode)
       if (e.listaFmt) setListaFmt(e.listaFmt)
       if (e.sel) setSel(e.sel)
@@ -602,9 +610,9 @@ export function ClientePortalView({
       if (e.ym) setYm(e.ym)
       modalIdRestaurar.current = e.modalId ?? null
       const y = Number(e.scroll) || 0
-      if (y > 0) setTimeout(() => window.scrollTo({ top: y }), 120)
-    } catch { /* sin almacenamiento: arranca en la Lista */ }
-  }, [LS_PORTAL])
+      if ((e.version === 2 || e.modalId) && y > 0) setTimeout(() => window.scrollTo({ top: y }), 120)
+    } catch { /* sin almacenamiento: arranca en el Resumen */ }
+  }, [LS_PORTAL, navVisible])
   useEffect(() => {
     const id = modalIdRestaurar.current
     if (!id) return
@@ -615,7 +623,7 @@ export function ClientePortalView({
     const guardar = () => {
       try {
         localStorage.setItem(LS_PORTAL, JSON.stringify({
-          t: Date.now(), vista, calMode, listaFmt, sel, weekStart, ym, modalId: modalPub?.id ?? null, scroll: window.scrollY,
+          version: 2, t: Date.now(), vista, calMode, listaFmt, sel, weekStart, ym, modalId: modalPub?.id ?? null, scroll: window.scrollY,
         }))
       } catch { /* modo privado */ }
     }
@@ -642,9 +650,11 @@ export function ClientePortalView({
     /* El deep-link se CONSUME una sola vez: sin esto, cada refresh de pubs
        (realtime / volver a la pestaña) re-forzaba la vista o reabría el modal
        y el cliente no podía salir de la sección. Fix 31-ago-2026. */
-    if (qs.get('reunion') || qs.get('obs') || qs.get('pub') || qs.get('reporte')) {
+    if (qs.get('welcome') || qs.get('vista') || qs.get('reunion') || qs.get('obs') || qs.get('pub') || qs.get('reporte')) {
       window.history.replaceState(null, '', window.location.pathname)
     }
+    const requestedView = navVisible.find(n => n.id === qs.get('vista'))
+    if (requestedView) { setVista(requestedView.id); return }
     if (qs.get('reporte') && tieneReporte) { setVista('reporte'); return }
     // Deep-links de notificaciones: reunión nueva o respuesta (ahora Soporte).
     if (qs.get('reunion')) { setVista('reuniones'); return }
@@ -652,8 +662,8 @@ export function ClientePortalView({
     const pubId = qs.get('pub')
     if (!pubId) return
     const p = pubs.find((x) => x.id === pubId)
-    if (p) setModalPub(p)
-  }, [pubs])
+    if (p) { setVista('cal'); setModalPub(p) }
+  }, [pubs, navVisible, tieneReporte])
 
   // Hero de la marca: degradado con SU color (ya no el rosa fijo) y texto
   // oscuro cuando la marca es clara (lima, dorado) para que se lea bien.
@@ -701,6 +711,7 @@ export function ClientePortalView({
             return (
               <button
                 key={id}
+                aria-current={activo ? 'page' : undefined}
                 onClick={() => setVista(id)}
                 className="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors"
                 style={activo ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
@@ -772,7 +783,7 @@ export function ClientePortalView({
 
           {/* HERO — el degradado de la marca. Va en móvil Y en PC: a Pedro le
               gustaba y da la bienvenida. Grande y con aire. */}
-          <header className="relative overflow-hidden rounded-2xl p-6 sm:p-8 lg:p-10" style={{ background: heroGrad, color: heroTxt }}>
+          <header className="relative overflow-hidden rounded-2xl p-5 sm:p-6" style={{ background: heroGrad, color: heroTxt }}>
             <div aria-hidden className="absolute -top-12 -right-10 w-44 h-44 lg:w-64 lg:h-64 rounded-full" style={{ background: heroVelo }} />
             <div aria-hidden className="absolute -bottom-14 -left-8 w-40 h-40 lg:w-56 lg:h-56 rounded-full" style={{ background: heroVelo2 }} />
             <div className="relative flex items-center gap-4 lg:gap-6">
@@ -785,7 +796,7 @@ export function ClientePortalView({
                 </div>
                 {/* Solo "Bienvenido" (no solo Andrea usa la cuenta del cliente)
                     + bajada profesional. Pedro 17-jul-2026. */}
-                <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-extrabold leading-tight mt-0.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight mt-0.5">
                   Bienvenido 👋
                 </h1>
                 <p className="text-[13px] lg:text-[15px] mt-1 max-w-xl" style={{ opacity: 0.9 }}>
@@ -799,7 +810,6 @@ export function ClientePortalView({
             </div>
           </header>
 
-          <ClientQuickAccess key={marcaId} marcaId={marcaId} marcaSlug={marcaSlug} />
 
           {/* Cliente multi-marca: selector en móvil (en PC va en el menú lateral). */}
           {marcasDisponibles.length > 1 && (
@@ -809,13 +819,16 @@ export function ClientePortalView({
           )}
 
           {/* Activar notificaciones */}
-          <div className="rounded-2xl border-2 bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderColor: `${marcaColor}33` }}>
+          <details className="rounded-xl border bg-card px-4 py-2" style={{ borderColor: `${marcaColor}33` }}>
+            <summary className="cursor-pointer text-sm font-semibold">Avisos de publicaciones</summary>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="text-sm min-w-0 flex-1">
               <div className="font-bold flex items-center gap-1.5"><Bell className="w-4 h-4 shrink-0" style={{ color: marcaColor }} /> Avísame cuando publiquen</div>
               <div className="text-xs text-muted-foreground">Con un toque activas las notificaciones y recibes un aviso en tu celular apenas se publique tu contenido.</div>
             </div>
             <ActivarNotificaciones className="w-full sm:w-auto" />
-          </div>
+            </div>
+          </details>
 
           {/* Toggle — solo MÓVIL (en PC está el menú lateral) */}
           <div className="lg:hidden grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-muted/60 w-full">
@@ -830,6 +843,9 @@ export function ClientePortalView({
               />
             ))}
           </div>
+          <details className="lg:hidden rounded-xl border bg-card p-3">
+            <summary className="cursor-pointer text-sm font-semibold">Más herramientas</summary>
+            <div className="mt-3 space-y-2">
           {/* Tareas + Drive — acceso en móvil (en PC va en el menú). */}
           <button
             onClick={() => setVista('tareas')}
@@ -864,7 +880,12 @@ export function ClientePortalView({
             </a>
           )}
 
-      {vista === 'planificacion' && <section className="rounded-2xl border bg-card p-5"><h2 className="text-xl font-bold mb-4">Planificación compartida contigo</h2><div className="grid gap-3 md:grid-cols-2">{planificacionHojas.map(s=><a className="rounded-xl border p-5 hover:bg-violet-50" key={s.id} href={`/cliente/planificacion/${s.id}`}><strong>{s.title}</strong><p className="text-sm text-muted-foreground mt-2">Ver lienzo y comentar →</p></a>)}</div></section>}
+            </div>
+          </details>
+
+      {vista === 'resumen' && <ClientBrandOverview data={brandSpace} onNavigate={setVista} />}
+      {vista === 'accesos' && marcaSlug === 'little-joe' && <section className="space-y-4"><h2 className="text-xl font-bold">Catálogos y accesos de tu marca</h2><ClientQuickAccess key={marcaId} marcaId={marcaId} marcaSlug={marcaSlug} portalLink={false} /></section>}
+      {vista === 'planificacion' && <section className="rounded-2xl border bg-card p-5"><h2 className="text-xl font-bold mb-4">Planificación compartida contigo</h2>{!planificacionHojas.length && <p className="text-sm text-muted-foreground">Tu equipo aún no ha compartido una planificación contigo.</p>}<div className="grid gap-3 md:grid-cols-2">{planificacionHojas.map(s=><a className="rounded-xl border p-5 hover:bg-violet-50" key={s.id} href={`/cliente/planificacion/${s.id}`}><strong>{s.title}</strong><p className="text-sm text-muted-foreground mt-2">Ver lienzo y comentar →</p></a>)}</div></section>}
       {vista === 'cal' && (
         <div className="space-y-4">
           <section className="rounded-2xl bg-card p-4 sm:p-5 lg:p-7 border">
@@ -1204,8 +1225,8 @@ export function ClientePortalView({
 
       {/* Reporte mensual — privado: si aún no ingresó el código (meses=null),
           se muestra el candado; al validar, el server refresca y manda la data. */}
-      {vista === 'reporte' && tieneReporte && (
-        reporteMeses
+      {vista === 'reporte' && (
+        !tieneReporte ? <section className="rounded-2xl border bg-card p-5"><h2 className="mb-3 text-xl font-bold">Reportes de tu marca</h2><p className="text-sm text-muted-foreground">Aún no hay reportes publicados para esta marca.</p></section> : reporteMeses
           ? <ReporteMarcaView nombre={reporteNombre!} meses={reporteMeses} modo="cliente" onGuardarVentas={guardarVentasCliente} />
           : <div className="pt-8"><PinGate titulo="Reporte mensual" /></div>
       )}

@@ -82,7 +82,7 @@ try {
   for (const s of [a, b]) {
     const index = s === a ? 0 : 1
     const portal = await request('/cliente', s)
-    assert.equal(portal.r.status, 200); assert(portal.text.includes(`/marca/${slugs[index]}/estrategia`)); assert(!portal.text.includes('gestion-catalogos'))
+    assert.equal(portal.r.status, 200); assert(portal.text.includes('Resumen de la marca')); assert(portal.text.includes('Tu marca, de un vistazo')); assert(portal.text.includes('Planificación compartida')); assert(!portal.text.includes('gestion-catalogos'))
     const result = await request(`/marca/${slugs[index]}/estrategia`, s)
     assert.equal(result.r.status, 200); assert(result.text.includes('Portal de marca'))
     assert(!result.text.includes('INTERNAL-')); assert(!result.text.includes(passwords.catalogos)); assert(!result.text.includes('ciphertext'))
@@ -92,6 +92,9 @@ try {
   assert(own.text.includes(ids.shared)); assert(!own.text.includes(ids.private)); assert(!own.text.includes(ids.archived)); assert(!own.text.includes(ids.foreign)); assert(!own.text.includes(`PUBLIC-${id}`))
   const unlocked = await request(`/marca/${slugs[0]}/estrategia`, a, null, { cookie: `${a.cookie()}; reportes_pin=ok` })
   assert(unlocked.text.includes(`PUBLIC-${id}`)); assert(!unlocked.text.includes(`DRAFT-${id}`))
+  const portalUnlocked = await request('/cliente', a, null, { cookie: `${a.cookie()}; reportes_pin=ok` })
+  assert(portalUnlocked.text.includes(`PUBLIC-${id}`)); assert(!portalUnlocked.text.includes(`DRAFT-${id}`));
+  assert(!portalUnlocked.text.includes(ids.private)); assert(!portalUnlocked.text.includes(ids.foreign)); assert(!portalUnlocked.text.includes('INTERNAL-'));
   const foreign = await request(`/marca/${slugs[1]}/estrategia`, a)
   assert(foreign.r.status === 404 || foreign.text.includes('NEXT_HTTP_ERROR_FALLBACK;404'))
   assert(!foreign.text.includes(ids.foreign))
