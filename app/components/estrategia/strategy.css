@@ -1221,3 +1221,12 @@
 .st-r360-tabla tbody th small { display: block; font-weight: 500; color: #8a7f97; font-size: 11px; }
 .st-r360-tabla tbody th em { display: inline-block; margin-top: 3px; font-style: normal; font-size: 10.5px; font-weight: 700; color: #b45309; background: #fff7e6; border-radius: 999px; padding: 1px 8px; }
 .st-r360-alerta { background: #fffbf2; }
+.st-canvas-wrap { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; }
+.st-canvas-wrap .st-canvas { flex:1; min-height:0; }
+.st-sketch-tools { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 12px; background:#fff; border-bottom:1px solid #ece6f4; }
+.st-sketch-tools label { display:flex; align-items:center; gap:7px; font-size:12px; }
+.st-sketch-tools select { max-width:280px; }
+.st-sheet .st-sketch-tools button, .st-sheet .st-sketch-tools select { padding:6px 10px; font-size:12px; border-radius:8px; }
+.st-sketch-tools > span { width:100%; font-size:12px; color:#705b8d; }
+.st-sketch-sync { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:4px 14px; background:#f7f3fd; color:#7a6892; font-size:11px; }
+.st-sheet .st-sketch-sync button { padding:3px 8px; font-size:11px; }

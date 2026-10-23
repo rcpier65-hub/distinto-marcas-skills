@@ -857,3 +857,6 @@
     height: 70dvh;
   }
 }
+.cr-sketch-strip { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid #e9e4f1; background:#f8f5ff; font-size:12px; color:#75668d; }
+.cr-sketch-strip button { flex-shrink:0; color:#7446cf; font-weight:600; }
+@media(max-width:650px) { .cr-sketch-strip { flex-wrap:wrap; } }

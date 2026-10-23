@@ -114,3 +114,35 @@ Finalizar siempre con `node scripts/qa-creative-fixture.mjs --cleanup`.
   al anotar. Chat y Mis pendientes no se superponen a esta ruta; la sesión de
   Oficina permanece. Un comentario sin guardar bloquea cambiar archivo/versión
   y la navegación de páginas PDF para no guardarlo en otro lugar por accidente.
+
+### Boceto libre desde una entrega (22 octubre, ampliación)
+
+En una tarea de Diseño con boceto, abrir una imagen en Revisión incorpora una copia
+optimizada al mismo lienzo de Planificación. `Trabajar en boceto` abre el área de esa
+versión; si la tarea aún no tenía boceto, lo crea privado al pulsar ese botón.
+Abrir el boceto directamente también incorpora las últimas imágenes de cada pieza.
+Para PDF se incorpora la página visualizada; para video, `Fotograma al boceto` toma
+el cuadro donde está pausado. No se importan automáticamente todas las páginas ni
+el historial completo: una versión anterior se incorpora cuando se revisa.
+
+Cada área conserva el nombre de la pieza, versión, página o segundo y una base
+bloqueada para dibujar encima sin moverla por accidente (se puede desbloquear con
+las herramientas del lienzo). Hay un selector para enfocar cada área, señalar una
+zona, dibujar, poner flechas, pegar capturas o subir referencias. `Capturar pantalla`
+solicita elegir una pantalla/ventana en el navegador, toma una sola imagen y cierra
+la captura; no solicita audio. Si el navegador no lo permite, se puede pegar con
+Ctrl/Cmd+V o subir la captura. Las referencias se pueden mover y redimensionar.
+
+La copia corresponde al archivo disponible al incorporarlo. No garantiza recuperar
+los bytes de un enlace antiguo si el proveedor reemplazó su contenido. Se conserva
+como imagen en el lienzo y no cambia al reabrir ni cuenta como nueva entrega/rebote.
+Los comentarios formales y sus estados permanecen en Revisión; las marcas libres
+son anotaciones del boceto. No se cambian permisos de publicación o acceso cliente.
+
+`POST /api/creative-review/[id]/boceto` comprueba equipo, Diseño, Marcas, marca y
+parentesco de la versión. Reutiliza el registro canónico `boceto_publicacion_id`;
+no agrega tablas. Bloquea tarea/lienzo y añade elementos por ID determinista para
+evitar duplicados incluso con dos pestañas. Respeta los elementos borrados y los
+bocetos archivados. Mantiene una instantánea anterior, el límite de 15 MB y la
+reconciliación de cambios concurrentes. La descarga usa el proxy autorizado existente;
+las capturas se validan/decodifican y optimizan a WebP (máximo 1800 px).

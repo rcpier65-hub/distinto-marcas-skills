@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import env from "@next/env";
+import sharp from "sharp";
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -396,6 +397,46 @@ try {
     ).status,
     404,
   );
+  const snapshot = 'data:image/png;base64,' + (await sharp({ create: { width: 300, height: 180, channels: 3, background: '#ab74ed' } }).png().toBuffer()).toString('base64');
+  const sketchPath = path + '/boceto';
+  const seed = { versionId: vs[0].id, image: snapshot, create: true };
+  assert.equal((await request(sketchPath, team, seed)).status, 404);
+  assert([403, 307].includes((await request(sketchPath, client, seed)).status));
+  assert([401, 307].includes((await request(sketchPath, null, seed)).status));
+  assert.equal((await request(sketchPath, owner, seed, { origin: 'https://evil.example' })).status, 403);
+  assert.equal((await request(sketchPath, owner, { ...seed, image: 'data:image/png;base64,SGVsbG8=' })).status, 422);
+  assert.equal((await request(sketchPath, owner, { ...seed, versionId: (await versions(carousel))[0].id })).status, 404);
+  const seeded = await Promise.all([request(sketchPath, owner, seed), request(sketchPath, owner, seed)]);
+  seeded.forEach(r => assert.equal(r.status, 200, JSON.stringify(r.out)));
+  assert.equal(seeded.filter(r => r.out.inserted).length, 1);
+  const sheet = (await db.query('SELECT * FROM strategy_records WHERE boceto_publicacion_id=$1', [parent])).rows;
+  assert.equal(sheet.length, 1); assert.equal(sheet[0].data.sharedWithClient, false);
+  const scenePath = '/api/estrategia/hojas/' + sheet[0].id;
+  let scene = (await request(scenePath, owner)).out.scene;
+  assert.equal(scene.elements.filter(e => e.customData?.deliveryVersionId).length, 1);
+  assert.equal(Object.keys(scene.files).length, 1);
+  const anchor = scene.elements.find(e => e.id === seeded[0].out.anchorId);
+  assert.equal(anchor.customData.deliveryVersionId, vs[0].id); assert.equal(anchor.locked, true);
+  const mark = { ...scene.elements.find(e => e.type === 'rectangle'), id: randomUUID(), x: 200, y: 200, width: 90, height: 60, version: 2 };
+  assert.equal((await request(scenePath, owner, { action: 'scene', elements: [...scene.elements, mark], files: scene.files })).status, 200);
+  const next = await request(sketchPath, owner, { ...seed, versionId: vs[1].id });
+  assert.equal(next.status, 200); assert(next.out.inserted);
+  // A late save from another tab must keep the imported V2.
+  assert.equal((await request(scenePath, owner, { action: 'scene', elements: [...scene.elements, mark], files: scene.files })).status, 200);
+  scene = (await request(scenePath, owner)).out.scene;
+  assert.equal(scene.elements.filter(e => e.customData?.deliveryVersionId).length, 2);
+  assert(scene.elements.some(e => e.id === mark.id)); assert.equal(Object.keys(scene.files).length, 2);
+  const beforeVersions = (await versions(child)).length;
+  assert.equal((await request('/api/creative-review/' + child + '/boceto', owner, seed)).out.inserted, false);
+  assert.equal((await versions(child)).length, beforeVersions);
+  const deleted = scene.elements.map(e => e.id === anchor.id ? { ...e, isDeleted: true, version: e.version + 1 } : e);
+  await request(scenePath, owner, { action: 'scene', elements: deleted, files: scene.files });
+  assert.equal((await request(sketchPath, owner, seed)).out.inserted, false);
+  assert((await request(scenePath, owner)).out.scene.elements.find(e => e.id === anchor.id).isDeleted);
+  await db.query('UPDATE strategy_records SET archived=true WHERE id=$1', [sheet[0].id]);
+  assert.equal((await request(sketchPath, owner, seed)).status, 409);
+  await db.query('UPDATE strategy_records SET archived=false WHERE id=$1', [sheet[0].id]);
+  console.log('PASS: sketch import, image validation, parent/child, concurrent deduplication, V1/V2 separation, annotations and stale saves preserved, deletion, archive, brand/client/origin isolation.');
   const ssrf = "https://127.0.0.1/private";
   await post({
     action: "delivery",

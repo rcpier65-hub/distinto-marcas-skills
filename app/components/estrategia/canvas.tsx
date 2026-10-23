@@ -22,7 +22,9 @@ export default function Canvas({
   follow,
   onStatus,
   onSelection,
+  focusAnchor = "",
 }: {
+  focusAnchor?: string;
   sheet: any;
   data: any;
   clientId: string;
@@ -110,10 +112,10 @@ export default function Canvas({
     return scene;
   });
   useEffect(() => {
-    if (!ex || !initial.elements.length) return;
+    if (!ex || !initial.elements.length || focusAnchor) return;
     const frame = requestAnimationFrame(() => ex.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 }));
     return () => cancelAnimationFrame(frame);
-  }, [ex, initial.elements.length]);
+  }, [ex, initial.elements.length, focusAnchor]);
   const remoteRevision = useRef(data.scene.revision);
   useEffect(() => {
     if (!ex || !loaded.current) return;
@@ -211,7 +213,96 @@ export default function Canvas({
       void save();
     };
   }, [ex, url, backup, data.me.client, clientId]);
+  const [activeAnchor, setActiveAnchor] = useState(focusAnchor);
+  const [referenceBusy, setReferenceBusy] = useState(false);
+  const [referenceMessage, setReferenceMessage] = useState("");
+  const upload = useRef<HTMLInputElement>(null);
+  const focused = useRef(false);
+  const anchors = (data.scene?.elements || []).filter((e: any) => !e.isDeleted && e.customData?.deliveryVersionId);
+  const focusVersion = (id: string) => {
+    setActiveAnchor(id);
+    const targets = ex?.getSceneElements().filter(e => e.id === id || e.id === `${id}-references`);
+    if (!id) ex?.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 });
+    else if (targets?.length) ex?.scrollToContent(targets, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 });
+  };
+  useEffect(() => {
+    if (!ex || focused.current || !focusAnchor) return;
+    const targets = ex.getSceneElements().filter(e => e.id === focusAnchor || e.id === `${focusAnchor}-references`);
+    if (!targets.length) return;
+    focused.current = true;
+    const frame = requestAnimationFrame(() => ex.scrollToContent(targets, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 }));
+    return () => cancelAnimationFrame(frame);
+  }, [ex, focusAnchor, data.scene]);
+  async function addReference(blob: Blob) {
+    if (!ex) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) || blob.size > 20_000_000) throw Error('Usa una imagen PNG, JPG o WebP de hasta 20 MB.');
+    const bitmap = await createImageBitmap(blob);
+    const factor = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * factor); canvas.height = Math.round(bitmap.height * factor);
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+    const dataURL = canvas.toDataURL('image/webp', 0.85);
+    const id = crypto.randomUUID();
+    const state = ex.getAppState();
+    const anchor = ex.getSceneElements().find(e => e.id === activeAnchor);
+    const x = anchor ? anchor.x + anchor.width + 70 : -state.scrollX + 140 / state.zoom.value;
+    const y = anchor ? anchor.y + 100 : -state.scrollY + 140 / state.zoom.value;
+    const displayScale = Math.min(1, 360 / canvas.width, 500 / canvas.height);
+    const image = convertToExcalidrawElements([{ type: 'image', x, y, width: canvas.width * displayScale, height: canvas.height * displayScale, fileId: id, status: 'saved', scale: [1, 1] } as any]);
+    ex.addFiles([{ id, mimeType: 'image/webp', dataURL, created: Date.now() } as any]);
+    ex.updateScene({ elements: [...ex.getSceneElementsIncludingDeleted(), ...image], appState: { selectedElementIds: { [image[0].id]: true } }, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+    ex.setActiveTool({ type: 'selection' });
+    setReferenceMessage('Referencia añadida. Puedes moverla, cambiar su tamaño y dibujar encima.');
+  }
+  async function referenceAction(fn: () => Promise<void>) {
+    setReferenceBusy(true); setReferenceMessage('');
+    try { await fn(); } catch (e) { setReferenceMessage((e as Error).name === 'NotAllowedError' ? 'No se dio acceso. También puedes hacer una captura y pegarla con Ctrl/Cmd + V.' : (e as Error).message); }
+    finally { setReferenceBusy(false); }
+  }
+  const pasteReference = () => referenceAction(async () => {
+    if (!navigator.clipboard?.read) throw Error('Pega tu captura sobre el lienzo con Ctrl/Cmd + V.');
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find(t => ['image/png', 'image/jpeg', 'image/webp'].includes(t));
+      if (type) { await addReference(await item.getType(type)); return; }
+    }
+    throw Error('El portapapeles no contiene una imagen. Copia una captura y vuelve a pegarla.');
+  });
+  const captureReference = () => referenceAction(async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) throw Error('Este navegador no permite capturar. Usa una captura del sistema y pégala con Ctrl/Cmd + V.');
+    let stream: MediaStream | undefined;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const preview = document.createElement('video'); preview.muted = true; preview.srcObject = stream;
+      await preview.play();
+      if (preview.requestVideoFrameCallback) await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(Error('La captura no respondió. Puedes pegar una captura del sistema.')), 5000);
+        preview.requestVideoFrameCallback(() => { clearTimeout(timeout); resolve(); });
+      });
+      const capture = document.createElement('canvas'); capture.width = preview.videoWidth; capture.height = preview.videoHeight;
+      capture.getContext('2d')!.drawImage(preview, 0, 0);
+      stream.getTracks().forEach(t => t.stop()); preview.srcObject = null;
+      const blob = await new Promise<Blob | null>(resolve => capture.toBlob(resolve, 'image/png'));
+      if (!blob) throw Error('No se pudo capturar. Puedes pegar una captura del sistema.');
+      await addReference(blob);
+    } finally { stream?.getTracks().forEach(t => t.stop()); }
+  });
   return (
+    <div className="st-canvas-wrap">
+      {sheet.boceto_publicacion_id && !data.me.client && <div className="st-sketch-tools">
+        <label>Versión <select aria-label="Zona de la versión" value={activeAnchor} onChange={e => focusVersion(e.target.value)}>
+          <option value="">Todo el boceto</option>
+          {anchors.map((e: any) => <option key={e.id} value={e.id}>{e.customData.deliveryLabel}</option>)}
+        </select></label>
+        <button onClick={() => { ex?.setActiveTool({ type: 'rectangle' }); ex?.updateScene({ appState: { currentItemBackgroundColor: 'transparent', currentItemStrokeColor: '#9c36b5', currentItemStrokeWidth: 2, currentItemRoughness: 0 } }); }}>▧ Señalar zona</button>
+        <button onClick={() => ex?.setActiveTool({ type: 'arrow' })}>↗ Flecha</button>
+        <button onClick={() => ex?.setActiveTool({ type: 'freedraw' })}>✎ Dibujar</button>
+        <button disabled={referenceBusy} onClick={() => void pasteReference()}>Pegar captura</button>
+        <button disabled={referenceBusy} onClick={() => void captureReference()}>Capturar pantalla</button>
+        <button disabled={referenceBusy} onClick={() => upload.current?.click()}>+ Referencia</button>
+        <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e => { const file = e.target.files?.[0]; if (file) void referenceAction(() => addReference(file)); e.target.value = ''; }} />
+        {referenceMessage && <span role="status">{referenceMessage}</span>}
+      </div>}
     <div className="st-canvas">
       <Excalidraw
         initialData={{
@@ -222,7 +313,7 @@ export default function Canvas({
             gridSize: 20,
             gridModeEnabled: true,
           },
-          scrollToContent: true,
+          scrollToContent: !focusAnchor,
         }}
         excalidrawAPI={setEx}
         langCode="es-ES"
@@ -281,6 +372,7 @@ export default function Canvas({
         Espacio + arrastrar para moverte · rueda + Ctrl para zoom · doble clic
         para escribir
       </div>
+    </div>
     </div>
   );
 }

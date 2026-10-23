@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MousePointer2,
   MessageSquarePlus,
   Scan,
   Expand,
   Minimize,
+  Brush,
 } from "lucide-react";
 import type { ReviewNote } from "@/lib/creative-review/model";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -23,11 +24,13 @@ function PDFPage({
   page,
   onPages,
   onRatio,
+  onRendered,
 }: {
   src: string;
   page: number;
   onPages: (n: number) => void;
   onRatio: (n: number) => void;
+  onRendered: (canvas: HTMLCanvasElement, page: number) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
@@ -74,7 +77,7 @@ function PDFPage({
         canvas.current.height = viewport.height;
         const task = p.render({ canvas: canvas.current, viewport });
         cancel = () => task.cancel();
-        return task.promise;
+        return task.promise.then(() => { if (!cancelled && canvas.current) onRendered(canvas.current, page); });
       })
       .catch((e) => {
         if (!cancelled && e?.name !== "RenderingCancelledException")
@@ -84,7 +87,7 @@ function PDFPage({
       cancelled = true;
       cancel?.();
     };
-  }, [doc, page, onRatio]);
+  }, [doc, page, onRatio, onRendered]);
   return error ? (
     <p role="alert">{error}</p>
   ) : (
@@ -96,6 +99,9 @@ function PDFPage({
   );
 }
 export function ReviewViewer({
+  publicationId,
+  canSketch,
+  hasSketch,
   versionId,
   notes,
   mark,
@@ -108,6 +114,9 @@ export function ReviewViewer({
   presenting,
   draftPending,
 }: {
+  publicationId: string;
+  canSketch: boolean;
+  hasSketch: boolean;
   versionId: string;
   notes: ReviewNote[];
   mark: Mark | null;
@@ -171,6 +180,49 @@ export function ReviewViewer({
       video.current.currentTime = focusSeconds;
     }
   }, [focusId, focusPage, focusSeconds, focusTick]);
+  const [sketchStatus, setSketchStatus] = useState("");
+  const [sketchBusy, setSketchBusy] = useState(false);
+  const sketchLock = useRef(false);
+  const pdfSnapshot = useRef<{ image: string; page: number } | null>(null);
+  const syncSketch = useCallback(async (snapshot?: { image: string; page: number; seconds?: number }, open = false) => {
+    if (!canSketch || sketchLock.current) return;
+    sketchLock.current = true;
+    setSketchBusy(true);
+    setSketchStatus("Incorporando la versión al boceto…");
+    try {
+      const r = await fetch(`/api/creative-review/${publicationId}/boceto`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId, ...snapshot, create: open }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw Error(d.error || "No se pudo incorporar la imagen");
+      if (d.requiresPreview) throw Error(d.message);
+      setSketchStatus("Versión incorporada al boceto · puedes añadir capturas y propuestas");
+      if (open) window.location.assign(d.href);
+    } catch (e) { setSketchStatus((e as Error).message); }
+    finally { sketchLock.current = false; setSketchBusy(false); }
+  }, [canSketch, publicationId, versionId]);
+  const pdfRendered = useCallback((canvas: HTMLCanvasElement, page: number) => {
+    const snapshot = { image: canvas.toDataURL("image/webp", 0.85), page };
+    pdfSnapshot.current = snapshot;
+    if (hasSketch) void syncSketch(snapshot);
+  }, [hasSketch, syncSketch]);
+  const openSketch = () => {
+    if (draftPending) { setSketchStatus("Guarda o descarta la observación antes de abrir el boceto."); return; }
+    if (mime.startsWith("video/")) {
+      const el = video.current;
+      if (!el || el.readyState < 2) { setSketchStatus("Reproduce el video y pausa en el fotograma que quieres llevar al boceto."); return; }
+      el.pause();
+      const canvas = document.createElement("canvas");
+      const factor = Math.min(1, 1800 / Math.max(el.videoWidth, el.videoHeight));
+      canvas.width = el.videoWidth * factor; canvas.height = el.videoHeight * factor;
+      canvas.getContext("2d")!.drawImage(el, 0, 0, canvas.width, canvas.height);
+      void syncSketch({ image: canvas.toDataURL("image/webp", 0.85), page: 1, seconds: el.currentTime }, true);
+    } else if (mime === "application/pdf") {
+      if (pdfSnapshot.current?.page !== page) { setSketchStatus("Espera a que se muestre esta página."); return; }
+      void syncSketch(pdfSnapshot.current, true);
+    } else void syncSketch(undefined, true);
+  };
   const point = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     return {
@@ -267,6 +319,12 @@ export function ReviewViewer({
           </button>
         </div>
       </div>
+      {canSketch && <div className="cr-sketch-strip">
+        <span role="status">{sketchStatus || "Lleva esta versión al lienzo para dibujar y pegar referencias."}</span>
+        <button disabled={sketchBusy || !mime || !!error || draftPending} onClick={openSketch}>
+          <Brush size={16} /> {mime.startsWith("video/") ? "Fotograma al boceto" : "Trabajar en boceto"}
+        </button>
+      </div>}
       <div className="cr-stage" ref={stage}>
         {error ? (
           <div className="cr-empty" role="alert">
@@ -295,6 +353,7 @@ export function ReviewViewer({
                 page={page}
                 onPages={setPages}
                 onRatio={setRatio}
+                onRendered={pdfRendered}
               />
             ) : mime.startsWith("video/") ? (
               <video
@@ -322,12 +381,13 @@ export function ReviewViewer({
               <img
                 src={src}
                 alt="Entrega seleccionada"
-                onLoad={(e) =>
+                onLoad={(e) => {
+                  if (hasSketch) void syncSketch();
                   setRatio(
                     e.currentTarget.naturalWidth /
                       e.currentTarget.naturalHeight || 1.5,
-                  )
-                }
+                  );
+                }}
                 onError={() => setError("No se pudo mostrar la imagen.")}
                 style={{ width: "100%", display: "block" }}
               />

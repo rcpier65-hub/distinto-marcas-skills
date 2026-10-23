@@ -587,6 +587,9 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
               />
             )}
             <ReviewViewer
+              publicationId={data.publication.id}
+              canSketch={data.canSketch}
+              hasSketch={!!data.sketchHref}
               key={v.id}
               versionId={v.id}
               notes={notes}

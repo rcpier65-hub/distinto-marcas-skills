@@ -4,8 +4,10 @@ import { SheetWorkspace } from "@/components/estrategia/sheet-workspace";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; id: string }>;
+  searchParams: Promise<{ zona?: string }>;
 }) {
   const { slug, id } = await params;
   let initial;
@@ -24,5 +26,5 @@ export default async function Page({
       </div>
     );
   }
-  return <SheetWorkspace initial={initial} />;
+  return <SheetWorkspace initial={initial} focusAnchor={(await searchParams).zona || ""} />;
 }

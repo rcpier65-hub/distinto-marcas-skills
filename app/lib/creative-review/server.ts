@@ -76,6 +76,7 @@ export async function reviewData(a: Actor, id: string): Promise<ReviewData> {
     sketchHref: sketch
       ? `/marca/${sketch.slug}/estrategia/hoja/${sketch.id}`
       : null,
+    canSketch: !!(publication.es_tarea_diseno || sketch) && (a.access.owner || (!!a.permisos.diseno?.acceso && !!a.permisos.marcas?.acceso)),
     manager: a.manager,
   };
 }

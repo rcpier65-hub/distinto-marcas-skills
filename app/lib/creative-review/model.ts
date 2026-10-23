@@ -50,6 +50,7 @@ export type ReviewData = {
   }[];
   items: { id: string; nombre: string }[];
   sketchHref: string | null;
+  canSketch: boolean;
   manager: boolean;
 };
 export const slotLabels: Record<string, string> = {

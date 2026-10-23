@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { SketchSync } from '@/components/creative-review/sketch-sync';
 import { ReviewLink } from '@/components/creative-review/link';
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -27,7 +28,7 @@ const Canvas = dynamic(() => import("./canvas"), {
   ssr: false,
   loading: () => <div className="st-empty">Abriendo lienzo…</div>,
 });
-export function SheetWorkspace({ initial }: { initial: any }) {
+export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; focusAnchor?: string }) {
   const [data, setData] = useState(initial),
     [panel, setPanel] = useState(initial.me.client ? "Comentarios" : initial.sheet.data.description ? "Plan" : "Reunión"),
     [open, setOpen] = useState(!initial.me.client && !initial.sheet.boceto_publicacion_id),
@@ -193,9 +194,11 @@ export function SheetWorkspace({ initial }: { initial: any }) {
           <span>El lienzo no crea tareas automáticamente</span>
         )}
       </div>
+      {!data.me.client && sheet.boceto_publicacion_id && <SketchSync publicationId={sheet.boceto_publicacion_id} onSynced={refresh} />}
       <div className="st-sheet-content">
         <Canvas
           sheet={sheet}
+          focusAnchor={focusAnchor}
           data={data}
           clientId={clientId}
           follow={follow}
