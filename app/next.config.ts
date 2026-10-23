@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
+  // Un solo worker durante la compilación del VPS; no modifica la app en ejecución.
+  ...(process.env.DISTINTO_VPS_BUILD === '1' ? {
+    experimental: { cpus: 1, webpackMemoryOptimizations: true },
+  } : {}),
   // Excluir Chromium + puppeteer del bundle de Next.js.
   // Si Next intenta empaquetarlos, su mecanismo interno de resolución de binaries
   // (libs nativas como libnss3, etc) se rompe y Chromium no puede lanzarse.

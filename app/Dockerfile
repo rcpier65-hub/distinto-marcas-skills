@@ -14,7 +14,9 @@ ARG APP_BUILD_ID=dev
 ENV APP_BUILD_ID=$APP_BUILD_ID
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN --mount=type=secret,id=appenv,target=/app/.env.production npm run build
+# Compilación acotada para este VPS compartido; el runtime conserva su configuración.
+RUN --mount=type=secret,id=appenv,target=/app/.env.production \
+    DISTINTO_VPS_BUILD=1 NODE_OPTIONS=--max-old-space-size=1536 npm run build -- --webpack
 
 FROM base AS run
 # Chromium del sistema para la grilla (PNG) y los PDF de propuestas.
