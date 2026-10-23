@@ -4,16 +4,16 @@ import Link from 'next/link'
 import { ArrowUpRight, Copy, KeyRound, LayoutDashboard, Loader2, X } from 'lucide-react'
 import { clientResources, type ClientResource } from '@/lib/cliente/access-resources'
 
-export function ClientQuickAccess({ marcaId, marcaSlug, portalLink = true }: { marcaId: string; marcaSlug: string; portalLink?: boolean }) {
+export function ClientQuickAccess({ marcaId, marcaSlug, portalLink = true, compact = false }: { marcaId: string; marcaSlug: string; portalLink?: boolean; compact?: boolean }) {
   const [selected, setSelected] = useState<ClientResource | null>(null)
   const close = useCallback(() => setSelected(null), [])
-  return <section aria-label="Accesos de tu marca" className={`grid gap-3 ${portalLink ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+  return <section aria-label="Accesos de tu marca" className={compact ? 'divide-y divide-slate-100' : `grid gap-3 ${portalLink ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
     {portalLink && <Link href={`/marca/${encodeURIComponent(marcaSlug)}/estrategia`} className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 font-semibold text-violet-800 hover:bg-violet-100">
       <LayoutDashboard className="h-5 w-5 shrink-0" /><span className="flex-1">Portal de marca<small className="mt-1 block font-normal text-xs">Resumen, planificación y reportes</small></span><ArrowUpRight className="h-4 w-4" />
     </Link>}
-    {marcaSlug === 'little-joe' && clientResources.map(resource => <div key={resource.id} className="flex flex-col justify-between gap-3 rounded-2xl border bg-white p-4">
-      <a href={resource.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 font-semibold text-slate-900 hover:text-violet-700">{resource.label}<ArrowUpRight className="h-4 w-4 shrink-0" /></a>
-      <button type="button" onClick={() => setSelected(resource)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50" aria-label={`Ver contraseña: ${resource.label}`}><KeyRound className="h-4 w-4" />Ver contraseña</button>
+    {marcaSlug === 'little-joe' && clientResources.map(resource => <div key={resource.id} className={compact ? "flex items-center justify-between gap-3 py-2" : "flex flex-col justify-between gap-3 rounded-2xl border bg-white p-4"}>
+      <a href={resource.url} target="_blank" rel="noopener noreferrer" className={compact ? "flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-700 hover:text-violet-700" : "flex items-center justify-between gap-3 font-semibold text-slate-900 hover:text-violet-700"}>{compact ? (resource.id === 'catalogos' ? 'Catálogos' : 'Libro de reclamaciones') : resource.label}<ArrowUpRight className="h-4 w-4 shrink-0" /></a>
+      <button type="button" onClick={() => setSelected(resource)} className={compact ? "flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-violet-700 hover:bg-violet-50" : "flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50"} aria-label={`Ver contraseña: ${resource.label}`}><KeyRound className="h-4 w-4" />{compact ? 'Contraseña' : 'Ver contraseña'}</button>
     </div>)}
     {selected && <AccessDialog key={`${marcaId}:${selected.id}`} marcaId={marcaId} resource={selected} close={close} />}
   </section>

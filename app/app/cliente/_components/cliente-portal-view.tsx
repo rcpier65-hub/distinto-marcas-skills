@@ -10,7 +10,6 @@ import {
   TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX, ImageOff, LayoutDashboard, KeyRound,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
-import { aclarar, oscurecer, esClaro } from '@/lib/marcas/branding'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { FormAgregarCliente, type FechaClienteItem } from './fechas-cliente-view'
 import { categoriaInfo } from '@/lib/fechas/categorias'
@@ -231,8 +230,8 @@ function videoAppUrl(url: string | null): string | null {
 }
 
 
-/* Menú del portal. Una sola lista alimenta el sidebar (PC) y el toggle (móvil),
-   así nunca se desincronizan. Pedro 17-jul-2026. */
+/* Destinos conservados para enlaces y retorno desde descargas. La navegación
+   principal se concentra en Resumen, Contenido y Soporte. */
 /* Pedro 31-ago-2026: la Lista vive DENTRO del Calendario (toggle), las fechas
    importantes van integradas al calendario de contenido (no calendario aparte),
    Observaciones se reemplaza por Soporte, y Reuniones+Grabación se unen en un
@@ -253,17 +252,6 @@ const NAV = [
   { id: 'reporte', label: 'Reporte mensual', corto: 'Reporte', Icono: TrendingUp },
 ] as const
 type VistaId = (typeof NAV)[number]['id']
-
-/* Encabezado de sección plegable del menú lateral, igual que la app
-   (▼ WORKSPACE / MARCAS). El chevron gira al colapsar. Pedro 19-jul-2026. */
-function GrupoSidebar({ titulo, abierto, onToggle }: { titulo: string; abierto: boolean; onToggle: () => void }) {
-  return (
-    <button onClick={onToggle}
-      className="w-full flex items-center gap-1 px-2 py-1.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
-      <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} /> {titulo}
-    </button>
-  )
-}
 
 /* Selector "Cambiar de marca" para clientes que manejan VARIAS marcas con el
    mismo login (p.ej. Praktico ↔ Retoz shop). Solo aparece si hay >1 marca. Al
@@ -381,7 +369,6 @@ export function ClientePortalView({
     (id !== 'accesos' || marcaSlug === 'little-joe') && (id !== 'influencers' || influencersActivo)), [marcaSlug, influencersActivo])
   /* Secciones plegables del menú lateral (como la app: ▼ WORKSPACE / MARCAS).
      Pedro 19-jul-2026. */
-  const [secAbierta, setSecAbierta] = useState<{ marca: boolean; herram: boolean }>({ marca: true, herram: true })
   /* Área de diseño: filtros del MISMO modelo del sistema (métricas clicables,
      búsqueda, rango de fechas y chip HOY). Pedro 31-ago-2026. */
   const [dzFiltro, setDzFiltro] = useState<SubEstadoDiseno | 'todos' | 'hoy'>('todos')
@@ -443,7 +430,7 @@ export function ClientePortalView({
   /* Videos (flujo de publicación) vs diseños de Aylin (banners, posts…). */
   const pubsNormales = useMemo(() => pubs.filter((p) => !esDisenoPieza(p)), [pubs])
   const disenos = useMemo(
-    () => pubs.filter(esDisenoPieza).sort((a, b) => (a.fechaEntrega ?? a.fecha ?? '9999').localeCompare(b.fechaEntrega ?? b.fecha ?? '9999')),
+    () => pubs.filter(p => esDisenoPieza(p) && p.estadoTarea !== 'archivado').sort((a, b) => (a.fechaEntrega ?? a.fecha ?? '9999').localeCompare(b.fechaEntrega ?? b.fecha ?? '9999')),
     [pubs],
   )
   /* Tareas PENDIENTES de la marca: videos que aún no se publican + diseños que
@@ -655,6 +642,8 @@ export function ClientePortalView({
     }
     const requestedView = navVisible.find(n => n.id === qs.get('vista'))
     if (requestedView) { setVista(requestedView.id); return }
+    const toolView = qs.get('vista')
+    if (toolView === 'tareas' || toolView === 'plan' || (toolView === 'drive' && driveUrl)) { setVista(toolView); return }
     if (qs.get('reporte') && tieneReporte) { setVista('reporte'); return }
     // Deep-links de notificaciones: reunión nueva o respuesta (ahora Soporte).
     if (qs.get('reunion')) { setVista('reuniones'); return }
@@ -663,227 +652,42 @@ export function ClientePortalView({
     if (!pubId) return
     const p = pubs.find((x) => x.id === pubId)
     if (p) { setVista('cal'); setModalPub(p) }
-  }, [pubs, navVisible, tieneReporte])
+  }, [pubs, navVisible, tieneReporte, driveUrl])
 
-  // Hero de la marca: degradado con SU color (ya no el rosa fijo) y texto
-  // oscuro cuando la marca es clara (lima, dorado) para que se lea bien.
-  const heroClaro = esClaro(marcaColor)
-  const heroTxt = heroClaro ? oscurecer(marcaColor, 0.72) : '#ffffff'
-  const heroGrad = `linear-gradient(135deg, ${aclarar(marcaColor, 0.14)} 0%, ${marcaColor} 45%, ${oscurecer(marcaColor, 0.32)} 100%)`
-  const heroVelo = heroClaro ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.15)'
-  const heroVelo2 = heroClaro ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.10)'
-  const heroBtn = heroClaro ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.20)'
+  const contentView = vista === 'cal' || vista === 'diseno'
+  const summaryView = !contentView && vista !== 'soporte'
+  const summaryWork = {
+    tasks: tareasMarca.length,
+    designs: disenos.filter(p => !disenoTerminado(p)).length,
+    publications: pubsNormales.filter(p => !esPublicada(p)).length,
+  }
 
   return (
-    /* ESTRUCTURA (Pedro 17-jul-2026): en PC, menú lateral fijo + panel al centro
-       ocupando toda la pantalla. En MÓVIL se queda EXACTAMENTE como estaba
-       (cabecera + toggle arriba), que ya funcionaba bien. */
-    <div className="lg:flex lg:h-[100dvh] lg:overflow-hidden">
+    <div className="min-h-[100dvh] bg-slate-50/60">
       <ClienteRealtime marcaId={marcaId} marcaSlug={marcaSlug} />
-
-      {/* ===== MENÚ LATERAL — solo PC ===== */}
-      <aside className="hidden lg:flex lg:flex-col w-[250px] shrink-0 border-r bg-card">
-        {/* El logo arranca a la MISMA altura que el hero "Bienvenida…" del
-            panel (que tiene lg:py-9 = 36px arriba), para que no quede flotando
-            pegado al techo. Pedro 17-jul-2026. */}
-        <div className="flex items-center gap-3 px-5 pt-9 pb-6 border-b">
-          <div className="rounded-xl p-1.5 shrink-0" style={{ background: `${marcaColor}14` }}>
-            <MarcaLogo slug={marcaSlug} nombre={marcaNombre} emoji={marcaEmoji} logoUrl={marcaLogoUrl} size={32} />
-          </div>
-          <div className="min-w-0">
-            <div className="font-extrabold text-[14px] leading-tight truncate">{marcaNombre}</div>
-            <div className="text-[11px] text-muted-foreground">Portal del cliente</div>
-          </div>
-        </div>
-
-        {/* Cliente multi-marca: selector para saltar entre sus marcas (PC). */}
-        {marcasDisponibles.length > 1 && (
-          <div className="px-4 pt-3">
-            <SwitcherMarca marcas={marcasDisponibles} activaId={marcaId} color={marcaColor} />
-          </div>
-        )}
-
-        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-          {/* ===== Sección plegable: TU MARCA ===== */}
-          <GrupoSidebar titulo="Tu marca" abierto={secAbierta.marca} onToggle={() => setSecAbierta((s) => ({ ...s, marca: !s.marca }))} />
-          {secAbierta.marca && navVisible.map(({ id, label, Icono }) => {
-            const activo = vista === id
-            return (
-              <button
-                key={id}
-                aria-current={activo ? 'page' : undefined}
-                onClick={() => setVista(id)}
-                className="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors"
-                style={activo ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
-              >
-                <Icono className="w-4 h-4 shrink-0" /> {label}
-              </button>
-            )
-          })}
-
-          {/* ===== Sección plegable: HERRAMIENTAS ===== */}
-          <div className="pt-2 mt-2 border-t">
-            <GrupoSidebar titulo="Herramientas" abierto={secAbierta.herram} onToggle={() => setSecAbierta((s) => ({ ...s, herram: !s.herram }))} />
-            {secAbierta.herram && (
-              <>
-                {/* TAREAS — el módulo real de tareas del sistema, solo su marca.
-                    (Reemplaza a "Tareas pendientes" con sub-filtros. Pedro 31-ago.) */}
-                <button
-                  onClick={() => setVista('tareas')}
-                  className="w-full flex items-center gap-2.5 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors hover:bg-muted"
-                  style={vista === 'tareas' ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
-                >
-                  <ListTodo className="w-4 h-4 shrink-0" /> Tareas
-                  {tareasMarca.length > 0 && (
-                    <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{tareasMarca.length}</span>
-                  )}
-                </button>
-                {/* PLAN DE TRABAJO — responsables, estados, Gantt y calendario
-                    de las tareas (el cliente VE el avance del equipo). */}
-                <button
-                  onClick={() => setVista('plan')}
-                  className="w-full flex items-center gap-2.5 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors hover:bg-muted"
-                  style={vista === 'plan' ? { background: `${marcaColor}18`, color: marcaColor } : { color: 'var(--muted-foreground, #64748b)' }}
-                >
-                  <LayoutGrid className="w-4 h-4 shrink-0" /> Plan de trabajo
-                </button>
-                {driveUrl && (
-                  /* Pedro 5-ago-2026: el botón lleva DIRECTO a la carpeta de Drive
-                     de la marca (abre Google Drive en otra pestaña), sin abrir una
-                     sección interna. Cada marca → su propia carpeta (driveUrl). */
-                  <a
-                    href={driveUrl}
-                    target="_blank" rel="noopener noreferrer"
-                    className="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[13.5px] font-semibold transition-colors hover:bg-muted"
-                    style={{ color: 'var(--muted-foreground, #64748b)' }}
-                  >
-                    <HardDrive className="w-4 h-4 shrink-0" /> Drive · Almacenamiento
-                  </a>
-                )}
-              </>
-            )}
-          </div>
-        </nav>
-
-        <div className="p-3 border-t">
-          <button
-            onClick={salir}
-            className="w-full flex items-center gap-2.5 h-10 px-3 rounded-xl text-[13px] font-semibold text-muted-foreground hover:bg-muted transition-colors"
-          >
-            <LogOut className="w-4 h-4" /> Cerrar sesión
-          </button>
-        </div>
-      </aside>
-
-      {/* ===== PANEL CENTRAL ===== */}
-      <div className="flex-1 min-w-0 lg:overflow-y-auto">
-        {/* Aire: padding generoso arriba/lados y un ancho máximo para que en
-            pantallas grandes no quede estirado de borde a borde. */}
-        <div className="p-4 sm:p-6 lg:px-10 lg:py-9 pb-28 lg:pb-12 space-y-6 lg:space-y-7 max-w-[1500px] mx-auto">
-
-          {/* HERO — el degradado de la marca. Va en móvil Y en PC: a Pedro le
-              gustaba y da la bienvenida. Grande y con aire. */}
-          <header className="relative overflow-hidden rounded-2xl p-5 sm:p-6" style={{ background: heroGrad, color: heroTxt }}>
-            <div aria-hidden className="absolute -top-12 -right-10 w-44 h-44 lg:w-64 lg:h-64 rounded-full" style={{ background: heroVelo }} />
-            <div aria-hidden className="absolute -bottom-14 -left-8 w-40 h-40 lg:w-56 lg:h-56 rounded-full" style={{ background: heroVelo2 }} />
-            <div className="relative flex items-center gap-4 lg:gap-6">
-              <div className="bg-white rounded-2xl p-2 lg:p-3 shrink-0 shadow-lg">
-                <MarcaLogo slug={marcaSlug} nombre={marcaNombre} emoji={marcaEmoji} logoUrl={marcaLogoUrl} size={48} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] lg:text-xs uppercase tracking-widest font-bold" style={{ opacity: 0.82 }}>
-                  {marcaNombre} · Portal del cliente
-                </div>
-                {/* Solo "Bienvenido" (no solo Andrea usa la cuenta del cliente)
-                    + bajada profesional. Pedro 17-jul-2026. */}
-                <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight mt-0.5">
-                  Bienvenido 👋
-                </h1>
-                <p className="text-[13px] lg:text-[15px] mt-1 max-w-xl" style={{ opacity: 0.9 }}>
-                  Tu espacio central con Distinto Agencia: revisa, aprueba y da seguimiento a todo el contenido de tu marca en un solo lugar.
-                </p>
-              </div>
-              {/* En PC el "Salir" vive en el menú lateral. */}
-              <button onClick={salir} title="Cerrar sesión" className="lg:hidden relative shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-xl px-3 py-2 transition-opacity hover:opacity-80" style={{ background: heroBtn, color: heroTxt }}>
-                <LogOut className="w-3.5 h-3.5" /> Salir
-              </button>
-            </div>
+      <div className="min-w-0">
+        <div className="mx-auto max-w-[1440px] space-y-4 px-4 pb-3 pt-4 sm:px-6 lg:px-8">
+          <header className="flex items-center gap-3">
+            <div className="shrink-0 rounded-xl border bg-white p-1.5"><MarcaLogo slug={marcaSlug} nombre={marcaNombre} emoji={marcaEmoji} logoUrl={marcaLogoUrl} size={36} /></div>
+            <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Portal de marca</p><h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{marcaNombre}</h1></div>
+            {marcasDisponibles.length > 1 && <SwitcherMarca marcas={marcasDisponibles} activaId={marcaId} color={marcaColor} />}
+            <details className="group relative">
+              <summary aria-label="Avisos de publicaciones" title="Avisos de publicaciones" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl text-slate-500 hover:bg-white [&::-webkit-details-marker]:hidden"><Bell size={18} /></summary>
+              <div className="absolute right-0 top-12 z-40 w-72 max-w-[calc(100vw-2rem)] space-y-3 rounded-2xl border bg-white p-4 shadow-lg"><p className="text-sm font-semibold">Avisos de publicaciones</p><p className="text-xs text-slate-500">Recibe un aviso cuando se publique tu contenido.</p><ActivarNotificaciones className="w-full" /></div>
+            </details>
+            <button type="button" onClick={salir} aria-label="Cerrar sesión" title="Cerrar sesión" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-white"><LogOut size={18} /></button>
           </header>
+          <nav aria-label="Navegación del portal" className="flex border-b border-violet-100">
+            {[
+              { id: 'resumen' as const, label: 'Resumen', Icon: LayoutDashboard, active: summaryView },
+              { id: 'cal' as const, label: 'Contenido', Icon: Clapperboard, active: contentView },
+              { id: 'soporte' as const, label: 'Soporte', Icon: LifeBuoy, active: vista === 'soporte' },
+            ].map(({ id, label, Icon, active }) => <button key={id} type="button" aria-current={active ? 'page' : undefined} onClick={() => setVista(id)} className={`flex min-h-12 flex-1 items-center justify-center gap-2 border-b-2 px-3 text-sm font-semibold sm:flex-none sm:px-6 ${active ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}><Icon size={17} />{label}</button>)}
+          </nav>
+          {contentView && <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">Contenido de la marca</h2><div className="flex rounded-xl border bg-white p-1">{[{ id: 'cal' as const, label: 'Publicaciones' }, { id: 'diseno' as const, label: 'Diseños' }].map(({ id, label }) => <button key={id} type="button" aria-pressed={vista === id} onClick={() => setVista(id)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${vista === id ? 'bg-violet-50 text-violet-700' : 'text-slate-500 hover:bg-slate-50'}`}>{label}</button>)}</div></div>}
+          {summaryView && vista !== 'resumen' && <button type="button" onClick={() => setVista('resumen')} className="inline-flex items-center gap-1 text-sm font-medium text-violet-700 hover:underline"><ChevronLeft size={16} />Volver al resumen</button>}
 
-
-          {/* Cliente multi-marca: selector en móvil (en PC va en el menú lateral). */}
-          {marcasDisponibles.length > 1 && (
-            <div className="lg:hidden">
-              <SwitcherMarca marcas={marcasDisponibles} activaId={marcaId} color={marcaColor} />
-            </div>
-          )}
-
-          {/* Activar notificaciones */}
-          <details className="rounded-xl border bg-card px-4 py-2" style={{ borderColor: `${marcaColor}33` }}>
-            <summary className="cursor-pointer text-sm font-semibold">Avisos de publicaciones</summary>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="text-sm min-w-0 flex-1">
-              <div className="font-bold flex items-center gap-1.5"><Bell className="w-4 h-4 shrink-0" style={{ color: marcaColor }} /> Avísame cuando publiquen</div>
-              <div className="text-xs text-muted-foreground">Con un toque activas las notificaciones y recibes un aviso en tu celular apenas se publique tu contenido.</div>
-            </div>
-            <ActivarNotificaciones className="w-full sm:w-auto" />
-            </div>
-          </details>
-
-          {/* Toggle — solo MÓVIL (en PC está el menú lateral) */}
-          <div className="lg:hidden grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-muted/60 w-full">
-            {navVisible.map(({ id, corto, Icono }) => (
-              <ToggleBtn
-                key={id}
-                active={vista === id}
-                onClick={() => setVista(id)}
-                color={marcaColor}
-                icon={<Icono className="w-4 h-4" />}
-                label={corto}
-              />
-            ))}
-          </div>
-          <details className="lg:hidden rounded-xl border bg-card p-3">
-            <summary className="cursor-pointer text-sm font-semibold">Más herramientas</summary>
-            <div className="mt-3 space-y-2">
-          {/* Tareas + Drive — acceso en móvil (en PC va en el menú). */}
-          <button
-            onClick={() => setVista('tareas')}
-            className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-2xl text-[13.5px] font-bold border-2"
-            style={vista === 'tareas'
-              ? { background: `${marcaColor}14`, color: marcaColor, borderColor: `${marcaColor}55` }
-              : { color: 'var(--muted-foreground, #64748b)', borderColor: 'var(--border, #e5e7eb)' }}
-          >
-            <ListTodo className="w-4 h-4" /> Tareas
-            {tareasMarca.length > 0 && (
-              <span className="min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold text-white inline-flex items-center justify-center" style={{ background: marcaColor }}>{tareasMarca.length}</span>
-            )}
-          </button>
-          <button
-            onClick={() => setVista('plan')}
-            className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-2xl text-[13.5px] font-bold border-2"
-            style={vista === 'plan'
-              ? { background: `${marcaColor}14`, color: marcaColor, borderColor: `${marcaColor}55` }
-              : { color: 'var(--muted-foreground, #64748b)', borderColor: 'var(--border, #e5e7eb)' }}
-          >
-            <LayoutGrid className="w-4 h-4" /> Plan de trabajo
-          </button>
-          {driveUrl && (
-            /* Directo a la carpeta de Drive de la marca (Pedro 5-ago-2026). */
-            <a
-              href={driveUrl}
-              target="_blank" rel="noopener noreferrer"
-              className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-2xl text-[13.5px] font-bold border-2"
-              style={{ color: 'var(--muted-foreground, #64748b)', borderColor: 'var(--border, #e5e7eb)' }}
-            >
-              <HardDrive className="w-4 h-4" /> Drive · Almacenamiento
-            </a>
-          )}
-
-            </div>
-          </details>
-
-      {vista === 'resumen' && <ClientBrandOverview data={brandSpace} onNavigate={setVista} />}
+      {vista === 'resumen' && <ClientBrandOverview data={brandSpace} onNavigate={setVista} work={summaryWork} driveUrl={driveUrl} influencersActive={influencersActivo} />}
       {vista === 'accesos' && marcaSlug === 'little-joe' && <section className="space-y-4"><h2 className="text-xl font-bold">Catálogos y accesos de tu marca</h2><ClientQuickAccess key={marcaId} marcaId={marcaId} marcaSlug={marcaSlug} portalLink={false} /></section>}
       {vista === 'planificacion' && <section className="rounded-2xl border bg-card p-5"><h2 className="text-xl font-bold mb-4">Planificación compartida contigo</h2>{!planificacionHojas.length && <p className="text-sm text-muted-foreground">Tu equipo aún no ha compartido una planificación contigo.</p>}<div className="grid gap-3 md:grid-cols-2">{planificacionHojas.map(s=><a className="rounded-xl border p-5 hover:bg-violet-50" key={s.id} href={`/cliente/planificacion/${s.id}`}><strong>{s.title}</strong><p className="text-sm text-muted-foreground mt-2">Ver lienzo y comentar →</p></a>)}</div></section>}
       {vista === 'cal' && (
@@ -1257,7 +1061,7 @@ export function ClientePortalView({
         <DriveView driveUrl={driveUrl} color={marcaColor} />
       )}
 
-      <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>
+      {vista !== 'resumen' && <p className="text-center text-[11px] text-muted-foreground pt-2">Portal de clientes · Distinto Agencia</p>}
 
       {/* Detalle de una fecha importante (chips del calendario) — puede eliminarla */}
       {detalleFecha && (
@@ -1617,17 +1421,7 @@ function WeekView({ weekDays, porDia, hoy, marcaColor, colorEstado, estadoLabel,
   )
 }
 
-function ToggleBtn({ active, onClick, color, icon, label }: { active: boolean; onClick: () => void; color: string; icon: ReactNode; label: string }) {
-  return (
-    <button onClick={onClick}
-      className="w-full min-w-0 inline-flex items-center justify-center gap-1 px-1 h-9 rounded-xl text-[12px] sm:text-[13px] font-bold whitespace-nowrap transition-all"
-      style={{ background: active ? '#fff' : 'transparent', color: active ? color : 'var(--muted-foreground, #64748b)', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.10)' : undefined }}>
-      <span className="shrink-0">{icon}</span> {label}
-    </button>
-  )
-}
 
-/* Formato fecha corta + hora (Lima) — usado en observaciones. */
 function fmtHoraMsg(iso: string): string {
   try {
     return new Intl.DateTimeFormat('es-PE', {
