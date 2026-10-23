@@ -43,27 +43,27 @@ export async function POST(request: NextRequest) {
     if (origin && !allowedOrigins.has(origin)) return NextResponse.json({ error: 'Origen no permitido.' }, { status: 403 })
     if (!request.headers.get('content-type')?.startsWith('application/json')) return NextResponse.json({ error: 'Formato inválido.' }, { status: 400 })
     const raw = await request.text()
-    if (raw.length > 55_000) return NextResponse.json({ error: 'El diagnóstico es demasiado extenso.' }, { status: 413 })
+    if (raw.length > 55_000) return NextResponse.json({ error: 'La solicitud es demasiado extensa.' }, { status: 413 })
     let json: unknown
     try { json = JSON.parse(raw) } catch { return NextResponse.json({ error: 'Solicitud inválida.' }, { status: 400 }) }
     const parsed = inputSchema.safeParse(json)
     if (!parsed.success) return NextResponse.json({ error: 'Revisa tu nombre, empresa, correo y consentimiento.' }, { status: 400 })
 
     const payloadText = JSON.stringify(parsed.data.payload)
-    if (payloadText.length > 45_000) return NextResponse.json({ error: 'El diagnóstico es demasiado extenso.' }, { status: 413 })
+    if (payloadText.length > 45_000) return NextResponse.json({ error: 'La solicitud es demasiado extensa.' }, { status: 413 })
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local'
     if (!await limit(`ip:${ip}`, 12, 3600) || !await limit(`email:${parsed.data.email}`, 6, 86400)) {
-      return NextResponse.json({ error: 'Ya guardaste varios diagnósticos. Intenta nuevamente más tarde.' }, { status: 429 })
+      return NextResponse.json({ error: 'Ya realizaste varias descargas. Intenta nuevamente más tarde.' }, { status: 429 })
     }
 
     const { resource, nombre, email, empresa, telefono, payload } = parsed.data
     const { error } = await db().from('public_resource_leads').insert({ resource, nombre, email, empresa, telefono: telefono || null, result: payload })
     if (error) {
       console.error('[resource-lead]', error.code)
-      return NextResponse.json({ error: 'No pudimos guardar el diagnóstico. Intenta nuevamente.' }, { status: 503 })
+      return NextResponse.json({ error: 'No pudimos preparar la descarga. Intenta nuevamente.' }, { status: 503 })
     }
     return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
   } catch {
-    return NextResponse.json({ error: 'No pudimos guardar el diagnóstico. Intenta nuevamente.' }, { status: 503 })
+    return NextResponse.json({ error: 'No pudimos preparar la descarga. Intenta nuevamente.' }, { status: 503 })
   }
 }
