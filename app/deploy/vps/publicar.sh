@@ -19,7 +19,7 @@ build_sha=$2
 builder=distinto-agencia-limitado
 if ! docker buildx inspect "$builder" >/dev/null 2>&1; then
   docker buildx create --name "$builder" --driver docker-container \
-    --driver-opt memory=2g,memory-swap=2g,cpu-period=100000,cpu-quota=150000,restart-policy=no
+    --driver-opt memory=1500m,memory-swap=1500m,cpu-period=100000,cpu-quota=100000,restart-policy=no
 fi
 trap 'docker buildx stop "$builder" >/dev/null 2>&1 || true' EXIT
 cd "$app_dir/src"
