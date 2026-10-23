@@ -10,6 +10,17 @@ function acceso(a: Actor) {
   if (!puedeMarcarDiseno(a)) throw new StrategyError("Sin permiso para acceder a Diseño", 403);
 }
 
+// Validar antes de crear/editar evita guardar media tarea cuando la selección
+// automática no tendría ninguna marca autorizada donde mostrarse.
+export async function validarPresentacionDiseno(a: Actor, ids: string[]) {
+  acceso(a);
+  const { rowCount } = await strategyDB().query(`
+    SELECT id FROM marcas WHERE activa = true AND slug <> 'interno'
+      AND id = ANY($1::uuid[]) AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[]))
+  `, [ids, a.brands]);
+  if (!rowCount) throw new StrategyError("Selecciona una marca a la que tengas acceso para presentar el diseño en reunión.", 403);
+}
+
 export async function disenosParaReunion(a: Actor): Promise<string[]> {
   acceso(a);
   const { rows } = await strategyDB().query<{ publicacion_id: string }>(`

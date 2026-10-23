@@ -12,6 +12,18 @@ Publicaciones; los independientes, Diseño. El diseño sigue visible para la reu
 al terminarlo, incluso si sale del tablero de trabajo. Se muestra su estado real:
 seleccionarlo para presentar no significa que esté terminado.
 
+Al crear una tarea con «¿Esta entrega necesita reunión?» activado, también se
+activa «Para presentar en reunión» automáticamente. La selección se guarda antes
+de intentar agendar Google: si Calendar falla, el diseño sigue preparado para
+presentar y el formulario informa el fallo de agenda. Los reintentos de creación
+recuperan la misma tarea y una sola selección por marca.
+
+En el detalle, indicar la hora de revisión o cambiar la fecha de una tarea con
+hora también activa la selección. Editar el nombre u otros campos no vuelve a
+activar temas ya presentados. El botón sigue permitiendo quitar la selección
+manualmente; quitarla no cancela reuniones en Calendar. No se reconstruyen las
+reuniones antiguas a partir del título de una tarea.
+
 Se incluyen la marca principal y las etiquetas adicionales activas, excluyendo
 Interno y las marcas fuera del permiso del miembro. Al retirar una marca del
 diseño, un trigger elimina únicamente su selección pendiente allí. El historial
@@ -35,6 +47,10 @@ Migración aditiva: `20261022140000_reunion_diseno.sql`.
 ## Verificación
 
 `TEST_BASE_URL=http://localhost:3122 node scripts/test-diseno-reunion.mjs`
+
+`TEST_BASE_URL=http://localhost:3122 node scripts/test-diseno-reunion-auto.mjs`
+prueba los actions reales de creación/edición, Sí/No, reintentos, panel, permisos,
+historial y reprogramación sin llamar a Google ni enviar invitaciones.
 
 La prueba crea marcas, diseños, tareas y un miembro restringido temporales; no
 envía mensajes. Comprueba concurrencia sin duplicados, datos originales intactos,

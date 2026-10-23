@@ -17,6 +17,7 @@ import { permitirBoceto, bocetosDeDisenos } from '@/lib/diseno/boceto'
 import { hoyLima } from '@/lib/fechas/hoy'
 import type { SubEstadoDiseno } from '@/lib/diseno/types'
 import { idDeSolicitudDiseno, insertarDisenoUnaVez } from '@/lib/diseno/create-task'
+import { marcarDiseno, validarPresentacionDiseno } from '@/lib/reuniones/diseno'
 
 type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -186,6 +187,27 @@ export async function updateDisenoEntry(
   if (patch.horaReunion !== undefined) update.reunion_hora = patch.horaReunion
   if (patch.invitadosEmails !== undefined) update.invitados_emails = patch.invitadosEmails
 
+  // Preparar la presentación al indicar una reunión, también desde el detalle.
+  // Guardados ajenos a fecha/hora no reabren una reunión ya presentada.
+  let presentacionActor: Awaited<ReturnType<typeof actor>> | undefined
+  if (patch.horaReunion || patch.fechaEntrega) {
+    const { data: anterior, error: lecturaError } = await service.from('publicaciones')
+      .select('reunion_hora, fecha_entrega, marca_id, marcas_extra').eq('id', id).single()
+    if (lecturaError) return { ok: false, error: lecturaError.message }
+    const hora = patch.horaReunion !== undefined ? patch.horaReunion : anterior.reunion_hora
+    const nuevaHora = patch.horaReunion !== undefined && String(hora || '').slice(0, 5) !== String(anterior.reunion_hora || '').slice(0, 5)
+    const nuevaFecha = patch.fechaEntrega !== undefined && patch.fechaEntrega !== anterior.fecha_entrega
+    if (hora && (nuevaHora || nuevaFecha)) {
+      try {
+        presentacionActor = await actor()
+        await validarPresentacionDiseno(presentacionActor, [
+          (update.marca_id ?? anterior.marca_id) as string,
+          ...((update.marcas_extra ?? anterior.marcas_extra ?? []) as string[]),
+        ].filter(Boolean))
+      } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'No se pudo preparar la presentación' } }
+    }
+  }
+
   let { error } = await service.from('publicaciones').update(update).eq('id', id)
 
   /* Defensive contra migration pendiente: si descripcion/fecha_entrega
@@ -212,7 +234,13 @@ export async function updateDisenoEntry(
     return { ok: false, error: error.message }
   }
 
+  if (presentacionActor) {
+    try { await marcarDiseno(presentacionActor, id, true) }
+    catch (e) { return { ok: false, error: `La tarea se guardó, pero no su selección para reunión: ${e instanceof Error ? e.message : 'vuelve a intentarlo'}` } }
+  }
+
   revalidatePath('/diseno')
+  revalidatePath(`/diseno/${id}`)
   revalidatePath(`/publicaciones/${id}`)
   return { ok: true }
 }
@@ -282,6 +310,7 @@ export async function obtenerCorreosDeMarca(slug: string): Promise<{
 export async function crearDisenoTask(args: {
   solicitudId?: string
   tieneBoceto?: boolean
+  paraReunion?: boolean
   paraHoy?: boolean
   nombre: string
   descripcion?: string | null
@@ -423,11 +452,25 @@ export async function crearDisenoTask(args: {
     if (idsExtras.length > 0) insert.marcas_extra = idsExtras
   }
 
+  const paraReunion = args.paraReunion === true || !!args.horaReunion
+  let presentacionActor: Awaited<ReturnType<typeof actor>> | undefined
+  if (paraReunion) {
+    try {
+      presentacionActor = await actor()
+      await validarPresentacionDiseno(presentacionActor, [marca.id, ...idsExtras])
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'No se pudo preparar la presentación' } }
+  }
+
   const { data, error } = await insertarDisenoUnaVez(service, insert)
 
   if (error || !data) {
     console.error('[crearDisenoTask] error:', error)
     return { ok: false, error: error?.message ?? 'No se pudo guardar la tarea. Vuelve a intentar.' }
+  }
+
+  if (presentacionActor) {
+    try { await marcarDiseno(presentacionActor, data.id, true) }
+    catch (e) { return { ok: false, error: `La tarea se creó, pero no su selección para reunión. Reintenta para recuperar la misma tarea: ${e instanceof Error ? e.message : 'error al guardar'}` } }
   }
 
   /* Las marcas extra ya quedaron etiquetadas en marcas_extra de ESTA tarea

@@ -1315,6 +1315,7 @@ function NuevaTareaModal({
       const r = await crearDisenoTask({
         solicitudId: solicitudId.current,
         tieneBoceto,
+        paraReunion: agregarReunion,
         paraHoy,
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
@@ -1336,6 +1337,7 @@ function NuevaTareaModal({
         invitadosEmails: null,
       })
       if (!r.ok) { toast.error(r.error); return }
+      if (agregarReunion) window.dispatchEvent(new Event('distinto:reunion-temas'))
 
       if (esParaPublicar && tipo) {
         const re = await crearEntregables({
@@ -1622,7 +1624,7 @@ function NuevaTareaModal({
               <Opcion activo={paraHoy} onToggle={() => setParaHoy((v) => !v)} color="#7170ff" Icon={IcoHoy}
                 titulo="Trabajar hoy" texto="La agrega a tu lista de hoy." />
               <Opcion activo={agregarReunion} onToggle={() => setAgregarReunion((v) => !v)} color="#10b981" Icon={IcoVideo}
-                titulo="¿Esta entrega necesita reunión?" texto="Actívalo si hay que presentar el diseño en una reunión." />
+                titulo="¿Esta entrega necesita reunión?" texto="También activa «Para presentar en reunión» en el panel de la marca." />
               {agregarReunion && (
                 <div style={{ display: 'grid', gap: 12, padding: 14, borderRadius: 14, background: '#f6fdf9', border: '1px solid #d1fae5' }}>
                   {/* Mismo asistente del calendario: una frase y listo. */}

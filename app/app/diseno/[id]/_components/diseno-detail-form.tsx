@@ -133,8 +133,11 @@ export function DisenoDetailForm({
       setIsSaving(false)
       if (!r.ok) {
         toast.error(`Error: ${r.error}`)
-      } else if (msg) {
-        toast.success(msg, { duration: 1200 })
+      } else {
+        if (patch.horaReunion !== undefined || patch.fechaEntrega !== undefined) {
+          window.dispatchEvent(new Event('distinto:reunion-temas'))
+        }
+        if (msg) toast.success(msg, { duration: 1200 })
       }
     })
   }
@@ -381,6 +384,7 @@ export function DisenoDetailForm({
 
       {/* CARD: Reunión */}
       <Section icon={<Video className="w-4 h-4" />} title="Reunión de revisión" color="#10b981">
+        <p className="text-xs text-muted-foreground">Al guardar la hora, este diseño se agrega automáticamente a «Para presentar en reunión» en el panel de la marca.</p>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Hora" icon={<Clock className="w-3.5 h-3.5" />}>
             <input
