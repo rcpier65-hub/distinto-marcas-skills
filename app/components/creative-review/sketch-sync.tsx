@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw, AlertCircle } from "lucide-react";
 import type { ReviewData } from "@/lib/creative-review/model";
 export function SketchSync({
   publicationId,
@@ -9,12 +10,14 @@ export function SketchSync({
   onSynced: () => Promise<void>;
 }) {
   const [status, setStatus] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [failed, setFailed] = useState(false);
   const lock = useRef(false);
   const sync = useCallback(async () => {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
+    setFailed(false);
     setStatus("Comprobando entregas…");
     try {
       const response = await fetch(`/api/creative-review/${publicationId}`, {
@@ -52,6 +55,7 @@ export function SketchSync({
         `${added ? `${added} entrega(s) incorporadas. ` : "Imágenes al día. "}${preview ? "PDF y video: elige la página o fotograma en Revisión." : "Cada versión conserva su espacio."}`,
       );
     } catch (e) {
+      setFailed(true);
       setStatus((e as Error).message);
     } finally {
       lock.current = false;
@@ -63,11 +67,11 @@ export function SketchSync({
     return () => clearTimeout(timer);
   }, [sync]);
   return (
-    <div className="st-sketch-sync">
-      <span role="status">{status}</span>
-      <button disabled={busy} onClick={() => void sync()}>
-        Actualizar entregas
+    <div className="st-sketch-sync" title={status}>
+      <button disabled={busy} onClick={() => void sync()} title={`Actualizar entregas${status ? ": " + status : ""}`} aria-label="Actualizar entregas">
+        {failed ? <AlertCircle size={17}/> : <RefreshCw size={17} className={busy ? "animate-spin" : ""}/>}
       </button>
+      {failed && <span className="st-sync-error" role="alert">{status}</span>}
     </div>
   );
 }

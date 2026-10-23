@@ -10,6 +10,7 @@ import {
 } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
+import { MessageSquare, Scan, ClipboardPaste, MonitorUp, ImagePlus, X, ScanEye } from "lucide-react";
 import { api } from "./common";
 import { SketchComments } from "@/components/creative-review/sketch-comments";
 import { mergeScene } from "@/lib/estrategia/model";
@@ -308,19 +309,17 @@ export default function Canvas({
   return (
     <div className="st-canvas-wrap">
       {sheet.boceto_publicacion_id && !data.me.client && <div className="st-sketch-tools">
-        <label>Versión <select aria-label="Zona de la versión" disabled={commentDraft} value={activeAnchor} onChange={e => focusVersion(e.target.value)}>
+        <label><select aria-label="Zona de la versión" disabled={commentDraft} value={activeAnchor} onChange={e => focusVersion(e.target.value)}>
           <option value="">Todo el boceto</option>
           {anchors.map((e: any) => <option key={e.id} value={e.id}>{e.customData.deliveryLabel}</option>)}
         </select></label>
-        <button className={commentMode ? 'st-selected' : ''} aria-pressed={commentMode} disabled={commentDraft} onClick={() => { setCommentMode(!commentMode); setShowComments(true); }}>▧ Comentar zona</button>
-        <button aria-pressed={showComments} disabled={commentDraft} onClick={() => setShowComments(!showComments)}>Comentarios · {commentCount}</button>
-        <button onClick={() => { setCommentMode(false); ex?.setActiveTool({ type: 'arrow' }); }}>↗ Flecha</button>
-        <button onClick={() => { setCommentMode(false); ex?.setActiveTool({ type: 'freedraw' }); }}>✎ Dibujar</button>
-        <button disabled={referenceBusy} onClick={() => void pasteReference()}>Pegar captura</button>
-        <button disabled={referenceBusy} onClick={() => void captureReference()}>Capturar pantalla</button>
-        <button disabled={referenceBusy} onClick={() => upload.current?.click()}>+ Referencia</button>
+        <button className={commentMode ? 'st-selected' : ''} aria-pressed={commentMode} disabled={commentDraft} onClick={() => { setCommentMode(!commentMode); setShowComments(true); }} title="Arrastra una zona del diseño para comentar"><Scan size={16}/> Comentar zona</button>
+        <button aria-pressed={showComments} disabled={commentDraft} onClick={() => setShowComments(!showComments)} title="Mostrar u ocultar comentarios"><MessageSquare size={16}/> <span className="st-tools-label">Comentarios</span> {commentCount}</button>
+        <button disabled={referenceBusy} title="Pegar captura · Ctrl/Cmd + V" aria-label="Pegar captura" onClick={() => void pasteReference()}><ClipboardPaste size={17}/></button>
+        <button disabled={referenceBusy} title="Capturar pantalla" aria-label="Capturar pantalla" onClick={() => void captureReference()}><MonitorUp size={17}/></button>
+        <button disabled={referenceBusy} title="Añadir imagen de referencia" aria-label="Añadir imagen de referencia" onClick={() => upload.current?.click()}><ImagePlus size={17}/></button>
         <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e => { const file = e.target.files?.[0]; if (file) void referenceAction(() => addReference(file)); e.target.value = ''; }} />
-        {referenceMessage && <span role="status">{referenceMessage}</span>}
+        {referenceMessage && <span className="st-reference-message" role="status">{referenceMessage}<button aria-label="Cerrar aviso de referencia" onClick={() => setReferenceMessage('')}><X size={15}/></button></span>}
       </div>}
     <div className="st-sketch-stage">
     <div className="st-canvas" ref={bindCanvas}>
@@ -388,11 +387,7 @@ export default function Canvas({
           <MainMenu.DefaultItems.Help />
         </MainMenu>
       </Excalidraw>
-      <button className="st-fit-canvas" onClick={() => ex?.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 })}>Ver todo el lienzo</button>
-      <div className="st-canvas-tip">
-        Espacio + arrastrar para moverte · rueda + Ctrl para zoom · doble clic
-        para escribir
-      </div>
+      <button className="st-fit-canvas" onClick={() => ex?.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.86, maxZoom: 1 })} title="Ver todo el lienzo" aria-label="Ver todo el lienzo"><ScanEye size={18}/></button>
     </div>
     {sheet.boceto_publicacion_id && !data.me.client && <SketchComments ex={ex} publicationId={sheet.boceto_publicacion_id} canvasNode={canvasNode} mode={commentMode} show={showComments} activeAnchor={activeAnchor} onMode={setCommentMode} onShow={setShowComments} onCount={setCommentCount} onDraft={setCommentDraft} />}
     </div>

@@ -19,6 +19,7 @@ export function SketchComments({ ex, publicationId, canvasNode, mode, show, acti
 }) {
   const [review, setReview] = useState<ReviewData | null>(null), [view, setView] = useState<View>(EMPTY);
   const [draft, setDraft] = useState<Draft | null>(null), [text, setText] = useState(''), [requestedBy, setRequestedBy] = useState('Cliente');
+  const [hintHidden, setHintHidden] = useState(false);
   const [selected, setSelected] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null), saving = useRef(false), lastRead = useRef(0);
   const dragging = useRef<{ image: SketchImage; start: Point; screen: Point } | null>(null);
@@ -120,9 +121,8 @@ export function SketchComments({ ex, publicationId, canvasNode, mode, show, acti
     if (element) ex?.scrollToContent([element], { fitToViewport: true, viewportZoomFactor: .7, maxZoom: 1 });
   }
   const draftImage = view.images.find(i => i.id === draft?.anchorId);
-  const renderNotes = show || mode;
-  const visibleNotes = renderNotes ? notes.filter(n => view.images.some(i => noteMatchesImage(n, i))) : [];
-  const overlay = <div className={`sk-comments-overlay ${mode ? 'is-commenting' : ''}`}>
+  const visibleNotes = notes.filter(n => view.images.some(i => noteMatchesImage(n, i)));
+  const overlay = <div className={`sk-comments-overlay ${mode ? 'is-commenting' : ''} ${!show ? 'is-panel-closed' : ''}`}>
     <svg className="sk-comments-svg" aria-label="Zonas de comentarios">
       {visibleNotes.map(n => {
         const image = view.images.find(i => noteMatchesImage(n, i))!;
@@ -139,7 +139,7 @@ export function SketchComments({ ex, publicationId, canvasNode, mode, show, acti
       const number = notes.findIndex(x => x.id === n.id) + 1;
       return <button key={n.id} className={`sk-note-pin ${selected === n.id ? 'is-selected' : ''}`} style={{ left: p.x, top: p.y }} aria-label={`Comentario ${number}: ${n.text}`} disabled={!!draft} onClick={() => selectNote(n)}><b>{number}</b><span>{n.text}</span></button>;
     })}
-    {mode && !draft && <div className="sk-comment-hint">Arrastra sobre el diseño para comentar una zona · Clic para marcar un punto · Esc para salir</div>}
+    {mode && !draft && !hintHidden && <div className="sk-comment-hint">Arrastra sobre el diseño para comentar una zona · Clic para marcar un punto · Esc para salir <button aria-label="Cerrar ayuda de comentar zona" onClick={() => setHintHidden(true)}>×</button></div>}
   </div>;
   return <>
     {canvasNode && createPortal(overlay, canvasNode)}

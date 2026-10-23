@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { ControlOficinaLienzo } from '@/app/oficina/_contexto';
 import { SketchSync } from '@/components/creative-review/sketch-sync';
 import { ReviewLink } from '@/components/creative-review/link';
 import dynamic from "next/dynamic";
@@ -17,6 +18,12 @@ import {
   Check,
   Play,
   Download,
+  X,
+  Maximize2,
+  Minimize2,
+  CircleHelp,
+  PencilRuler,
+  ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { type ActionData, actionInput } from "@/lib/estrategia/model";
@@ -31,7 +38,9 @@ const Canvas = dynamic(() => import("./canvas"), {
 export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; focusAnchor?: string }) {
   const [data, setData] = useState(initial),
     [panel, setPanel] = useState(initial.me.client ? "Comentarios" : initial.sheet.data.description ? "Plan" : "Reunión"),
-    [open, setOpen] = useState(!initial.me.client && !initial.sheet.boceto_publicacion_id),
+    [open, setOpen] = useState(false),
+    [help, setHelp] = useState(false),
+    [expanded, setExpanded] = useState(false),
     [status, setStatus] = useState("Guardado"),
     [connectionError, setConnectionError] = useState(""),
     [clientId] = useState(() => crypto.randomUUID()),
@@ -47,6 +56,38 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
     [selectedActions, setSelectedActions] = useState<string[]>([]),
     [splitting, setSplitting] = useState<string | null>(null),
     [parts, setParts] = useState("");
+  const workspace = useRef<HTMLDivElement>(null);
+  const expandButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const leave = () => { setExpanded(false); expandButton.current?.focus(); };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.fullscreenElement === workspace.current) void document.exitFullscreen().catch(() => {});
+      leave();
+    };
+    const fullscreen = () => { if (!document.fullscreenElement) leave(); };
+    window.addEventListener("keydown", escape);
+    document.addEventListener("fullscreenchange", fullscreen);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", escape);
+      document.removeEventListener("fullscreenchange", fullscreen);
+    };
+  }, [expanded]);
+  async function toggleFullscreen() {
+    if (expanded) {
+      if (document.fullscreenElement === workspace.current) await document.exitFullscreen();
+      setExpanded(false);
+      expandButton.current?.focus();
+    } else {
+      setExpanded(true); setHelp(false);
+      try { await workspace.current?.requestFullscreen?.(); }
+      catch { /* The fixed workspace still fills browsers without Fullscreen support. */ }
+    }
+  }
   const notesDraft = useRef<{ id: string; text: string } | null>(null);
   const revision = useRef(initial.scene.revision),
     url = `/api/estrategia/hojas/${initial.sheet.id}`,
@@ -121,23 +162,27 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
     toast.success("Tareas creadas y visibles para sus responsables");
   }
   return (
-    <div className="st-sheet">
+    <div ref={workspace} className={`st-sheet st-sheet-compact ${expanded ? "st-sheet-expanded" : ""}`}>
       <header className="st-sheet-head">
-        <div className="st-row">
+        <div className="st-row st-sheet-identity">
           <Link
             href={data.me.client ? "/cliente" : base}
             aria-label="Volver a marca"
           >
             <ArrowLeft size={19} />
           </Link>
-          <div>
+          <div className="st-sheet-title">
             <small>{data.brand.nombre} / Planificación</small>
-            <h1>{sheet.title}</h1>
+            <h1 title={sheet.title}>{sheet.title}</h1>
+          </div>
+          <div className="st-sheet-save" role="status" title={data.me.client ? "Lienzo compartido · solo lectura" : status}>
+            <span className={status === "Guardado" ? "is-saved" : ""}>●</span> {data.me.client ? "Solo lectura" : status}
+            {recording.state !== "idle" && <span className="st-recording">● {recording.state === "paused" ? "Pausada" : "Grabando"} · {clock(recording.elapsed)}</span>}
           </div>
         </div>
         <div className="st-toolbar">
-          {!data.me.client && sheet.boceto_publicacion_id && <ReviewLink id={sheet.boceto_publicacion_id} />}
-          {!data.me.client && sheet.boceto_publicacion_id && <Link href={`/diseno/${sheet.boceto_publicacion_id}`}>Volver al diseño ↗</Link>}
+          {!data.me.client && sheet.boceto_publicacion_id && <ReviewLink id={sheet.boceto_publicacion_id} compact />}
+          {!data.me.client && sheet.boceto_publicacion_id && <Link className="st-icon-button" href={`/diseno/${sheet.boceto_publicacion_id}`} title="Volver al diseño" aria-label="Volver al diseño"><PencilRuler size={17}/></Link>}
           <div className="st-presence">
             {data.presence
               .filter((p: any) => p.client_id !== clientId)
@@ -149,27 +194,26 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
                     setFollow(follow === p.client_id ? "" : p.client_id)
                   }
                   title={
-                    follow === p.client_id
-                      ? "Dejar de seguir"
-                      : "Seguir su vista"
+                    `${p.name} · ${follow === p.client_id ? "Dejar de seguir" : "Seguir su vista"}`
                   }
                 >
-                  {p.name.split(" ")[0]} {follow === p.client_id ? "◉" : ""}
+                  {p.name.charAt(0)}{follow === p.client_id ? "◉" : ""}
                 </button>
               ))}
           </div>
           {!data.me.client && (
             <button
+              title="Ver acuerdos" aria-label="Ver acuerdos"
               onClick={() => {
                 setPanel("Acuerdos");
                 setOpen(true);
               }}
             >
-              Acuerdos ·{" "}
+              <ListChecks size={17} /> <span className="st-action-count">
               {
                 data.actions.filter((a: any) => a.data.state !== "discarded")
                   .length
-              }
+              }</span>
             </button>
           )}
           <button
@@ -177,31 +221,23 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
               setOpen(!open);
               if (data.me.client) setPanel("Comentarios");
             }}
-            aria-label="Panel lateral"
+            aria-label="Panel lateral" title="Detalles, reunión e historial" aria-expanded={open}
           >
             <PanelRight size={17} />
           </button>
+          {!data.me.client && sheet.boceto_publicacion_id && <SketchSync publicationId={sheet.boceto_publicacion_id} onSynced={refresh} />}
+          <button title="Ayuda del lienzo" aria-label="Ayuda del lienzo" aria-expanded={help} onClick={() => setHelp(!help)}><CircleHelp size={17}/></button>
+          <ControlOficinaLienzo />
+          <button ref={expandButton} className="st-expand-button" title={expanded ? "Salir de pantalla completa (Esc)" : "Pantalla completa"} aria-label={expanded ? "Salir de pantalla completa" : "Pantalla completa"} aria-pressed={expanded} onClick={() => void toggleFullscreen()}>{expanded ? <Minimize2 size={17}/> : <Maximize2 size={17}/>}</button>
         </div>
       </header>
-      <div className="st-sheet-status">
-        {sheet.boceto_publicacion_id && <span>Pega imágenes con Ctrl/Cmd + V, dibuja y añade notas. El boceto se guarda en Planificación.</span>}
-        <span>
-          {sheet.data.state || "Planificación"} ·{" "}
-          {data.me.client ? "Lienzo compartido · solo lectura" : connectionError || status}
-        </span>
-        {recording.state !== "idle" ? (
-          <span className="st-recording">
-            ●{" "}
-            {recording.state === "paused"
-              ? "Grabación pausada"
-              : "Grabando con consentimiento"}{" "}
-            · {clock(recording.elapsed)}
-          </span>
-        ) : (
-          <span>El lienzo no crea tareas automáticamente</span>
-        )}
-      </div>
-      {!data.me.client && sheet.boceto_publicacion_id && <SketchSync publicationId={sheet.boceto_publicacion_id} onSynced={refresh} />}
+      {connectionError && <div className="st-sheet-warning" role="alert">{connectionError}</div>}
+      {help && <aside className="st-sheet-help" aria-label="Ayuda del lienzo">
+        <header><strong>Ayuda del lienzo</strong><button aria-label="Cerrar ayuda" onClick={() => setHelp(false)}><X size={16}/></button></header>
+        <p>Pega imágenes con Ctrl/Cmd + V. Usa Comentar zona para arrastrar sobre un diseño y anotar cambios.</p>
+        <p>Espacio + arrastrar para moverte · Ctrl + rueda para zoom · doble clic para escribir.</p>
+        <p>El lienzo se guarda en Planificación. Estado: {sheet.data.state || "Planificación"}. Las tareas se crean al confirmar acuerdos.</p>
+      </aside>}
       <div className="st-sheet-content">
         <Canvas
           sheet={sheet}
@@ -214,6 +250,7 @@ export function SheetWorkspace({ initial, focusAnchor = "" }: { initial: any; fo
         />
         {open && (
           <aside className="st-panel">
+            <header className="st-panel-heading"><strong>Detalles y reunión</strong><button aria-label="Cerrar detalles" title="Cerrar detalles" onClick={() => setOpen(false)}><X size={16}/></button></header>
             <nav className="st-tabs">
               {(data.me.client
                 ? ["Comentarios"]

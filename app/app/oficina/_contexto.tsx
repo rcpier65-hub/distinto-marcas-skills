@@ -17,7 +17,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Building2, Mic, MicOff, LogOut } from 'lucide-react'
+import { Building2, Mic, MicOff, LogOut, X } from 'lucide-react'
 import { useOficinaRealtime } from './_usar-oficina'
 import { avatarPorNombre, avatarValido, type AvatarConfig, type Direccion } from './_avatar'
 import { SPAWN, zonaDe, construirColisiones, esSolido } from './_mapa'
@@ -230,32 +230,40 @@ export function OficinaProvider({ children }: { children: React.ReactNode }) {
   } : null), [of, datos, avatar, guardarAvatar, duenos, entrarManual, salirManual, actividad])
 
   const enOficina = pathname?.startsWith('/oficina')
+  const enLienzo = pathname?.includes('/estrategia/hoja/')
 
   return (
     <Ctx.Provider value={valor}>
       {children}
-      {valor && valor.entrado && !enOficina && <MiniOficina of={valor} />}
+      {valor && valor.entrado && !enOficina && !enLienzo && <MiniOficina of={valor} />}
     </Ctx.Provider>
   )
 }
 
 /* Mini control fuera de /oficina: sigues en la oficina aunque estés en otro
    módulo. */
-function MiniOficina({ of }: { of: Valor }) {
+export function ControlOficinaLienzo() {
+  const of = useOficina()
+  return of?.entrado ? <MiniOficina of={of} inline /> : null
+}
+function MiniOficina({ of, inline = false }: { of: Valor; inline?: boolean }) {
+  const [open, setOpen] = useState(false)
   /* Mientras está visible, el contenido baja un poco (clase en <body>) para
      que el control no tape los botones de arriba a la derecha. */
   useEffect(() => {
+    if (inline) return
     document.body.classList.add('con-mini-oficina')
     return () => document.body.classList.remove('con-mini-oficina')
-  }, [])
+  }, [inline])
   const cerca = of.listaUI.filter((j) => j.gain > 0.05)
   const hablando = cerca.filter((j) => j.nivel > 0.12)
-  return (
+  const controls = (
     <div
+      className={inline ? 'st-office-popover' : undefined}
       style={{
         /* Arriba a la derecha, fuera del camino de las barras de abajo y del
            chat (Pedro 30-sep-2026). */
-        position: 'fixed', right: 16, top: 'calc(12px + env(safe-area-inset-top, 0px))', zIndex: 8990,
+        position: inline ? 'absolute' : 'fixed', right: inline ? 0 : 16, top: inline ? 'calc(100% + 10px)' : 'calc(12px + env(safe-area-inset-top, 0px))', zIndex: 8990,
         display: 'flex', alignItems: 'center', gap: 4, padding: '5px 6px 5px 10px', borderRadius: 14,
         background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(15,23,42,0.14)',
         fontSize: 12.5, color: '#0f172a', maxWidth: 'calc(100vw - 110px)',
@@ -282,6 +290,14 @@ function MiniOficina({ of }: { of: Valor }) {
         style={{ width: 30, height: 30, borderRadius: 9, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#f1f2f6', color: '#64748b' }}>
         <LogOut size={14} />
       </button>
+      {inline && <button aria-label="Cerrar controles de Oficina" title="Cerrar controles de Oficina" onClick={() => setOpen(false)}><X size={15}/></button>}
     </div>
   )
+  if (!inline) return controls
+  return <div className="st-office-inline">
+    <button aria-label="Controles de Oficina" aria-expanded={open} title={`Oficina · ${of.listaUI.length + 1} en línea · Micrófono ${of.micOn ? 'activado' : 'apagado'}`} onClick={() => setOpen(!open)}>
+      <Building2 size={17}/>{of.micOn ? <Mic size={12} className="st-office-mic-active"/> : <MicOff size={12}/>}
+    </button>
+    {open && controls}
+  </div>
 }

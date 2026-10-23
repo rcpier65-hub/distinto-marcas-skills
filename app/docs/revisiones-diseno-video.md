@@ -168,3 +168,25 @@ no deja «Sin conexión» pegado después de una lectura correcta.
 Prueba de coordenadas: `node scripts/test-sketch-comments.mjs`. Verifica arrastre
 inverso, límites, zoom/desplazamiento, rotación, volteo y aislamiento de páginas,
 versiones y fotogramas. Las pruebas de API siguen en `test-creative-review.mjs`.
+
+## Espacio del lienzo (23 de octubre de 2026)
+
+Planificación y Boceto usan una cabecera compacta: el estado de guardado sigue
+visible, las instrucciones se abren con Ayuda y los detalles de reunión, acuerdos
+Historial y plan se abren desde Panel lateral. Ayuda y Detalles tienen una X.
+La actualización de entregas sigue automática; su botón muestra el resultado al
+pasar el mouse y los errores se muestran como alertas, sin ocultarlos en la ayuda.
+
+Oficina pasa a un control desplegable dentro de la cabecera del lienzo. Su X
+solo cierra los controles: no sale de Oficina, no cambia el micrófono ni corta la
+conexión. Desaparece el margen de 52 px que reservaba el control flotante.
+
+La X de Comentarios libera el ancho del panel; conserva las zonas y los números
+sobre la imagen. Clic en una marca abre de nuevo el comentario. El formulario
+con un comentario sin guardar mantiene su protección. Pegar, capturar pantalla,
+referencias y selector de versiones permanecen disponibles; Flecha y Dibujar
+siguen en la barra de herramientas del propio lienzo.
+
+Pantalla completa amplía la misma instancia del lienzo, sin desmontarlo ni
+reiniciar comentarios pendientes. El botón de salida o Escape restauran la vista.
+Navegadores sin Fullscreen usan la vista ampliada dentro de la ventana.

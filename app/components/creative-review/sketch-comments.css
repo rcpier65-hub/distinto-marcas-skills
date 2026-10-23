@@ -41,3 +41,7 @@
 .sk-comment-error { padding:10px 14px; margin:0; color:#9c411c; background:#fff4ec; font-size:11px; }
 @media(max-width:850px) { .sk-comments-panel { width:250px; } .sk-note-pin span { max-width:130px; } }
 @media(max-width:600px) { .st-sketch-stage { flex-direction:column; } .sk-comments-panel { max-width:100%; width:100%; height:40%; border-left:0; border-top:1px solid #e9e2f1; } .st-sketch-stage > .st-canvas { min-height:220px; } .sk-comments-panel header { padding:8px 12px; } .sk-comment-form { max-height:90%; } .sk-comment-hint { font-size:10px; } }
+.sk-comments-overlay.is-panel-closed .sk-note-pin:not(:hover):not(:focus-visible):not(.is-selected) span { display:none; }
+.st-sheet .sk-comment-hint button { pointer-events:auto; margin-left:8px; padding:0 4px; border:0; background:transparent; color:white; font-size:16px; }
+
+.st-sheet .sk-comment-hint button:hover { background:#ffffff20 !important; color:#fff !important; }
