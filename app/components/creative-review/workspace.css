@@ -1,8 +1,5 @@
 .cr-workspace {
-  background: #f7f6fb;
   color: #28213b;
-  padding: 18px;
-  min-height: calc(100dvh - 40px);
   font-size: 14px;
 }
 .cr-workspace:fullscreen {
@@ -73,7 +70,6 @@
   min-width: 0;
 }
 .cr-title h1 {
-  font-size: 20px;
   font-weight: 700;
   margin: 2px 0;
   overflow: hidden;
@@ -92,14 +88,10 @@
 .cr-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 24px;
-  padding: 13px 0;
-  font-size: 12px;
   color: #81768e;
 }
 .cr-summary b {
   color: #5a398e;
-  font-size: 14px;
 }
 .cr-alert,
 .cr-success {
@@ -129,20 +121,13 @@
 .cr-version-bar {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 12px;
   background: white;
   border: 1px solid #e7e2f0;
   border-radius: 12px;
 }
-.cr-piece {
-  max-width: 38%;
-  min-width: 180px;
-}
 .cr-versions {
   display: flex;
   gap: 6px;
-  flex: 1;
   overflow-x: auto;
 }
 .cr-versions button[aria-pressed="true"],
@@ -159,14 +144,9 @@
 .cr-version-info {
   font-size: 11px;
   color: #83778e;
-  margin: 9px 0;
 }
 .cr-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 355px;
-  gap: 14px;
-  min-height: 430px;
-  height: calc(100dvh - 290px);
 }
 .cr-preview,
 .cr-comments {
@@ -182,8 +162,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px;
   border-bottom: 1px solid #eee;
 }
 .cr-tools label {
@@ -203,18 +181,14 @@
   white-space: nowrap;
 }
 .cr-stage {
-  background: #eeedf2;
   flex: 1;
   overflow: auto;
-  padding: 25px;
   display: block;
 }
 .cr-media {
   position: relative;
   margin: auto;
-  box-shadow: 0 3px 20px #30253e1a;
   background: white;
-  min-width: 80px;
 }
 .cr-annotations {
   position: absolute;
@@ -264,13 +238,11 @@
 .cr-comment-tabs {
   display: flex;
   gap: 5px;
-  padding: 10px;
   border-bottom: 1px solid #eee;
 }
 .cr-note-list {
   flex: 1;
   overflow: auto;
-  padding: 12px;
 }
 .cr-note-list article {
   border: 1px solid #eee8f7;
@@ -322,13 +294,8 @@
   margin-top: 8px;
 }
 .cr-composer {
-  padding: 12px;
   border-top: 1px solid #eee;
   background: #fcfaff;
-}
-.cr-composer textarea {
-  height: 80px;
-  resize: vertical;
 }
 .cr-composer label {
   margin-bottom: 7px;
@@ -371,13 +338,11 @@
   padding: 2px;
 }
 .cr-empty {
-  padding: 35px 18px;
   text-align: center;
   color: #8a7d98;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
 }
 .cr-empty h2,
 .cr-empty h3 {
@@ -387,7 +352,6 @@
 }
 .cr-empty p {
   max-width: 440px;
-  font-size: 13px;
 }
 .cr-note-list details summary {
   cursor: pointer;
@@ -479,7 +443,6 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: auto;
 }
 .cr-presenting .cr-main {
   flex: 1;
@@ -498,4 +461,399 @@
 .cr-presenting .cr-header,
 .cr-presenting .cr-summary {
   flex-shrink: 0;
+}
+
+/* Review workspace: maximize the actual artwork, keep details in side panels. */
+.cr-workspace {
+  height: 100dvh;
+  min-height: 570px;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f6f5f9;
+}
+.cr-workspace > * {
+  flex-shrink: 0;
+}
+.cr-header {
+  min-height: 44px;
+}
+.cr-title h1 {
+  font-size: 19px;
+}
+.cr-summary {
+  padding: 9px 0;
+  gap: 8px 20px;
+  font-size: 11px;
+}
+.cr-summary b {
+  font-size: 12px;
+}
+.cr-header-actions span {
+  display: inline;
+}
+.cr-workspace .cr-fullscreen {
+  border-color: #baaae7;
+  color: #6339c6;
+  white-space: nowrap;
+}
+.cr-version-bar {
+  padding: 8px 10px;
+  gap: 10px;
+  min-height: 52px;
+}
+.cr-piece {
+  min-width: 100px;
+  max-width: 34%;
+  flex: 1;
+  font-size: 10px !important;
+  gap: 2px !important;
+}
+.cr-piece select {
+  padding: 5px;
+  font-size: 12px;
+}
+.cr-versions {
+  flex: 0 1 auto;
+}
+.cr-versions button {
+  padding: 6px 10px;
+}
+.cr-version-info {
+  margin: 6px 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cr-file-navigation {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.cr-file-navigation button {
+  padding: 5px;
+  border: 0;
+}
+.cr-main {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 310px;
+}
+.cr-main.cr-with-gallery {
+  grid-template-columns: 106px minmax(0, 1fr) 310px;
+}
+.cr-main.cr-comments-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cr-main.cr-with-gallery.cr-comments-hidden {
+  grid-template-columns: 106px minmax(0, 1fr);
+}
+.cr-comments[hidden] {
+  display: none;
+}
+.cr-gallery {
+  overflow: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 3px;
+}
+.cr-gallery > small {
+  padding: 5px 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.cr-gallery button {
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+  flex-shrink: 0;
+  position: relative;
+  width: 100%;
+}
+.cr-gallery button[aria-current="true"] {
+  border-color: #9270e4;
+  box-shadow: inset 0 0 0 1px #9270e4;
+  background: #f1ebff;
+}
+.cr-thumbnail {
+  width: 100%;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9e6ef;
+  border-radius: 5px;
+  overflow: hidden;
+  color: #827593;
+}
+.cr-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.cr-gallery-name {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+}
+.cr-gallery-label {
+  font-size: 10px;
+  color: #7a6c91;
+}
+.cr-gallery-count {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 10px;
+}
+.cr-preview {
+  border-color: #dedbe6;
+}
+.cr-tools {
+  padding: 7px 9px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cr-tools button {
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.cr-zoom-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.cr-zoom-tools select {
+  padding: 5px;
+  width: 82px;
+}
+.cr-stage {
+  padding: 16px;
+  background: #292b33;
+  color: #eceaf2;
+}
+.cr-stage .cr-empty h3,
+.cr-stage .cr-empty b {
+  color: #f8f7fc;
+}
+.cr-stage .cr-empty {
+  color: #c1bdcc;
+}
+.cr-media {
+  box-shadow: 0 10px 35px #0004;
+  min-width: 0;
+}
+.cr-preview footer {
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.cr-preview footer button {
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.cr-comment-tabs {
+  padding: 8px;
+}
+.cr-comment-tabs button {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+.cr-note-list {
+  min-height: 70px;
+  padding: 10px;
+}
+.cr-empty {
+  padding: 25px 12px;
+  gap: 9px;
+}
+.cr-empty h3 {
+  font-size: 17px;
+}
+.cr-empty p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.cr-composer {
+  flex-shrink: 0;
+  max-height: 65%;
+  overflow: auto;
+  padding: 10px;
+}
+.cr-composer input {
+  padding: 6px 8px;
+}
+.cr-composer textarea {
+  height: 85px;
+  min-height: 65px;
+  resize: vertical;
+}
+.cr-composer small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.cr-composer small button {
+  font-size: 10px;
+  padding: 4px;
+}
+.cr-add-comment {
+  margin: 8px;
+  flex-shrink: 0;
+}
+.cr-comments footer {
+  padding: 8px;
+  flex-shrink: 0;
+}
+.cr-comments footer button {
+  padding: 6px;
+}
+.cr-new-delivery {
+  flex-wrap: wrap;
+  max-height: 40dvh;
+  overflow: auto;
+}
+.cr-delivery-help {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #7e748e;
+  order: 1;
+}
+.cr-workspace.cr-presenting {
+  padding: 12px;
+  overflow: hidden;
+}
+.cr-presenting .cr-summary,
+.cr-presenting .cr-version-info {
+  display: none;
+}
+.cr-presenting .cr-header {
+  margin-bottom: 8px;
+}
+.cr-presenting .cr-version-bar {
+  margin-bottom: 10px;
+}
+.cr-alert {
+  position: fixed;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  max-width: min(600px, 90vw);
+  z-index: 100002;
+  box-shadow: 0 6px 25px #0002;
+}
+@media (max-width: 1100px) {
+  .cr-main {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+  .cr-main.cr-with-gallery {
+    grid-template-columns: 88px minmax(0, 1fr) 280px;
+  }
+  .cr-header {
+    flex-wrap: wrap;
+  }
+  .cr-title {
+    flex-basis: 35%;
+  }
+  .cr-title h1 {
+    font-size: 16px;
+  }
+  .cr-header-actions button {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .cr-version-bar {
+    flex-wrap: wrap;
+  }
+  .cr-version-bar > a {
+    margin-left: auto;
+  }
+}
+@media (max-width: 750px) {
+  .cr-workspace {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    padding: 10px;
+  }
+  .cr-header-actions {
+    justify-content: start;
+    flex-wrap: wrap;
+  }
+  .cr-title h1 {
+    font-size: 16px;
+  }
+  .cr-main,
+  .cr-main.cr-with-gallery,
+  .cr-main.cr-comments-hidden {
+    display: flex;
+    flex-direction: column;
+  }
+  .cr-gallery {
+    flex-direction: row;
+    max-height: 125px;
+    min-height: 110px;
+  }
+  .cr-gallery > small {
+    display: none;
+  }
+  .cr-gallery button {
+    width: 90px;
+  }
+  .cr-thumbnail {
+    height: 55px;
+  }
+  .cr-preview {
+    height: 65dvh;
+    min-height: 350px;
+    max-height: none;
+    flex-shrink: 0;
+  }
+  .cr-comments {
+    height: 65dvh;
+    min-height: 400px;
+  }
+  .cr-tools {
+    gap: 4px;
+  }
+  .cr-tools button {
+    padding: 6px;
+  }
+  .cr-tools label {
+    font-size: 11px;
+  }
+  .cr-preview footer {
+    flex-wrap: wrap;
+  }
+  .cr-piece {
+    min-width: 140px;
+    max-width: 100%;
+    width: auto;
+  }
+  .cr-workspace.cr-presenting {
+    overflow: auto;
+  }
+  .cr-presenting .cr-main {
+    flex: none;
+    min-height: auto;
+  }
+  .cr-presenting .cr-preview {
+    height: 70dvh;
+  }
 }

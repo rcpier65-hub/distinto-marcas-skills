@@ -91,3 +91,26 @@ RLS, separación de marcas/clientes y bloqueo de direcciones privadas.
 en bucket privado y enlace al video CC0 de ejemplos MDN para verificación visual.
 Credenciales temporales solo en /tmp/distinto-creative-fixture.json (600).
 Finalizar siempre con `node scripts/qa-creative-fixture.mjs --cleanup`.
+
+## Visor ampliado y galería (22-oct-2026)
+
+- **Pantalla completa**, también accesible desde la barra del visor, amplía el
+  espacio. Usa Fullscreen API cuando el navegador la admite y una presentación
+  dentro de la ventana como alternativa. Escape o el botón permiten volver.
+- La imagen/PDF empieza en **Comentar**: un clic ubica el punto y abre el campo
+  de texto enfocado. **Zona** dibuja un rectángulo; el arrastre no roba el foco.
+  Video inicia en Explorar para conservar sus controles; Comentar pausa el video
+  y guarda el segundo exacto. Observación general conserva su ubicación de página
+  y segundo desde el pie del visor. El comentario general del panel es del archivo.
+- **Archivos (N)** muestra una galería de piezas, láminas y variantes ya registradas
+  en la tarea y sus entregables. Las flechas anterior/siguiente recorren archivos;
+  V1/V2 recorre versiones del archivo activo. PDF conserva su paginación separada.
+  Las miniaturas se solicitan al entrar en la zona visible con el mismo acceso
+  autorizado del visor; PDF/video tienen iconos. No se descargan carpetas completas.
+- Nueva entrega sigue usando los enlaces individuales y formatos de la tarea.
+  Otra lámina/entregable comienza en V1; reemplazar el mismo archivo mantiene su
+  historial. No se modifica la métrica ni se crea una versión por navegar.
+- Se pueden ocultar galería y comentarios. El formulario solo ocupa espacio
+  al anotar. Chat y Mis pendientes no se superponen a esta ruta; la sesión de
+  Oficina permanece. Un comentario sin guardar bloquea cambiar archivo/versión
+  y la navegación de páginas PDF para no guardarlo en otro lugar por accidente.

@@ -22,7 +22,9 @@ if (process.argv.includes("--cleanup")) {
   await ok(s.from("team_members").delete().eq("id", f.member));
   await ok(s.auth.admin.deleteUser(f.user));
   await ok(s.from("marcas").delete().eq("id", f.brand));
-  await ok(s.storage.emptyBucket(f.bucket));
+  const files = await ok(s.storage.from(f.bucket).list());
+  if (files.length)
+    await ok(s.storage.from(f.bucket).remove(files.map((x) => x.name)));
   await ok(s.storage.deleteBucket(f.bucket));
   await fs.unlink(file);
   console.log("UI fixtures removed.");
@@ -48,33 +50,29 @@ const user = await ok(
 f.user = user.user.id;
 await fs.writeFile(file, JSON.stringify(f), { mode: 0o600 });
 await ok(
-  s
-    .from("marcas")
-    .insert({
-      id: f.brand,
-      slug: f.slug,
-      nombre: "Marca de prueba · Revisión",
-      activa: true,
-    }),
+  s.from("marcas").insert({
+    id: f.brand,
+    slug: f.slug,
+    nombre: "Marca de prueba · Revisión",
+    activa: true,
+  }),
 );
 await ok(
-  s
-    .from("team_members")
-    .insert({
-      id: f.member,
-      auth_user_id: f.user,
-      email: f.email,
-      nombre: "QA Revisión",
-      rol_base: "director",
-      activo: true,
-      marcas_acceso: [f.brand],
-      permisos_override: {
-        diseno: { acceso: true },
-        editor: { acceso: true },
-        publicaciones: { acceso: true },
-        marcas: { acceso: true },
-      },
-    }),
+  s.from("team_members").insert({
+    id: f.member,
+    auth_user_id: f.user,
+    email: f.email,
+    nombre: "QA Revisión",
+    rol_base: "director",
+    activo: true,
+    marcas_acceso: [f.brand],
+    permisos_override: {
+      diseno: { acceso: true },
+      editor: { acceso: true },
+      publicaciones: { acceso: true },
+      marcas: { acceso: true },
+    },
+  }),
 );
 await ok(s.storage.createBucket(f.bucket, { public: false }));
 const urls = [];
@@ -125,29 +123,25 @@ pdf +=
     .join("") +
   `trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
 await ok(
-  s.storage
-    .from(f.bucket)
-    .upload("proposal.pdf", Buffer.from(pdf), {
-      contentType: "application/pdf",
-    }),
+  s.storage.from(f.bucket).upload("proposal.pdf", Buffer.from(pdf), {
+    contentType: "application/pdf",
+  }),
 );
 f.pdf = (
   await ok(s.storage.from(f.bucket).createSignedUrl("proposal.pdf", 86400))
 ).signedUrl;
 await ok(
-  s
-    .from("publicaciones")
-    .insert({
-      id: f.id,
-      marca_id: f.brand,
-      nombre: "Presentación de diseño · Prueba de revisión",
-      es_tarea_diseno: true,
-      estado_tarea: "sin_empezar",
-      tiene_boceto: true,
-      drive_resultado_url: urls[0],
-      created_by: f.user,
-      updated_by: f.user,
-    }),
+  s.from("publicaciones").insert({
+    id: f.id,
+    marca_id: f.brand,
+    nombre: "Presentación de diseño · Prueba de revisión",
+    es_tarea_diseno: true,
+    estado_tarea: "sin_empezar",
+    tiene_boceto: true,
+    drive_resultado_url: urls[0],
+    created_by: f.user,
+    updated_by: f.user,
+  }),
 );
 await ok(
   s

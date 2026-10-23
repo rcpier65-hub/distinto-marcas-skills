@@ -120,6 +120,7 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
   const pageTitle = getPageTitle(pathname)
   const brandWorkspace = !!pathname?.includes('/estrategia')
   const brandCanvas = !!pathname?.includes('/estrategia/hoja/')
+  const creativeReview = !!pathname?.startsWith('/revision/')
 
   return (
     /* La oficina vive en toda la app: cambiar de módulo no te saca. */
@@ -188,8 +189,8 @@ export function AppShell({ children, marcas, permisos, emailActivo, notificacion
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} marcas={marcas} permisos={permisos} emailActivo={emailActivo} />
 
       {/* Chat interno del equipo (burbuja flotante abajo a la derecha). */}
-      {!brandCanvas && <div className={brandWorkspace ? "st-brand-chat" : undefined}><ChatFlotante /></div>}
-      {!brandCanvas && permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} compact={brandWorkspace} />}
+      {!brandCanvas && !creativeReview && <div className={brandWorkspace ? "st-brand-chat" : undefined}><ChatFlotante /></div>}
+      {!brandCanvas && !creativeReview && permisos?.email && <PendientesFlotantes key={permisos.email} usuario={permisos.email} compact={brandWorkspace} />}
       <SonidosBridge />
       {/* "¿Transcribimos?" cuando empieza una reunión (estilo Granola). */}
       {!brandCanvas && <AvisoReunion />}

@@ -1,5 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import {
+  MousePointer2,
+  MessageSquarePlus,
+  Scan,
+  Expand,
+  Minimize,
+} from "lucide-react";
 import type { ReviewNote } from "@/lib/creative-review/model";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 export type Mark = {
@@ -97,6 +104,9 @@ export function ReviewViewer({
   selected,
   focus,
   focusTick,
+  onFullscreen,
+  presenting,
+  draftPending,
 }: {
   versionId: string;
   notes: ReviewNote[];
@@ -106,6 +116,9 @@ export function ReviewViewer({
   selected: string | null;
   focus: ReviewNote | null;
   focusTick: number;
+  onFullscreen: () => void;
+  presenting: boolean;
+  draftPending: boolean;
 }) {
   const [mime, setMime] = useState("");
   const [error, setError] = useState("");
@@ -126,7 +139,9 @@ export function ReviewViewer({
     observer.observe(stage.current);
     return () => observer.disconnect();
   }, []);
-  const [tool, setTool] = useState<"view" | "pin" | "area">("view");
+  const [tool, setTool] = useState<"view" | "pin" | "area">("pin");
+  const [drag, setDrag] = useState<Mark | null>(null);
+  const draft = drag || mark;
   const [seconds, setSeconds] = useState(0);
   const video = useRef<HTMLVideoElement>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -138,6 +153,7 @@ export function ReviewViewer({
         const d = await r.json();
         if (!r.ok) throw Error(d.error || "No se pudo cargar el archivo");
         setMime(d.mime);
+        if (d.mime.startsWith("video/")) setTool("view");
       })
       .catch((e) => {
         if (!ac.signal.aborted) setError(e.message);
@@ -186,14 +202,21 @@ export function ReviewViewer({
                 if (t !== "view") video.current?.pause();
               }}
             >
-              {t === "view" ? "Ver" : t === "pin" ? "📍 Punto" : "▧ Zona"}
+              {t === "view" ? (
+                <MousePointer2 size={15} />
+              ) : t === "pin" ? (
+                <MessageSquarePlus size={15} />
+              ) : (
+                <Scan size={15} />
+              )}
+              {t === "view" ? "Explorar" : t === "pin" ? "Comentar" : "Zona"}
             </button>
           ))}
         </div>
         {mime === "application/pdf" && (
           <div className="cr-pager">
             <button
-              disabled={page <= 1}
+              disabled={page <= 1 || draftPending}
               onClick={() => {
                 setPage((p) => p - 1);
                 onMark(null);
@@ -206,7 +229,7 @@ export function ReviewViewer({
               {page} / {pages}
             </span>
             <button
-              disabled={page >= pages}
+              disabled={page >= pages || draftPending}
               onClick={() => {
                 setPage((p) => p + 1);
                 onMark(null);
@@ -217,20 +240,32 @@ export function ReviewViewer({
             </button>
           </div>
         )}
-        <label>
-          Zoom{" "}
-          <select
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
+        <div className="cr-zoom-tools">
+          <label>
+            Zoom{" "}
+            <select
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+            >
+              <option value={0}>Ajustar</option>
+              {[50, 75, 100, 125, 150, 200].map((z) => (
+                <option key={z} value={z}>
+                  {z}%
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="cr-expand-viewer"
+            aria-label={
+              presenting ? "Reducir visor" : "Ampliar visor a pantalla completa"
+            }
+            title="Pantalla completa"
+            onClick={onFullscreen}
           >
-            <option value={0}>Ajustar</option>
-            {[50, 75, 100, 125, 150, 200].map((z) => (
-              <option key={z} value={z}>
-                {z}%
-              </option>
-            ))}
-          </select>
-        </label>
+            {presenting ? <Minimize size={17} /> : <Expand size={17} />}
+          </button>
+        </div>
       </div>
       <div className="cr-stage" ref={stage}>
         {error ? (
@@ -301,23 +336,19 @@ export function ReviewViewer({
               className="cr-annotations"
               style={{
                 pointerEvents: tool === "view" ? "none" : "auto",
-                touchAction: tool === "view" ? "auto" : "none",
+                touchAction: tool === "area" ? "none" : "auto",
+                cursor: tool === "view" ? "default" : "crosshair",
               }}
               onPointerDown={(e) => {
                 if (tool === "view") return;
                 e.currentTarget.setPointerCapture(e.pointerId);
                 start.current = point(e);
-                onMark({
-                  ...location(),
-                  ...start.current,
-                  width: null,
-                  height: null,
-                });
+                video.current?.pause();
               }}
               onPointerMove={(e) => {
                 if (tool !== "area" || !start.current) return;
                 const p = point(e);
-                onMark({
+                setDrag({
                   ...location(),
                   x: Math.min(p.x, start.current.x),
                   y: Math.min(p.y, start.current.y),
@@ -325,9 +356,23 @@ export function ReviewViewer({
                   height: Math.abs(p.y - start.current.y),
                 });
               }}
-              onPointerUp={() => {
+              onPointerCancel={() => {
                 start.current = null;
-                setTool("view");
+                setDrag(null);
+              }}
+              onPointerUp={(e) => {
+                if (!start.current) return;
+                const p = point(e),
+                  from = start.current;
+                start.current = null;
+                setDrag(null);
+                onMark({
+                  ...location(),
+                  x: tool === "area" ? Math.min(from.x, p.x) : p.x,
+                  y: tool === "area" ? Math.min(from.y, p.y) : p.y,
+                  width: tool === "area" ? Math.abs(from.x - p.x) : null,
+                  height: tool === "area" ? Math.abs(from.y - p.y) : null,
+                });
               }}
             >
               {visible
@@ -352,15 +397,15 @@ export function ReviewViewer({
                     {notes.indexOf(n) + 1}
                   </button>
                 ))}
-              {mark && mark.page === page && mark.x !== null && (
+              {draft && draft.page === page && draft.x !== null && (
                 <div
                   className="cr-pin draft"
                   style={{
-                    transform: mark.width ? "none" : undefined,
-                    left: `${mark.x * 100}%`,
-                    top: `${(mark.y || 0) * 100}%`,
-                    width: mark.width ? `${mark.width * 100}%` : undefined,
-                    height: mark.height ? `${mark.height * 100}%` : undefined,
+                    transform: draft.width ? "none" : undefined,
+                    left: `${draft.x * 100}%`,
+                    top: `${(draft.y || 0) * 100}%`,
+                    width: draft.width ? `${draft.width * 100}%` : undefined,
+                    height: draft.height ? `${draft.height * 100}%` : undefined,
                   }}
                 >
                   +
@@ -373,7 +418,7 @@ export function ReviewViewer({
       <footer>
         {mime.startsWith("video/")
           ? `Posición: ${seconds.toFixed(1)} s · pausa y marca el punto del cambio.`
-          : "Elige Punto o Zona y marca dónde debe hacerse el cambio."}
+          : "Haz clic en el diseño para dejar un comentario. Zona permite marcar un área."}
         <button
           onClick={() =>
             onMark({

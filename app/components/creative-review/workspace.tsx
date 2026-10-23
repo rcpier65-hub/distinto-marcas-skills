@@ -5,6 +5,12 @@ import {
   ArrowLeft,
   Brush,
   Expand,
+  Minimize,
+  PanelRightClose,
+  PanelRightOpen,
+  Files,
+  ChevronLeft,
+  ChevronRight,
   RefreshCw,
   Link2,
   Plus,
@@ -20,6 +26,7 @@ import {
   type ReviewNote,
 } from "@/lib/creative-review/model";
 import { ReviewViewer, type Mark } from "./viewer";
+import { FileGallery } from "./gallery";
 import "./workspace.css";
 const date = (s: string) =>
   new Date(s).toLocaleString("es-PE", {
@@ -48,18 +55,55 @@ async function imageData(file: File) {
 export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
   const [data, setData] = useState(initial);
   const [presenting, setPresenting] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(true);
+  const [galleryOpen, setGalleryOpen] = useState(
+    initial.versions.some(
+      (x) =>
+        x.slot !== initial.versions[0]?.slot ||
+        x.publicacion_id !== initial.versions[0]?.publicacion_id,
+    ),
+  );
+  const [composing, setComposing] = useState(false);
+  const commentInput = useRef<HTMLTextAreaElement>(null);
+  const fullscreenButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setPresenting(false);
     };
+    const onFullscreen = () => {
+      if (!document.fullscreenElement) {
+        setPresenting(false);
+        fullscreenButton.current?.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFullscreen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFullscreen);
+    };
   }, []);
   const [versionId, setVersionId] = useState(initial.versions.at(-1)?.id || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const root = useRef<HTMLDivElement>(null);
+  const toggleFullscreen = async () => {
+    if (presenting) {
+      if (document.fullscreenElement === root.current)
+        await document.exitFullscreen();
+      setPresenting(false);
+      fullscreenButton.current?.focus();
+      return;
+    }
+    setPresenting(true);
+    // Embedded browsers and iPhone may not support Fullscreen; expanded mode still works.
+    try {
+      await root.current?.requestFullscreen?.();
+    } catch {
+      /* Keep expanded mode. */
+    }
+  };
   const [mark, setMark] = useState<Mark | null>(null);
   const [text, setText] = useState("");
   const [requestedBy, setRequestedBy] = useState("Cliente");
@@ -148,6 +192,9 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
       data.versions.map((x) => [x.publicacion_id + ":" + x.slot, x]),
     ).values(),
   ];
+  const groupIndex = groups.findIndex(
+    (g) => g.publicacion_id === v?.publicacion_id && g.slot === v?.slot,
+  );
   const changeVersion = (id: string) => {
     if (text || attachments.length) {
       setError(
@@ -156,6 +203,7 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
       return;
     }
     setVersionId(id);
+    setComposing(false);
     setMark(null);
     setSelected(null);
     setExclude(false);
@@ -190,7 +238,19 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
       setBusy(false);
     }
   };
+  const beginNote = (m: Mark | null) => {
+    setMark(m);
+    if (m) {
+      setComposing(true);
+      setCommentsOpen(true);
+      setHistory(false);
+      setSelected(null);
+      requestAnimationFrame(() => commentInput.current?.focus());
+    }
+  };
   const focus = useCallback((id: string) => {
+    setCommentsOpen(true);
+    setHistory(false);
     setFocusTick((t) => t + 1);
     setSelected(id);
     document
@@ -208,6 +268,7 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
     }
   };
   const discard = () => {
+    setComposing(false);
     setText("");
     setAttachments([]);
     setMark(null);
@@ -264,12 +325,13 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
             <RefreshCw size={17} />
           </button>
           <button
-            onClick={() => {
-              setPresenting((p) => !p);
-            }}
+            ref={fullscreenButton}
+            className="cr-fullscreen"
+            aria-pressed={presenting}
+            onClick={() => void toggleFullscreen()}
           >
-            <Expand size={16} />
-            <span>{presenting ? "Salir de presentación" : "Presentar"}</span>
+            {presenting ? <Minimize size={16} /> : <Expand size={16} />}
+            {presenting ? "Salir de pantalla completa" : "Pantalla completa"}
           </button>
           <button
             className="primary"
@@ -380,7 +442,15 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
               placeholder="https://…"
             />
           </label>
-          <button className="primary" disabled={busy || !!text}>
+          <p className="cr-delivery-help">
+            Cada pieza o lámina tiene sus propias versiones y comentarios. Para
+            corregir un archivo, elige el mismo; para otro archivo, elige otra
+            lámina o entregable. Usa enlaces individuales, no carpetas.
+          </p>
+          <button
+            className="primary"
+            disabled={busy || !!text || !!attachments.length}
+          >
             Guardar entrega
           </button>
           <button
@@ -407,6 +477,38 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
       ) : (
         <>
           <div className="cr-version-bar">
+            <button
+              aria-pressed={galleryOpen}
+              onClick={() => setGalleryOpen((s) => !s)}
+              title="Mostrar archivos de la tarea"
+            >
+              <Files size={16} /> Archivos ({groups.length})
+            </button>
+            <div className="cr-file-navigation">
+              <button
+                aria-label="Archivo anterior"
+                disabled={groupIndex <= 0}
+                onClick={() => {
+                  const i = groupIndex;
+                  if (i > 0) changeVersion(groups[i - 1].id);
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>
+                {groupIndex + 1} / {groups.length}
+              </span>
+              <button
+                aria-label="Archivo siguiente"
+                disabled={groupIndex >= groups.length - 1}
+                onClick={() => {
+                  const i = groupIndex;
+                  if (i < groups.length - 1) changeVersion(groups[i + 1].id);
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
             <label className="cr-piece">
               Pieza y formato
               <select
@@ -443,6 +545,21 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
                 </button>
               ))}
             </div>
+            <button
+              title={
+                commentsOpen ? "Ocultar comentarios" : "Mostrar comentarios"
+              }
+              aria-label={
+                commentsOpen ? "Ocultar comentarios" : "Mostrar comentarios"
+              }
+              onClick={() => setCommentsOpen((s) => !s)}
+            >
+              {commentsOpen ? (
+                <PanelRightClose size={17} />
+              ) : (
+                <PanelRightOpen size={17} />
+              )}
+            </button>
             <a href={v.url} target="_blank" rel="noreferrer">
               Abrir original ↗
             </a>
@@ -458,19 +575,32 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
             {v.exclusion_reason &&
               `· Excluida de la métrica: ${v.exclusion_reason}`}
           </p>
-          <div className="cr-main">
+          <div
+            className={`cr-main ${commentsOpen ? "" : "cr-comments-hidden"} ${galleryOpen ? "cr-with-gallery" : ""}`}
+          >
+            {galleryOpen && (
+              <FileGallery
+                groups={groups}
+                active={v}
+                notes={data.notes}
+                onSelect={changeVersion}
+              />
+            )}
             <ReviewViewer
               key={v.id}
               versionId={v.id}
               notes={notes}
               mark={mark}
-              onMark={setMark}
+              onMark={beginNote}
               onSelect={focus}
               selected={selected}
               focusTick={focusTick}
+              onFullscreen={() => void toggleFullscreen()}
+              presenting={presenting}
+              draftPending={!!text || !!attachments.length}
               focus={notes.find((n) => n.id === selected) || null}
             />
-            <aside className="cr-comments">
+            <aside className="cr-comments" hidden={!commentsOpen}>
               <div className="cr-comment-tabs">
                 <button
                   aria-pressed={!history}
@@ -591,10 +721,16 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
                   <div className="cr-note-list">
                     {!notes.length && (
                       <div className="cr-empty">
-                        <h3>Revisemos esta entrega</h3>
+                        <MessageSquare size={28} />
+                        <h3>
+                          {v.category === "video"
+                            ? "Pausa y comenta el video"
+                            : "Haz clic en el diseño"}
+                        </h3>
                         <p>
-                          Marca un punto o una zona y escribe el cambio
-                          solicitado. Puedes pegar imágenes de referencia.
+                          Señala dónde quieres un cambio y escribe tu
+                          comentario. También puedes marcar una zona y pegar
+                          imágenes de referencia.
                         </p>
                       </div>
                     )}
@@ -696,94 +832,116 @@ export function ReviewWorkspace({ initial }: { initial: ReviewData }) {
                       </details>
                     )}
                   </div>
-                  <form
-                    className="cr-composer"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void addNote();
-                    }}
-                    onPaste={(e) => {
-                      const f = [...e.clipboardData.files].filter((x) =>
-                        x.type.startsWith("image/"),
-                      );
-                      if (f.length) {
+                  {composing ? (
+                    <form
+                      className="cr-composer"
+                      onSubmit={(e) => {
                         e.preventDefault();
-                        void attach(f);
-                      }
-                    }}
-                  >
-                    <label>
-                      Solicitado por
-                      <input
-                        value={requestedBy}
-                        maxLength={160}
-                        onChange={(e) => setRequestedBy(e.target.value)}
-                        placeholder="Cliente o nombre de la persona"
-                      />
-                    </label>
-                    <label>
-                      Cambio solicitado
-                      <textarea
-                        required
-                        maxLength={4000}
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        placeholder="Por ejemplo: usar el logo oficial en esta esquina…"
-                      />
-                    </label>
-                    {mark && (
-                      <small>
-                        {mark.x !== null
-                          ? "Zona marcada"
-                          : "Observación general"}{" "}
-                        · página {mark.page}
-                        {mark.seconds !== null
-                          ? ` · ${mark.seconds.toFixed(1)} s`
-                          : ""}
-                        <button type="button" onClick={() => setMark(null)}>
-                          Quitar marca
-                        </button>
-                      </small>
-                    )}
-                    {attachments.map((a, i) => (
-                      <div className="cr-attachment" key={i}>
-                        <img src={a} alt={`Referencia por adjuntar ${i + 1}`} />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAttachments((s) => s.filter((_, j) => i !== j))
-                          }
-                          aria-label={`Quitar referencia ${i + 1}`}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="cr-composer-actions">
-                      <label className="cr-file">
-                        + Referencia
+                        void addNote();
+                      }}
+                      onPaste={(e) => {
+                        const f = [...e.clipboardData.files].filter((x) =>
+                          x.type.startsWith("image/"),
+                        );
+                        if (f.length) {
+                          e.preventDefault();
+                          void attach(f);
+                        }
+                      }}
+                    >
+                      <label>
+                        Solicitado por
                         <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          multiple
-                          disabled={attachments.length >= 3}
-                          onChange={(e) => {
-                            void attach([...(e.target.files || [])]);
-                            e.target.value = "";
-                          }}
+                          value={requestedBy}
+                          maxLength={160}
+                          onChange={(e) => setRequestedBy(e.target.value)}
+                          placeholder="Cliente o nombre de la persona"
                         />
                       </label>
-                      <button type="button" onClick={discard}>
-                        Descartar
-                      </button>
-                      <button
-                        className="primary"
-                        disabled={busy || !text.trim()}
-                      >
-                        Guardar
-                      </button>
-                    </div>
-                  </form>
+                      <label>
+                        Cambio solicitado
+                        <textarea
+                          ref={commentInput}
+                          required
+                          maxLength={4000}
+                          value={text}
+                          onChange={(e) => setText(e.target.value)}
+                          placeholder="Por ejemplo: usar el logo oficial en esta esquina…"
+                        />
+                      </label>
+                      {mark && (
+                        <small>
+                          {mark.x !== null
+                            ? "Zona marcada"
+                            : "Observación general"}{" "}
+                          · página {mark.page}
+                          {mark.seconds !== null
+                            ? ` · ${mark.seconds.toFixed(1)} s`
+                            : ""}
+                          <button type="button" onClick={() => setMark(null)}>
+                            Quitar marca
+                          </button>
+                        </small>
+                      )}
+                      {attachments.map((a, i) => (
+                        <div className="cr-attachment" key={i}>
+                          <img
+                            src={a}
+                            alt={`Referencia por adjuntar ${i + 1}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAttachments((s) => s.filter((_, j) => i !== j))
+                            }
+                            aria-label={`Quitar referencia ${i + 1}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="cr-composer-actions">
+                        <label className="cr-file">
+                          + Referencia
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            multiple
+                            disabled={attachments.length >= 3}
+                            onChange={(e) => {
+                              void attach([...(e.target.files || [])]);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <button type="button" onClick={discard}>
+                          Descartar
+                        </button>
+                        <button
+                          className="primary"
+                          disabled={busy || !text.trim()}
+                        >
+                          Guardar
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      className="cr-add-comment"
+                      onClick={() =>
+                        beginNote({
+                          x: null,
+                          y: null,
+                          width: null,
+                          height: null,
+                          page: 1,
+                          seconds: null,
+                        })
+                      }
+                    >
+                      <Plus size={16} /> Comentario general del archivo
+                    </button>
+                  )}
                 </>
               )}
               <footer>
