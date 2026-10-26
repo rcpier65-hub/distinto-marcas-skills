@@ -8,6 +8,7 @@
 export type ModuloPermiso =
   | 'inbox'
   | 'publicaciones'
+  | 'calendario'
   | 'editor'
   | 'diseno'
   | 'grilla'
@@ -25,6 +26,7 @@ export type ModuloPermiso =
 export type Permisos = {
   inbox?: { acceso?: boolean }
   publicaciones?: { acceso?: boolean; puede_crear?: boolean; puede_editar?: boolean; puede_borrar?: boolean }
+  calendario?: { acceso?: boolean; puede_editar?: boolean }
   editor?: { acceso?: boolean; solo_propias?: boolean }
   diseno?: { acceso?: boolean }
   grilla?: { acceso?: boolean; puede_enviar?: boolean }
@@ -107,6 +109,7 @@ export function mergePermisos(rolBase: Permisos, override: Permisos | null | und
  * Recibe los permisos YA mergeados (output de mergePermisos).
  */
 export function tieneAcceso(permisos: Permisos, modulo: ModuloPermiso): boolean {
+  if (modulo === 'calendario') return permisos.calendario?.acceso ?? permisos.publicaciones?.acceso === true
   const m = permisos[modulo]
   if (!m) return false
   return !!(m as { acceso?: boolean }).acceso
@@ -133,7 +136,7 @@ export function resumenPermisos(permisos: Permisos): {
   const todos: ModuloPermiso[] = [
     'inbox', 'publicaciones', 'editor', 'diseno', 'grilla',
     'comentarios', 'metricas', 'settings', 'equipo', 'finanzas',
-    'marcas', 'tareas',
+    'marcas', 'tareas', 'calendario',
   ]
   const modulosAccesibles = todos.filter((m) => tieneAcceso(permisos, m))
   return { modulosAccesibles, totalModulos: todos.length }
@@ -143,6 +146,7 @@ export function resumenPermisos(permisos: Permisos): {
 export const MODULO_LABEL: Record<ModuloPermiso, string> = {
   inbox: 'Inbox global',
   publicaciones: 'Publicaciones',
+  calendario: 'Calendario',
   editor: 'Editor de video',
   diseno: 'Diseño',
   grilla: 'Grilla semanal',

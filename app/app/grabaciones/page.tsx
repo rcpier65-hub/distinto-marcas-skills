@@ -5,6 +5,8 @@
 import Link from 'next/link'
 import { Clapperboard, List, CalendarRange } from 'lucide-react'
 import { requireUser } from '@/lib/auth/get-user'
+import { getCalendarAccess } from '@/lib/calendario/access-server'
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/service'
 import { listGrabaciones, getGrabacionesKPIs } from './_actions'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,9 +24,7 @@ type SP = { desde?: string; hasta?: string }
 
 export default async function GrabacionesPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
-  /* Grabaciones es parte de publicaciones — usa el mismo permiso */
-  const { ensureAccesoModulo } = await import('@/lib/team/permisos-helper')
-  await ensureAccesoModulo('publicaciones')
+  if (!(await getCalendarAccess()).view) redirect('/inicio')
 
   const sp = await searchParams
   const desde = sp.desde

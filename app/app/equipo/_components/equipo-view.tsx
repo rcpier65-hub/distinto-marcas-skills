@@ -7,6 +7,7 @@
    - Toggle "ver inactivos" para revisar miembros desactivados */
 
 import { useState, useMemo, useTransition, useEffect } from 'react'
+import { calendarAccess } from '@/lib/calendario/access'
 import { toast } from 'sonner'
 import {
   actualizarMiembro,
@@ -752,6 +753,9 @@ function TabInfo({
    ============================================================ */
 
 const MODULO_OPCIONES: Record<ModuloPermiso, { acceso: string; extras?: { key: string; label: string }[] }> = {
+  calendario:   { acceso: 'Ver Calendario', extras: [
+                    { key: 'puede_editar', label: 'Agendar por texto o voz, editar eventos y gestionar reservas' },
+                  ] },
   inbox:        { acceso: 'Ver Inbox global' },
   publicaciones:{ acceso: 'Ver Publicaciones', extras: [
                     { key: 'puede_crear', label: 'Puede crear nuevas' },
@@ -792,6 +796,7 @@ function TabPermisos({
 }) {
   /* Permisos efectivos para mostrar checkbox states (rol + override) */
   const efectivos = mergePermisos(rolBase?.permisos_default ?? {}, member.permisos_override)
+  const calendario = calendarAccess({ activo: true, rolBase: member.rol_base, permisos: efectivos })
 
   function toggle(mod: ModuloPermiso, key: string, value: boolean) {
     const base = rolBase?.permisos_default?.[mod] ?? {}
@@ -841,7 +846,9 @@ function TabPermisos({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {(Object.keys(MODULO_OPCIONES) as ModuloPermiso[]).map((mod) => {
             const opts = MODULO_OPCIONES[mod]
-            const efectivo = efectivos[mod] ?? {}
+            const efectivo = mod === 'calendario'
+              ? { acceso: calendario.view, puede_editar: calendario.manage }
+              : efectivos[mod] ?? {}
             const tieneAccesoEfectivo = !!(efectivo as { acceso?: boolean }).acceso
             return (
               <div key={mod} style={{

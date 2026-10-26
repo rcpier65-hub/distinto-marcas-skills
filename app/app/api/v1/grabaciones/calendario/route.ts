@@ -7,8 +7,8 @@
 //   que el asistente "Agendar reunión o grabación".
 //
 // Auth: cookie de sesión, Bearer JWT de Supabase, o dst_live_ con alcance owner.
-// GET además exige el módulo publicaciones (igual que la página).
-// POST exige director, admin, o usuario sin team_member.
+// GET/POST comparten las capacidades de calendario de la página y sus acciones.
+// Un usuario sin miembro activo no recibe acceso interno.
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -16,6 +16,7 @@ import { deviceScopeAllows, jsonApiError, resolveV1Actor } from '@/lib/api/auth'
 import { OWNER_SCOPE } from '@/lib/api/device-key-scopes'
 import { normalizarHoraAgenda } from '@/lib/api/hora'
 import { cargarMiembroV1 } from '@/lib/api/miembro-v1'
+import { calendarAccess } from '@/lib/calendario/access'
 import { cargarAgendaCalendario, type AgendaCargada } from '@/lib/calendario/cargar-agenda'
 import { ejecutarAgendarGrabacion, ejecutarAgendarReunion } from '@/lib/calendario/agendar-web'
 import { hoyLima } from '@/lib/fechas/hoy'
@@ -91,7 +92,8 @@ export async function GET(request: Request) {
   }
   const cargado = await cargarMiembroV1(auth.actor)
   if ('response' in cargado) return cargado.response
-  if (!cargado.miembro.puedePublicaciones) {
+  const access = calendarAccess({ activo: !!cargado.miembro.teamMemberId, rolBase: cargado.miembro.rolBase, permisos: cargado.miembro.permisos ?? {} })
+  if (!access.view) {
     return jsonApiError('No tienes acceso al calendario', 403)
   }
 
@@ -182,11 +184,9 @@ export async function POST(request: Request) {
   }
   const tipo = tipoRaw
 
-  if (!cargado.miembro.esDirector) {
-    const error = tipo === 'grabacion'
-      ? 'Solo los directores pueden agendar grabaciones.'
-      : 'Solo los directores pueden agendar reuniones.'
-    return jsonApiError(error, 403)
+  const access = calendarAccess({ activo: !!cargado.miembro.teamMemberId, rolBase: cargado.miembro.rolBase, permisos: cargado.miembro.permisos ?? {} })
+  if (!access.schedule) {
+    return jsonApiError('No tienes permiso para agendar en el calendario.', 403)
   }
 
   const fecha = typeof input.fecha === 'string' ? input.fecha.trim().slice(0, 10) : ''
@@ -223,6 +223,9 @@ export async function POST(request: Request) {
     .maybeSingle()
   if (marcaError) return jsonApiError(marcaError.message, 500)
   if (!marca) return jsonApiError(`Marca '${marcaSlug}' no encontrada`, 404)
+  if (cargado.miembro.marcasAcceso && !cargado.miembro.marcasAcceso.includes(marca.id)) {
+    return jsonApiError('No tienes acceso a esta marca.', 403)
+  }
 
   if (tipo === 'grabacion') {
     const extra = correosDe(input.invitados ?? input.correos)

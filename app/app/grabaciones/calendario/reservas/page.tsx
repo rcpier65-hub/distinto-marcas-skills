@@ -2,18 +2,17 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/get-user'
-import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { getCalendarAccess } from '@/lib/calendario/access-server'
 import { db, settings } from '@/lib/reservas/server'
 export const dynamic = 'force-dynamic'
 
-async function requireDirector() {
+async function requireCalendarManager() {
   await requireUser()
-  const p = await getCurrentMemberPermisos()
-  if (p && !['director', 'admin'].includes(p.member.rol_base)) redirect('/inicio')
+  if (!(await getCalendarAccess()).manage) redirect('/inicio')
 }
 async function save(form: FormData) {
   'use server'
-  await requireDirector()
+  await requireCalendarManager()
   const number = (key: string, min: number, max: number) => {
     const n = Number(form.get(key))
     if (!Number.isInteger(n) || n < min || n > max) throw new Error('Configuración inválida: ' + key)
@@ -31,7 +30,7 @@ async function save(form: FormData) {
   redirect('/grabaciones/calendario/reservas?guardado=1')
 }
 export default async function ReservasAdmin({ searchParams }: { searchParams: Promise<{ guardado?: string }> }) {
-  await requireDirector()
+  await requireCalendarManager()
   const [config, bookings, sp] = await Promise.all([settings(), db().from('web_bookings').select('id,nombre,email,empresa,starts_at,status,meet_link').order('created_at', { ascending: false }).limit(100), searchParams])
   return <main className="mx-auto max-w-4xl space-y-6 p-6">
     <Link href="/grabaciones/calendario" className="text-sm text-purple-700">← Calendario</Link>

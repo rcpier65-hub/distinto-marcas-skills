@@ -15,9 +15,11 @@
 
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { ArrowUpRight, CalendarDays, CalendarRange, Globe, List } from 'lucide-react'
 import { requireUser } from '@/lib/auth/get-user'
-import { ensureAccesoModulo, getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
+import { getCalendarAccess } from '@/lib/calendario/access-server'
 import { cargarAgendaCalendario } from '@/lib/calendario/cargar-agenda'
 import { GoogleCalendarConnect } from '../_components/gcal-connect'
 import { AgendarReunionBox } from '@/app/inicio/_components/agendar-reunion-box'
@@ -39,7 +41,8 @@ function addDias(ymd: string, n: number): string {
 
 export default async function GrabacionesCalendarioPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser()
-  await ensureAccesoModulo('publicaciones')
+  const access = await getCalendarAccess()
+  if (!access.view) redirect('/inicio')
   const sp = await searchParams
 
   /* Filtros del calendario guardados (chips + marca): se mantienen al cambiar
@@ -87,11 +90,8 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         ? `semana del ${fmtCorto(desde)} al ${fmtCorto(hasta)}`
         : `${MESES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`
 
-  /* Solo directores ven el asistente agendador (la action igual valida server-side). */
+  /* La misma capacidad controla el formulario, la edición y sus acciones. */
   const permisos = await getCurrentMemberPermisos()
-  const esDirector = !permisos || permisos.member.rol_base === 'director' || permisos.member.rol_base === 'admin'
-  /* El asistente para agendar escribiendo: directores + diseño (Ailyn). */
-  const puedeAgendar = esDirector || permisos?.member.rol_base === 'disenador'
 
   /* Mismo armado que GET /api/v1/grabaciones/calendario. */
   const agenda = await cargarAgendaCalendario({
@@ -126,7 +126,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {esDirector && (
+          {access.manage && (
             <Link
               href="/grabaciones/calendario/reservas"
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-card text-[13px] font-medium text-foreground hover:bg-muted transition-colors"
@@ -155,10 +155,10 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         </Link>
       </nav>
 
-      {/* ASISTENTE AGENDADOR (solo directores) — "agéndame una reunión a las
+      {/* ASISTENTE AGENDADOR — "agéndame una reunión a las
           3:30 con Vid Natur" → detecta correos de la marca y Google manda la
           invitación + recordatorio. */}
-      {puedeAgendar && <AgendarReunionBox />}
+      {access.schedule && <AgendarReunionBox />}
 
       {(agenda.grabError || agenda.gcalError) && (
         <div className="p-4 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
@@ -176,7 +176,7 @@ export default async function GrabacionesCalendarioPage({ searchParams }: { sear
         eventos={eventos}
         marcas={marcasMes}
         hoy={hoyLima}
-        esDirector={esDirector}
+        esDirector={access.manage}
         filtrosIniciales={sp.marca && marcasMes.some(m => m.slug === sp.marca)
           ? { ...filtrosGuardados, marca: sp.marca, tipos: { ...filtrosGuardados.tipos, grabacion: true, reunion: true } }
           : filtrosGuardados}
