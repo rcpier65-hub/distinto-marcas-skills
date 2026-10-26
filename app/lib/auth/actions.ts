@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { loginErrorMessage } from '@/lib/auth/login-error'
 
 export type AuthActionResult =
   | { ok: true; message: string }
@@ -25,12 +26,19 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
     redirect('/login?error=' + encodeURIComponent('Email y contraseña son obligatorios'))
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({ email: email!, password: password! })
+  let error: unknown
+  try {
+    const supabase = await createClient()
+    const result = await supabase.auth.signInWithPassword({ email: email!, password: password! })
+    error = result.error
+  } catch (cause) {
+    error = cause
+  }
 
   if (error) {
-    console.error('[signInWithPassword]', error.message)
-    redirect('/login?error=' + encodeURIComponent('Email o contraseña incorrectos'))
+    const message = loginErrorMessage(error)
+    console.error('[signInWithPassword]', message)
+    redirect('/login?error=' + encodeURIComponent(message))
   }
 
   /* Redirigir al landing dinámico según permisos del usuario.
