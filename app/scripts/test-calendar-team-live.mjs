@@ -9,7 +9,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3126'
 const svc = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {auth:{persistSession:false,autoRefreshToken:false}})
 const manifest = JSON.parse(fs.readFileSync('.next/server/server-reference-manifest.json','utf8'))
 const actions = Object.fromEntries(Object.entries(manifest.node).map(([id,v])=>[v.exportedName,id]))
-const names = ['pedro','lorena','pieer','ailyn','paolo','ruth','nayeli']
+const names = (process.env.TEST_MEMBERS || 'pedro,lorena,pieer,ailyn,paolo,ruth,nayeli').split(',')
 let expectedIds
 for (const name of names) {
   const jar = new Map()
@@ -30,7 +30,9 @@ for (const name of names) {
     assert.equal(html.includes('Reservas de la web'),full,name+' reservations')
     assert(!html.includes('NEXT_HTTP_ERROR_FALLBACK;500'))
     const reservations = await fetch(base+'/grabaciones/calendario/reservas',{headers,redirect:'manual'})
-    assert.equal(reservations.status,full?200:307,name+' reservations guard')
+    const reservationHtml = await reservations.text()
+    if (full) { assert.equal(reservations.status,200); assert(!reservationHtml.includes('NEXT_REDIRECT')) }
+    else { assert(reservations.status===307 || reservationHtml.includes('NEXT_REDIRECT'),name+' reservations guard') }
     const denied = await fetch(base+'/api/v1/grabaciones/calendario',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({tipo:'reunion',fecha:'invalid'})})
     assert.equal(denied.status,full?400:403,name+' API write permission')
     for (const [action,args,message] of [

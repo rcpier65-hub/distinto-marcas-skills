@@ -29,3 +29,23 @@ Verificación reproducible desde app/:
 
 Publicar desde la base vigente del VPS, compilando localmente según AGENTS.md.
 No ejecutar una compilación pesada de Next en el VPS compartido.
+
+## Verificación del 26-oct-2026
+
+- Build Webpack y TypeScript aprobados. Las diez incidencias y tres avisos de
+  lint en Equipo/Grabaciones/Sidebar/CommandPalette coinciden con 0415b17;
+  los archivos nuevos y demás archivos afectados no agregan incidencias.
+- Tests locales y de la imagen candidata comprobaron los cuatro miembros,
+  Pedro, Ruth y Nayeli: mismos 37 eventos de la semana; controles/acciones/API
+  habilitados para los autorizados, solo lectura para Ruth y Nayeli. Cliente
+  TOTAL SUPS rechazado en calendario interno (redirección en página, 403 en API).
+- Navegador: texto y micrófono visibles en las cuatro cuentas, interpretación
+  de reunión/grabación TypHouse con fecha y hora correctas; detalle editable
+  para Lorena. No se confirmó ningún evento ni se enviaron invitaciones.
+- Imagen funcional b8c955e publicada sobre 0415b17, conservando el commit local
+  b0ad0d5. Runtime Linux y dependencias de producción reutilizados: package,
+  lock, public y next.config sin diferencias; `.next` compilado localmente.
+- Audio sintético de prueba contra producción devolvió OpenAI 429, sin créditos.
+  El acceso al botón está habilitado; la transcripción de respaldo no funciona
+  hasta recargar esa cuenta. No se cambiaron facturación ni claves. El dictado
+  nativo permanece disponible según navegador; no se validó un micrófono físico.
