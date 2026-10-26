@@ -22,7 +22,7 @@ if ! docker buildx inspect "$builder" >/dev/null 2>&1; then
     --driver-opt memory=3g,memory-swap=3g,cpu-period=100000,cpu-quota=100000,restart-policy=no
 else
   # Mantiene un techo estricto, pero deja margen para Next.js y BuildKit.
-  docker update --memory 3g --memory-swap 3g --cpus 1 \
+  docker update --memory 3g --memory-swap 3g --cpu-period 100000 --cpu-quota 100000 \
     "buildx_buildkit_${builder}0" >/dev/null
 fi
 trap 'docker buildx stop "$builder" >/dev/null 2>&1 || true' EXIT
