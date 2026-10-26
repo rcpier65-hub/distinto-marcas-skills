@@ -2,6 +2,7 @@
 """Genera los recursos públicos 05 y 06 con la identidad de Distinto."""
 
 from pathlib import Path
+from io import BytesIO
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -10,6 +11,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
@@ -22,11 +24,14 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from PIL import Image as PILImage, ImageEnhance, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "public" / "recursos"
 OUTPUT = ROOT.parent / "output" / "pdf"
 LOGO = ROOT / "public" / "brand" / "logo-h-color-tight.png"
+COVER_05 = ROOT / "public" / "recursos" / "portadas" / "recurso-05-contenido.png"
+COVER_06 = ROOT / "public" / "recursos" / "portadas" / "recurso-06-ruta-digital.png"
 
 PURPLE = colors.HexColor("#BA41F7")
 VIOLET = colors.HexColor("#7C3AED")
@@ -57,6 +62,18 @@ styles.add(ParagraphStyle(name="DCenter", fontName="Arial", fontSize=9, leading=
 
 def P(text, style="DBody"):
     return Paragraph(text, styles[style])
+
+
+def cover_background(path):
+    """Prepara un fondo A4 oscurecido sin depender de transparencia del PDF."""
+    target = (1191, 1684)
+    with PILImage.open(path).convert("RGB") as source:
+        fitted = ImageOps.fit(source, target, method=PILImage.Resampling.LANCZOS, centering=(.5, .5))
+        fitted = ImageEnhance.Brightness(fitted).enhance(.58)
+        buffer = BytesIO()
+        fitted.save(buffer, format="JPEG", quality=91, optimize=True)
+        buffer.seek(0)
+        return ImageReader(buffer)
 
 
 def bullets(items, color=PURPLE):
@@ -132,10 +149,11 @@ def table(rows, widths, header=True, font_size=8.2):
 
 
 class ResourceDoc(BaseDocTemplate):
-    def __init__(self, path, title, number):
+    def __init__(self, path, title, number, cover_art):
         super().__init__(str(path), pagesize=A4, rightMargin=18*mm, leftMargin=18*mm, topMargin=22*mm, bottomMargin=18*mm, title=title, author="Distinto Agencia")
         self.resource_title = title
         self.resource_number = number
+        self.cover_art = cover_art
         frame = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="normal")
         self.addPageTemplates(PageTemplate(id="all", frames=frame, onPage=self.decorate))
 
@@ -143,12 +161,8 @@ class ResourceDoc(BaseDocTemplate):
         page = canvas.getPageNumber()
         canvas.saveState()
         if page == 1:
-            canvas.setFillColor(INK)
-            canvas.rect(0, 0, A4[0], A4[1], stroke=0, fill=1)
-            canvas.setFillColor(PURPLE)
-            canvas.circle(A4[0] - 22*mm, A4[1] - 28*mm, 31*mm, stroke=0, fill=1)
-            canvas.setFillColor(YELLOW)
-            canvas.circle(A4[0] - 49*mm, 21*mm, 11*mm, stroke=0, fill=1)
+            canvas.drawImage(cover_background(self.cover_art), 0, 0,
+                             width=A4[0], height=A4[1], mask="auto")
         else:
             canvas.setFillColor(CREAM)
             canvas.rect(0, 0, A4[0], A4[1], stroke=0, fill=1)
@@ -197,7 +211,7 @@ def section(title, intro=None):
 
 
 def build_05(path):
-    doc = ResourceDoc(path, "Qué contenido repetir, corregir o descartar", "05")
+    doc = ResourceDoc(path, "Qué contenido repetir, corregir o descartar", "05", COVER_05)
     story = cover("05", "Qué contenido repetir, corregir o descartar", "Un sistema para dejar de juzgar una publicación solo por sus vistas y convertir cada pieza en una decisión útil.")
 
     story += section("Antes de mirar números, define la función", "Una publicación no puede evaluarse si no sabemos para qué fue creada. El mismo resultado puede ser bueno para posicionamiento y malo para ventas.")
@@ -294,7 +308,7 @@ def build_05(path):
 
 
 def build_06(path):
-    doc = ResourceDoc(path, "Ruta digital de 90 días para ordenar un negocio", "06")
+    doc = ResourceDoc(path, "Ruta digital de 90 días para ordenar un negocio", "06", COVER_06)
     story = cover("06", "Ruta digital de 90 días para ordenar un negocio", "Una guía para conectar presencia, captación, ventas, seguimiento, operación y datos sin comprar herramientas que todavía no necesitas.")
 
     story += section("Digitalizar no es abrir más cuentas", "Un ecosistema digital existe cuando la información fluye desde el primer contacto hasta la venta, la entrega y el aprendizaje. Tener redes, una web y un CRM separados no garantiza ese recorrido.")

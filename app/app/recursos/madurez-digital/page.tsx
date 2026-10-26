@@ -12,6 +12,7 @@ export default function DigitalMaturityPage() {
     number="06"
     resource="madurez-digital"
     title="Ruta digital de 90 días para ordenar un negocio"
+    coverImage="/recursos/portadas/recurso-06-ruta-digital.png"
     description="Una guía para conectar marketing, ventas, seguimiento, operación y datos sin llenar la empresa de herramientas que todavía no necesita."
     filename="guia-06-ruta-digital-90-dias.pdf"
     pages={10}

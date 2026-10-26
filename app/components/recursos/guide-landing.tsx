@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, BookOpen, Check, Clock3, Download, FileText } from 'lucide-react'
 import { ResourceDownload } from './resource-download'
 import s from './recursos.module.css'
@@ -7,6 +8,7 @@ type GuideLandingProps = {
   number: '05' | '06'
   resource: 'decision-contenido' | 'madurez-digital'
   title: string
+  coverImage: string
   description: string
   filename: string
   pages: number
@@ -34,6 +36,8 @@ export function GuideLanding(props: GuideLandingProps) {
           </div>
           <div className={s.coverWrap} aria-hidden="true">
             <div className={s.cover}>
+              <Image className={s.coverImage} src={props.coverImage} alt="" fill sizes="242px" />
+              <div className={s.coverShade} />
               <span>RECURSO {props.number}</span>
               <strong>{props.title}</strong>
               <small>Guía práctica de Distinto</small>

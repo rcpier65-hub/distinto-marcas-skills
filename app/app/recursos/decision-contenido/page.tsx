@@ -12,6 +12,7 @@ export default function ContentDecisionPage() {
     number="05"
     resource="decision-contenido"
     title="Qué contenido repetir, corregir o descartar"
+    coverImage="/recursos/portadas/recurso-05-contenido.png"
     description="Una guía para dejar de evaluar publicaciones solo por sus vistas y convertir cada pieza en una decisión concreta para el siguiente contenido."
     filename="guia-05-decidir-contenido.pdf"
     pages={9}
