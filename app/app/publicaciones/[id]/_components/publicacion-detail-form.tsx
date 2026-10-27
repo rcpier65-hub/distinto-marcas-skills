@@ -23,6 +23,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { MarcaLogo } from '@/components/marca-logo'
+import { DescargarPortada } from '@/components/descargar-portada'
 import { updatePublicacion, deletePublicacion, togglePublicacionField, marcarParaDiseno, generarCopysConIA, guardarPromptMarca, avisarClientePublicado } from '../_actions'
 import { duplicarPublicacion } from '../../_actions'
 import { esRedireccion } from '@/lib/utils/is-redirect-error'
@@ -1577,6 +1578,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                           onChange={(v) => setForm((s) => ({ ...s, portada_cruda_url: v }))}
                           placeholder="https://drive.google.com/…"
                         />
+                        {form.portada_cruda_url && <div className="mt-1"><DescargarPortada id={initial.id} titulo={initial.nombre} url={form.portada_cruda_url} tipo="cruda" /></div>}
                       </div>
                     </div>
                     <div className="block text-xs">
@@ -1587,6 +1589,7 @@ export function PublicacionDetailForm({ publicacion: initial, marca, editores, p
                           onChange={(v) => setForm((s) => ({ ...s, portada_editada_url: v }))}
                           placeholder="https://drive.google.com/…"
                         />
+                        {form.portada_editada_url && <div className="mt-1"><DescargarPortada id={initial.id} titulo={initial.nombre} url={form.portada_editada_url} tipo="editada" /></div>}
                       </div>
                     </div>
                   </div>

@@ -22,7 +22,8 @@ import type { Tarea, FocusLane } from '@/lib/tareas/types'
 import { crearTarea, completarTarea, eliminarTarea, moverTareaCategoria, setFocusLane, traspasarTarea } from '../_actions'
 import { iniciarTarea, pausarTarea, setEstadoTarea, setFechasTarea } from '../_plan-actions'
 import { marcarTareaParaReunion } from '../_reunion-actions'
-import { ahoraServidor, desfaseActual, segundosTranscurridos, sincronizarReloj } from '@/lib/tiempo/reloj'
+import { segundosTranscurridos, sincronizarReloj } from '@/lib/tiempo/reloj'
+import { useReloj } from '@/lib/tiempo/use-reloj'
 import { Gantt, CalendarioTareas, type TareaPlan } from '@/components/tareas/tareas-plan-view'
 import { type EstadoTarea } from '@/lib/tareas/pro-types'
 
@@ -933,15 +934,8 @@ function fmtCorto(seg: number): string {
 /* Cuenta con la hora del servidor (lib/tiempo/reloj): si la computadora va
    adelantada o atrasada, el segundero ya no salta al recargar. */
 function useSegundos(desde: string | null, acumulado: number): number {
-  const [ahora, setAhora] = useState(() => Date.now())
-  const [desfase, setDesfase] = useState(desfaseActual)
-  useEffect(() => {
-    if (!desde) return
-    void sincronizarReloj().then(setDesfase)
-    const t = setInterval(() => setAhora(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [desde])
-  return segundosTranscurridos(desde, acumulado, ahora, desfase)
+  const reloj = useReloj(!!desde)
+  return reloj ? segundosTranscurridos(desde, acumulado, reloj.ahora, reloj.desfase) : acumulado
 }
 
 function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
@@ -963,25 +957,28 @@ function PlanChips({ tareaId, planInfo, hoy, onCambio }: {
 
   async function iniciar() {
     if (cargando) return
-    const antes = { estado, desde }
-    setEstado('en_proceso'); setDesde(new Date(ahoraServidor()).toISOString())  // optimista, con hora del servidor
     setCargando(true)
-    const r = await iniciarTarea(tareaId)
-    setCargando(false)
-    if (!r.ok) { setEstado(antes.estado); setDesde(antes.desde); toast.error(r.error); return }
-    window.dispatchEvent(new Event('distinto-timer'))
-    onCambio?.()
+    try {
+      await sincronizarReloj()
+      const r = await iniciarTarea(tareaId)
+      if (!r.ok) { toast.error(r.error); return }
+      setEstado('en_proceso'); setDesde(r.timer.desde); setAcumulado(r.timer.acumulado)
+      window.dispatchEvent(new Event('distinto-timer'))
+      onCambio?.()
+    } catch { toast.error('No se pudo iniciar el cronómetro. Intenta de nuevo.') }
+    finally { setCargando(false) }
   }
   async function pausar() {
     if (cargando || !desde) return
-    const antes = desde
-    setAcumulado(segundos); setDesde(null)  // optimista
     setCargando(true)
-    const r = await pausarTarea(tareaId)
-    setCargando(false)
-    if (!r.ok) { setDesde(antes); toast.error(r.error); return }
-    window.dispatchEvent(new Event('distinto-timer'))
-    onCambio?.()
+    try {
+      const r = await pausarTarea(tareaId)
+      if (!r.ok) { toast.error(r.error); return }
+      setDesde(r.timer.desde); setAcumulado(r.timer.acumulado)
+      window.dispatchEvent(new Event('distinto-timer'))
+      onCambio?.()
+    } catch { toast.error('No se pudo pausar el cronómetro. Intenta de nuevo.') }
+    finally { setCargando(false) }
   }
   async function desarchivar() {
     setEstado('sin_empezar')

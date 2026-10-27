@@ -219,6 +219,7 @@ export default function Canvas({
   const [activeAnchor, setActiveAnchor] = useState(focusAnchor);
   const [commentMode, setCommentMode] = useState(false), [showComments, setShowComments] = useState(true), [commentCount, setCommentCount] = useState(0), [commentDraft, setCommentDraft] = useState(false);
   const [referenceBusy, setReferenceBusy] = useState(false);
+  const referenceRunning = useRef(false);
   const [referenceMessage, setReferenceMessage] = useState("");
   const upload = useRef<HTMLInputElement>(null);
   const focused = useRef(false);
@@ -252,7 +253,7 @@ export default function Canvas({
     timer = setTimeout(fit, 100);
     return () => clearTimeout(timer);
   }, [ex, ready, focusAnchor, data.scene]);
-  async function addReference(blob: Blob) {
+  async function addReference(blob: Blob, index = 0) {
     if (!ex) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) || blob.size > 20_000_000) throw Error('Usa una imagen PNG, JPG o WebP de hasta 20 MB.');
     const bitmap = await createImageBitmap(blob);
@@ -264,28 +265,44 @@ export default function Canvas({
     const id = crypto.randomUUID();
     const state = ex.getAppState();
     const anchor = ex.getSceneElements().find(e => e.id === activeAnchor);
-    const x = anchor ? anchor.x + anchor.width + 70 : -state.scrollX + 140 / state.zoom.value;
-    const y = anchor ? anchor.y + 100 : -state.scrollY + 140 / state.zoom.value;
+    const x = (anchor ? anchor.x + anchor.width + 70 : -state.scrollX + 140 / state.zoom.value) + (index % 3) * 390;
+    const y = (anchor ? anchor.y + 100 : -state.scrollY + 140 / state.zoom.value) + Math.floor(index / 3) * 530;
     const displayScale = Math.min(1, 360 / canvas.width, 500 / canvas.height);
     const image = convertToExcalidrawElements([{ type: 'image', x, y, width: canvas.width * displayScale, height: canvas.height * displayScale, fileId: id, status: 'saved', scale: [1, 1] } as any]);
     ex.addFiles([{ id, mimeType: 'image/webp', dataURL, created: Date.now() } as any]);
     ex.updateScene({ elements: [...ex.getSceneElementsIncludingDeleted(), ...image], appState: { selectedElementIds: { [image[0].id]: true } }, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
     ex.setActiveTool({ type: 'selection' });
     setReferenceMessage('Referencia añadida. Puedes moverla, cambiar su tamaño y dibujar encima.');
+    return image[0];
   }
   async function referenceAction(fn: () => Promise<void>) {
+    if (referenceRunning.current || data.me.client) return;
+    referenceRunning.current = true;
     setReferenceBusy(true); setReferenceMessage('');
     try { await fn(); } catch (e) { setReferenceMessage((e as Error).name === 'NotAllowedError' ? 'No se dio acceso. También puedes hacer una captura y pegarla con Ctrl/Cmd + V.' : (e as Error).message); }
-    finally { setReferenceBusy(false); }
+    finally { referenceRunning.current = false; setReferenceBusy(false); }
+  }
+  async function addReferences(blobs: Blob[]) {
+    const added = [];
+    for (const [i, blob] of blobs.entries()) {
+      const image = await addReference(blob, i);
+      if (image) added.push(image);
+    }
+    if (added.length) {
+      ex?.scrollToContent(added, { fitToViewport: true, viewportZoomFactor: 0.8, maxZoom: 1 });
+      setReferenceMessage(`${added.length === 1 ? 'Imagen añadida' : `${added.length} imágenes añadidas`}. Puedes moverlas y cambiar su tamaño.`);
+    }
   }
   const pasteReference = () => referenceAction(async () => {
     if (!navigator.clipboard?.read) throw Error('Pega tu captura sobre el lienzo con Ctrl/Cmd + V.');
     const items = await navigator.clipboard.read();
+    const blobs = [];
     for (const item of items) {
       const type = item.types.find(t => ['image/png', 'image/jpeg', 'image/webp'].includes(t));
-      if (type) { await addReference(await item.getType(type)); return; }
+      if (type) blobs.push(await item.getType(type));
     }
-    throw Error('El portapapeles no contiene una imagen. Copia una captura y vuelve a pegarla.');
+    if (!blobs.length) throw Error('El portapapeles no contiene una imagen. Copia la imagen o adjúntala con Añadir imágenes.');
+    await addReferences(blobs);
   });
   const captureReference = () => referenceAction(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) throw Error('Este navegador no permite capturar. Usa una captura del sistema y pégala con Ctrl/Cmd + V.');
@@ -307,18 +324,37 @@ export default function Canvas({
     } finally { stream?.getTracks().forEach(t => t.stop()); }
   });
   return (
-    <div className="st-canvas-wrap">
-      {sheet.boceto_publicacion_id && !data.me.client && <div className="st-sketch-tools">
+    <div className="st-canvas-wrap"
+      onPasteCapture={e => {
+        if (data.me.client || isEditingText(e.target)) return;
+        const images = Array.from(e.clipboardData.files).filter(f => f.type.startsWith('image/'));
+        if (!images.length) return; // Preserve Excalidraw objects and text paste.
+        e.preventDefault(); e.stopPropagation();
+        void referenceAction(() => addReferences(images));
+      }}
+      onDragOverCapture={e => {
+        if (!data.me.client && Array.from(e.dataTransfer.items).some(i => i.kind === 'file' && i.type.startsWith('image/'))) e.preventDefault();
+      }}
+      onDropCapture={e => {
+        if (data.me.client || isEditingText(e.target)) return;
+        const images = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (!images.length) return;
+        e.preventDefault(); e.stopPropagation();
+        void referenceAction(() => addReferences(images));
+      }}>
+      {!data.me.client && <div className="st-sketch-tools">
+        {sheet.boceto_publicacion_id && <>
         <label><select aria-label="Zona de la versión" disabled={commentDraft} value={activeAnchor} onChange={e => focusVersion(e.target.value)}>
           <option value="">Todo el boceto</option>
           {anchors.map((e: any) => <option key={e.id} value={e.id}>{e.customData.deliveryLabel}</option>)}
         </select></label>
         <button className={commentMode ? 'st-selected' : ''} aria-pressed={commentMode} disabled={commentDraft} onClick={() => { setCommentMode(!commentMode); setShowComments(true); }} title="Arrastra una zona del diseño para comentar"><Scan size={16}/> Comentar zona</button>
         <button aria-pressed={showComments} disabled={commentDraft} onClick={() => setShowComments(!showComments)} title="Mostrar u ocultar comentarios"><MessageSquare size={16}/> <span className="st-tools-label">Comentarios</span> {commentCount}</button>
+        </>}
         <button disabled={referenceBusy} title="Pegar captura · Ctrl/Cmd + V" aria-label="Pegar captura" onClick={() => void pasteReference()}><ClipboardPaste size={17}/></button>
         <button disabled={referenceBusy} title="Capturar pantalla" aria-label="Capturar pantalla" onClick={() => void captureReference()}><MonitorUp size={17}/></button>
-        <button disabled={referenceBusy} title="Añadir imagen de referencia" aria-label="Añadir imagen de referencia" onClick={() => upload.current?.click()}><ImagePlus size={17}/></button>
-        <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e => { const file = e.target.files?.[0]; if (file) void referenceAction(() => addReference(file)); e.target.value = ''; }} />
+        <button disabled={referenceBusy} title="Añadir imágenes · también puedes arrastrarlas al lienzo" aria-label="Añadir imágenes" onClick={() => upload.current?.click()}><ImagePlus size={17}/><span className="st-tools-label">Imágenes</span></button>
+        <input ref={upload} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={e => { const files = Array.from(e.target.files || []); if (files.length) void referenceAction(() => addReferences(files)); e.target.value = ''; }} />
         {referenceMessage && <span className="st-reference-message" role="status">{referenceMessage}<button aria-label="Cerrar aviso de referencia" onClick={() => setReferenceMessage('')}><X size={15}/></button></span>}
       </div>}
     <div className="st-sketch-stage">
@@ -393,6 +429,9 @@ export default function Canvas({
     </div>
     </div>
   );
+}
+function isEditingText(target: EventTarget | null) {
+  return target instanceof HTMLElement && !!target.closest('input,textarea,[contenteditable="true"]');
 }
 function signature(elements: readonly any[], files: any) {
   return (

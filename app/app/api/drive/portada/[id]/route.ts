@@ -1,6 +1,8 @@
 import { getClienteActual } from '@/lib/cliente/get-cliente'
 import { createServiceClient } from '@/lib/supabase/service'
 import { idPortadaDrive, nombrePortada, tipoPortada } from '@/lib/cliente/portada'
+import { getUser } from '@/lib/auth/get-user'
+import { loadTaskAccess } from '@/lib/tareas/access-server'
 
 export const dynamic = 'force-dynamic'
 const MAX_BYTES = 25 * 1024 * 1024
@@ -11,18 +13,31 @@ function error(message: string, status: number) {
 
 // Se autoriza la publicación de la marca, no un ID de Drive enviado por el cliente.
 // Descargar desde el mismo dominio evita la navegación/redirects de Drive en iPhone.
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getUser()
+  if (!user) return error('Inicia sesión para descargar la portada.', 401)
   const cliente = await getClienteActual()
-  if (!cliente) return error('Inicia sesión en el portal de tu marca.', 401)
   const { id } = await params
   if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(id)) return error('Publicación inválida.', 400)
-  const { data: pub, error: dbError } = await createServiceClient().from('publicaciones')
-    .select('nombre, portada_editada_url, portada_cruda_url')
-    .eq('id', id).eq('marca_id', cliente.marcaId)
-    .maybeSingle<{ nombre: string | null; portada_editada_url: string | null; portada_cruda_url: string | null }>()
+  const service = createServiceClient()
+  let query = service.from('publicaciones').select('nombre, portada_editada_url, portada_cruda_url').eq('id', id)
+  if (cliente) query = query.eq('marca_id', cliente.marcaId)
+  else {
+    try {
+      const { member, access, permisos } = await loadTaskAccess(service, user.id)
+      if (!member || (!access.owner && !['publicaciones', 'diseno', 'editor', 'grilla'].some(key => permisos[key as keyof typeof permisos]?.acceso === true)))
+        return error('No tienes permiso para descargar esta portada.', 403)
+      const { data: scope, error: scopeError } = await service.from('team_members').select('marcas_acceso').eq('id', member.id).single<{ marcas_acceso: string[] | null }>()
+      if (scopeError || !scope) return error('No se pudo comprobar el acceso.', 503)
+      if (!access.owner && scope.marcas_acceso !== null) query = query.in('marca_id', scope.marcas_acceso)
+    } catch { return error('No se pudo comprobar el acceso.', 503) }
+  }
+  const { data: pub, error: dbError } = await query.maybeSingle<{ nombre: string | null; portada_editada_url: string | null; portada_cruda_url: string | null }>()
   if (dbError) return error('No se pudo consultar la portada. Intenta de nuevo.', 503)
   if (!pub) return error('La publicación no está disponible para tu marca.', 404)
-  const fileId = idPortadaDrive(pub.portada_editada_url?.trim() || pub.portada_cruda_url)
+  const tipoPedido = !cliente ? new URL(req.url).searchParams.get('tipo') : null
+  const portada = tipoPedido === 'cruda' ? pub.portada_cruda_url : tipoPedido === 'editada' ? pub.portada_editada_url : pub.portada_editada_url?.trim() || pub.portada_cruda_url
+  const fileId = idPortadaDrive(portada)
   if (!fileId) return error('Esta publicación no tiene una portada de Drive disponible.', 404)
 
   try {

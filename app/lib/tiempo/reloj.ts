@@ -37,9 +37,10 @@ export function sincronizarReloj(): Promise<number> {
   medicion ??= (async () => {
     try {
       const enviado = Date.now()
-      const r = await fetch('/api/version', { cache: 'no-store' })
+      const r = await fetch('/api/version', { cache: 'no-store', signal: AbortSignal.timeout(5000) })
+      if (!r.ok || !r.headers.get('date')) throw new Error('Reloj no disponible')
       desfase = estimarDesfase(enviado, Date.now(), r.headers.get('date'))
-    } catch { /* sin red: hora local */ }
+    } catch { medicion = null /* permite volver a medir al recuperar la red */ }
     return desfase
   })()
   return medicion

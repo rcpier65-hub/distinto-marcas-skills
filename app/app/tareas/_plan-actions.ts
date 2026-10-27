@@ -17,6 +17,13 @@ import { mayEditTask } from '@/lib/tareas/access-server'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = any
 type Result = { ok: true } | { ok: false; error: string }
+type TimerResult = { ok: true; timer: { desde: string | null; acumulado: number } } | { ok: false; error: string }
+
+async function leerCronometro(service: Service, id: string): Promise<TimerResult> {
+  const { data, error } = await service.from('tareas').select('en_proceso_desde, tiempo_seg').eq('id', id).single()
+  if (error || !data) return { ok: false, error: 'No se pudo leer el cronómetro. Recarga la tarea.' }
+  return { ok: true, timer: { desde: data.en_proceso_desde, acumulado: data.tiempo_seg ?? 0 } }
+}
 
 
 function refrescar() {
@@ -47,20 +54,22 @@ export async function setEstadoTarea(id: string, estado: EstadoTarea): Promise<R
 }
 
 /* ▶ Iniciar / reanudar: pasa a "en proceso" y arranca el cronómetro. */
-export async function iniciarTarea(id: string): Promise<Result> {
-  return setEstadoTarea(id, 'en_proceso')
+export async function iniciarTarea(id: string): Promise<TimerResult> {
+  const resultado = await setEstadoTarea(id, 'en_proceso')
+  if (!resultado.ok) return resultado
+  return leerCronometro(createServiceClient(), id)
 }
 
 /* ⏸ Pausar: sigue "en proceso" pero el cronómetro se detiene y la sesión
    queda guardada. */
-export async function pausarTarea(id: string): Promise<Result> {
+export async function pausarTarea(id: string): Promise<TimerResult> {
   const user = await requireUser()
   const service = createServiceClient() as Service
   const permiso = await mayEditTask(service, user.id, id)
   if (!permiso.ok) return permiso
   await cerrarSesion(service, id, 'pausa')
   refrescar()
-  return { ok: true }
+  return leerCronometro(service, id)
 }
 
 export async function setFechasTarea(id: string, input: {

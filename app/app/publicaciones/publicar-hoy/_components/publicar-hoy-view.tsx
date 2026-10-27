@@ -13,6 +13,7 @@ import {
   ChevronLeft, Scissors, Type, History, CheckCircle2, X, AlertTriangle, RotateCcw, CalendarDays, Trash2,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
+import { DescargarPortada } from '@/components/descargar-portada'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { marcarPublicado, desmarcarPublicado, eliminarPublicacion } from '../_actions'
 
@@ -255,7 +256,7 @@ function PiezaCard({ item, fecha, publicada, onConfirm, onUndo }: {
         </Paso>
 
         <Paso n={2} label="Descargar portada" icon={<ImageIcon className="w-4 h-4" />}>
-          <LinkBtn href={portada} icon={<Download className="w-3.5 h-3.5" />} label="Abrir portada" color="#9333ea" />
+          {portada ? <DescargarPortada id={item.id} titulo={item.titulo} url={portada} /> : <span className="text-xs text-muted-foreground">Portada pendiente de subir.</span>}
         </Paso>
 
         <Paso n={3} label="Copiar el copy" icon={<Copy className="w-4 h-4" />}>

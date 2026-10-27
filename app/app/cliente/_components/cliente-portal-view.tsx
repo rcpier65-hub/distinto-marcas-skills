@@ -7,9 +7,10 @@ import {
   CheckCircle2, Clock, ExternalLink, LogOut, ChevronDown, ChevronLeft, ChevronRight,
   ThumbsUp, Sparkles, PartyPopper, CalendarDays, List, BarChart3, FileText, Play, X, Palette, Send,
   ClipboardList, CalendarClock, Clapperboard, Video, MapPin, CalendarPlus, Trash2, Download, LayoutGrid, HardDrive, ListTodo, Bell, Star, Copy, Check,
-  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Image as ImageIcon, Music2, VolumeX, ImageOff, LayoutDashboard, KeyRound,
+  TrendingUp, Search, RefreshCw, LifeBuoy, Plus, Upload, Music2, VolumeX, ImageOff, LayoutDashboard, KeyRound,
 } from 'lucide-react'
 import { MarcaLogo } from '@/components/marca-logo'
+import { DescargarPortada } from '@/components/descargar-portada'
 import { ActivarNotificaciones } from '@/components/activar-notificaciones'
 import { FormAgregarCliente, type FechaClienteItem } from './fechas-cliente-view'
 import { categoriaInfo } from '@/lib/fechas/categorias'
@@ -2185,7 +2186,6 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
   const [enviando, setEnviando] = useState(false)
   const videoSinMusica = videoAppUrl(p.videoSinMusica ?? null)
   const portada = urlOk(p.portada)
-  const portadaDescarga = portada ? (driveId(portada) ? `/api/drive/portada/${p.id}` : portada) : null
   async function marcar() {
     setEnviando(true)
     const r = await marcarPublicadoCliente(p.id, { instagram: ig, tiktok: tt })
@@ -2224,12 +2224,7 @@ function PublicarTuMismo({ p, color, videoDirecto }: { p: PubCliente; color: str
             <VolumeX className="w-3.5 h-3.5" /> Sin música: pronto
           </span>
         ) : null}
-        {portadaDescarga && (
-          <a href={portadaDescarga} download aria-label={`Descargar portada de ${p.titulo}`}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12.5px] font-bold border bg-card" style={{ borderColor: `${color}55`, color }}>
-            <ImageIcon className="w-3.5 h-3.5" /> Portada
-          </a>
-        )}
+        {portada && <DescargarPortada id={p.id} titulo={p.titulo} url={portada} color={color} />}
         {p.copy && <span className="-mt-2"><CopiarTextoBtn texto={p.copy} color={color} /></span>}
       </div>
       {urlOk(p.enlaceMusica ?? null) && (
