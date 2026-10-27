@@ -1,0 +1,6 @@
+.env
+kong.yml
+volumes/db/data/
+volumes/db/tls/
+volumes/storage/
+backups/

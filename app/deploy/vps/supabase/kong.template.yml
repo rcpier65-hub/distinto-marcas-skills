@@ -1,0 +1,134 @@
+_format_version: '2.1'
+_transform: true
+consumers:
+  - username: anon
+    keyauth_credentials:
+      - key: >-
+          ${ANON_KEY}
+  - username: service_role
+    keyauth_credentials:
+      - key: >-
+          ${SERVICE_ROLE_KEY}
+acls:
+  - consumer: anon
+    group: anon
+  - consumer: service_role
+    group: admin
+services:
+  - name: auth
+    url: http://auth:9999/
+    routes:
+      - name: auth
+        strip_path: true
+        paths:
+          - /auth/v1/
+    plugins: &ref_0
+      - &ref_1
+        name: cors
+        config:
+          origins:
+            - https://app.distintostudio.com
+          credentials: true
+      - name: key-auth
+        config:
+          hide_credentials: false
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - anon
+            - admin
+  - name: rest
+    url: http://rest:3000/
+    routes:
+      - name: rest
+        strip_path: true
+        paths:
+          - /rest/v1/
+    plugins: *ref_0
+  - name: storage
+    url: http://storage:5000/
+    routes:
+      - name: storage
+        strip_path: true
+        paths:
+          - /storage/v1/
+    plugins:
+      - *ref_1
+  - name: realtime-ws
+    url: http://realtime-dev.supabase-realtime:4000/socket
+    protocol: ws
+    routes:
+      - name: realtime-ws
+        strip_path: true
+        paths:
+          - /realtime/v1/
+    plugins: *ref_0
+  - name: realtime-rest
+    url: http://realtime-dev.supabase-realtime:4000/api
+    routes:
+      - name: realtime-rest
+        strip_path: true
+        paths:
+          - /realtime/v1/api
+    plugins: *ref_0
+  - name: auth-open-verify
+    url: http://auth:9999/verify
+    routes:
+      - name: auth-open-verify
+        strip_path: true
+        paths:
+          - /auth/v1/verify
+    plugins:
+      - *ref_1
+  - name: auth-open-callback
+    url: http://auth:9999/callback
+    routes:
+      - name: auth-open-callback
+        strip_path: true
+        paths:
+          - /auth/v1/callback
+    plugins:
+      - *ref_1
+  - name: auth-open-authorize
+    url: http://auth:9999/authorize
+    routes:
+      - name: auth-open-authorize
+        strip_path: true
+        paths:
+          - /auth/v1/authorize
+    plugins:
+      - *ref_1
+  - name: auth-open-well-known-jwksjson
+    url: http://auth:9999/.well-known/jwks.json
+    routes:
+      - name: auth-open-well-known-jwksjson
+        strip_path: true
+        paths:
+          - /auth/v1/.well-known/jwks.json
+    plugins:
+      - *ref_1
+  - name: realtime-block-tenants
+    url: http://realtime:4000/api/tenants
+    routes:
+      - name: realtime-block-tenants
+        strip_path: true
+        paths:
+          - /realtime/v1/api/tenants
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 403
+          message: Forbidden
+  - name: realtime-block-openapi
+    url: http://realtime:4000/api/openapi
+    routes:
+      - name: realtime-block-openapi
+        strip_path: true
+        paths:
+          - /realtime/v1/api/openapi
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 403
+          message: Forbidden

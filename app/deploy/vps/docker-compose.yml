@@ -11,6 +11,9 @@ services:
     # Tope de recursos para no quitarle rendimiento a las otras apps del VPS.
     cpus: "2.0"
     mem_limit: 2g
+    networks:
+      - default
+      - supabase
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=distinto-agencia_default"
@@ -25,3 +28,8 @@ services:
         max-file: "5"
     security_opt:
       - no-new-privileges:true
+
+networks:
+  supabase:
+    external: true
+    name: distinto-agencia-supabase_default
