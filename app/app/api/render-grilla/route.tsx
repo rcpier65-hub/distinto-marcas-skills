@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server'
 import chromium from '@sparticuz/chromium-min'
 import puppeteer, { type Browser } from 'puppeteer-core'
 import { buildGrillaHtml } from '@/lib/grilla/template-builder'
+import { canRenderGrilla, loadGrillaBrand } from '@/lib/grilla/render-brand'
 
 // URL del binary compilado con shared libs incluidas (libnss3, etc).
 // Cambiar al actualizar @sparticuz/chromium-min — match con el major version.
@@ -35,13 +36,6 @@ const MESES_UP = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP',
 // Theme-builder usa SIEMPRE las mismas 2 clases de card. Alternamos para variedad.
 const CARD_CLASSES = ['is-white', 'is-alt']
 
-// Extensión del logo local por marca. SOLO little-joe y vid-natur tienen .png;
-// el resto usa .svg. DEBE coincidir con render-grilla-html (el preview) para que
-// el PNG copiado/enviado muestre el MISMO logo que el preview.
-// Bug (15-jun-2026): este mapa decía manrique:'png' pero el archivo real es
-// logo.svg → el render pedía logo.png (404) y el logo NO salía en la imagen copiada.
-const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas', 'retoz'])
-
 // SVG icon de "video" — para publicaciones tipo REEL/Video
 const VIDEO_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="34" rx="3"/><path d="M27 22l12 7-12 7z" fill="currentColor" stroke="none"/><path d="M22 52h20"/><path d="M32 46v6"/></svg>`
 // SVG icon de "imagen" — para POST estático
@@ -50,30 +44,6 @@ const IMAGE_ICON_SVG = `<svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" h
 const MESSAGE_ICON_SVG = `<svg viewBox="0 0 64 64"><path d="M12 12h40c2 0 4 2 4 4v24c0 2-2 4-4 4H30l-10 8v-8h-8c-2 0-4-2-4-4V16c0-2 2-4 4-4z"/></svg>`
 // SVG icon de "empty" — círculo con guión
 const EMPTY_ICON_SVG = `<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="20"/><path d="M22 32h20"/></svg>`
-
-/**
- * Normaliza URLs de Google Drive a su formato de descarga directa.
- * Drive expone los archivos en varios formatos; solo el ?export=download&id=
- * devuelve los bytes del archivo (no HTML del viewer).
- *
- * Convierte:
- *   https://drive.google.com/file/d/FILE_ID/view → https://drive.google.com/uc?export=download&id=FILE_ID
- *   https://drive.google.com/open?id=FILE_ID    → https://drive.google.com/uc?export=download&id=FILE_ID
- *   URLs ya en formato correcto → sin cambios
- *   URLs no-Drive → sin cambios
- */
-function normalizeDriveUrl(rawUrl: string): string {
-  if (!rawUrl.includes('drive.google.com')) return rawUrl
-  // Pattern: /file/d/FILE_ID/...
-  const m1 = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
-  if (m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`
-  // Pattern: ?id=FILE_ID or &id=FILE_ID
-  const m2 = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/)
-  if (m2 && !rawUrl.includes('export=download')) {
-    return `https://drive.google.com/uc?export=download&id=${m2[1]}`
-  }
-  return rawUrl
-}
 
 function pickIcon(tipo: string[]): string {
   const t = tipo.join(' ').toLowerCase()
@@ -92,19 +62,8 @@ type Publicacion = {
 export async function GET(request: Request) {
   const url = new URL(request.url)
 
-  // Auth dual: aceptamos
-  //   1. Bearer ${CRON_SECRET} → llamadas server-to-server (cron, automatización)
-  //   2. Sesión Supabase válida → user logueado pulsando "Copiar imagen" en el browser
-  // Pedro reportó 401 al copiar imagen desde el workspace — antes solo había bearer.
-  const authHeader = request.headers.get('authorization')
-  const hasBearer = authHeader === `Bearer ${process.env.CRON_SECRET}`
-  if (!hasBearer) {
-    /* Fallback a sesión Supabase */
-    const { getUser } = await import('@/lib/auth/get-user')
-    const user = await getUser()
-    if (!user) {
-      return new NextResponse('Unauthorized — necesitas estar logueado o un Bearer válido', { status: 401 })
-    }
+  if (!await canRenderGrilla(request)) {
+    return new NextResponse('Necesitas iniciar sesión para generar la grilla', { status: 401 })
   }
 
   const slug = url.searchParams.get('slug') ?? 'manrique'
@@ -119,29 +78,13 @@ export async function GET(request: Request) {
     publicaciones = []
   }
 
-  // Construir URL del logo con jerarquía:
-  //   1. Query param explícito (?logo=...)
-  //   2. Fallback al placeholder local /marcas/{slug}/logo.{ext}
-  const proto = url.protocol
-  const host = url.host
-  const logoOverride = url.searchParams.get('logo')
-  let logoUrl: string
-  if (logoOverride) {
-    logoUrl = normalizeDriveUrl(logoOverride)
-  } else {
-    const logoExt = PNG_ONLY_LOGOS.has(slug) ? 'png' : 'svg'
-    logoUrl = `${proto}//${host}/marcas/${slug}/logo.${logoExt}`
-  }
-
-  // Generar HTML con la plantilla maestra parametrizada por theme
-  const agencyLogoUrl = `${proto}//${host}/agencia/distinto-horizontal.svg`
+  const brand = await loadGrillaBrand(slug, url.searchParams.get('logo'))
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)
   const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, publicaciones)
   const html = buildGrillaHtml({
     slug,
-    logoUrl,
-    agencyLogoUrl,
+    ...brand,
     datePill,
     dateSub,
     cardsHtml,

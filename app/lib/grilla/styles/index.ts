@@ -8,6 +8,7 @@ import type { StyleName } from '../themes'
 import type { StyleBuilder } from './types'
 
 import { clinicalWarm } from './clinical-warm'
+import { brandNeutral } from './brand-neutral'
 import { artisanCraft } from './artisan-craft'
 import { gymEnergy } from './gym-energy'
 import { playfulItalian } from './playful-italian'
@@ -22,6 +23,7 @@ import { industrialPractical } from './praktico'
 
 export function getStyleBuilder(style: StyleName): StyleBuilder {
   switch (style) {
+    case 'brand-neutral':    return brandNeutral
     case 'clinical-warm':    return clinicalWarm
     case 'artisan-craft':    return artisanCraft
     case 'gym-energy':       return gymEnergy

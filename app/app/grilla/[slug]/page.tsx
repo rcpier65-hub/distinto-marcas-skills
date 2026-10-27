@@ -168,6 +168,7 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
       </nav>
 
       <GrillaWorkspace
+        key={`${marca.slug}:${inicio}:${fin}`}
         marca={{
           slug: marca.slug,
           nombre: marca.nombre,

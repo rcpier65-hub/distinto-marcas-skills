@@ -13,7 +13,9 @@ import { getStyleBuilder } from './styles'
 
 export type TemplateInput = {
   slug: string
-  logoUrl: string
+  logoUrl: string | null
+  theme?: GrillaTheme
+  assetBaseUrl?: string
   agencyLogoUrl?: string // URL del logo SVG de Distinto Agencia (default: /agencia/distinto-horizontal.svg)
   datePill: string       // "18 — 24 MAY · 2026"
   dateSub: string        // "Mayo · Del lunes 18 al domingo 24"
@@ -21,7 +23,7 @@ export type TemplateInput = {
 }
 
 export function buildGrillaHtml(input: TemplateInput): string {
-  const t = getTheme(input.slug)
+  const t = input.theme ?? getTheme(input.slug)
   const blocks = getStyleBuilder(t.style)(t)
   const heroTitle = blocks.heroTitleOverride ?? t.heroTitle ?? '¿Qué se viene?'
 
@@ -29,7 +31,8 @@ export function buildGrillaHtml(input: TemplateInput): string {
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<title>Grilla ${input.slug}</title>
+<title>Grilla ${escapeHtml(t.brandBig)}</title>
+${input.assetBaseUrl ? `<base href="${escapeHtml(input.assetBaseUrl)}/" />` : ''}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${t.fontsUrl}" rel="stylesheet">
@@ -39,11 +42,11 @@ export function buildGrillaHtml(input: TemplateInput): string {
 </style>
 </head>
 <body>
-<div class="poster">
+<div class="poster${input.logoUrl ? '' : ' no-logo'}">
   ${blocks.decorations}
 
   <header class="header">
-    <img class="logo" src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(t.brandBig)}" />
+    ${input.logoUrl ? `<img class="logo" src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(t.brandBig)}" />` : ''}
     <div class="brand-name">
       <div class="small">${escapeHtml(t.brandSmall)}</div>
       <div class="big">${escapeHtml(t.brandBig)}</div>
@@ -113,6 +116,7 @@ function buildBaseCss(t: GrillaTheme): string {
     margin: -20px -10px -20px -20px; background: var(--logo-bg); border-radius: 12px;
     padding: var(--logo-pad); }
   .brand-name { flex: 1; }
+  .poster.no-logo .brand-name { display: block !important; }
   .brand-name .small { font-size: 18px; font-weight: 500; letter-spacing: 4px;
     color: var(--primary); line-height: 1; margin-bottom: 6px; opacity: .85;
     text-transform: uppercase; }

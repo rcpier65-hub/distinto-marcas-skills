@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { buildGrillaHtml } from '@/lib/grilla/template-builder'
+import { canRenderGrilla, loadGrillaBrand } from '@/lib/grilla/render-brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,9 @@ function pickIcon(tipo: string): string {
 type Pub = { fecha: string; titulo: string; plataformas: string; tipo: string }
 
 export async function GET(request: Request) {
+  if (!await canRenderGrilla(request)) {
+    return new NextResponse('Necesitas iniciar sesión para ver la grilla', { status: 401 })
+  }
   const url = new URL(request.url)
   const slug = url.searchParams.get('slug') ?? 'manrique'
   const semanaInicio = url.searchParams.get('inicio') ?? '2026-05-18'
@@ -40,39 +44,16 @@ export async function GET(request: Request) {
     pubs = JSON.parse(url.searchParams.get('pubs') ?? '[]')
   } catch {}
 
-  // Logo URL — usa override si vino, sino el archivo local oficial.
-  // Por default usamos SVG (vector, escala perfecto al render Chromium 1080×1620).
-  // Excepciones: marcas que solo tienen PNG oficial (sin SVG vector aún).
-  const proto = url.protocol
-  const host = url.host
-  const PNG_ONLY_LOGOS = new Set(['little-joe', 'vid-natur', 'mil-ideas', 'retoz'])
-  const ext = PNG_ONLY_LOGOS.has(slug) ? 'png' : 'svg'
-  const logoUrl = logoOverride
-    ? normalizeDriveUrl(logoOverride)
-    : `${proto}//${host}/marcas/${slug}/logo.${ext}`
-
-  // Logo Distinto Agencia (footer) — URL absoluta para que Chromium PNG la cargue
-  const agencyLogoUrl = `${proto}//${host}/agencia/distinto-horizontal.svg`
+  const brand = await loadGrillaBrand(slug, logoOverride)
 
   const datePill = buildDatePill(semanaInicio, semanaFin)
   const dateSub = buildDateSub(semanaInicio, semanaFin)
   const cardsHtml = buildCardsHtml(semanaInicio, semanaFin, pubs)
-  const html = buildGrillaHtml({ slug, logoUrl, agencyLogoUrl, datePill, dateSub, cardsHtml })
+  const html = buildGrillaHtml({ slug, ...brand, datePill, dateSub, cardsHtml })
 
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Distinto-Grilla': '1' },
   })
-}
-
-function normalizeDriveUrl(rawUrl: string): string {
-  if (!rawUrl.includes('drive.google.com')) return rawUrl
-  const m1 = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
-  if (m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`
-  const m2 = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/)
-  if (m2 && !rawUrl.includes('export=download')) {
-    return `https://drive.google.com/uc?export=download&id=${m2[1]}`
-  }
-  return rawUrl
 }
 
 function buildDatePill(inicio: string, fin: string): string {

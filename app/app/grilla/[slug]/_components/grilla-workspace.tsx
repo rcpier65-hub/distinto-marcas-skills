@@ -167,6 +167,18 @@ export function GrillaWorkspace({
   /* Estado del botón "Copiar imagen". Visualmente distinto del envío
      porque acá no estamos enviando — solo generamos PNG + copiamos. */
   const [isCopyingImage, setIsCopyingImage] = useState(false)
+  const [isDownloadingImage, setIsDownloadingImage] = useState(false)
+
+  function descargarPNG(blob: Blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `grilla-${marca.slug}-${semanaInicio}.png`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 4000)
+  }
 
   /* URL del PNG real (mismo endpoint que usa "Enviar"). Construimos
      una vez con los mismos params del preview HTML. Si los datos
@@ -188,8 +200,23 @@ export function GrillaWorkspace({
   }, [marca.slug, semanaInicio, semanaFin, publicaciones])
 
   // Validar tipo y firma PNG antes de copiar o descargar; nunca convertir HTML en imagen.
+  async function handleDownloadImage() {
+    if (isCopyingImage || isDownloadingImage) return
+    setIsDownloadingImage(true)
+    toast.loading('Preparando imagen…', { id: 'download-img' })
+    try {
+      const bytes = await solicitarGrillaPNG(pngEndpointUrl, {
+        credentials: 'same-origin', signal: AbortSignal.timeout(65_000),
+      })
+      descargarPNG(new Blob([bytes], { type: 'image/png' }))
+      toast.success('Imagen descargada · lista para adjuntar', { id: 'download-img' })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo descargar la imagen', { id: 'download-img' })
+    } finally { setIsDownloadingImage(false) }
+  }
+
   async function handleCopyImage() {
-    if (isCopyingImage) return
+    if (isCopyingImage || isDownloadingImage) return
     setIsCopyingImage(true)
     toast.loading('Generando PNG (~10s)…', { id: 'copy-img' })
 
@@ -221,14 +248,7 @@ export function GrillaWorkspace({
          enviarlo. Reusamos la misma promesa (ya está resolviéndose). */
       try {
         const blob = await pngBlobPromise
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `grilla-${marca.slug}-${semanaInicio}.png`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 4000)
+        descargarPNG(blob)
         toast.success('No se pudo copiar, pero descargué la imagen ✓ — adjúntala en WhatsApp', {
           id: 'copy-img',
           duration: 9000,
@@ -331,11 +351,20 @@ export function GrillaWorkspace({
               <button
                 type="button"
                 onClick={handleCopyImage}
-                disabled={isCopyingImage}
+                disabled={isCopyingImage || isDownloadingImage}
                 className="ml-auto px-2 py-0.5 rounded text-xs border hover:bg-muted disabled:opacity-60 disabled:cursor-wait"
                 title="Genera el PNG profesional 1080×1620 y lo copia al portapapeles — listo para pegar en WhatsApp, Drive, donde sea"
               >
                 {isCopyingImage ? '⏳ Copiando…' : '📋 Copiar imagen'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadImage}
+                disabled={isCopyingImage || isDownloadingImage}
+                className="px-2 py-0.5 rounded text-xs border hover:bg-muted disabled:opacity-60 disabled:cursor-wait"
+                title="Guardar la grilla como PNG para adjuntarla desde cualquier dispositivo"
+              >
+                {isDownloadingImage ? '⏳ Descargando…' : '↓ Descargar PNG'}
               </button>
               <button
                 type="button"

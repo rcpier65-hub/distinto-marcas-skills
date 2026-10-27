@@ -4,6 +4,7 @@
 // (cada marca tiene un mood/decoraciones distintas, no solo otro color).
 
 export type StyleName =
+  | 'brand-neutral'      // Marcas sin plantilla: nombre y color de su ficha
   | 'clinical-warm'      // Manrique     — Playfair italic + blobs raspberry
   | 'artisan-craft'      // Lozano       — Bebas Neue + grid técnico blueprint
   | 'gym-energy'         // Distri Fit   — Display peso + glow naranja + diagonales
@@ -416,6 +417,19 @@ export const THEMES: Record<string, GrillaTheme> = {
   },
 }
 
-export function getTheme(slug: string): GrillaTheme {
-  return THEMES[slug] ?? THEMES.manrique
+export function getTheme(slug: string, brand?: { nombre: string; color_primario_hex: string | null }): GrillaTheme {
+  if (Object.hasOwn(THEMES, slug)) return THEMES[slug]
+  const color = /^#[\da-f]{6}$/i.test(brand?.color_primario_hex ?? '')
+    ? brand!.color_primario_hex! : '#111827'
+  // Una marca nueva nunca hereda nombre, frase ni identidad de otro cliente.
+  return {
+    style: 'brand-neutral', primary: '#111827', accent: color, highlight: '#E5E7EB',
+    canvas: '#F6F7F9', text: '#111827', cardBg: '#FFFFFF', cardAltBg: '#FFFFFF',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
+    fontSerif: "'Inter', system-ui, sans-serif", fontSans: "'Inter', system-ui, sans-serif",
+    brandSmall: 'PLANIFICACIÓN DE CONTENIDO',
+    brandBig: brand?.nombre || slug.split('-').join(' '),
+    tagline: '', footerUrl: 'www.agenciadistinto.com', heroTitle: 'Esta semana',
+    logoBg: '#FFFFFF',
+  }
 }

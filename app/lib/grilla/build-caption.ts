@@ -90,6 +90,13 @@ function formatRangoLargo(inicio: string, fin: string): string {
     const d1 = new Date(inicio + 'T12:00:00Z')
     const d2 = new Date(fin + 'T12:00:00Z')
     const month = d1.toLocaleDateString('es-PE', { month: 'long', timeZone: 'UTC' })
+    const lastMonth = d2.toLocaleDateString('es-PE', { month: 'long', timeZone: 'UTC' })
+    if (d1.getUTCFullYear() !== d2.getUTCFullYear()) {
+      return `semana del ${d1.getUTCDate()} de ${month} de ${d1.getUTCFullYear()} al ${d2.getUTCDate()} de ${lastMonth} de ${d2.getUTCFullYear()}`
+    }
+    if (d1.getUTCMonth() !== d2.getUTCMonth()) {
+      return `semana del ${d1.getUTCDate()} de ${month} al ${d2.getUTCDate()} de ${lastMonth}`
+    }
     return `semana del ${d1.getUTCDate()} al ${d2.getUTCDate()} de ${month}`
   } catch {
     return `semana ${inicio} → ${fin}`
