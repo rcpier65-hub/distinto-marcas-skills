@@ -82,13 +82,14 @@ export async function openMedia(
   }
   return res;
 }
-async function mediaSource(v: DeliveryVersion) {
+type MediaSource = Pick<DeliveryVersion, "url" | "publicacion_id">;
+async function mediaSource(v: MediaSource) {
   const id = idPortadaDrive(v.url);
   return id
     ? `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`
     : v.url;
 }
-export async function serveMedia(v: DeliveryVersion, req: Request) {
+export async function serveMedia(v: MediaSource, req: Request) {
   const probe = new URL(req.url).searchParams.has("info");
   const range = probe ? "bytes=0-65535" : req.headers.get("range");
   if (range && !/^bytes=\d*-\d*$/.test(range))
