@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'node:crypto'
 import { db, settings, rateLimit, checkSlot, daySlots, syncBooking, BookingError, type Booking } from '@/lib/reservas/server'
 import { limaDate } from '@/lib/reservas/slots'
+import { allowedBookingOrigin } from '@/lib/reservas/origin'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 export async function POST(req: NextRequest) {
   try {
     const origin = req.headers.get('origin')
-    if (origin !== req.nextUrl.origin && origin !== 'https://distinto-app.vercel.app') throw new BookingError('Origen no permitido.', 403)
+    if (!allowedBookingOrigin(origin, req.nextUrl.origin)) throw new BookingError('Origen no permitido.', 403)
     if (!req.headers.get('content-type')?.startsWith('application/json')) throw new BookingError('Formato inválido.', 400)
     const text = await req.text()
     if (text.length > 8000) throw new BookingError('Solicitud demasiado extensa.', 413)
