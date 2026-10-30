@@ -2,8 +2,8 @@
 
 ## URLs
 
-- Página pública: `https://distinto-app.vercel.app/reservar/diagnostico`
-- Configuración interna: `https://distinto-app.vercel.app/grabaciones/calendario/reservas`
+- Página pública: `https://app.distintostudio.com/reservar/diagnostico`
+- Configuración interna: `https://app.distintostudio.com/grabaciones/calendario/reservas`
 - GET disponibilidad: `/api/reservas/disponibilidad?desde=YYYY-MM-DD` (31 días, sin datos privados).
 - POST reserva: `/api/reservas` (utilizado por el formulario del mismo origen).
 
@@ -21,7 +21,7 @@ Citas de 60 minutos, lunes a viernes 09:00–18:00, 24 horas de anticipación, h
 
 ```html
 <iframe id="distinto-reservas"
-  src="https://distinto-app.vercel.app/reservar/diagnostico"
+  src="https://app.distintostudio.com/reservar/diagnostico"
   title="Agenda tu reunión de diagnóstico con Distinto"
   loading="lazy"
   style="display:block;width:100%;height:850px;border:0;border-radius:24px;"
@@ -30,7 +30,7 @@ Citas de 60 minutos, lunes a viernes 09:00–18:00, 24 horas de anticipación, h
 (() => {
   const frame = document.getElementById('distinto-reservas');
   window.addEventListener('message', (event) => {
-    if (event.origin !== 'https://distinto-app.vercel.app' || event.source !== frame.contentWindow) return;
+    if (event.origin !== 'https://app.distintostudio.com' || event.source !== frame.contentWindow) return;
     if (event.data?.type !== 'distinto-booking:resize') return;
     const height = Number(event.data.height);
     if (Number.isFinite(height) && height >= 200 && height <= 3000) frame.style.height = Math.ceil(height) + 'px';
@@ -59,4 +59,8 @@ Google Calendar no ofrece una transacción conjunta con Postgres: se verifica ju
 
 - `scripts/test-live-reservas.ts`: persistencia real en Supabase, creación de evento y Google Meet, reintento idempotente y eliminación del evento y registro temporales. No se enviaron invitaciones durante la prueba.
 
-La migración `20260913194318_public_booking.sql` ya se aplicó mediante Management API a `exhmimlehdisonjvedvx`. No volver a ejecutarla a ciegas ni correr todas las migraciones históricas sobre producción.
+La migración `20260913194318_public_booking.sql` se aplicó originalmente en Cloud.
+Desde el 26-oct-2026, sus tablas y funciones están migradas al Supabase del VPS.
+No ejecutar migraciones históricas a ciegas ni escribir en el Cloud anterior.
+Ver [corrección del 30 de octubre](./reservas-web-oct30.md) para el origen público,
+la búsqueda del primer mes disponible y la verificación de confirmación.
