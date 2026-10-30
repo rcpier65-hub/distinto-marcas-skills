@@ -1,6 +1,6 @@
 // Explicit controlled integration test. No attendees, no email invitations.
 // Creates one temporary event and DB row, verifies idempotence/Meet, cleans up both.
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { db, settings, daySlots, syncBooking, google } from '../lib/reservas/server'
 import { limaDate } from '../lib/reservas/slots'
 async function main() {
@@ -10,6 +10,8 @@ async function main() {
   if (!slot) throw Error('No slot available for controlled test')
   const id = randomUUID()
   const row = { id, request_hash: 'controlled-test', nombre: 'PRUEBA TEMPORAL DISTINTO — SIN INVITADOS', email: 'test@example.invalid', empresa: 'PRUEBA TEMPORAL', motivo: 'Verificación técnica; se elimina al terminar', starts_at: slot, ends_at: new Date(Date.parse(slot) + config.duration_min * 60000).toISOString(), status: 'pending', google_event_id: 'db' + id.replaceAll('-', ''), calendar_id: config.calendar_id, meet_link: null }
+  row.request_hash = createHash('sha256').update(JSON.stringify({ nombre: row.nombre, email: row.email,
+    empresa: row.empresa, motivo: row.motivo, start: slot })).digest('hex')
   const inserted = await db().from('web_bookings').insert(row)
   if (inserted.error) throw Error('Test insert failed: ' + inserted.error.code)
   try {
@@ -21,6 +23,26 @@ async function main() {
     if (!response.ok || event.attendees?.length) throw Error('Unexpected event or attendees')
     if (!first.meetLink && !second.meetLink && !event.hangoutLink) throw Error('Meet was not generated yet')
     console.log('PASS: Supabase persistence, Google event, Google Meet and idempotent retry. No attendees or invitations.')
+    if (process.env.TEST_BASE_URL) {
+      // The event already exists without attendees. HTTP retries only read it;
+      // they cannot enter the event-creation branch or send invitations.
+      const endpoint = process.env.TEST_BASE_URL + '/api/reservas'
+      const payload = { id, nombre: row.nombre, email: row.email, empresa: row.empresa,
+        motivo: row.motivo, start: slot, consent: true, token: 'unused-existing-reservation' }
+      const headers = { Origin: 'https://app.distintostudio.com', 'Content-Type': 'application/json' }
+      for (let retry = 0; retry < 2; retry++) {
+        const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload) })
+        const result = await response.json()
+        if (response.status !== 200 || !result.ok || result.id !== id || !result.meetLink) throw Error('Public confirmation failed: ' + response.status + ' ' + result.error)
+      }
+      const foreign = await fetch(endpoint, { method: 'POST', headers: { ...headers, Origin: 'https://example.invalid' }, body: JSON.stringify(payload) })
+      if (foreign.status !== 403) throw Error('Foreign origin was not rejected')
+      const changed = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ ...payload, nombre: 'OTHER TEST' }) })
+      if (changed.status !== 409) throw Error('Changed retry payload was not rejected')
+      const final = await google(`/calendars/${encodeURIComponent(row.calendar_id)}/events/${row.google_event_id}`)
+      if (!final.ok || (await final.json()).attendees?.length) throw Error('Unexpected attendee after public retry')
+      console.log('PASS: public POST accepts the VPS origin, returns the confirmed Meet without duplication, rejects foreign origins and conflicting retries.')
+    }
   } finally {
     const removed = await google(`/calendars/${encodeURIComponent(row.calendar_id)}/events/${row.google_event_id}?sendUpdates=none`, { method: 'DELETE' })
     if (!removed.ok && ![404,410].includes(removed.status)) throw Error('Test event cleanup requires attention')
