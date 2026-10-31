@@ -51,3 +51,20 @@ metadatos de conservación en las tablas existentes; no modifica eventos reales.
 - `test-calendar-access.mjs`, `test-brand-calendar.mjs`: regresiones de acceso,
   origen, aislamiento y deduplicación.
 - Evidencias de compilación y pruebas en `output/calendario-editar-oct31/`.
+
+## Publicación y prueba final
+
+- Producción `/api/version`: `0e79023` (`0e790231611e48f4f17a8ec3a79f8bf8492dcdce`).
+  Imagen `distinto-agencia:calendario-0e79023` promovida a `prod`, manifest
+  `6655e235ab6213f19a357dd4010658b38c4a7146961dc61569d7ae614da2f885`.
+  Retorno `distinto-agencia:calendario-base-f2d6bb7`. Ambas redes conservadas.
+- Permisos verificados en candidata: Pedro, Lorena, Pieer, Ailyn y Paolo pueden
+  editar; Ruth conserva lectura; anónimo bloqueado. No se cambiaron permisos.
+- Navegador en producción: reunión temporal → grabación → reunión; cambio
+  10–11 a 11–13:30; creación real de Meet. Al reabrir se conservaron campos.
+  SQL y Google confirmaron mismo ID Google, tipo, hora, duración y enlace.
+- La prueba no tuvo asistentes ni envíos. Su evento Google, filas internas,
+  actividad y marca fueron eliminados y se verificó su ausencia. Candidata,
+  archivos de transferencia y túneles retirados.
+- El evento de la captura de Manrique se abrió para comprobar la interfaz,
+  sin modificarlo. Captura: `output/calendario-editar-oct31/calendario-edicion-publicada.png`.
