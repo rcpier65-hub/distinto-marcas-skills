@@ -17,6 +17,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { fetchCalendarPages } from '@/lib/calendario/google-event-pages'
+import type { EdicionAgenda, TipoAgendaEditable } from '@/lib/calendario/editar-validacion'
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -564,6 +565,51 @@ export async function deleteCalendarEvent(eventId: string): Promise<{ ok: true }
 
 /* ==================== LECTURA (scope calendar.readonly) ==================== */
 
+/** Edita el mismo evento. PATCH conserva invitados, descripción y conferencia.
+ * La clasificación explícita no depende del título ni de que exista un Meet. */
+export async function editarDetalleGoogle(eventId: string, input: EdicionAgenda): Promise<
+  { ok: true; meetLink: string | null; meetPendiente: boolean } | { ok: false; error: string }
+> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'Google Calendar no está conectado.' }
+  const grabCal = await getGrabacionesCalendarId(token)
+  for (const calId of [...new Set([grabCal, 'primary'])]) {
+    const url = `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`
+    const auth = { Authorization: `Bearer ${token}` }
+    const actual = await fetch(url, { headers: auth, cache: 'no-store', signal: AbortSignal.timeout(10000) })
+    if (actual.status === 404) continue
+    if (!actual.ok) return { ok: false, error: 'No se pudo leer el evento de Google Calendar.' }
+    const ev = await actual.json()
+    const meetDe = (e: typeof ev): string | null => e.hangoutLink
+      ?? e.conferenceData?.entryPoints?.find((p: { entryPointType: string }) => p.entryPointType === 'video')?.uri ?? null
+    const pending = ev.conferenceData?.createRequest?.status?.statusCode === 'pending'
+    const start = new Date(`${input.fecha}T${input.hora ?? '00:00'}:00-05:00`)
+    const end = new Date(start.getTime() + (input.hora ? input.duracionMin : 1440) * 60000)
+    const body = {
+      summary: input.titulo.trim(),
+      start: input.hora ? { date: null, dateTime: start.toISOString(), timeZone: 'America/Lima' } : { date: input.fecha, dateTime: null, timeZone: null },
+      end: input.hora ? { date: null, dateTime: end.toISOString(), timeZone: 'America/Lima' } : { date: end.toISOString().slice(0, 10), dateTime: null, timeZone: null },
+      extendedProperties: { private: { ...ev.extendedProperties?.private, distintoTipo: input.tipo } },
+      ...(input.crearMeet && !meetDe(ev) && !pending ? {
+        conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
+      } : {}),
+    }
+    const r = await fetch(`${url}?conferenceDataVersion=1&sendUpdates=none`, {
+      method: 'PATCH', headers: { ...auth, 'Content-Type': 'application/json', ...(ev.etag ? { 'If-Match': ev.etag } : {}) },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
+    })
+    const data = await r.json()
+    if (!r.ok) return { ok: false, error: r.status === 412 ? 'El evento cambió en Google. Actualiza y vuelve a intentarlo.' : (data.error?.message ?? 'Google no pudo guardar el evento.') }
+    let meetLink = meetDe(data)
+    if (input.crearMeet && !meetLink) {
+      const fresh = await fetch(url, { headers: auth, cache: 'no-store', signal: AbortSignal.timeout(8000) })
+      if (fresh.ok) meetLink = meetDe(await fresh.json())
+    }
+    return { ok: true, meetLink, meetPendiente: !!input.crearMeet && !meetLink }
+  }
+  return { ok: false, error: 'Ese evento ya no existe en Google Calendar.' }
+}
+
 export type GCalEventLite = {
   id: string
   summary: string
@@ -572,6 +618,7 @@ export type GCalEventLite = {
   meetLink: string | null
   allDay: boolean
   durationMin: number | null  // duración real del evento (min); null si all-day
+  tipoAgenda?: TipoAgendaEditable
 }
 
 /* Fecha/hora de Lima a partir de un ISO con offset (GCal manda dateTime). */
@@ -614,7 +661,7 @@ export async function listCalendarEvents(desde: string, hasta: string, onError?:
     singleEvents: 'true',
     orderBy: 'startTime',
     maxResults: '250',
-    fields: 'nextPageToken,items(id,summary,status,start,end,hangoutLink)',
+    fields: 'nextPageToken,items(id,summary,status,start,end,hangoutLink,extendedProperties,conferenceData)',
   })
 
   const durMin = (ev: { start?: { dateTime?: string }; end?: { dateTime?: string } }): number | null => {
@@ -640,11 +687,14 @@ export async function listCalendarEvents(desde: string, hasta: string, onError?:
   for (const ev of respuestas.flat()) {
     if (!ev?.id || vistos.has(ev.id) || ev.status === 'cancelled') continue
     vistos.add(ev.id)
+    const tipo = ev.extendedProperties?.private?.distintoTipo
+    const tipoAgenda = tipo === 'reunion' || tipo === 'grabacion' || tipo === 'gcal' ? tipo : undefined
+    const meetLink = ev.hangoutLink ?? ev.conferenceData?.entryPoints?.find(p => p.entryPointType === 'video')?.uri ?? null
     if (ev.start?.dateTime) {
       const { ymd, hm } = isoALima(ev.start.dateTime)
-      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ymd, hora: hm, meetLink: ev.hangoutLink ?? null, allDay: false, durationMin: durMin(ev) })
+      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ymd, hora: hm, meetLink, allDay: false, durationMin: durMin(ev), tipoAgenda })
     } else if (ev.start?.date) {
-      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ev.start.date, hora: null, meetLink: ev.hangoutLink ?? null, allDay: true, durationMin: null })
+      out.push({ id: ev.id, summary: ev.summary ?? '(sin título)', fecha: ev.start.date, hora: null, meetLink, allDay: true, durationMin: null, tipoAgenda })
     }
   }
   return out

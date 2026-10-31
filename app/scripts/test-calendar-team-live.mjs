@@ -41,6 +41,7 @@ for (const name of names) {
       ['agendarGrabacion',[{fecha:'invalid',hora:'00:00',invitados:[]}],'Fecha inválida'],
       ['editarReunionCal',['invalid',{fecha:'invalid',hora:'00:00'}],'Fecha inválida'],
       ['editarEventoGoogle',['!',{fecha:'invalid',titulo:'QA'}],'Evento inválido'],
+      ['editarDetalleAgenda',['invalid',{origen:'reunion',tipo:'grabacion',titulo:'QA',fecha:'invalid',hora:'10:00',duracionMin:60}],'Fecha inválida'],
       ['eliminarEventoGoogle',['!'],'Evento inválido'],
       ['vincularEventoGcal',[{}],'Faltan datos'],
       ['moverPublicacion',['invalid','invalid'],'Datos inválidos'],

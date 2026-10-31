@@ -15,6 +15,8 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCalendarAccess } from '@/lib/calendario/access-server'
 import { ensureReunionCols } from '@/lib/reuniones/db'
+import { guardarEdicionAgenda } from '@/lib/calendario/editar-evento'
+import type { EdicionAgenda } from '@/lib/calendario/editar-validacion'
 import { updateTimedCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarEvent } from '@/lib/integrations/google-calendar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,6 +34,19 @@ async function puedeEditarCalendario(): Promise<boolean> {
 function refrescar() {
   revalidatePath('/grabaciones/calendario')
   revalidatePath('/grabaciones')
+}
+
+export async function editarDetalleAgenda(id: string, input: EdicionAgenda) {
+  const user = await requireUser()
+  if (!(await puedeEditarCalendario())) return { ok: false as const, error: 'No tienes permiso para editar el calendario.' }
+  const result = await guardarEdicionAgenda(id, input, user.id)
+  if (result.ok) {
+    refrescar()
+    revalidatePath('/marca/[slug]/estrategia', 'page')
+    revalidatePath('/cliente')
+    revalidatePath('/inicio')
+  }
+  return result
 }
 
 /**

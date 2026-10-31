@@ -21,8 +21,8 @@ export async function consultarGrabaciones(
   const d = desde ?? firstDay
   const h = hasta ?? lastDay
 
-  const FULL_COLS = 'id, marca_id, fecha_planeada, hora_planeada, duracion_min, guion_listo, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
-  const BASE_COLS = 'id, marca_id, fecha_planeada, hora_planeada, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
+  const FULL_COLS = 'id, marca_id, titulo, meet_link, fecha_planeada, hora_planeada, duracion_min, guion_listo, fecha_real, hora_real, estado, videos_grabados, notas, enlace_guiones, google_event_id, created_at, updated_at, marcas:marca_id (slug, nombre, emoji_marca)'
+  const BASE_COLS = FULL_COLS.replace('guion_listo, ', '')
 
   let res = await service
     .from('grabaciones')
@@ -67,6 +67,8 @@ export async function consultarGrabaciones(
     notas: r.notas,
     enlace_guiones: r.enlace_guiones ?? null,
     google_event_id: r.google_event_id ?? null,
+    titulo: r.titulo ?? null,
+    meet_link: r.meet_link ?? null,
     duracion_min: r.duracion_min ?? null,
     guion_listo: r.guion_listo ?? false,
     created_at: r.created_at,

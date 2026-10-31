@@ -121,8 +121,9 @@ export async function cargarAgendaCalendario(opts: {
   }))
 
   const durGoogle = new Map(gcalEvents.map((ev) => [ev.id, ev.durationMin]))
+  const meetGoogle = new Map(gcalEvents.map((ev) => [ev.id, ev.meetLink]))
   const durDe = (propia: number | null | undefined, gid: string | null | undefined) =>
-    (propia && propia > 0 ? propia : null) ?? (gid ? durGoogle.get(gid) ?? null : null)
+    (gid ? durGoogle.get(gid) ?? null : null) ?? (propia && propia > 0 ? propia : null)
 
   for (const g of grabRows) {
     const marca = marcasById.get(g.marca_id)
@@ -131,13 +132,13 @@ export async function cargarAgendaCalendario(opts: {
       tipo: 'grabacion',
       fecha: g.fecha_planeada,
       hora: g.hora_planeada ? g.hora_planeada.slice(0, 5) : null,
-      titulo: `Grabación · ${g.marca_nombre}`,
+      titulo: g.titulo || `Grabación · ${g.marca_nombre}`,
       marcaSlug: g.marca_slug,
       marcaNombre: g.marca_nombre,
       marcaEmoji: g.marca_emoji,
       color: marca?.color_calendario ?? '#6366F1',
       estado: g.estado,
-      meetLink: null,
+      meetLink: (g.google_event_id ? meetGoogle.get(g.google_event_id) : null) ?? (g.meet_link && /^https?:\/\//.test(g.meet_link) ? g.meet_link : null),
       notas: g.notas,
       videosGrabados: g.videos_grabados,
       duracionMin: durDe(g.duracion_min, g.google_event_id),
@@ -159,7 +160,7 @@ export async function cargarAgendaCalendario(opts: {
       marcaEmoji: marca?.emoji_marca ?? null,
       color: marca?.color_calendario ?? '#7c3aed',
       estado: r.estado ?? 'agendada',
-      meetLink: esLink ? r.lugar_enlace : null,
+      meetLink: (r.google_event_id ? meetGoogle.get(r.google_event_id) : null) ?? (esLink ? r.lugar_enlace : null),
       notas: r.notas ?? (r.modalidad === 'presencial' && r.lugar_enlace && !esLink ? `Lugar: ${r.lugar_enlace}` : null),
       videosGrabados: null,
       duracionMin: durDe(r.duracion_min, r.google_event_id),
@@ -223,14 +224,14 @@ export async function cargarAgendaCalendario(opts: {
   for (const ev of gcalEvents) {
     if (idsDeLaApp.has(ev.id)) continue
     if (ev.meetLink && meetsDeReuniones.has(ev.meetLink)) continue
-    if (ev.summary.startsWith('🎬')) continue
+    if (ev.summary.startsWith('🎬') && !ev.tipoAgenda) continue
     if (ev.summary.startsWith('📣')) continue
     if (ev.summary.startsWith('⭐')) continue
-    if (ev.summary.startsWith('📌') && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
+    if (ev.summary.startsWith('📌') && !ev.tipoAgenda && clavesReuniones.has(`${ev.fecha}|${ev.hora}`)) continue
     if (titulosReuniones.has(`${ev.fecha}|${normTitulo(ev.summary)}`)) continue
-    const tipoGoogle = /grabaci|grabar|rodaje/i.test(ev.summary) ? 'grabacion' as const
+    const tipoGoogle = ev.tipoAgenda ?? (/grabaci|grabar|rodaje/i.test(ev.summary) ? 'grabacion' as const
       : (/reuni|revisi|diagn[oó]stic|llamada|sesi[oó]n|meeting|call\b|entrevista|onboarding|kick.?off/i.test(ev.summary) || !!ev.meetLink) ? 'reunion' as const
-      : 'gcal' as const
+      : 'gcal' as const)
     const esReservaWeb = /^diagn[oó]stico distinto/i.test(ev.summary.trim())
     const marcaG = tipoGoogle !== 'gcal' && !esReservaWeb ? marcaPorTitulo(ev.summary, [...marcasById.values()]) : null
     if (marcaG && marcasPermitidas && !marcasPermitidas.has(marcaG.id)) continue

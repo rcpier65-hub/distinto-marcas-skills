@@ -2,6 +2,8 @@ type GoogleEventRow = {
   id?: string; summary?: string; status?: string; hangoutLink?: string;
   start?: { date?: string; dateTime?: string };
   end?: { date?: string; dateTime?: string };
+  extendedProperties?: { private?: Record<string, string> };
+  conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
 }
 
 /** Calendar can return fewer than maxResults even when another page exists. */

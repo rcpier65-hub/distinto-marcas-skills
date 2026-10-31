@@ -35,6 +35,8 @@ export type GrabacionWithMarca = {
      una URL de Google Drive con los guiones que se van a grabar. */
   enlace_guiones: string | null
   google_event_id: string | null   // ID del evento en Google Calendar (sync)
+  titulo?: string | null
+  meet_link?: string | null
   /* Duración del bloque en GCal (min). Combinada con hora_planeada
      da el rango start/end del evento. Default 60. */
   duracion_min: number | null

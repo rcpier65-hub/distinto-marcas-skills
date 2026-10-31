@@ -12,30 +12,24 @@
    - Evento solo de Google (incl. grabaciones/reuniones agendadas allá) →
      editarEventoGoogle / eliminarEventoGoogle
    - Publicación / fecha importante → solo lectura + enlace a su pantalla.
-   Editar es solo para directores; el resto ve el detalle. */
+   Editar requiere permiso de calendario; el resto ve el detalle. */
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CalendarDays, CheckCircle2, Clock, ExternalLink, Trash2, Video, X } from 'lucide-react'
+import { CalendarDays, CheckCircle2, Copy, ExternalLink, Trash2, Video, X } from 'lucide-react'
 import type { AgendaEvento } from './agenda-calendar'
-import { editarEventoGoogle, editarReunionCal, eliminarEventoGoogle, eliminarReunionCal } from '../_actions'
-import { updateGrabacionEstado, updateGrabacionFecha } from '../../_actions'
+import { editarDetalleAgenda, eliminarEventoGoogle, eliminarReunionCal } from '../_actions'
+import { updateGrabacionEstado } from '../../_actions'
+
+import { horaFinalInput, minutosHasta, validarEdicionAgenda, type EdicionAgenda, type TipoAgendaEditable } from '@/lib/calendario/editar-validacion'
 
 const ACENTO = '#7170ff'
 const TITULO_TIPO: Record<AgendaEvento['tipo'], string> = {
   grabacion: 'Grabación', reunion: 'Reunión', publicacion: 'Publicación',
   fecha: 'Fecha importante', diseno: 'Diseño', gcal: 'Google Calendar',
-}
-const DURACIONES = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480]
-
-function etiquetaDuracion(min: number): string {
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return m ? `${h} h ${m} min` : `${h} h`
 }
 function horaFin(hora: string, min: number): string {
   const [h, m] = hora.split(':').map(Number)
@@ -54,19 +48,23 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
   const esGrabacionApp = e.tipo === 'grabacion' && !esGoogle
   const esReunionApp = e.tipo === 'reunion' && !esGoogle
   const editable = esDirector && (esGoogle || esGrabacionApp || esReunionApp)
-  /* El título de una grabación de la app lo define su marca (no se edita). */
-  const tituloEditable = esGoogle || esReunionApp
-  /* Las reuniones de la app conservan la duración que tengan en Google. */
-  const duracionEditable = esGoogle || esGrabacionApp
+  /* Todos los eventos conservan su título al editarse. */
+  const tituloEditable = editable
+  /* Inicio y fin editables también para reuniones. */
+  const duracionEditable = editable
 
   const [titulo, setTitulo] = useState(e.titulo)
   const [fecha, setFecha] = useState(e.fecha)
   const [todoElDia, setTodoElDia] = useState(!e.hora)
   const [hora, setHora] = useState(e.hora ?? '10:00')
   const [duracion, setDuracion] = useState<number>(e.duracionMin ?? (e.tipo === 'reunion' ? 45 : 60))
+  const [tipo, setTipo] = useState<TipoAgendaEditable>(e.tipo === 'reunion' || e.tipo === 'grabacion' ? e.tipo : 'gcal')
+  const [crearMeet, setCrearMeet] = useState(false)
+  const input: EdicionAgenda = { origen: esGoogle ? 'gcal' : esReunionApp ? 'reunion' : 'grabacion', tipo, titulo, fecha, hora: todoElDia ? null : hora, duracionMin: duracion, crearMeet: tipo === 'reunion' && crearMeet }
+  const errorEdicion = validarEdicionAgenda(input)
   const [guardando, setGuardando] = useState(false)
 
-  const cambio = titulo.trim() !== e.titulo || fecha !== e.fecha || (todoElDia ? null : hora) !== e.hora
+  const cambio = tipo !== e.tipo || crearMeet || titulo.trim() !== e.titulo || fecha !== e.fecha || (todoElDia ? null : hora) !== e.hora
     || (duracionEditable && !todoElDia && duracion !== (e.duracionMin ?? (e.tipo === 'reunion' ? 45 : 60)))
 
   useEffect(() => {
@@ -82,24 +80,15 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
   }
 
   async function guardar() {
-    if (!cambio || guardando) return
+    if (!cambio || guardando || errorEdicion) return
     setGuardando(true)
     try {
-      if (esGoogle) {
-        const r = await editarEventoGoogle(e.id, { titulo, fecha, hora: todoElDia ? null : hora, duracionMin: duracion })
-        if (!r.ok) { toast.error(r.error); return }
-        listo('✅ Evento actualizado en Google Calendar')
-      } else if (esReunionApp) {
-        const r = await editarReunionCal(e.id, { fecha, hora: todoElDia ? '09:00' : hora, ...(titulo.trim() !== e.titulo ? { titulo } : {}) })
-        if (!r.ok) { toast.error(r.error); return }
-        if (r.gcalError) toast.warning(`Guardado en la app, pero Google Calendar falló (${r.gcalError}).`, { duration: 8000 })
-        listo('✅ Reunión actualizada (también en Google Calendar)')
-      } else if (esGrabacionApp) {
-        const r = await updateGrabacionFecha(e.id, fecha, todoElDia ? null : hora, todoElDia ? null : duracion)
-        if (!r.ok) { toast.error(r.error); return }
-        if (r.gcalError) toast.warning(`Guardado en la app, pero Google Calendar falló (${r.gcalError}).`, { duration: 8000 })
-        listo('✅ Grabación actualizada (también en Google Calendar)')
-      }
+      const r = await editarDetalleAgenda(e.id, input)
+      if (!r.ok) { toast.error(r.error); return }
+      if (r.meetPendiente) toast.info('Google está generando el Meet. Vuelve a abrir el evento en unos segundos.')
+      listo('Evento actualizado')
+    } catch {
+      toast.error('No se pudo confirmar el guardado. Actualiza el calendario antes de reintentar.')
     } finally {
       setGuardando(false)
     }
@@ -152,7 +141,7 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
         aria-label={`Detalle: ${e.titulo}`}
         onClick={(ev) => ev.stopPropagation()}
         style={{
-          width: 'min(460px, 100%)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
+          width: 'min(540px, 100%)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
           background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)',
           boxShadow: '0 16px 48px rgba(0,0,0,0.22)',
         }}
@@ -162,7 +151,7 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
           <span style={{ width: 12, height: 12, borderRadius: 4, background: e.color, flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11.5, color: '#64748b', fontWeight: 500 }}>
-              {TITULO_TIPO[e.tipo]}{e.marcaNombre ? ` · ${e.marcaEmoji ?? ''} ${e.marcaNombre}` : ''}{esGoogle && e.tipo !== 'gcal' ? ' · desde Google Calendar' : ''}
+              {TITULO_TIPO[editable ? tipo : e.tipo]}{e.marcaNombre ? ` · ${e.marcaEmoji ?? ''} ${e.marcaNombre}` : ''}{esGoogle && e.tipo !== 'gcal' ? ' · desde Google Calendar' : ''}
             </div>
           </div>
           <button type="button" onClick={onCerrar} aria-label="Cerrar" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', lineHeight: 0, padding: 2 }}>
@@ -186,28 +175,38 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
             <div style={{ fontSize: 18, fontWeight: 600, color: '#0f172a' }}>{e.titulo}</div>
           )}
 
+          {editable && (
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
+              Tipo de evento
+              <select aria-label="Tipo de evento" className={campo} value={tipo} disabled={guardando}
+                onChange={ev => { const t = ev.target.value as TipoAgendaEditable; setTipo(t); setCrearMeet(false); if (t === 'reunion') setTodoElDia(false) }}>
+                <option value="reunion">Reunión</option>
+                <option value="grabacion">Grabación</option>
+                {esGoogle && <option value="gcal">Otro evento</option>}
+              </select>
+            </label>
+          )}
+
           {/* Fecha y hora */}
           {editable ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <CalendarDays size={16} color="#64748b" />
                 <input type="date" value={fecha} onChange={(ev) => setFecha(ev.target.value)} className={campo} aria-label="Fecha" />
-                {!todoElDia && (
-                  <input type="time" value={hora} onChange={(ev) => setHora(ev.target.value)} className={campo} aria-label="Hora de inicio" />
-                )}
+
               </div>
               {!todoElDia && duracionEditable && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Clock size={16} color="#64748b" />
-                  <select value={duracion} onChange={(ev) => setDuracion(Number(ev.target.value))} className={campo} aria-label="Duración">
-                    {[...new Set([...DURACIONES, duracion])].sort((a, b) => a - b).map((m) => (
-                      <option key={m} value={m}>{etiquetaDuracion(m)}</option>
-                    ))}
-                  </select>
-                  <span style={{ fontSize: 12.5, color: '#64748b' }}>termina {horaFin(hora, duracion)}</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1 text-xs text-slate-600">Inicio
+                    <input type="time" value={hora} onChange={ev => setHora(ev.target.value)} className={campo} aria-label="Hora de inicio" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-600">Fin
+                    <input type="time" value={horaFinalInput(hora, duracion)} onChange={ev => { if (ev.target.value) setDuracion(minutosHasta(hora, ev.target.value)) }} className={campo} aria-label="Hora de fin" />
+                  </label>
+                  <span className="col-span-2 text-xs text-slate-500">{Math.floor(duracion / 60) ? `${Math.floor(duracion / 60)} h ` : ''}{duracion % 60 ? `${duracion % 60} min` : ''}{horaFinalInput(hora, duracion) <= hora ? ' · termina al día siguiente' : ''} · hora de Lima</span>
                 </div>
               )}
-              {(esGoogle || esGrabacionApp) && (
+              {tipo !== 'reunion' && (
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#475569', cursor: 'pointer', width: 'fit-content' }}>
                   <input type="checkbox" checked={todoElDia} onChange={(ev) => setTodoElDia(ev.target.checked)} />
                   Todo el día
@@ -230,14 +229,24 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
           )}
           {e.notas && <p style={{ fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap', margin: 0 }}>{e.notas}</p>}
 
+          {(tipo === 'reunion' || e.meetLink) && (
+            <section className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 space-y-2">
+              <div className="text-xs font-semibold text-slate-600">Enlace de reunión</div>
+              {e.meetLink ? <>
+                <input aria-label="Enlace de reunión" value={e.meetLink} readOnly className="w-full text-sm bg-transparent text-slate-700 outline-none" onFocus={ev => ev.target.select()} />
+                <div className="flex gap-2">
+                  <a href={e.meetLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white"><Video size={15} /> Unirse a Meet</a>
+                  <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(e.meetLink!); toast.success('Enlace copiado') } catch { toast.error('Selecciona el enlace y cópialo manualmente.') } }} className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm"><Copy size={15} /> Copiar</button>
+                </div>
+              </> : editable ? <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={crearMeet} onChange={ev => setCrearMeet(ev.target.checked)} /> Generar enlace de Google Meet al guardar
+              </label> : <p className="text-sm text-slate-500">Sin enlace de reunión.</p>}
+            </section>
+          )}
+          {editable && errorEdicion && <p role="alert" className="text-xs text-red-600">{errorEdicion}</p>}
+
           {/* Accesos */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {e.meetLink && (
-              <a href={e.meetLink} target="_blank" rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 10, color: '#fff', fontSize: 12.5, fontWeight: 600, background: 'linear-gradient(135deg,#10b981,#059669)', textDecoration: 'none' }}>
-                <Video size={15} /> Unirse a Meet
-              </a>
-            )}
             {e.href && (
               <Link href={e.href} onClick={onCerrar}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12.5, fontWeight: 500, color: '#0f172a', textDecoration: 'none' }}>
@@ -271,7 +280,7 @@ export function EventoModal({ e, esDirector, onCerrar }: { e: AgendaEvento; esDi
               style={{ height: 36, padding: '0 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, cursor: 'pointer' }}>
               Cerrar
             </button>
-            <button type="button" onClick={guardar} disabled={!cambio || guardando}
+            <button type="button" onClick={guardar} disabled={!cambio || guardando || !!errorEdicion}
               style={{ height: 36, padding: '0 16px', borderRadius: 10, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: cambio && !guardando ? 'pointer' : 'default', background: cambio ? `linear-gradient(135deg, ${ACENTO}, #ba41f7)` : '#cbd5e1' }}>
               {guardando ? 'Guardando…' : 'Guardar'}
             </button>
