@@ -156,7 +156,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           ))}
         </div>
         {scope === "personal" && <button aria-label="Abrir deudas personales" onClick={()=>setTab("Deudas")} aria-pressed={tab==="Deudas"}><Wallet size={17}/> Deudas</button>}
-        <label className={styles.compact}>
+        {tab !== "Deudas" && <label className={styles.compact}>
           Mes
           <input
             aria-label="Mes de finanzas"
@@ -166,7 +166,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
             value={month}
             onChange={(e) => reload(e.target.value)}
           />
-        </label>
+        </label>}
         <select
           aria-label="Moneda"
           value={currency}
@@ -182,12 +182,12 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
         >
           <RefreshCw size={17} />
         </button>
-        <button
+        {tab !== "Deudas" && <button
           className={styles.primary}
           onClick={() => setForm({ kind: "expense" })}
         >
           <Plus size={17} /> Formulario de gasto
-        </button>
+        </button>}
       </div>
       {error && (
         <div role="alert" className={styles.error}>
@@ -206,7 +206,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
         onCharge={(charge) => setForm({ kind: "payment", charge })}
         onRecurring={(costDraft) => setForm({ kind: "rule", recurringKind: "expense", costDraft })}
       />}
-      <nav className={styles.tabs} aria-label="Secciones de finanzas">
+      {tab !== "Deudas" && <nav className={styles.tabs} aria-label="Secciones de finanzas">
         {[
           "Registrar",
           "Resumen",
@@ -222,7 +222,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
             {t}
           </button>
         ))}
-      </nav>
+      </nav>}
       {tab === "Deudas" && scope === "personal" && <DebtsPanel data={data} currency={currency} onSave={send} onPayment={(charge)=>setForm({kind:"payment",charge})}/>}
       {tab === "Resumen" && (
         <>
