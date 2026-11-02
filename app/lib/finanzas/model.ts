@@ -95,6 +95,7 @@ export function remaining(c: Charge) {
 export type Account = {
   id: string;
   name: string;
+  usage?: "agency" | "personal" | null;
   owner: keyof typeof ownerNames | null;
   currency: "PEN" | "USD" | null;
   opening: number | null;
@@ -107,8 +108,26 @@ export function accountBalance(a: Account): number | null {
     ? a.opening + a.movements
     : null;
 }
-export function accountTotals(accounts: Account[], currency: "PEN" | "USD") {
-  const inCurrency = accounts.filter((a) => a.currency === currency);
+export function accountUsageName(usage: Account["usage"]) {
+  return usage === "personal"
+    ? "Personal"
+    : usage === "agency"
+      ? "Agencia"
+      : "Sin clasificar";
+}
+export function accountTransferScope(a: Pick<Account, "usage" | "owner">) {
+  return a.usage ?? (a.owner === "agency" ? "agency" : "personal");
+}
+export function accountTotals(
+  accounts: Account[],
+  currency: "PEN" | "USD",
+  usage?: Account["usage"],
+) {
+  const inCurrency = accounts.filter(
+    (a) =>
+      a.currency === currency &&
+      (usage === undefined || (a.usage ?? null) === usage),
+  );
   const balances = inCurrency
     .map(accountBalance)
     .filter((balance): balance is number => balance !== null);
@@ -154,6 +173,7 @@ export type Receipt = {
 };
 export type FinanceData = {
   ownerTarget: number | null;
+  ownerWeeklyTarget?: number | null;
   today: string;
   month: string;
   charges: Charge[];
@@ -197,6 +217,7 @@ export const ruleInput = chargeInput
   );
 export const actions = z
   .discriminatedUnion("action", [
+    z.object({ action: z.literal("weeklyWithdrawalTarget"), amount: money }),
     z.object({
       action: z.literal("quickEntry"),
       kind: z.enum(["income", "expense"]),
@@ -226,10 +247,16 @@ export const actions = z
       active: z.boolean(),
     }),
     z.object({
+      action: z.literal("accountUsage"),
+      id: z.string().uuid(),
+      usage: scope,
+    }),
+    z.object({
       action: z.literal("account"),
       id: z.string().uuid().optional(),
       name: text,
       owner,
+      usage: scope.optional(),
       currency,
       opening: z.number().int().min(-100000000).max(100000000).nullable(),
       opening_date: date,

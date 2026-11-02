@@ -6,6 +6,7 @@ import { getUser } from "@/lib/auth/get-user";
 import { strategyDB as db, transaction } from "@/lib/estrategia/db";
 import {
   actions,
+  accountTransferScope,
   occurrences,
   today,
   monthSchema,
@@ -174,11 +175,16 @@ export async function loadFinance(
       "SELECT id,nombre FROM marcas WHERE activa=true ORDER BY nombre",
     ),
     db().query(
-      "SELECT value FROM finance_settings WHERE key='owner-monthly-target'",
+      "SELECT key,value FROM finance_settings WHERE key IN ('owner-monthly-target','owner-weekly-target')",
     ),
   ]);
   return {
-    ownerTarget: results[8].rows[0]?.value?.amount ?? null,
+    ownerTarget:
+      results[8].rows.find((r) => r.key === "owner-monthly-target")?.value
+        ?.amount ?? null,
+    ownerWeeklyTarget:
+      results[8].rows.find((r) => r.key === "owner-weekly-target")?.value
+        ?.amount ?? null,
     today: today(),
     month,
     charges: results[0].rows,
@@ -445,6 +451,26 @@ export async function mutate(
       );
       if (!r.rowCount) throw new FinanceError("Recurrencia no encontrada", 404);
       id = b.id;
+    } else if (b.action === "weeklyWithdrawalTarget") {
+      await c.query(
+        "INSERT INTO finance_settings(key,value) VALUES('owner-weekly-target',$1) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+        [
+          JSON.stringify({
+            amount: b.amount,
+            currency: "PEN",
+            owner: "pedro",
+            frequency: "weekly",
+          }),
+        ],
+      );
+    } else if (b.action === "accountUsage") {
+      const updated = await c.query(
+        "UPDATE finance_accounts SET usage=$2 WHERE id=$1 RETURNING id",
+        [b.id, b.usage],
+      );
+      if (!updated.rowCount)
+        throw new FinanceError("Cuenta no encontrada", 404);
+      id = b.id;
     } else if (b.action === "account") {
       if (b.opening_date > today())
         throw new FinanceError("La fecha de apertura no puede ser futura");
@@ -475,7 +501,7 @@ export async function mutate(
             "La apertura debe ser anterior o igual al primer movimiento registrado",
           );
         await c.query(
-          "UPDATE finance_accounts SET name=$2,owner=$3,currency=$4,opening=$5,opening_date=$6,note=$7 WHERE id=$1",
+          "UPDATE finance_accounts SET name=$2,owner=$3,currency=$4,opening=$5,opening_date=$6,note=$7,usage=COALESCE($8,usage) WHERE id=$1",
           [
             b.id,
             b.name,
@@ -484,14 +510,23 @@ export async function mutate(
             b.opening,
             b.opening_date,
             b.note,
+            b.usage ?? null,
           ],
         );
         id = b.id;
       } else
         id = (
           await c.query(
-            "INSERT INTO finance_accounts(name,owner,currency,opening,opening_date,note) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",
-            [b.name, b.owner, b.currency, b.opening, b.opening_date, b.note],
+            "INSERT INTO finance_accounts(name,owner,currency,opening,opening_date,note,usage) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id",
+            [
+              b.name,
+              b.owner,
+              b.currency,
+              b.opening,
+              b.opening_date,
+              b.note,
+              b.usage ?? null,
+            ],
           )
         ).rows[0].id;
     } else if (b.action === "payment") {
@@ -599,7 +634,7 @@ export async function mutate(
         await c.query(
           `INSERT INTO finance_movements(kind,scope,owner,currency,amount,account_id,destination_id,title,date,created_by) VALUES('transfer',$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
           [
-            from.owner === "agency" ? "agency" : "personal",
+            accountTransferScope(from),
             from.owner,
             from.currency,
             b.amount,

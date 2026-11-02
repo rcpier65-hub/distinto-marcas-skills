@@ -94,6 +94,9 @@
   gap: 12px;
 }
 .headerActions button { min-height: 44px; }
+.accountUsage { align-self: flex-start; width: fit-content; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #f1f1f4; color: #625b6c; }
+.accountUsage[data-usage="personal"] { background: #eee7ff; color: #7040ba; }
+.accountUsage[data-usage="agency"] { background: #e6f5ef; color: #157854; }
 .eyebrow {
   font-size: 10px;
   letter-spacing: 2px;

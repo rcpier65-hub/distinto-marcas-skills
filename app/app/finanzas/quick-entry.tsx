@@ -14,6 +14,7 @@ import {
   today,
   remaining,
   ownerNames,
+  accountUsageName,
   type FinanceData,
 } from "@/lib/finanzas/model";
 import { prepareQuickEntry, type QuickDraft } from "@/lib/finanzas/quick-entry";
@@ -349,7 +350,9 @@ function QuickReview({
             <div className={q.account}>
               <Wallet size={20} />
               <div>
-                <strong>{account.name}</strong>
+                <strong>
+                  {account.name} · {accountUsageName(account.usage)}
+                </strong>
                 <small>
                   {account.owner
                     ? ownerNames[account.owner]
@@ -385,6 +388,7 @@ function QuickReview({
                     }}
                   >
                     {a.name}
+                    {` · ${accountUsageName(a.usage)}`}
                     {a.currency ? ` · ${a.currency}` : ""}
                   </button>
                 ))}
@@ -392,6 +396,39 @@ function QuickReview({
               {!!matches.length && !showAllAccounts && (
                 <button type="button" onClick={() => setShowAllAccounts(true)}>
                   Otra cuenta
+                </button>
+              )}
+            </div>
+          )}
+          {account?.usage && account.usage !== space && (
+            <div className={q.hint} role="status">
+              <p>
+                La cuenta es de uso{" "}
+                {accountUsageName(account.usage).toLowerCase()}, pero este{" "}
+                {d.kind === "income" ? "cobro" : "gasto"} se registrará en{" "}
+                {space === "agency" ? "Agencia" : "Personales"}. Si pagaste
+                desde la cuenta equivocada, conserva la cuenta real y el tipo
+                real de gasto.
+              </p>
+              {!charge && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setD({
+                      ...d,
+                      scope: account.usage!,
+                      owner:
+                        account.usage === "agency"
+                          ? "agency"
+                          : account.owner === "agency"
+                            ? null
+                            : account.owner,
+                    })
+                  }
+                >
+                  {account.usage === "personal"
+                    ? "Este registro es personal"
+                    : "Este registro es de la agencia"}
                 </button>
               )}
             </div>

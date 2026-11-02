@@ -18,6 +18,7 @@ import {
   amount,
   remaining,
   ownerNames,
+  accountUsageName,
   type FinanceData,
   type Charge,
   type Account,
@@ -126,8 +127,14 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           </span>
           <button
             className={styles.primary}
-            aria-label={tab === "Registrar" ? "Ver resumen de cuentas" : "Volver a registrar gastos"}
-            onClick={() => setTab(tab === "Registrar" ? "Resumen" : "Registrar")}
+            aria-label={
+              tab === "Registrar"
+                ? "Ver resumen de cuentas"
+                : "Volver a registrar gastos"
+            }
+            onClick={() =>
+              setTab(tab === "Registrar" ? "Resumen" : "Registrar")
+            }
           >
             {tab === "Registrar" ? "Resumen" : "Registrar"}
           </button>
@@ -142,7 +149,12 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
         />
       )}
       <div hidden={tab !== "Registrar"}>
-        <QuickEntry data={data} scope={scope} currency={currency} onSave={send} />
+        <QuickEntry
+          data={data}
+          scope={scope}
+          currency={currency}
+          onSave={send}
+        />
       </div>
       <div className={styles.toolbar}>
         <div className={styles.segment}>
@@ -313,15 +325,24 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
               </div>
               {scope === "agency" &&
                 currency === "PEN" &&
-                data.ownerTarget !== null && (
+                (data.ownerWeeklyTarget != null ||
+                  data.ownerTarget !== null) && (
                   <div className={styles.listRow}>
                     <span>
                       Meta de retiro personal de Pedro
+                      {data.ownerWeeklyTarget != null
+                        ? " · semanal"
+                        : " · mensual"}
                       <small>
                         No es un sueldo registrado ni un gasto pagado
                       </small>
                     </span>
-                    <strong>{amount(data.ownerTarget!, "PEN")}</strong>
+                    <strong>
+                      {amount(
+                        data.ownerWeeklyTarget ?? data.ownerTarget!,
+                        "PEN",
+                      )}
+                    </strong>
                   </div>
                 )}
               <p className={styles.hint}>
@@ -817,6 +838,7 @@ function FinanceForm({
         id: s.account?.id,
         name: str("name"),
         owner: str("owner"),
+        usage: str("usage"),
         currency: chosenCurrency,
         opening: str("opening") === "" ? null : cent("opening"),
         opening_date: str("date"),
@@ -862,7 +884,7 @@ function FinanceForm({
         .filter((a) => a.currency === chosenCurrency && a.owner)
         .map((a) => (
           <option key={a.id} value={a.id}>
-            {a.name} · {a.currency}
+            {a.name} · {accountUsageName(a.usage)} · {a.currency}
           </option>
         ))}
     </select>
@@ -1067,6 +1089,23 @@ function FinanceForm({
             <Field label="Nombre de la cuenta">
               <input name="name" defaultValue={s.account?.name} required />
             </Field>
+            <Field label="Uso de la cuenta">
+              <select
+                name="usage"
+                defaultValue={s.account?.usage || ""}
+                required
+              >
+                <option value="" disabled>
+                  Selecciona el uso
+                </option>
+                <option value="agency">Agencia</option>
+                <option value="personal">Personal</option>
+              </select>
+            </Field>
+            <p className={styles.hint}>
+              El uso es independiente del titular. Por ejemplo, una cuenta a
+              nombre de Nayeli puede destinarse a la agencia.
+            </p>
             <div className={styles.formGrid}>
               <Field label="Titular">
                 <select
