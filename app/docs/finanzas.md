@@ -321,3 +321,33 @@ Corrección posterior de Pedro: **Efectivo también es Personal**. Se aplicó el
 con auditoría, sin modificar titular, moneda, saldo de apertura ni movimientos.
 Ahora son cinco cuentas personales y tres de agencia. Efectivo mantiene S/102
 registrados en esta comprobación; no fijar ese saldo para cambios futuros.
+
+### Resumen explicable por espacio — 2 de noviembre de 2026
+
+Cada indicador abre su desglose en un diálogo accesible. Agencia separa cobros
+confirmados del mes, cuotas por revisar y saldos anteriores; gastos pagados,
+pendientes previstos y saldo actual por cuenta. Personal muestra saldo, gastos,
+entradas separando transferencias externas y movimientos. Una transferencia
+entre dos cuentas personales no crea ingreso. Saldos son actuales, no cierres
+históricos; los movimientos se filtran por su fecha real.
+
+La previsión es de caja, no utilidad contable: cobros realizados y pendientes del
+mes menos su IGV registrado proporcional, menos pagos realizados y saldo pendiente
+de obligaciones, más reserva de costos mensuales todavía sin fecha. Incluye
+cuotas por revisar y excluye pendientes anteriores. No presume crédito fiscal,
+renta, tipo de cambio ni otros costos. Se resta una sola vez la meta personal:
+con S/1,500 semanal y día sin definir, cuatro o cinco retiros según calendario.
+Las transferencias realizadas no se restan de nuevo como gasto.
+
+`finance_settings.monthly-cost-drafts.items` conserva costos mensuales con
+importe conocido y fecha pendiente. No genera pagos, deuda confirmada ni altera
+cuentas. «Programar fecha» abre el formulario con datos precargados. La API bloquea
+ese ajuste, crea la recurrencia y retira la reserva en la misma transacción; los
+reintentos no duplican. Una reserva se programa en el mes actual, incluyendo el
+primer vencimiento de ese mes. Los errores dejan intacta la reserva. Datos
+específicos del usuario y sustento se guardan privadamente en la BD, fuera de Git.
+
+Pruebas: `node scripts/test-finance-dashboard.mjs` para periodos, monedas,
+abonos/IGV, transferencias, saldos y cuatro/cinco retiros; `TEST_BASE_URL=...
+node scripts/test-finance-cost-drafts.mjs` para conversión concurrente/idempotente,
+rollback y permisos. No ejecutan pagos reales; el segundo elimina sus fixtures.

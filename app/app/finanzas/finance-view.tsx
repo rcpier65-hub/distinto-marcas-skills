@@ -7,7 +7,6 @@ import {
   type FormEvent,
 } from "react";
 import {
-  Wallet,
   ArrowLeftRight,
   Plus,
   RefreshCw,
@@ -23,10 +22,12 @@ import {
   type Charge,
   type Account,
   type Movement,
+  type MonthlyCostDraft,
 } from "@/lib/finanzas/model";
 import { DocumentsPanel } from "./documents-panel";
 import { QuickEntry } from "./quick-entry";
 import { AccountBalances } from "./account-balances";
+import { FinanceDashboard } from "./finance-dashboard";
 import styles from "./finance.module.css";
 type FormKind =
   | "expense"
@@ -42,6 +43,8 @@ type FormState = {
   charge?: Charge;
   account?: Account;
   movement?: Movement;
+  recurringKind?: "income" | "expense";
+  costDraft?: MonthlyCostDraft;
 };
 export function FinanceView({ initial }: { initial: FinanceData }) {
   const [data, setData] = useState(initial),
@@ -93,23 +96,10 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
   const relevant = data.charges.filter(
     (c) => c.scope === scope && c.currency === currency && c.state !== "void",
   );
-  const due = relevant.filter((c) => c.due.slice(0, 7) === month);
   const unpaid = relevant.filter((c) => remaining(c) > 0);
-  const confirmed = unpaid.filter((c) => c.state === "confirmed");
-  const sum = (cs: Charge[]) => cs.reduce((s, c) => s + remaining(c), 0);
-  const moves = data.movements.filter(
-    (m) => m.scope === scope && m.currency === currency && !m.void_reason,
-  );
-  const income = moves
-      .filter((m) => m.kind === "income")
-      .reduce((s, m) => s + m.amount, 0),
-    expense = moves
-      .filter((m) => m.kind === "expense")
-      .reduce((s, m) => s + m.amount, 0);
   const activeRules = data.rules.filter(
     (r) => r.active && r.scope === scope && r.currency === currency,
   );
-  const pendingReview = unpaid.filter((c) => c.state === "review").length;
   return (
     <main className={styles.root}>
       <header className={styles.header}>
@@ -140,14 +130,6 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           </button>
         </div>
       </header>
-      {tab === "Resumen" && (
-        <AccountBalances
-          accounts={data.accounts}
-          today={data.today}
-          onConfigure={(account) => setForm({ kind: "account", account })}
-          onManage={() => setTab("Cuentas")}
-        />
-      )}
       <div hidden={tab !== "Registrar"}>
         <QuickEntry
           data={data}
@@ -215,31 +197,12 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           {notice}
         </div>
       )}
-      <div className={styles.cards}>
-        <Metric
-          title="Cobrado en el mes"
-          value={amount(income, currency)}
-          sub="Dinero registrado en tus cuentas"
-        />
-        <Metric
-          title="Por cobrar confirmado"
-          value={amount(
-            sum(confirmed.filter((c) => c.kind === "income")),
-            currency,
-          )}
-          sub="Incluye saldos anteriores; no es caja"
-        />
-        <Metric
-          title="Pagado en el mes"
-          value={amount(expense, currency)}
-          sub="Transferencias excluidas"
-        />
-        <Metric
-          title="Por revisar"
-          value={String(pendingReview)}
-          sub="Mensualidades sin conciliar"
-        />
-      </div>
+      <FinanceDashboard
+        key={`${scope}-${currency}-${month}`}
+        data={data} scope={scope} currency={currency} month={month}
+        onCharge={(charge) => setForm({ kind: "payment", charge })}
+        onRecurring={(costDraft) => setForm({ kind: "rule", recurringKind: "expense", costDraft })}
+      />
       <nav className={styles.tabs} aria-label="Secciones de finanzas">
         {[
           "Registrar",
@@ -258,6 +221,14 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
       </nav>
       {tab === "Resumen" && (
         <>
+          <AccountBalances
+            accounts={data.accounts.filter((a) => a.usage === scope && a.currency === currency)}
+            today={data.today}
+            usage={scope === "personal" ? "personal" : "agency"}
+            currency={currency === "USD" ? "USD" : "PEN"}
+            onConfigure={(account) => setForm({ kind: "account", account })}
+            onManage={() => setTab("Cuentas")}
+          />
           <div className={styles.twoCol}>
             <section className={styles.panel}>
               <h2>
@@ -295,63 +266,10 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
               )}
             </section>
             <section className={styles.panel}>
-              <h2>
-                <Wallet size={20} /> Plan del mes
-              </h2>
-              <p>
-                Proyección operativa. No representa utilidad ni saldo bancario.
-              </p>
-              <div className={styles.listRow}>
-                <span>Servicios previstos, sin IGV</span>
-                <strong>
-                  {amount(
-                    due
-                      .filter((c) => c.kind === "income" && c.rule_id)
-                      .reduce((s, c) => s + c.base, 0),
-                    currency,
-                  )}
-                </strong>
-              </div>
-              <div className={styles.listRow}>
-                <span>Pagos previstos al equipo</span>
-                <strong>
-                  {amount(
-                    due
-                      .filter((c) => c.kind === "expense" && c.member_id)
-                      .reduce((s, c) => s + c.base + c.tax, 0),
-                    currency,
-                  )}
-                </strong>
-              </div>
-              {scope === "agency" &&
-                currency === "PEN" &&
-                (data.ownerWeeklyTarget != null ||
-                  data.ownerTarget !== null) && (
-                  <div className={styles.listRow}>
-                    <span>
-                      Meta de retiro personal de Pedro
-                      {data.ownerWeeklyTarget != null
-                        ? " · semanal"
-                        : " · mensual"}
-                      <small>
-                        No es un sueldo registrado ni un gasto pagado
-                      </small>
-                    </span>
-                    <strong>
-                      {amount(
-                        data.ownerWeeklyTarget ?? data.ownerTarget!,
-                        "PEN",
-                      )}
-                    </strong>
-                  </div>
-                )}
-              <p className={styles.hint}>
-                Registra un pago solo cuando ocurra. Al mover dinero entre tus
-                cuentas usa Transferir para no duplicar ingresos ni gastos.
-              </p>
-              <button onClick={() => setForm({ kind: "transfer" })}>
-                <ArrowLeftRight size={16} /> Transferir entre cuentas
-              </button>
+              <h2>Costos recurrentes</h2>
+              <p>Registra plataformas, servicios y otros pagos mensuales o semanales para incluirlos en la previsión. Se generan pendientes, sin marcarse pagados automáticamente.</p>
+              <button onClick={() => setForm({ kind: "rule", recurringKind: "expense" })}><Plus size={16} /> Agregar costo recurrente</button>
+              <button onClick={() => setTab("Mensualidades")}>Ver acuerdos recurrentes</button>
             </section>
           </div>
           <details className={styles.panel}>
@@ -718,23 +636,6 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
     </main>
   );
 }
-function Metric({
-  title,
-  value,
-  sub,
-}: {
-  title: string;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <article className={styles.metric}>
-      <span>{title}</span>
-      <strong>{value}</strong>
-      <small>{sub}</small>
-    </article>
-  );
-}
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className={styles.field}>
@@ -764,7 +665,7 @@ function FinanceForm({
     [paid, setPaid] = useState(true),
     [frequency, setFrequency] = useState("monthly"),
     [chosenCurrency, setCurrency] = useState(
-      s.charge?.currency || s.account?.currency || currency,
+      s.costDraft?.currency || s.charge?.currency || s.account?.currency || currency,
     ),
     [creditKind, setCreditKind] = useState("none");
   const attempt = useRef<{ hash: string; id: string } | null>(null);
@@ -774,7 +675,7 @@ function FinanceForm({
   const titles = {
     expense: "Registrar gasto",
     charge: "Nuevo cobro",
-    rule: "Nueva mensualidad o pago recurrente",
+    rule: s.recurringKind === "expense" ? "Nuevo costo recurrente" : "Nueva mensualidad o pago recurrente",
     account: "Configurar cuenta",
     transfer: "Transferencia / retiro",
     payment: "Registrar pago realizado",
@@ -790,7 +691,7 @@ function FinanceForm({
     const f = new FormData(e.currentTarget),
       str = (k: string) => String(f.get(k) || ""),
       cent = (k: string) => Math.round(Number(str(k)) * 100);
-    let p: Record<string, unknown> = { action: s.kind };
+    let p: Record<string, unknown> = { action: s.kind, ...(s.costDraft ? {cost_draft_id:s.costDraft.id} : {}) };
     if (hasInfo) {
       const common = {
         title: str("title"),
@@ -945,6 +846,7 @@ function FinanceForm({
                 required
                 maxLength={300}
                 placeholder="Cliente, servicio o gasto"
+                defaultValue={s.costDraft?.title}
               />
             </Field>
             <div className={styles.formGrid}>
@@ -952,6 +854,7 @@ function FinanceForm({
               <Field label="Importe base">
                 <input
                   name="base"
+                  defaultValue={s.costDraft ? s.costDraft.amount / 100 : undefined}
                   type="number"
                   min="0.01"
                   max="1000000"
@@ -1013,7 +916,7 @@ function FinanceForm({
             {s.kind === "rule" && (
               <div className={styles.formGrid}>
                 <Field label="Tipo">
-                  <select name="kind">
+                  <select name="kind" defaultValue={s.recurringKind || "income"}>
                     <option value="income">Cobro a cliente</option>
                     <option value="expense">Pago / gasto</option>
                   </select>
@@ -1040,7 +943,7 @@ function FinanceForm({
                       type="number"
                       min="1"
                       max="31"
-                      defaultValue="6"
+                      defaultValue={s.costDraft ? "" : s.recurringKind === "expense" ? Number(data.today.slice(8)) : 6}
                     />
                   ) : (
                     <select key="weekly" name="day" defaultValue="6">
@@ -1261,7 +1164,7 @@ function FinanceForm({
               name="date"
               type="date"
               required
-              defaultValue={s.account?.opening_date || data.today}
+              defaultValue={s.costDraft ? data.today.slice(0, 7) + "-01" : s.account?.opening_date || data.today}
               max={
                 s.kind === "payment" ||
                 s.kind === "transfer" ||
@@ -1277,7 +1180,7 @@ function FinanceForm({
             <textarea
               name="note"
               maxLength={2000}
-              defaultValue={s.account?.note || ""}
+              defaultValue={s.costDraft?.note || s.account?.note || ""}
             />
           </Field>
         )}

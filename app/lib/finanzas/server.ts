@@ -10,6 +10,7 @@ import {
   occurrences,
   today,
   monthSchema,
+  monthlyCostDrafts,
   type Rule,
   type FinanceData,
 } from "./model";
@@ -175,10 +176,11 @@ export async function loadFinance(
       "SELECT id,nombre FROM marcas WHERE activa=true ORDER BY nombre",
     ),
     db().query(
-      "SELECT key,value FROM finance_settings WHERE key IN ('owner-monthly-target','owner-weekly-target')",
+      "SELECT key,value FROM finance_settings WHERE key IN ('owner-monthly-target','owner-weekly-target','monthly-cost-drafts')",
     ),
   ]);
   return {
+    monthlyCosts: monthlyCostDrafts.parse(results[8].rows.find((r) => r.key === "monthly-cost-drafts")?.value?.items ?? []),
     ownerTarget:
       results[8].rows.find((r) => r.key === "owner-monthly-target")?.value
         ?.amount ?? null,
@@ -364,6 +366,20 @@ export async function mutate(
       const d = b.data;
       if (b.action === "rule") {
         const r = b.data;
+        if (b.cost_draft_id) {
+          const saved = (await c.query("SELECT value FROM finance_settings WHERE key='monthly-cost-drafts' FOR UPDATE")).rows[0];
+          const items = monthlyCostDrafts.parse(saved?.value?.items ?? []);
+          const draft = items.find((d) => d.id === b.cost_draft_id);
+          if (!draft) throw new FinanceError("Este costo ya fue programado. Actualiza el resumen.");
+          if (r.kind !== "expense" || r.scope !== draft.scope || r.currency !== draft.currency || r.frequency !== "monthly")
+            throw new FinanceError("Conserva el espacio, moneda y frecuencia del costo mensual.");
+          if (r.starts.slice(0, 7) !== today().slice(0, 7))
+            throw new FinanceError("Programa este costo en el mes actual para conservar la previsión del mes.");
+          const lastDay = new Date(Number(r.starts.slice(0, 4)), Number(r.starts.slice(5, 7)), 0).getDate();
+          if (Number(r.starts.slice(8)) > Math.min(r.day, lastDay))
+            throw new FinanceError("El inicio debe incluir el primer cobro del mes. Usa el primer día del mes si aún debes ese cobro.");
+          await c.query("UPDATE finance_settings SET value=$1 WHERE key='monthly-cost-drafts'", [{items:items.filter((d) => d.id !== b.cost_draft_id)}]);
+        }
         if (r.starts.slice(0, 7) < today().slice(0, 7))
           throw new FinanceError(
             "Las nuevas recurrencias empiezan este mes o después. Registra deudas anteriores como cobros individuales.",

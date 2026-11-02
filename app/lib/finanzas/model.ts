@@ -171,7 +171,13 @@ export type Receipt = {
   review_note: string;
   created_at: string;
 };
+export const monthlyCostDrafts = z.array(z.object({
+  id: z.string().uuid(), title: text, scope, currency, amount: money,
+  starts_month: monthSchema, note: z.string().max(2000),
+}));
+export type MonthlyCostDraft = z.infer<typeof monthlyCostDrafts>[number];
 export type FinanceData = {
+  monthlyCosts?: MonthlyCostDraft[];
   ownerTarget: number | null;
   ownerWeeklyTarget?: number | null;
   today: string;
@@ -240,7 +246,7 @@ export const actions = z
       id: z.string().uuid(),
       reason: text,
     }),
-    z.object({ action: z.literal("rule"), data: ruleInput }),
+    z.object({ action: z.literal("rule"), data: ruleInput, cost_draft_id: z.string().uuid().optional() }),
     z.object({
       action: z.literal("pauseRule"),
       id: z.string().uuid(),
