@@ -414,3 +414,22 @@ crea una salida automática. No se generan recibos tributarios.
 
 Pruebas: `node scripts/test-finance-debts.mjs`; integración con fixtures
 aislados `TEST_BASE_URL=... node scripts/test-finance-debts-live.mjs` desde app/.
+
+Publicado y verificado en VPS: `/api/version` = `1dee274`, rama
+`codex/finanzas-deudas-personales`, sobre `0ce03b6`; funcionalidad `261b582`
+y ajuste móvil `1dee274`. Migración aplicada al PostgreSQL activo del VPS.
+Compilación, TypeScript, lint afectado, pruebas puras y regresiones de dashboard
+y registro rápido aprobados. Integración comprobó pagos parciales, reintentos
+concurrentes, reversión, edición, cuotas sin duplicados y autorización de
+Pedro/Nayeli con bloqueo de Ailyn; todos los datos QA se eliminaron.
+
+Los tres compromisos solicitados se guardaron con sus datos reales en BD,
+manteniendo nulos los importes/fechas que faltan y el indicador aproximado.
+Lectura final confirma cero pagos creados. No se modificaron saldos ni
+movimientos previos. Navegador de producción comprobado en móvil 390×844 y
+escritorio 1280×900: formularios con cuota/fecha opcionales, guardar sin cambios,
+abono con cuenta por seleccionar y vista sin desborde horizontal. En Deudas se
+ocultan el filtro de mes y controles de gasto que no corresponden a esa vista;
+Registrar sigue siendo la entrada inicial. Evidencia privada en
+`output/finanzas-deudas-nov02/`. Despliegue conserva las tres redes del contenedor;
+no se publicó en Vercel.
