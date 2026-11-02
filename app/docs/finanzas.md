@@ -86,3 +86,38 @@ cobra tarjetas. Los futuros vencimientos no se materializan antes de su mes.
   cambiaron contraseñas ni se ejecutaron pagos o declaraciones.
 - Evidencia local: `output/finanzas-nov01/finanzas-publicado.png` y
   `candidate-final-tests.txt`, fuera del repositorio público.
+
+## Registro rápido por texto y audio
+
+Entrada prioritaria en móvil, antes de los indicadores. «Gasté 100 soles en
+movilidad con BCP de Pedro» prepara una tarjeta con importe, cuenta, fecha y
+concepto. El usuario confirma; nunca se guarda al transcribir. Las cuentas
+ambiguas se eligen explícitamente. El titular bancario no decide el titular
+fiscal del movimiento. Los pendientes coincidentes se reutilizan; los casos
+con varios pendientes piden elegir. Se pueden corregir los datos antes de guardar.
+
+Reconoce importes escritos y hablados, PEN/USD, hoy/ayer y fechas explícitas.
+No admite varias operaciones, fechas futuras ni transferencias en esta entrada.
+Retenciones/detracciones siguen en el formulario de pago completo. Es una ayuda
+para preparar el registro; la revisión del usuario sigue siendo necesaria.
+
+`quickEntry` guarda obligación y movimiento en una transacción, con clave de
+solicitud estable al reintentar. Si falta la moneda o titular de una cuenta,
+solo se completa al confirmar expresamente; no se inventa su saldo inicial.
+Los permisos, validación de saldos y monedas se repiten en el servidor.
+
+Audio: MediaRecorder hasta 60 s o archivo de hasta 6 MB. Ruta privada
+`/api/finanzas/transcribir` (Pedro/Nayeli, control de origen). Usa el transcriptor
+ya existente del VPS vía `FINANCE_TRANSCRIBER_URL=http://transcriptor:9000/asr`,
+red externa `transcriptor_net`. No se alteró ese contenedor ni se publicó un
+puerto adicional. Compose conserva las redes app y Supabase y añade esa red.
+La API de OpenAI anterior respondió sin cuota; esta función no depende de ella.
+No se conservan audios en la base ni se envía el texto a un modelo externo.
+Un bloqueo asesor de PostgreSQL limita a una transcripción simultánea de Finanzas.
+
+Verificación: pruebas de frases/importes/ambigüedades, API con reintento
+simultáneo, configuración atómica, abonos sin sobrepago y acceso de audio;
+flujo móvil 390×844 de preparar → confirmar → resumen con cuenta temporal.
+Audio de prueba español transcrito realmente en VPS y convertido en tarjeta
+S/100 / movilidad / BCP Pedro. No equivale a probar el micrófono físico del
+usuario: el navegador del teléfono pedirá su permiso la primera vez.

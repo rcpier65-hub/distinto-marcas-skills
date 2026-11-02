@@ -437,6 +437,136 @@ try {
     0,
   );
   console.log("PASS reactivation does not backfill paused months");
+  const unset = (
+    await pool.query(
+      "INSERT INTO finance_accounts(name,owner) VALUES($1,'pedro') RETURNING id",
+      [prefix + " unset"],
+    )
+  ).rows[0].id;
+  ids.accounts.push(unset);
+  const quickBody = {
+    action: "quickEntry",
+    kind: "expense",
+    title: prefix + " quick expense",
+    scope: "agency",
+    owner: "agency",
+    currency: "PEN",
+    amount: 10000,
+    date: day,
+    account_id: unset,
+    charge_id: null,
+    configure_account: true,
+    account_owner: "pedro",
+    note: "Gasto de prueba",
+    requestId: randomUUID(),
+  };
+  await post(
+    pedro,
+    { ...quickBody, account_owner: "nayeli", requestId: randomUUID() },
+    400,
+  );
+  assert.equal(
+    (
+      await pool.query("SELECT currency FROM finance_accounts WHERE id=$1", [
+        unset,
+      ])
+    ).rows[0].currency,
+    null,
+  );
+  const [quickA, quickB] = await Promise.all([
+    post(pedro, quickBody),
+    post(pedro, quickBody),
+  ]);
+  assert.equal(quickA.id, quickB.id);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS n FROM finance_movements WHERE account_id=$1",
+        [unset],
+      )
+    ).rows[0].n,
+    1,
+  );
+  assert.deepEqual(
+    (
+      await pool.query(
+        "SELECT currency,opening,owner FROM finance_accounts WHERE id=$1",
+        [unset],
+      )
+    ).rows[0],
+    { currency: "PEN", opening: null, owner: "pedro" },
+  );
+  const quickCharge = await post(pedro, {
+    action: "charge",
+    data: {
+      title: prefix + " quick income",
+      kind: "income",
+      scope: "agency",
+      owner: "pedro",
+      currency: "PEN",
+      base: 15000,
+      due: day,
+    },
+  });
+  ids.charges.push(quickCharge.id);
+  const qpay = {
+    ...quickBody,
+    kind: "income",
+    title: prefix + " quick income",
+    owner: "pedro",
+    charge_id: quickCharge.id,
+    configure_account: false,
+  };
+  await post(pedro, { ...qpay, requestId: randomUUID() });
+  await post(pedro, { ...qpay, requestId: randomUUID() }, 400);
+  await post(pedro, { ...qpay, kind: "expense", requestId: randomUUID() }, 400);
+  await post(
+    pedro,
+    { ...quickBody, currency: "USD", requestId: randomUUID() },
+    400,
+  );
+  await post(ailyn, { ...quickBody, requestId: randomUUID() }, 403);
+  const audioForm = () => {
+    const f = new FormData();
+    f.append(
+      "audio",
+      new File(["not audio"], "invalid.txt", { type: "text/plain" }),
+    );
+    return f;
+  };
+  assert.equal(
+    (
+      await fetch(base + "/api/finanzas/transcribir", {
+        method: "POST",
+        headers: pedro,
+        body: audioForm(),
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await fetch(base + "/api/finanzas/transcribir", {
+        method: "POST",
+        headers: ailyn,
+        body: audioForm(),
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await fetch(base + "/api/finanzas/transcribir", {
+        method: "POST",
+        headers: { ...pedro, origin: "https://wrong.invalid" },
+        body: audioForm(),
+      })
+    ).status,
+    403,
+  );
+  console.log(
+    "PASS quick entry, atomic account setup, concurrent retry, existing obligations, no overpay, currency and private audio",
+  );
   const rest = await fetch(
     process.env.NEXT_PUBLIC_SUPABASE_URL + "/rest/v1/finance_charges?select=id",
     { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY } },

@@ -181,6 +181,21 @@ export const ruleInput = chargeInput
   );
 export const actions = z
   .discriminatedUnion("action", [
+    z.object({
+      action: z.literal("quickEntry"),
+      kind: z.enum(["income", "expense"]),
+      title: text,
+      scope,
+      owner,
+      currency,
+      amount: money,
+      date,
+      account_id: z.string().uuid(),
+      charge_id: z.string().uuid().nullable(),
+      configure_account: z.boolean().default(false),
+      account_owner: owner.optional(),
+      note: z.string().max(2000).default(""),
+    }),
     z.object({ action: z.literal("charge"), data: chargeInput }),
     z.object({ action: z.literal("confirm"), id: z.string().uuid() }),
     z.object({

@@ -24,6 +24,7 @@ import {
   type Movement,
 } from "@/lib/finanzas/model";
 import { DocumentsPanel } from "./documents-panel";
+import { QuickEntry } from "./quick-entry";
 import styles from "./finance.module.css";
 type FormKind =
   | "expense"
@@ -122,6 +123,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           <ShieldCheck size={16} /> Pedro y Nayeli
         </span>
       </header>
+      <QuickEntry data={data} scope={scope} currency={currency} onSave={send} />
       <div className={styles.toolbar}>
         <div className={styles.segment}>
           {[
@@ -167,7 +169,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           className={styles.primary}
           onClick={() => setForm({ kind: "expense" })}
         >
-          <Plus size={17} /> Registrar gasto
+          <Plus size={17} /> Formulario de gasto
         </button>
       </div>
       {error && (

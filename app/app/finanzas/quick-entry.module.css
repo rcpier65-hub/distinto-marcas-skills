@@ -1,0 +1,271 @@
+.quick {
+  background: linear-gradient(125deg, #faf7ff, #fff);
+  border: 1px solid #dcd0f6;
+  border-radius: 18px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.head h2 {
+  margin: 0;
+  font-size: 19px;
+}
+.head p {
+  margin: 3px 0 0 !important;
+  font-size: 12px;
+}
+.tag {
+  background: #efe6ff;
+  border-radius: 20px;
+  padding: 6px 10px;
+  color: #7043bd;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.quick textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 76px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.controls button {
+  min-height: 44px;
+}
+.controls button:last-child {
+  margin-left: auto;
+}
+.quick .recording {
+  background: #fff0f1;
+  border-color: #d8526b;
+  color: #ac2644;
+}
+.error {
+  background: #fff0f0;
+  color: #9d2840;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.error p {
+  color: inherit;
+  margin: 0 0 4px !important;
+}
+.error button {
+  margin-top: 8px;
+}
+.examples {
+  margin-top: 12px;
+  color: #81738f;
+}
+.examples summary {
+  font-size: 11px;
+}
+.saved {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #157451 !important;
+}
+.review {
+  width: 480px;
+}
+.hero {
+  padding: 16px;
+  background: #f6f1fd;
+  border-radius: 14px;
+  text-align: center;
+}
+.hero span {
+  font-size: 12px;
+  color: #78658c;
+}
+.hero strong {
+  font-size: 38px;
+  display: block;
+  margin: 5px 0;
+  color: #6239b4;
+  letter-spacing: -1px;
+}
+.hero b {
+  font-size: 15px;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #7a6b86;
+  padding: 14px 0;
+}
+.fields {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.fields label {
+  display: block;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.fields select,
+.fields input:not([type="checkbox"]) {
+  width: 100%;
+  margin-top: 6px;
+  min-height: 44px;
+}
+.fields input[type="checkbox"] {
+  margin-right: 7px;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0;
+}
+.choices button {
+  min-height: 48px;
+  font-size: 12px;
+  text-align: left;
+  justify-content: flex-start;
+}
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e6ddf3;
+  border-radius: 12px;
+}
+.account div {
+  flex: 1;
+}
+.account strong {
+  font-size: 14px;
+}
+.account small {
+  font-size: 11px;
+  display: block;
+  color: #80738b;
+}
+.account button {
+  font-size: 11px;
+}
+.setup {
+  padding: 0 12px 10px;
+  border-radius: 10px;
+  background: #fff8e9;
+}
+.setup small {
+  font-size: 11px;
+  line-height: 1.5;
+  display: block;
+  color: #816838;
+}
+.setup label {
+  line-height: 1.7;
+}
+.hint {
+  background: #f3effa;
+  border-radius: 10px;
+  padding: 10px;
+}
+.edit summary {
+  font-size: 12px;
+  color: #8254c4;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.editGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+.confirm {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eee5f6;
+}
+.confirm small {
+  font-size: 11px;
+  display: block;
+  text-align: center;
+  margin-bottom: 10px;
+  color: #7a6b86;
+}
+.confirm button {
+  width: 100%;
+  min-height: 48px;
+}
+@media (max-width: 650px) {
+  .quick {
+    padding: 14px;
+    margin: 14px 0;
+  }
+  .head h2 {
+    font-size: 18px;
+  }
+  .tag {
+    display: none;
+  }
+  .quick textarea {
+    font-size: 16px !important;
+  }
+  .controls button {
+    font-size: 14px !important;
+  }
+  .review {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    max-width: 100% !important;
+    max-height: 92dvh !important;
+    margin: 0;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom)) !important;
+  }
+  .review input,
+  .review select {
+    font-size: 16px !important;
+  }
+  .review button {
+    min-height: 44px;
+  }
+  .confirm {
+    position: sticky;
+    bottom: -18px;
+    background: white;
+    padding-bottom: 12px;
+  }
+  .hero strong {
+    font-size: 34px;
+  }
+  .editGrid {
+    grid-template-columns: 1fr;
+  }
+}

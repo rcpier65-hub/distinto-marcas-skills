@@ -208,6 +208,7 @@ async function account(
   id: string | null,
   currency: string,
   date: string,
+  setup?: { owner: "agency" | "pedro" | "nayeli" },
 ) {
   if (!id)
     throw new FinanceError(
@@ -219,6 +220,21 @@ async function account(
       [id],
     )
   ).rows[0];
+  if (a && setup && (!a.currency || !a.owner)) {
+    if (
+      (a.currency && a.currency !== currency) ||
+      (a.owner && a.owner !== setup.owner)
+    )
+      throw new FinanceError(
+        "La cuenta cambió. Revisa su moneda y titular antes de guardar.",
+      );
+    await c.query(
+      "UPDATE finance_accounts SET currency=$2,owner=$3 WHERE id=$1",
+      [id, currency, setup.owner],
+    );
+    a.currency = currency;
+    a.owner = setup.owner;
+  }
   if (!a || a.currency !== currency || !a.owner)
     throw new FinanceError(
       "Completa el titular y la moneda de esta cuenta en Cuentas; deben coincidir con el pago",
@@ -253,7 +269,92 @@ export async function mutate(
       );
     if (req.result.ok) return req.result;
     let id: string | null = null;
-    if (b.action === "charge" || b.action === "rule") {
+    if (b.action === "quickEntry") {
+      if (b.date > today())
+        throw new FinanceError("Registra pagos realizados, no pagos futuros");
+      let chargeId = b.charge_id;
+      let title = b.title;
+      if (chargeId) {
+        const ch = (
+          await c.query(
+            "SELECT * FROM finance_charges WHERE id=$1 FOR UPDATE",
+            [chargeId],
+          )
+        ).rows[0];
+        if (!ch || ch.state === "void")
+          throw new FinanceError("El pendiente ya no está disponible", 404);
+        if (
+          ch.kind !== b.kind ||
+          ch.currency !== b.currency ||
+          ch.scope !== b.scope ||
+          ch.owner !== b.owner
+        )
+          throw new FinanceError(
+            "El pendiente cambió. Vuelve a preparar el registro.",
+          );
+        const settled = Number(
+          (
+            await c.query(
+              "SELECT COALESCE(sum(amount+credit),0) AS n FROM finance_movements WHERE charge_id=$1 AND void_reason IS NULL",
+              [chargeId],
+            )
+          ).rows[0].n,
+        );
+        if (b.amount > ch.base + ch.tax - ch.prior_credit - settled)
+          throw new FinanceError(
+            "El importe supera el saldo pendiente. Revisa si ya se registró otro pago.",
+          );
+        title = ch.title;
+      } else {
+        chargeId = (
+          await c.query(
+            "INSERT INTO finance_charges(title,kind,scope,owner,currency,base,due,state,note) VALUES($1,$2,$3,$4,$5,$6,$7,'confirmed',$8) RETURNING id",
+            [
+              title,
+              b.kind,
+              b.scope,
+              b.owner,
+              b.currency,
+              b.amount,
+              b.date,
+              b.note,
+            ],
+          )
+        ).rows[0].id;
+      }
+      if (b.configure_account && !b.account_owner)
+        throw new FinanceError("Confirma el titular de la cuenta");
+      await account(
+        c,
+        b.account_id,
+        b.currency,
+        b.date,
+        b.configure_account && b.account_owner
+          ? { owner: b.account_owner }
+          : undefined,
+      );
+      id = (
+        await c.query(
+          "INSERT INTO finance_movements(kind,scope,owner,currency,amount,account_id,charge_id,title,date,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
+          [
+            b.kind,
+            b.scope,
+            b.owner,
+            b.currency,
+            b.amount,
+            b.account_id,
+            chargeId,
+            title,
+            b.date,
+            a.id,
+          ],
+        )
+      ).rows[0].id;
+      await c.query(
+        "UPDATE finance_charges SET state='confirmed' WHERE id=$1",
+        [chargeId],
+      );
+    } else if (b.action === "charge" || b.action === "rule") {
       const d = b.data;
       if (b.action === "rule") {
         const r = b.data;

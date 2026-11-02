@@ -6,6 +6,8 @@ services:
     container_name: distinto-agencia
     restart: unless-stopped
     env_file: ./app.env
+    environment:
+      FINANCE_TRANSCRIBER_URL: http://transcriptor:9000/asr
     ports:
       - "127.0.0.1:8120:3000"
     # Tope de recursos para no quitarle rendimiento a las otras apps del VPS.
@@ -14,6 +16,7 @@ services:
     networks:
       - default
       - supabase
+      - transcriptor
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=distinto-agencia_default"
@@ -30,6 +33,9 @@ services:
       - no-new-privileges:true
 
 networks:
+  transcriptor:
+    external: true
+    name: transcriptor_net
   supabase:
     external: true
     name: distinto-agencia-supabase_default

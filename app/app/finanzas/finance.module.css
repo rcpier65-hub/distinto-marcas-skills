@@ -390,7 +390,16 @@ table:where(.root table) {
     padding: 70px 12px 20px;
   }
   .root h1 {
-    font-size: 27px;
+    font-size: 24px;
+  }
+  .header p,
+  .header .secure {
+    display: none;
+  }
+  .root input,
+  .root select,
+  .root textarea {
+    font-size: 16px;
   }
   .secure {
     font-size: 10px;
