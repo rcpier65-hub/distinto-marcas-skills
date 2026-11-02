@@ -217,3 +217,29 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
 - Respaldo `distinto-agencia:balances-base-c144cd0`; fuente y compose anterior en
   `/docker/distinto-agencia/balances-c13604b/`. Tres redes conservadas. Evidencia
   privada local `output/finanzas-saldos-nov01/resumen-movil.png`.
+
+### Registro primero y resumen a demanda — 2 de noviembre de 2026
+
+- Producción `cf4b149`, rama `codex/finanzas-registro-primero`, conserva `c13604b`
+  y su documentación posterior. Finanzas abre en Registrar; el botón superior
+  Resumen muestra cuentas y saldos. Registrar regresa al formulario conservando
+  el texto sin guardar. Al recargar inicia nuevamente en Registrar.
+- El formulario se mantiene montado mientras está oculto. En móvil se reduce el
+  espacio superior; no se modifican importes, movimientos, permisos ni API.
+- Build/TypeScript y lint de archivos afectados aprobados. Prueba de producción:
+  registro inicial visible, resumen oculto, cuentas equivalentes entre meses,
+  cobro anterior conservado; Pedro/Nayeli autorizados, Ailyn/Pieer/anónimo
+  bloqueados. Sesiones de prueba revocadas y cero escrituras financieras.
+- Navegador real en producción a 390×844: formulario, Dictar y Preparar visibles
+  sin desplazar; Resumen muestra ocho cuentas; retorno conserva texto de prueba,
+  eliminado sin confirmar. Recargar desde Resumen abre Registrar. Captura local
+  privada: `output/finanzas-registro-primero-nov01/registro-movil-publicado.png`.
+  No equivale a probar el dispositivo físico del usuario.
+- Publicación demorada por saturación independiente del VPS: memoria disponible
+  inferior a 1 GB, swap lleno y carga elevada; no se detuvieron otros servicios.
+  El candidato propio se detuvo para liberar recursos. La promoción terminó
+  tras recuperar respuesta; `/api/version` público confirmó `cf4b149`. Esta
+  entrega no declara resuelto el consumo global del servidor.
+- Respaldo `distinto-agencia:entry-base-c13604b`; fuente y compose anterior en
+  `/docker/distinto-agencia/entry-cf4b149/`. Tres redes conservadas. Se verificó
+  nuevamente producción antes de promover, sin publicar en Vercel.
