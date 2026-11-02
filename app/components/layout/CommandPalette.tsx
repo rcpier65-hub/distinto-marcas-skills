@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { Wallet } from 'lucide-react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
 import { tieneAcceso, type ModuloPermiso, type Permisos } from '@/lib/team/types'
 
@@ -44,6 +45,7 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos, e
 
   const actions: Action[] = useMemo(() => [
     { id: 'nav-inicio', title: 'Ir a Inicio', subtitle: 'Tu dashboard ejecutivo', category: 'navegacion', icon: <IconHome />, shortcut: ['G', 'I'], keywords: 'home dashboard cockpit ejecutivo bienvenida', href: '/inicio', requiereModulo: undefined },
+    { id: 'nav-finanzas', title: 'Finanzas', subtitle: 'Registrar gastos y cobros por texto o audio', category: 'navegacion', icon: <Wallet size={16} />, keywords: 'dinero cuentas pagos ingresos egresos caja banco bcp yape', href: '/finanzas', requiereModulo: 'finanzas' },
     { id: 'nav-planes', title: 'Planes Distinto', subtitle: 'Catálogo comercial interno', category: 'navegacion', icon: <IconGrid />, shortcut: ['G', 'L'], keywords: 'planes precios cotizacion social web retainer', href: '/planes', requiereModulo: undefined, requierePedro: true },
     { id: 'nav-inbox', title: 'Inbox global de comentarios', category: 'navegacion', icon: <IconInbox />, shortcut: ['G', 'I'], keywords: 'comentarios respuestas', href: '/comentarios', requiereModulo: 'comentarios' },
     { id: 'nav-pubs', title: 'Publicaciones', category: 'navegacion', icon: <IconCalendar />, shortcut: ['G', 'P'], keywords: 'posts contenido', href: '/publicaciones', requiereModulo: 'publicaciones' },
@@ -82,7 +84,10 @@ export function CommandPalette({ open, onClose, marcas = MARCAS_NAV, permisos, e
         return tieneAcceso(permisos.modulos, a.requiereModulo)
       })
     }
-    return list.filter((a) => !a.requierePedro || esPedro)
+    return list.filter((a) =>
+      (!a.requierePedro || esPedro) &&
+      (a.requiereModulo !== 'finanzas' || permisos?.modulos.finanzas?.acceso === true)
+    )
   }, [actions, permisos, emailActivo, esPedro])
 
   const filtered = useMemo(() => {

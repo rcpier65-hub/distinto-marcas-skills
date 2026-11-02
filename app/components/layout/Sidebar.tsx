@@ -146,6 +146,23 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           </button>
           <NotificationBell notificaciones={notificaciones} />
         </div>
+        {permisos?.modulos.finanzas?.acceso === true && (
+          <Link
+            href="/finanzas"
+            className="mk-focusable"
+            aria-current={isActive('/finanzas') ? 'page' : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, minHeight: 44,
+              marginTop: 8, padding: '10px 12px', borderRadius: 10,
+              background: 'var(--mk-bg-selected)', color: 'var(--mk-text-primary)',
+              textDecoration: 'none', fontSize: 14, fontWeight: 600,
+              border: '1px solid var(--mk-border-default)', flexShrink: 0,
+            }}
+          >
+            <Wallet size={18} aria-hidden style={{ color: 'var(--mk-accent)' }} />
+            <span className="mk-nav-label">Finanzas</span>
+          </Link>
+        )}
       </div>
       <nav
         style={{
@@ -169,7 +186,6 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {esPedro && (
             <NavItem href="/presentaciones" icon={<PresentacionIcon />} label="Presentaciones" active={isActive('/presentaciones')} />
           )}
-          {permisos?.modulos.finanzas?.acceso === true && <NavItem href="/finanzas" icon={<Wallet size={14}/>} label="Finanzas" active={isActive('/finanzas')} />}
           {permisos && <NavItem href="/mis-recibos" icon={<ReceiptText size={14}/>} label="Mis recibos" active={isActive('/mis-recibos')} />}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
           <NavItem href="/recordatorios" icon={<NoteIcon />} label="Recordatorios" active={isActive('/recordatorios')} />
