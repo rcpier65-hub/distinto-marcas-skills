@@ -101,6 +101,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       data = await loadRows(BASE_COLS)
     }
     return data
+      .filter((r) => r.estado !== 'archivado')
       .filter((r) => !(r.estado === 'disenar' && !r.fecha_publicacion))
       .map((r) => {
       const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
