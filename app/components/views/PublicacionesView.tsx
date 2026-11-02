@@ -489,6 +489,12 @@ export function PublicacionesView({ publicaciones = PUBLICACIONES_MOCK, marcas =
       )}
 
       {/* ============== BODY ============== */}
+      {view !== 'listado' && filtered.some((p) => !p.fecha) && (
+        <div className="px-4 py-2 text-sm text-muted-foreground">
+          {filtered.filter((p) => !p.fecha).length} publicaciones sin fecha.{' '}
+          <button type="button" className="underline" onClick={() => setView('listado')}>Ver en listado</button>
+        </div>
+      )}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {view === 'listado' && (
           <ListadoView
@@ -599,7 +605,7 @@ function ListRow({ pub, selected, onToggleSelect }: { pub: PublicacionMock; sele
   const estadoCfg = ESTADO_PUB_CONFIG[pub.estado]
   const fecha = new Date(pub.fecha + 'T00:00:00')
   const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  const fechaLabel = `${fecha.getDate()} ${meses[fecha.getMonth()]} ${fecha.getFullYear()}`
+  const fechaLabel = pub.fecha ? `${fecha.getDate()} ${meses[fecha.getMonth()]} ${fecha.getFullYear()}` : 'Sin fecha'
 
   return (
     <tr

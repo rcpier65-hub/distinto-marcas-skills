@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { registrarActividad } from '@/lib/actividad/registrar'
 import { generateGrillaPNG } from '@/lib/grilla/generate-png'
 import { uploadGrillaPNG } from '@/lib/grilla/upload-png'
+import { isPublishableContent } from '@/lib/publicaciones/visibility'
 import {
   sendWhatsAppImage,
   sendWhatsAppImageToNamedGroup,
@@ -44,7 +45,7 @@ export async function generarGrillaParaSemana(
   // 2. Publicaciones de la semana
   const { data: pubsRaw } = await service
     .from('publicaciones')
-    .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido')
+    .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido, es_tarea_diseno')
     .eq('marca_id', marca.id)
     .gte('fecha_publicacion', semanaInicio)
     .lte('fecha_publicacion', semanaFin)
@@ -56,8 +57,10 @@ export async function generarGrillaParaSemana(
     fecha_publicacion: string | null
     plataformas: string[] | null
     tipo_contenido: string[] | null
+    es_tarea_diseno: boolean | null
   }
   const publicaciones: GrillaPublicacion[] = (pubsRaw ?? [])
+    .filter(isPublishableContent)
     .filter((p: PubRow) => p.fecha_publicacion)
     .map((p: PubRow) => ({
       notion_id: p.id,
@@ -244,7 +247,7 @@ export async function enviarGrillaAlGrupo(
   // 2. Publicaciones actualizadas
   const { data: pubsRaw } = await service
     .from('publicaciones')
-    .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido')
+    .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido, es_tarea_diseno')
     .eq('marca_id', marca.id)
     .gte('fecha_publicacion', semanaInicio)
     .lte('fecha_publicacion', semanaFin)
@@ -253,8 +256,10 @@ export async function enviarGrillaAlGrupo(
   type PubRow = {
     id: string; nombre: string; fecha_publicacion: string | null
     plataformas: string[] | null; tipo_contenido: string[] | null
+    es_tarea_diseno: boolean | null
   }
   const publicaciones: GrillaPublicacion[] = (pubsRaw ?? [])
+    .filter(isPublishableContent)
     .filter((p: PubRow) => p.fecha_publicacion)
     .map((p: PubRow) => ({
       notion_id: p.id, titulo: p.nombre, fecha: p.fecha_publicacion!,

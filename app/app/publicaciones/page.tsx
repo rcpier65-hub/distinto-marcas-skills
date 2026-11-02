@@ -12,6 +12,7 @@ import { HistoriasEnPublicaciones } from '@/components/views/HistoriasEnPublicac
 import { SyncNotionButton } from './_components/SyncNotionButton'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
 import { readPublicationPages } from '@/lib/publicaciones/read-pages'
+import { isPublishableContent } from '@/lib/publicaciones/visibility'
 import {
   type PublicacionMock,
   type EstadoPubMetricool,
@@ -61,6 +62,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       estado: string | null
       plataformas: string[] | null
       tipo_contenido: string[] | null
+      es_tarea_diseno: boolean | null
       copy: string | null
       copy_listo: boolean | null
       portada_lista: boolean | null
@@ -73,7 +75,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
     }
     const FULL_COLS = `
         id, nombre, fecha_publicacion, hora_publicacion, estado,
-        plataformas, tipo_contenido, copy, editor_id,
+        plataformas, tipo_contenido, es_tarea_diseno, copy, editor_id,
         copy_listo, portada_lista, editado,
         iniciado_edicion_at, editado_at,
         editor:editores(nombre),
@@ -81,7 +83,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       `
     const BASE_COLS = `
         id, nombre, fecha_publicacion, hora_publicacion, estado,
-        plataformas, tipo_contenido, copy, editor_id,
+        plataformas, tipo_contenido, es_tarea_diseno, copy, editor_id,
         editor:editores(nombre),
         marca:marcas(slug)
       `
@@ -101,6 +103,7 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       data = await loadRows(BASE_COLS)
     }
     return data
+      .filter(isPublishableContent)
       .filter((r) => r.estado !== 'archivado')
       .filter((r) => !(r.estado === 'disenar' && !r.fecha_publicacion))
       .map((r) => {
@@ -108,7 +111,8 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
       const editor = Array.isArray(r.editor) ? r.editor[0] : r.editor
       const redes = (r.plataformas ?? []).map(normalizeRed).filter(Boolean) as Red[]
       const tipo = normalizeTipo((r.tipo_contenido ?? [])[0])
-      let fecha = new Date().toISOString().slice(0, 10)
+      // An undated deliverable belongs in the list, never on today's calendar.
+      let fecha = ''
       let hora = r.hora_publicacion?.slice(0, 5) ?? '—'
       if (r.fecha_publicacion) {
         const parts = r.fecha_publicacion.split('T')

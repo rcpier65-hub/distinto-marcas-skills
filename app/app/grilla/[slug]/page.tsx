@@ -9,6 +9,7 @@ import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { GrillaWorkspace } from './_components/grilla-workspace'
 import { buildCaptionDefault } from '@/lib/grilla/build-caption'
+import { isPublishableContent } from '@/lib/publicaciones/visibility'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,7 +100,7 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
   // 3. Publicaciones de la semana (de NUESTRA BD)
   const { data: pubsRaw } = await service
     .from('publicaciones')
-    .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido')
+    .select('id, nombre, fecha_publicacion, plataformas, tipo_contenido, es_tarea_diseno')
     .eq('marca_id', marca.id)
     .gte('fecha_publicacion', inicio)
     .lte('fecha_publicacion', fin)
@@ -111,8 +112,10 @@ export default async function GrillaPage({ params, searchParams }: PageProps) {
     fecha_publicacion: string | null
     plataformas: string[] | null
     tipo_contenido: string[] | null
+    es_tarea_diseno: boolean | null
   }
   const pubs: PubLite[] = (pubsRaw ?? [])
+    .filter(isPublishableContent)
     .filter((p: PubRow) => p.fecha_publicacion)
     .map((p: PubRow) => ({
       id: p.id,

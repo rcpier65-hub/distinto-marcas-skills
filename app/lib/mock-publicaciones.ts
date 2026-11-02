@@ -21,7 +21,7 @@ export type TipoContenido = 'reel' | 'post' | 'carrusel' | 'story' | 'video'
 export type PublicacionMock = {
   id: string
   marcaSlug: string
-  fecha: string             /* ISO 2026-06-10 */
+  fecha: string             /* ISO 2026-06-10; '' = sin fecha, solo en Listado */
   hora: string              /* 20:00 */
   /* Título del video (columna `nombre` en BD). Lorena lo necesita visible en
      el calendario para encontrar videos rápido (antes solo se veía el copy). */
