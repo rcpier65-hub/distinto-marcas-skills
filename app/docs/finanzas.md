@@ -142,3 +142,24 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
   `confirmacion-movil-publicada.png` y `candidate-tests.txt` (local, ignorado).
   No se probó el micrófono físico de un teléfono; se verificó audio por archivo
   y la interfaz móvil. Permiso de micrófono solicitado solo al pulsar Dictar.
+
+### Acceso visible en móvil — 1 de noviembre de 2026
+
+- Producción `/api/version` = `359d33c`, rama `codex/finanzas-acceso-movil`,
+  conserva el registro rápido de `c357f01`. El permiso de Pedro ya estaba activo;
+  al plegar Workspace desaparecía el enlace anterior. Ahora Finanzas queda fijo
+  debajo de Buscar, fuera de las secciones plegables y del scroll del menú.
+- El buscador global incluye Finanzas y su entrada de gastos/cobros por texto o
+  audio. Ambos accesos exigen permiso explícito; no se ampliaron permisos.
+- Build/TypeScript aprobado. Lint conserva dos errores y un aviso preexistentes,
+  cotejados contra la base (efectos de Sidebar/CommandPalette y dependencia de
+  emailActivo). Sin incidencias nuevas de lint.
+- Candidata VPS: Pedro y Nayeli acceden; Ailyn y Pieer reciben bloqueo. Sesiones
+  temporales de prueba revocadas. No se modificaron movimientos financieros.
+- Navegador de producción a 390×844: con Workspace y Marcas plegados, Finanzas
+  permanece visible; abre el registro rápido y la búsqueda «finanzas» entrega
+  un resultado funcional. No equivale a prueba en el teléfono físico de Pedro.
+  Evidencia local: `output/finanzas-menu-nov01/menu-movil-publicado.png`.
+- Respaldo: `distinto-agencia:menu-base-c357f01`; compose anterior en
+  `/docker/distinto-agencia/menu-359d33c/compose-before.yml`. Se conservaron las
+  tres redes del contenedor, incluidas Supabase y transcriptor.
