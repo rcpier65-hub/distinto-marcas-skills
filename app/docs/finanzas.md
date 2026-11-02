@@ -163,3 +163,20 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
 - Respaldo: `distinto-agencia:menu-base-c357f01`; compose anterior en
   `/docker/distinto-agencia/menu-359d33c/compose-before.yml`. Se conservaron las
   tres redes del contenedor, incluidas Supabase y transcriptor.
+
+### Icono propio para el acceso directo — 1 de noviembre de 2026
+
+- Producción `/api/version` = `4efe57f`, rama `codex/finanzas-icono`, conserva
+  `359d33c`. `/finanzas` declara billetera blanca con moneda sobre morado,
+  nombre Finanzas y manifest propio con `id`/`start_url` `/finanzas`.
+- PNG de 32/180/192/512 px en `/icons/finanzas/v1/`, públicos sin sesión.
+  Safari recibe un único apple-touch-icon de 180 px; el manifest tiene iconos
+  normales y maskable. SVG fuente y script `generate-finance-icons.mjs` incluidos.
+  La agencia conserva su manifest, nombre e imágenes originales.
+- Build/TypeScript, lint y comprobación HTTP en candidata aprobados: metadata
+  de Finanzas y de Inicio, formatos PNG/tamaños y manifest único. Navegador en
+  producción confirma título y enlaces del head. Sin cambios de permisos ni
+  datos financieros. No se probó la instalación en el iPhone físico; para un
+  acceso anterior con icono guardado, volver a añadirlo desde Safari en Finanzas.
+- Imagen de retorno `distinto-agencia:icon-base-359d33c`; compose anterior y
+  fuente en `/docker/distinto-agencia/icon-4efe57f/`. Las tres redes conservadas.
