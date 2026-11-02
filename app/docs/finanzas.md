@@ -121,3 +121,24 @@ flujo móvil 390×844 de preparar → confirmar → resumen con cuenta temporal.
 Audio de prueba español transcrito realmente en VPS y convertido en tarjeta
 S/100 / movilidad / BCP Pedro. No equivale a probar el micrófono físico del
 usuario: el navegador del teléfono pedirá su permiso la primera vez.
+
+### Publicación del registro rápido — 1 de noviembre de 2026
+
+- Producción confirmada `/api/version` = `c357f01`, rama
+  `codex/finanzas-registro-rapido`, conserva `57e1a22` y su documentación.
+- Build/TypeScript, lint afectado, parser y pruebas completas de API aprobadas.
+  La integración se ejecutó en la imagen candidata del VPS antes de promoverla.
+  No hubo cambios de esquema ni de dependencias. Respaldo de imagen:
+  `distinto-agencia:quick-base-57e1a22`; compose anterior guardado en
+  `/docker/distinto-agencia/quick-c357f01/compose-before.yml`.
+- Se conservaron las dos redes existentes y se añadió `transcriptor_net` para
+  consumir el transcriptor interno. No se cambió su servicio ni se adquirió una
+  suscripción. El audio sintético tardó aproximadamente 4 s en la prueba de API.
+- Navegador en producción 390×844: frase exacta de Pedro muestra dos opciones
+  BCP; audio real de prueba prepara S/100, Movilidad y BCP Pedro. Se cerraron
+  ambos sin confirmar. El guardado completo ya se comprobó con datos QA y se
+  retiraron: cero movimientos financieros reales añadidos, cero cuentas QA.
+- Evidencia: `output/finanzas-rapido-nov01/registro-movil-publicado.png`,
+  `confirmacion-movil-publicada.png` y `candidate-tests.txt` (local, ignorado).
+  No se probó el micrófono físico de un teléfono; se verificó audio por archivo
+  y la interfaz móvil. Permiso de micrófono solicitado solo al pulsar Dictar.
