@@ -1,0 +1,17 @@
+{
+  "id": "/finanzas",
+  "name": "Finanzas · Distinto",
+  "short_name": "Finanzas",
+  "description": "Registro de gastos, cobros y cuentas de Distinto",
+  "start_url": "/finanzas",
+  "scope": "/finanzas",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8440de",
+  "lang": "es-PE",
+  "icons": [
+    { "src": "/icons/finanzas/v1/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/finanzas/v1/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/finanzas/v1/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
