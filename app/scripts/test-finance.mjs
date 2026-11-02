@@ -17,7 +17,7 @@ const base = process.env.TEST_BASE_URL || "http://localhost:3133",
   );
 const prefix = "QA-FIN-" + randomUUID(),
   sessions = [],
-  ids = { accounts: [], charges: [], docs: [], requests: [] };
+  ids = { accounts: [], charges: [], rules: [], docs: [], requests: [] };
 async function login(name) {
   const jar = new Map(),
     auth = createServerClient(
@@ -398,6 +398,45 @@ try {
   assert.equal(correctedResponse.status, 200, corrected.error);
   ids.docs.push(corrected.id);
   assert.notEqual(corrected.id, doc.id);
+  const schedule = await post(pedro, {
+    action: "rule",
+    data: {
+      title: prefix + " paused rule",
+      kind: "income",
+      scope: "agency",
+      owner: "pedro",
+      currency: "PEN",
+      base: 100,
+      frequency: "monthly",
+      day: 28,
+      starts: day,
+    },
+  });
+  ids.rules.push(schedule.id);
+  await post(pedro, { action: "pauseRule", id: schedule.id, active: false });
+  await pool.query("UPDATE finance_rules SET starts='2026-01-01' WHERE id=$1", [
+    schedule.id,
+  ]);
+  await post(pedro, { action: "pauseRule", id: schedule.id, active: true });
+  assert.equal(
+    (
+      await pool.query("SELECT starts::text FROM finance_rules WHERE id=$1", [
+        schedule.id,
+      ])
+    ).rows[0].starts,
+    day,
+  );
+  await get(pedro);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS n FROM finance_charges WHERE rule_id=$1 AND due<$2::date",
+        [schedule.id, month + "-01"],
+      )
+    ).rows[0].n,
+    0,
+  );
+  console.log("PASS reactivation does not backfill paused months");
   const rest = await fetch(
     process.env.NEXT_PUBLIC_SUPABASE_URL + "/rest/v1/finance_charges?select=id",
     { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY } },
@@ -418,6 +457,9 @@ try {
     "DELETE FROM finance_charges WHERE id=ANY($1::uuid[]) OR title LIKE $2",
     [ids.charges, prefix + "%"],
   );
+  await pool.query("DELETE FROM finance_rules WHERE id=ANY($1::uuid[])", [
+    ids.rules,
+  ]);
   await pool.query("DELETE FROM finance_accounts WHERE id=ANY($1::uuid[])", [
     ids.accounts,
   ]);

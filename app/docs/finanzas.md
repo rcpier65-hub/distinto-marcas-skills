@@ -12,7 +12,8 @@
 - **Mensualidades**: acuerdos mensuales/semanales; se generan al entrar las cuotas
   hasta el mes actual. Claves únicas (acuerdo, vencimiento) evitan duplicados.
   Las nuevas cuotas quedan **Por revisar**, sin presumir deuda ni pago.
-  Una pausa impide cuotas nuevas; conserva las ya generadas. Cambios de precio:
+  Una pausa impide cuotas nuevas; conserva las ya generadas. Al reactivar se
+  reinicia la vigencia desde ese día, sin retrocrear las cuotas del periodo pausado. Cambios de precio:
   pausar y crear otro acuerdo desde su vigencia; revisar las cuotas de ese mes.
 - **Cobros / Gastos y equipo**: confirmar pendiente, registrar pagos parciales o
   completos con fecha/cuenta real. Retenciones/detracciones acreditadas se separan

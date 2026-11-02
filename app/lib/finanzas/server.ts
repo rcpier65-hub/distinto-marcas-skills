@@ -335,9 +335,12 @@ export async function mutate(
       }
       id = b.id;
     } else if (b.action === "pauseRule") {
+      await c.query(
+        "SELECT pg_advisory_xact_lock(hashtext('distinto-finance-recurring'))",
+      );
       const r = await c.query(
-        "UPDATE finance_rules SET active=$2 WHERE id=$1 RETURNING id",
-        [b.id, b.active],
+        "UPDATE finance_rules SET starts=CASE WHEN $2=true AND active=false THEN GREATEST(starts,$3::date) ELSE starts END,active=$2 WHERE id=$1 RETURNING id",
+        [b.id, b.active, today()],
       );
       if (!r.rowCount) throw new FinanceError("Recurrencia no encontrada", 404);
       id = b.id;
