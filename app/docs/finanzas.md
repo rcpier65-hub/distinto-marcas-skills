@@ -64,3 +64,25 @@ pagada por clientes queda fuera de caja. No se reasignan RH entre personas.
 Limitaciones: conciliación manual, sin conexión bancaria ni declaración tributaria.
 La generación es al entrar al módulo (o Mis recibos), no envía recordatorios ni
 cobra tarjetas. Los futuros vencimientos no se materializan antes de su mes.
+
+## Publicación verificada — 1 de noviembre de 2026
+
+- Producción `/api/version`: `57e1a22`, sobre `0e79023`; rama
+  `codex/finanzas-agencia-personales`. Se conservó la base activa y se comprobó
+  otra vez antes de reemplazar exclusivamente el contenedor de la agencia.
+- Compilación, TypeScript, lint afectado y pruebas del modelo aprobados.
+  La integración completa pasó en un contenedor candidato del VPS antes de
+  promover esa misma imagen. Incluye reactivación sin cobros retroactivos.
+- Se promovió el artefacto Next compilado para VPS sobre la imagen existente,
+  sin cambiar dependencias, secretos, cron ni configuración de Supabase. Imagen
+  final `distinto-agencia:57e1a22`; respaldo
+  `distinto-agencia:finanzas-base-0e79023`. Ambas redes y los límites de recursos
+  originales se conservaron. No hubo publicación en Vercel.
+- Verificación en producción: login 200, API autorizada para Pedro/Nayeli;
+  equipo bloqueado y cliente redirigido a su portal sin datos financieros.
+  Navegador con la sesión existente de Pedro muestra el resumen publicado.
+- Datos iniciales: 12 acuerdos, 18 obligaciones, cero movimientos de caja;
+  registros temporales de prueba retirados. No se enviaron mensajes, se
+  cambiaron contraseñas ni se ejecutaron pagos o declaraciones.
+- Evidencia local: `output/finanzas-nov01/finanzas-publicado.png` y
+  `candidate-final-tests.txt`, fuera del repositorio público.
