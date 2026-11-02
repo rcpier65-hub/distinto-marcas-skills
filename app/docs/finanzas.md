@@ -358,3 +358,27 @@ revisión. Un gasto con espacio expresamente indicado o vinculado a una obligaci
 conserva ese espacio. Los cobros conservan al prestador; no se reclasifican por
 la cuenta que recibe el dinero. La revisión continúa siendo obligatoria. Se
 cubrieron frases, selección posterior, cuentas mixtas e ingresos vinculados.
+
+Verificación publicada: `/api/version` = `0ce03b6`, rama
+`codex/finanzas-resumen-explicable`, sobre `9687b7d`; dashboard en `d524877` y
+clasificación rápida en `0ce03b6`. Compilación/TypeScript, lint afectado y pruebas
+puras de dashboard y registro rápido aprobados. Integración de costos en
+candidata: conversión concurrente, rollback, Pedro/Nayeli autorizados y Ailyn
+bloqueada; fixtures eliminados. Lectura final de producción confirma tres
+reservas de plataformas y ausencia de cargos/reglas QA.
+
+Navegador real: 390×844 y 1280×900 sin desborde horizontal. Se abrieron cobros
+del mes/anteriores, gastos, saldos, entradas, movimientos y la fórmula de la
+previsión. Programar ChatGPT precarga importe/moneda y deja el día pendiente;
+se cerró sin guardar. El gasto de ejemplo desde Yape personal se preparó como
+Personal incluso desde Agencia y se descartó sin pago. Registro diario sigue
+siendo la entrada inicial. Evidencias privadas en
+`output/finanzas-dashboard-nov02/`.
+
+Pedro autorizó reclasificar cuatro gastos concretos de Yape de Nayeli a
+Personal. Se cambiaron únicamente los espacios de esos movimientos y sus
+obligaciones asociadas, con respaldo y auditoría; lectura posterior confirmó
+importes, fechas, cuentas y titulares originales. Los saldos y movimientos
+concurrentes del usuario se conservaron. No se realizaron transferencias
+bancarias ni pagos de plataformas. Fechas de plataformas y día semanal del
+retiro siguen pendientes; las monedas se presupuestan separadas.
