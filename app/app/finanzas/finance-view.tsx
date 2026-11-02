@@ -144,7 +144,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           <input
             aria-label="Mes de finanzas"
             type="month"
-            min="2026-11"
+            min="2000-01"
             max={data.today.slice(0, 7)}
             value={month}
             onChange={(e) => reload(e.target.value)}
