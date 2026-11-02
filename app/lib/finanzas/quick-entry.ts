@@ -7,6 +7,7 @@ export type QuickDraft = {
   date: string;
   title: string;
   scope: "agency" | "personal";
+  scopeExplicit?: boolean;
   owner: "agency" | "pedro" | "nayeli" | null;
   accountIds: string[];
   destinationIds: string[];
@@ -14,6 +15,14 @@ export type QuickDraft = {
   problems: string[];
   source: string;
 };
+// El uso elegido para una cuenta orienta gastos nuevos; no cambia el prestador
+// de un cobro ni un pendiente existente. La decisión explícita prevalece.
+export function reviewClassification(d: QuickDraft, account?: Account, charge?: Charge) {
+  if (charge) return {space:charge.scope, owner:charge.owner};
+  if (d.kind === "expense" && !d.scopeExplicit && account?.usage)
+    return {space:account.usage, owner:account.usage === "agency" ? "agency" as const : account.owner === "agency" ? null : account.owner};
+  return {space:d.scope, owner:d.owner};
+}
 const normalize = (s: string) =>
   s
     .normalize("NFD")
@@ -317,10 +326,12 @@ export function prepareQuickEntry(
     s.match(/\b(?:cuenta|bcp|bbva|yape|interbank|efectivo)\b.*$/)?.[0] || "";
   const transactionPart = s.replace(bankPart, "");
   if (/\b(personal|personales|para mi|mi casa)\b/.test(transactionPart)) {
+    d.scopeExplicit = true;
     d.scope = "personal";
     d.owner = null;
   }
   if (/\b(agencia|distinto)\b/.test(transactionPart)) {
+    d.scopeExplicit = true;
     d.scope = "agency";
     d.owner = "agency";
   }

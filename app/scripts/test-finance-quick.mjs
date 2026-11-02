@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { prepareQuickEntry, parseMoney } from "../lib/finanzas/quick-entry.ts";
+import { prepareQuickEntry, parseMoney, reviewClassification } from "../lib/finanzas/quick-entry.ts";
 const accounts = [
   { id: "bcp-p", name: "BCP Pedro / Yape", owner: "pedro", usage: "personal", currency: null },
   { id: "bcp-n", name: "BCP Nayeli", owner: "nayeli", usage: "agency", currency: "PEN" },
@@ -44,6 +44,13 @@ const context = {
 function parse(s) {
   return prepareQuickEntry(s, context);
 }
+assert.deepEqual(reviewClassification(parse('Gasté 31.40 soles en desodorante con Yape de Nayeli'), accounts[2]), {space:'personal',owner:'nayeli'});
+assert.deepEqual(reviewClassification(parse('Gasté 20 soles para la agencia con Yape de Nayeli'), accounts[2]), {space:'agency',owner:'agency'});
+assert.deepEqual(reviewClassification(parse('Gasto personal de Pedro de 20 soles con BCP de Nayeli'), accounts[1]), {space:'personal',owner:'pedro'});
+assert.deepEqual(reviewClassification(parse('Recibí mil soles de Kintu en Yape de Nayeli'), accounts[2], charges[0]), {space:'agency',owner:'pedro'});
+assert.deepEqual(reviewClassification(parse('Pagué a Lorena 1800 soles con Yape de Nayeli'), accounts[2], charges[1]), {space:'agency',owner:'agency'});
+assert.deepEqual(reviewClassification(parse('Gasté 10 soles en café con BCP'), accounts[1]), {space:'agency',owner:'agency'});
+assert.deepEqual(reviewClassification(parse('Gasté 10 soles en café con BCP'), accounts[0]), {space:'personal',owner:'pedro'});
 let d = parse("registra un gasto de 100 soles de la cuenta Bcp");
 assert.equal(d.amount, 10000);
 assert.deepEqual(d.accountIds, ["bcp-p", "bcp-n"]);

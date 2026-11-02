@@ -351,3 +351,10 @@ Pruebas: `node scripts/test-finance-dashboard.mjs` para periodos, monedas,
 abonos/IGV, transferencias, saldos y cuatro/cinco retiros; `TEST_BASE_URL=...
 node scripts/test-finance-cost-drafts.mjs` para conversión concurrente/idempotente,
 rollback y permisos. No ejecutan pagos reales; el segundo elimina sus fixtures.
+
+Los gastos rápidos nuevos sin espacio explícito toman como propuesta el uso de
+la cuenta seleccionada (personal/agencia), incluso al cambiar de cuenta en la
+revisión. Un gasto con espacio expresamente indicado o vinculado a una obligación
+conserva ese espacio. Los cobros conservan al prestador; no se reclasifican por
+la cuenta que recibe el dinero. La revisión continúa siendo obligatoria. Se
+cubrieron frases, selección posterior, cuentas mixtas e ingresos vinculados.

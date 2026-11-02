@@ -17,7 +17,7 @@ import {
   accountUsageName,
   type FinanceData,
 } from "@/lib/finanzas/model";
-import { prepareQuickEntry, type QuickDraft } from "@/lib/finanzas/quick-entry";
+import { prepareQuickEntry, reviewClassification, type QuickDraft } from "@/lib/finanzas/quick-entry";
 import { useQuickVoice } from "./use-quick-voice";
 import { QuickTransferReview } from "./quick-transfer-review";
 import styles from "./finance.module.css";
@@ -231,9 +231,8 @@ function QuickReview({
   }, []);
   const account = data.accounts.find((a) => a.id === accountId);
   const charge = data.charges.find((c) => c.id === chargeId);
-  const owner = charge?.owner || d.owner,
-    space = charge?.scope || d.scope,
-    coin = charge?.currency || d.currency;
+  const {owner, space} = reviewClassification(d, account, charge);
+  const coin = charge?.currency || d.currency;
   const needsSetup = !!account && (!account.currency || !account.owner),
     accountOwner = account?.owner || bankOwner;
   const compatible = data.accounts.filter(
@@ -422,6 +421,7 @@ function QuickReview({
                     setD({
                       ...d,
                       scope: account.usage!,
+                      scopeExplicit: true,
                       owner:
                         account.usage === "agency"
                           ? "agency"
@@ -594,11 +594,12 @@ function QuickReview({
                   <label>
                     Espacio
                     <select
-                      value={d.scope}
+                      value={space}
                       onChange={(e) =>
                         setD({
                           ...d,
                           scope: e.target.value as QuickDraft["scope"],
+                          scopeExplicit: true,
                           owner: e.target.value === "agency" ? "agency" : null,
                         })
                       }
@@ -610,11 +611,13 @@ function QuickReview({
                   <label>
                     Titular del movimiento
                     <select
-                      value={d.owner || ""}
+                      value={owner || ""}
                       onChange={(e) =>
                         setD({
                           ...d,
                           owner: e.target.value as QuickDraft["owner"],
+                          scope: space,
+                          scopeExplicit: true,
                         })
                       }
                     >
