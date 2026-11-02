@@ -1,0 +1,24 @@
+.section { margin: 16px 0; }
+.summary { padding: 17px; border: 1px solid #e4d9f9; border-radius: 15px; background: #f8f4ff; margin-bottom: 16px; }
+.summary span { font-size: 12px; }
+.summary strong { display: block; font-size: 26px; color: #7543cd; margin: 5px 0; }
+.grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.card { min-width: 0; padding: 19px; border: 1px solid var(--mk-border,#e4ddef); border-radius: 17px; background: var(--mk-bg-elevated,#fff); overflow-wrap: anywhere; }
+.cardHead { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
+.card h3 { font-size: 18px; margin: 4px 0; }
+.mainAmount { margin: 19px 0 14px; }
+.mainAmount span { display: block; font-size:12px; color:#796d88; }
+.mainAmount strong { font-size: 25px; }
+.due { display:flex; gap:8px; align-items:center; font-size:12px; margin:14px 0; }
+.due svg { flex-shrink:0; color:#8659cd; }
+.pending { background:#fff7e9; border-radius:8px; padding:9px; margin-bottom:12px; }
+.card .note { white-space:pre-wrap; background:#faf8ff; border-left:3px solid #d6c4f8; padding:10px; }
+.actions { display:flex; flex-wrap:wrap; gap:8px; }
+.actions button { min-height:44px; }
+.history { border-top:1px solid #eee8f7; margin-top:16px; padding-top:12px; }
+.checks { display:grid; gap:12px; margin-bottom:16px; }
+.checks label { display:flex; gap:9px; align-items:center; font-size:13px; }
+.sticky { position:sticky; bottom:-18px; background:white; padding-bottom:12px; }
+.dialog input,.dialog textarea,.dialog select { font-size:16px; }
+@media(max-width:1100px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:650px) { .grid { grid-template-columns:1fr; } .card { padding:16px; } .summary strong { font-size:24px; } .dialog { max-height:94dvh; } }

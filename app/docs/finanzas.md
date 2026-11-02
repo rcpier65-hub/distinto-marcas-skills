@@ -382,3 +382,35 @@ importes, fechas, cuentas y titulares originales. Los saldos y movimientos
 concurrentes del usuario se conservaron. No se realizaron transferencias
 bancarias ni pagos de plataformas. Fechas de plataformas y día semanal del
 retiro siguen pendientes; las monedas se presupuestan separadas.
+
+### Deudas personales y cuotas — 2 noviembre 2026
+
+Personal incluye botón Deudas, con tarjetas, nota editable, abonos y pago único
+o recurrente mensual. `finance_debts` tiene RLS y no permite acceso directo de
+anon/authenticated; utiliza la misma autorización de Pedro/Nayeli del módulo.
+Migración aditiva `20261102150000_finance_personal_debts.sql` enlaza obligaciones
+existentes mediante `debt_id` y periodo único. No modifica cuentas ni saldos.
+
+Total del crédito y cuota son campos separados. Importe o fecha desconocidos
+se conservan nulos; los aproximados se señalan y generan cuotas por revisar.
+Una mensualidad necesita cuota y primera fecha; la repetición conserva ese día,
+con ajuste al último día del mes cuando corresponda. El total, si se define,
+limita las cuotas: no se imputa todo el crédito además de la cuota mensual.
+No calcula intereses, seguros ni una tabla de amortización bancaria.
+
+Generación transaccional/idempotente al cargar Finanzas, solo meses alcanzados;
+un pago único conserva su fecha futura. Una cuota anulada no se recrea al
+actualizar. Pausar detiene nuevas cuotas, manteniendo las anteriores. Edición
+optimista por revisión evita sobrescribir cambios concurrentes. Las cuotas
+anteriores y aquellas con abonos conservan su importe; las cuotas sin pagar de
+este mes se actualizan. Un pago único permite corregir total y vencimiento,
+sin bajar el total por debajo de los abonos. Cambiar moneda/titular/tipo cuando
+hay vencimientos se bloquea; modificar la nota sigue disponible.
+
+Registrar pago utiliza la operación existente: exige cuenta/fecha/importe,
+descuenta de la cuenta y del pendiente con un solo movimiento. La reversión
+restaura ambos saldos. Guardar una deuda nunca ejecuta un pago bancario ni
+crea una salida automática. No se generan recibos tributarios.
+
+Pruebas: `node scripts/test-finance-debts.mjs`; integración con fixtures
+aislados `TEST_BASE_URL=... node scripts/test-finance-debts-live.mjs` desde app/.

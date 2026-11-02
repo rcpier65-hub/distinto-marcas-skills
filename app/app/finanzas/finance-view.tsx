@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ShieldCheck,
   CalendarDays,
+  Wallet,
 } from "lucide-react";
 import {
   amount,
@@ -28,6 +29,7 @@ import { DocumentsPanel } from "./documents-panel";
 import { QuickEntry } from "./quick-entry";
 import { AccountBalances } from "./account-balances";
 import { FinanceDashboard } from "./finance-dashboard";
+import { DebtsPanel } from "./debts-panel";
 import styles from "./finance.module.css";
 type FormKind =
   | "expense"
@@ -146,13 +148,14 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           ].map(([v, l]) => (
             <button
               key={v}
-              onClick={() => setScope(v)}
+              onClick={() => {setScope(v);if(v!=="personal" && tab==="Deudas")setTab("Registrar");}}
               aria-pressed={scope === v}
             >
               {l}
             </button>
           ))}
         </div>
+        {scope === "personal" && <button aria-label="Abrir deudas personales" onClick={()=>setTab("Deudas")} aria-pressed={tab==="Deudas"}><Wallet size={17}/> Deudas</button>}
         <label className={styles.compact}>
           Mes
           <input
@@ -197,16 +200,17 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           {notice}
         </div>
       )}
-      <FinanceDashboard
+      {tab !== "Deudas" && <FinanceDashboard
         key={`${scope}-${currency}-${month}`}
         data={data} scope={scope} currency={currency} month={month}
         onCharge={(charge) => setForm({ kind: "payment", charge })}
         onRecurring={(costDraft) => setForm({ kind: "rule", recurringKind: "expense", costDraft })}
-      />
+      />}
       <nav className={styles.tabs} aria-label="Secciones de finanzas">
         {[
           "Registrar",
           "Resumen",
+          ...(scope === "personal" ? ["Deudas"] : []),
           "Cobros",
           "Gastos y equipo",
           "Mensualidades",
@@ -219,6 +223,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           </button>
         ))}
       </nav>
+      {tab === "Deudas" && scope === "personal" && <DebtsPanel data={data} currency={currency} onSave={send} onPayment={(charge)=>setForm({kind:"payment",charge})}/>}
       {tab === "Resumen" && (
         <>
           <AccountBalances
@@ -1055,7 +1060,7 @@ function FinanceForm({
             <h3>{s.charge!.title}</h3>
             <p>
               Saldo pendiente: {amount(remaining(s.charge!), chosenCurrency)}.
-              Registra el depósito real, aunque sea parcial.
+              Registra el pago realizado, aunque sea parcial.
             </p>
             <Field label="Dinero efectivamente recibido o pagado">
               <input
@@ -1070,7 +1075,7 @@ function FinanceForm({
             <Field label="Cuenta del movimiento">
               {accounts("account_id", true)}
             </Field>
-            <details>
+            {!s.charge!.debt_id && <details>
               <summary>Retención o detracción acreditada</summary>
               <p>
                 Solo con comprobante. No es dinero disponible en esta cuenta. Si
@@ -1097,7 +1102,7 @@ function FinanceForm({
                   />
                 </Field>
               )}
-            </details>
+            </details>}
           </>
         )}
         {s.kind === "transfer" && (

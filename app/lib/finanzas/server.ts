@@ -15,6 +15,7 @@ import {
   type FinanceData,
 } from "./model";
 import { z } from "zod";
+import { DebtError, generateDebts, saveDebt } from "./debts-server";
 export class FinanceError extends Error {
   constructor(
     message: string,
@@ -57,6 +58,7 @@ export async function actor(req?: Request, staff = false) {
   return a;
 }
 export function failure(e: unknown) {
+  if (e instanceof DebtError) return Response.json({ error: e.message }, { status: 400 });
   if (e instanceof FinanceError)
     return Response.json({ error: e.message }, { status: e.status });
   if (e instanceof z.ZodError)
@@ -134,6 +136,7 @@ export async function generate(month: string) {
         m = new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 7);
       }
     }
+    await generateDebts(c, limit);
   });
 }
 export async function documents(member: { id: string; manager: boolean }) {
@@ -178,8 +181,12 @@ export async function loadFinance(
     db().query(
       "SELECT key,value FROM finance_settings WHERE key IN ('owner-monthly-target','owner-weekly-target','monthly-cost-drafts')",
     ),
+    db().query(`SELECT d.*,d.first_due::text,COALESCE((SELECT sum(m.amount+m.credit)::float8 FROM finance_movements m JOIN finance_charges c ON c.id=m.charge_id WHERE c.debt_id=d.id AND m.void_reason IS NULL),0) AS settled FROM finance_debts d ORDER BY d.first_due NULLS LAST,d.title`),
+    db().query(`SELECT c.*,c.due::text,COALESCE((SELECT sum(m.amount+m.credit)::float8 FROM finance_movements m WHERE m.charge_id=c.id AND m.void_reason IS NULL),0) AS settled FROM finance_charges c WHERE c.debt_id IS NOT NULL ORDER BY c.due`),
   ]);
   return {
+    debts: results[9].rows,
+    debtCharges: results[10].rows,
     monthlyCosts: monthlyCostDrafts.parse(results[8].rows.find((r) => r.key === "monthly-cost-drafts")?.value?.items ?? []),
     ownerTarget:
       results[8].rows.find((r) => r.key === "owner-monthly-target")?.value
@@ -277,7 +284,9 @@ export async function mutate(
       );
     if (req.result.ok) return req.result;
     let id: string | null = null;
-    if (b.action === "quickEntry") {
+    if (b.action === "debt") {
+      id = await saveDebt(c,b.data,b.id,b.revision);
+    } else if (b.action === "quickEntry") {
       if (b.date > today())
         throw new FinanceError("Registra pagos realizados, no pagos futuros");
       let chargeId = b.charge_id;

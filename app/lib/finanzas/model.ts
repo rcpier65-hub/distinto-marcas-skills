@@ -71,6 +71,8 @@ export function occurrences(
 }
 export type Charge = {
   id: string;
+  debt_id?: string | null;
+  debt_period?: string | null;
   rule_id: string | null;
   title: string;
   kind: "income" | "expense";
@@ -176,7 +178,22 @@ export const monthlyCostDrafts = z.array(z.object({
   starts_month: monthSchema, note: z.string().max(2000),
 }));
 export type MonthlyCostDraft = z.infer<typeof monthlyCostDrafts>[number];
+export const debtInput = z.object({
+  title: text,
+  owner: z.enum(["pedro", "nayeli"]),
+  currency,
+  frequency: z.enum(["once", "monthly"]),
+  total: money.nullable(),
+  installment: money.nullable(),
+  first_due: date.nullable(),
+  estimated: z.boolean(),
+  active: z.boolean(),
+  note: z.string().max(2000).default(""),
+});
+export type Debt = z.infer<typeof debtInput> & { id: string; revision: number; settled: number };
 export type FinanceData = {
+  debts?: Debt[];
+  debtCharges?: Charge[];
   monthlyCosts?: MonthlyCostDraft[];
   ownerTarget: number | null;
   ownerWeeklyTarget?: number | null;
@@ -223,6 +240,7 @@ export const ruleInput = chargeInput
   );
 export const actions = z
   .discriminatedUnion("action", [
+    z.object({ action: z.literal("debt"), id: z.string().uuid().optional(), revision: z.number().int().positive().optional(), data: debtInput }),
     z.object({ action: z.literal("weeklyWithdrawalTarget"), amount: money }),
     z.object({
       action: z.literal("quickEntry"),
