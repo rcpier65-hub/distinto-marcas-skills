@@ -22,7 +22,7 @@ export type Comentario = { id: string; autor: string; texto: string; fecha: stri
 export async function GET(req: Request) {
   try {
     const a = await actor(req);
-    if (!a.manager || a.client) throw new StrategyError("Solo administración puede revisar comentarios.", 403);
+    if (!a.canViewReports || a.client) throw new StrategyError("No tienes permiso para revisar comentarios de reportes.", 403);
     const q = z.object({ marca: z.string().min(1), red: z.enum(["instagram", "facebook"]), id: z.string().regex(/^\d+(?:_\d+)?$/) }).strict()
       .parse(Object.fromEntries(new URL(req.url).searchParams));
     const brand = await brandAccess(a, q.marca);

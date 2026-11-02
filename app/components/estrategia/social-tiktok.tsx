@@ -34,7 +34,7 @@ const btn = (primary = false): React.CSSProperties => ({
   border: primary ? "0" : "1px solid #dfd5f3", background: primary ? "#000" : "#fff", color: primary ? "#fff" : "#6d3ace",
 });
 
-export function TikTokSection({ slug, month }: { slug: string; month: string }) {
+export function TikTokSection({ slug, month, readOnly = false }: { slug: string; month: string; readOnly?: boolean }) {
   const { data, error, recargar } = useTikTok(slug, month);
   const [copiando, setCopiando] = useState(false);
   const [quitando, setQuitando] = useState(false);
@@ -93,7 +93,7 @@ export function TikTokSection({ slug, month }: { slug: string; month: string }) 
             ? "Conecta la cuenta de TikTok de esta marca para sumar seguidores, likes y el rendimiento de sus videos al reporte. Si no tienes el acceso, copia el enlace y envíaselo al cliente: lo abre, acepta en TikTok y listo."
             : "La conexión con TikTok aún no está configurada en el servidor."}
         </p>
-        {data.configurado && (
+        {data.configurado && !readOnly && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <a href={`/api/tiktok/conectar?marca=${encodeURIComponent(slug)}`} style={btn(true)}><LogIn size={15} /> Conectar TikTok</a>
             <button type="button" onClick={() => void copiarEnlace()} disabled={copiando} style={btn()}>
@@ -112,9 +112,9 @@ export function TikTokSection({ slug, month }: { slug: string; month: string }) 
       {header(
         <div style={{ display: "flex", gap: 8 }}>
           {(p?.profile_web_link || p?.profile_deep_link) && <a href={p.profile_web_link || p.profile_deep_link || undefined} target="_blank" rel="noopener noreferrer" style={btn()}>Ver perfil <ArrowUpRight size={14} /></a>}
-          <button type="button" onClick={() => void quitar()} disabled={quitando} style={{ ...btn(), color: "#b42318", borderColor: "#f3d0cc" }} title="Desconectar TikTok">
+          {!readOnly && <button type="button" onClick={() => void quitar()} disabled={quitando} style={{ ...btn(), color: "#b42318", borderColor: "#f3d0cc" }} title="Desconectar TikTok">
             <Unplug size={15} />
-          </button>
+          </button>}
         </div>,
       )}
       {data.error && <p role="alert" style={{ color: "#b42318", fontSize: 13, marginTop: 12 }}>{data.error}</p>}

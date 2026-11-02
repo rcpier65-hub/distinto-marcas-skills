@@ -333,6 +333,7 @@ export async function loadBrand(a: Actor, slug: string, calendarMonth = todayLim
       id: a.member.id,
       name: a.member.nombre,
       manager: a.manager,
+      canViewReports: a.canViewReports,
       assign: a.access.assign,
     },
     warnings,

@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 const sinCache = { headers: { "Cache-Control": "private, no-store" } };
 async function ctx(req: Request, marca: string) {
   const a = await actor(req);
-  if (!a.manager || a.client) throw new StrategyError("Solo dirección puede ver el reporte de anuncios.", 403);
+  if (a.client || !(req.method === "GET" ? a.canViewReports : a.manager)) throw new StrategyError("No tienes permiso para esta operación sobre este reporte de anuncios.", 403);
   return { a, brand: await brandAccess(a, marca) };
 }
 const respuesta = async (marcaId: string) => ({ meses: (await historialDeMarcas([marcaId]))[marcaId] ?? [], mesActual: todayLima().slice(0, 7) });

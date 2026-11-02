@@ -14,7 +14,7 @@ const sinCache = { headers: { "Cache-Control": "private, no-store" } };
 
 async function ctx(req: Request, marca: string) {
   const a = await actor(req);
-  if (!a.manager || a.client) throw new StrategyError("Solo dirección puede ver el reporte 360.", 403);
+  if (a.client || !(req.method === "GET" ? a.canViewReports : a.manager)) throw new StrategyError("No tienes permiso para esta operación sobre este reporte 360.", 403);
   if (marca !== MARCA) throw new StrategyError("El reporte 360 es solo para Oral Beauty.", 404);
   await brandAccess(a, marca);
   return a;

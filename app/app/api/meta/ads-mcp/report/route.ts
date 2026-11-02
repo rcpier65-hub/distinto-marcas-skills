@@ -6,7 +6,7 @@ export const dynamic='force-dynamic'
 export async function GET(req:Request){
   try{
     const a=await actor(req)
-    if(!a.manager||a.client)throw new StrategyError('Solo administración puede consultar este reporte.',403)
+    if(!a.canViewReports||a.client)throw new StrategyError('No tienes permiso para consultar este reporte.',403)
     const q=new URL(req.url).searchParams,brand=await brandAccess(a,q.get('marca')||'')
     const period=q.get('period')||'this_month'
     if(!REPORT_PERIODS.includes(period as ReportPeriod))throw new StrategyError('Periodo inválido.')

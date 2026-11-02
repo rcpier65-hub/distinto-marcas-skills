@@ -7,7 +7,7 @@ import { SocialCard } from '@/components/estrategia/social-card'
 export const dynamic='force-dynamic'
 export default async function Page({params}:{params:Promise<{slug:string}>}){
   const {slug}=await params,a=await actor(),brand=await brandAccess(a,slug)
-  if(!a.manager||a.client)return <main className="p-8">Solo administración puede consultar las métricas y configurar las cuentas de Meta.</main>
+  if(!a.canViewReports||a.client)return <main className="p-8">No tienes permiso para consultar las métricas de esta marca.</main>
   const [row,binding]=await Promise.all([connection(),brandBinding(brand.id)])
   const bindingKey=`${slug}:${binding?.updated_at||''}`
   return <main className="mx-auto max-w-6xl p-6 md:p-10">

@@ -10,7 +10,7 @@ import { Reporte360 } from "./reporte-360";
 type Res = { ok: true } | { ok: false; error: string };
 const URL_H = "/api/estrategia/pauta/historial";
 
-export function ReporteAnuncios({ slug, hoy }: { slug: string; hoy: string }) {
+export function ReporteAnuncios({ slug, hoy, readOnly = false }: { slug: string; hoy: string; readOnly?: boolean }) {
   const [datos, setDatos] = useState<{ meses: MesPauta[]; mesActual: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cargar = useCallback(async () => {
@@ -33,10 +33,10 @@ export function ReporteAnuncios({ slug, hoy }: { slug: string; hoy: string }) {
 
   return (
     <div className="st-ads">
-      {slug === "oral-bueaty" && <Reporte360 slug={slug} hoy={hoy} />}
+      {slug === "oral-bueaty" && <Reporte360 slug={slug} hoy={hoy} readOnly={readOnly} />}
       {error && <p className="st-r360-error" role="alert">{error}</p>}
       {datos ? (
-        <PautaHistorial slug={slug} meses={datos.meses} mesActual={datos.mesActual}
+        <PautaHistorial readOnly={readOnly} slug={slug} meses={datos.meses} mesActual={datos.mesActual}
           onActualizar={() => enviar({ accion: "actualizar" })}
           onPresupuesto={(mes, monto) => enviar({ accion: "presupuesto", mes, monto })} />
       ) : !error && <p className="st-mt-hint">Cargando historial de pauta…</p>}

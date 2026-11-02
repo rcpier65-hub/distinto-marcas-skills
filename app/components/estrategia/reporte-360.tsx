@@ -11,7 +11,7 @@ const sol = (v: number | null) => (v == null ? "—" : new Intl.NumberFormat("es
 const ent = (v: number) => new Intl.NumberFormat("es-PE").format(v);
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
 
-export function Reporte360({ slug, hoy }: { slug: string; hoy: string }) {
+export function Reporte360({ slug, hoy, readOnly = false }: { slug: string; hoy: string; readOnly?: boolean }) {
   const [mes, setMes] = useState(hoy.slice(0, 7));
   const [sede, setSede] = useState<"TODAS" | "LIMA" | "RIOJA">("TODAS");
   const [datos, setDatos] = useState<Datos | null | undefined>(undefined);
@@ -58,7 +58,7 @@ export function Reporte360({ slug, hoy }: { slug: string; hoy: string }) {
         </div>
         <div className="st-ads-tools">
           <input type="month" value={mes} max={hoy.slice(0, 7)} onChange={(e) => e.target.value && setMes(e.target.value)} aria-label="Mes del reporte" className="st-r360-mes" />
-          <button className="st-primary" onClick={actualizar} disabled={ocupado}><RefreshCw size={15} className={ocupado ? "animate-spin" : ""} /> {ocupado ? "Consultando Meta y la clínica…" : "Actualizar"}</button>
+          {!readOnly && <button className="st-primary" onClick={actualizar} disabled={ocupado}><RefreshCw size={15} className={ocupado ? "animate-spin" : ""} /> {ocupado ? "Consultando Meta y la clínica…" : "Actualizar"}</button>}
         </div>
       </div>
 

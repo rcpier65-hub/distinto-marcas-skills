@@ -108,10 +108,12 @@ export function SocialReportView({
   slug,
   today,
   brandName,
+  readOnly = false,
 }: {
   slug: string;
   today: string;
   brandName?: string;
+  readOnly?: boolean;
 }) {
   const [month, setMonth] = useState(today.slice(0, 7)),
     [revision, setRevision] = useState(0),
@@ -156,7 +158,7 @@ export function SocialReportView({
               }}
             />
           </label>
-          <button
+          {!readOnly && <button
             onClick={() => void actualizarDatos()}
             disabled={actualizando}
             aria-label="Actualizar los datos desde Meta y TikTok"
@@ -164,7 +166,7 @@ export function SocialReportView({
           >
             <RefreshCw size={15} className={actualizando ? "animate-spin" : ""} />
             {actualizando ? "Actualizando…" : "Actualizar datos"}
-          </button>
+          </button>}
         </div>
       </div>
       <ReportBody
@@ -172,6 +174,7 @@ export function SocialReportView({
         slug={slug}
         month={month}
         brandName={brandName || slug}
+        readOnly={readOnly}
       />
     </div>
   );
@@ -203,7 +206,7 @@ function ExportPdf({ slug, month, brand, report }: { slug: string; month: string
     </>
   );
 }
-function ReportBody({ slug, month, brandName }: { slug: string; month: string; brandName: string }) {
+function ReportBody({ slug, month, brandName, readOnly }: { slug: string; month: string; brandName: string; readOnly: boolean }) {
   const { data, error } = useReport<SocialReport & { guardadoEn?: string; guardadoPor?: string | null }>(slug, month, "report");
   const [showPosts, setShowPosts] = useState(false);
   const [trend, setTrend] = useState<TrendMetric | null>(null);
@@ -275,7 +278,7 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
           </div>
           <div className={styles.heroActions}>
             <ExportPdf slug={slug} month={month} brand={brandName} report={data} />
-            <EnviarCorreoBoton slug={slug} month={month} brand={brandName} />
+            {!readOnly && <EnviarCorreoBoton slug={slug} month={month} brand={brandName} />}
           </div>
         </div>
       </section>
@@ -490,7 +493,7 @@ function ReportBody({ slug, month, brandName }: { slug: string; month: string; b
           evidencia.
         </p>
       </section>
-      <TikTokSection slug={slug} month={month} />
+      <TikTokSection slug={slug} month={month} readOnly={readOnly} />
       <footer className={styles.footnote}>
         Consulta:{" "}
         {new Date(data.checkedAt).toLocaleString("es-PE", {

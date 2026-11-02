@@ -225,6 +225,7 @@ export function BrandOverview({
             key={b.brand.slug}
             slug={b.brand.slug}
             manager={b.me.manager}
+            canViewReports={b.me.canViewReports}
             compact
           />
         </div>

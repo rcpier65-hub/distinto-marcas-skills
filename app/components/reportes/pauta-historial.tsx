@@ -15,8 +15,8 @@ import { actualizarPautaReportes, guardarPresupuestoPauta } from '@/app/reportes
 type Res = { ok: true } | { ok: false; error: string }
 /* Por defecto usa las acciones del módulo Reportes (con código). Dentro del
    espacio de marca se le pasan acciones que van por la API de la marca. */
-export function PautaHistorial({ slug, meses, mesActual, onActualizar, onPresupuesto }: {
-  slug: string; meses: MesPauta[]; mesActual: string
+export function PautaHistorial({ slug, meses, mesActual, onActualizar, onPresupuesto, readOnly = false }: {
+  slug: string; meses: MesPauta[]; mesActual: string; readOnly?: boolean
   onActualizar?: () => Promise<Res>; onPresupuesto?: (mes: string, monto: number | null) => Promise<Res>
 }) {
   const router = useRouter()
@@ -56,10 +56,10 @@ export function PautaHistorial({ slug, meses, mesActual, onActualizar, onPresupu
           <h2 className="text-[18px] font-bold text-slate-900 leading-tight">Publicidad · historial mensual</h2>
           <p className="text-[12.5px] text-slate-500">Presupuesto, inversión y resultados en Meta Ads, mes a mes.{ultima ? ` Datos de Meta al ${new Date(ultima).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}.` : ''}</p>
         </div>
-        <button type="button" onClick={actualizar} disabled={pend}
+        {!readOnly && <button type="button" onClick={actualizar} disabled={pend}
           className="inline-flex items-center gap-2 h-10 px-4 rounded-[12px] text-[13px] font-semibold text-white disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#7170ff,#ba41f7)' }}>
           <RefreshCw className={`w-4 h-4 ${pend ? 'animate-spin' : ''}`} /> Actualizar desde Meta
-        </button>
+        </button>}
       </div>
 
       {grafico.some((m) => m.metricas?.gasto || m.presupuesto) && (
@@ -105,7 +105,7 @@ export function PautaHistorial({ slug, meses, mesActual, onActualizar, onPresupu
                 <tr key={m.mes} className="border-t border-slate-100">
                   <td className="py-2.5 px-2 font-semibold text-slate-900 whitespace-nowrap">{labelMes(m.mes)}{m.mes === mesActual && <span className="ml-1.5 text-[10.5px] font-semibold text-violet-600">en curso</span>}</td>
                   <td className="py-2.5 px-2 whitespace-nowrap">
-                    {editando === m.mes ? (
+                    {readOnly ? <span>{din(m.presupuesto, 0)}</span> : editando === m.mes ? (
                       <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); guardar(m.mes) }}>
                         <input autoFocus type="number" min="0" step="0.01" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} className="w-24 h-8 px-2 rounded-[8px] border border-slate-300 text-[13px]" aria-label={`Presupuesto de ${labelMes(m.mes)}`} />
                         <button type="submit" disabled={pend} className="h-8 px-2.5 rounded-[8px] text-[12px] font-semibold text-white bg-violet-600">OK</button>

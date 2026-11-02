@@ -9,10 +9,12 @@ export function SocialCard({
   slug,
   manager,
   compact = false,
+  canViewReports = manager,
 }: {
   slug: string;
   manager: boolean;
   compact?: boolean;
+  canViewReports?: boolean;
 }) {
   const [data, setData] = useState<SocialSummary | null>(null),
     [busy, setBusy] = useState(true),
@@ -122,7 +124,7 @@ export function SocialCard({
       >
         <div className="st-row">
           <span className="st-eyebrow">REDES SOCIALES</span>
-          {manager ? <button className="st-text-button" onClick={() => window.dispatchEvent(new CustomEvent("st:abrir-pestana", { detail: "Reportes" }))}>Ver reporte <ArrowUpRight size={13}/></button> : <button className="st-text-button" onClick={() => setExpanded(true)}>
+          {canViewReports ? <button className="st-text-button" onClick={() => window.dispatchEvent(new CustomEvent("st:abrir-pestana", { detail: "Reportes" }))}>Ver reporte <ArrowUpRight size={13}/></button> : <button className="st-text-button" onClick={() => setExpanded(true)}>
             Ver métricas <ArrowUpRight size={13} />
           </button>}
         </div>

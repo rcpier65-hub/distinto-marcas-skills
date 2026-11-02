@@ -44,6 +44,10 @@ export async function actor(req?: Request) {
     throw new StrategyError("No tienes acceso a este espacio", 403);
   if (team?.activo === false)
     throw new StrategyError("Tu acceso está desactivado", 403);
+  const manager = access.owner || ["director", "admin"].includes(member?.rol_base);
+  // Consultar reportes respeta Marcas + Métricas, sin elevar el rol ni permitir gestión.
+  const canViewReports = !!member && (manager ||
+    (permisos.marcas?.acceso === true && permisos.metricas?.acceso === true));
   return {
     user,
     service,
@@ -54,7 +58,8 @@ export async function actor(req?: Request) {
       string[] | null,
     clientBrands: (client.data ?? []) as { marca_id: string; nombre: string }[],
     client: !member,
-    manager: access.owner || ["director", "admin"].includes(member?.rol_base),
+    manager,
+    canViewReports,
   };
 }
 export type Actor = Awaited<ReturnType<typeof actor>>;

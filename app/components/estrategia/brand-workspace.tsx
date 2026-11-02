@@ -329,7 +329,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
               {n}
             </button>
           ))}
-          {b.me.manager && (
+          {b.me.canViewReports && (
             <button
               className={tab === "Reportes" ? "st-active" : ""}
               onClick={() => {
@@ -340,7 +340,7 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
               Reportes de redes
             </button>
           )}
-          {b.me.manager && (
+          {b.me.canViewReports && (
             <button
               className={tab === "Reporte de anuncios" ? "st-active" : ""}
               onClick={() => {
@@ -359,9 +359,9 @@ export function BrandWorkspace({ initial }: { initial: BrandPayload }) {
         </div>
       )}
       <div className="st-body">
-        {tab === "Reporte de anuncios" && b.me.manager && <ReporteAnuncios slug={brand.slug} hoy={b.today} />}
-        {tab === "Reportes" && b.me.manager && (
-          <SocialReportView slug={brand.slug} today={b.today} brandName={brand.nombre} />
+        {tab === "Reporte de anuncios" && b.me.canViewReports && <ReporteAnuncios slug={brand.slug} hoy={b.today} readOnly={!b.me.manager} />}
+        {tab === "Reportes" && b.me.canViewReports && (
+          <SocialReportView slug={brand.slug} today={b.today} brandName={brand.nombre} readOnly={!b.me.manager} />
         )}
         {tab === "Mapa de marca" && <BrandMap slug={brand.slug} brandName={brand.nombre} />}
         {tab === "Publicidad" && (

@@ -50,3 +50,15 @@ Se conservaron Finanzas, Deudas, permisos y datos comerciales.
   navegar a Editor y Hábitos, recargar y comprobar que sigue marcado.
 - Fixtures y sesión local retirados. Sin cambios a tareas/hábitos reales ni
   notificaciones/mensajes enviados a clientes.
+
+## Publicado
+
+Producción `/api/version` = `6143c73`, validada después de promover la imagen
+probada en un puerto privado. Compilación local aprobada; no se compiló Next
+en el VPS saturado. Se preservaron las tres redes y el entorno secreto.
+
+La prueba de hábitos pasó también en producción: reintentos concurrentes,
+persistencia y aislamiento; fixtures retirados. Las nueve lecturas con Lorena,
+Pieer y Ailyn entregaron 200 en 0.36–0.92 s. Es tiempo HTTP completo de la
+prueba, no una medición del dispositivo de cada miembro. Shalom sigue running,
+sin OOM ni reinicios y con límites persistentes.

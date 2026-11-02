@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 async function ctx(req: Request, slug: string) {
   const a = await actor(req);
-  if (!a.manager || a.client) throw new StrategyError("Solo administración puede gestionar TikTok.", 403);
+  if (a.client || !(req.method === "GET" ? a.canViewReports : a.manager)) throw new StrategyError("No tienes permiso para esta operación sobre las métricas de TikTok.", 403);
   return { a, brand: await brandAccess(a, slug) };
 }
 export async function GET(req: Request) {

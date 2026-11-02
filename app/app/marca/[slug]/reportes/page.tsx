@@ -12,10 +12,10 @@ export default async function Page({
   const { slug } = await params,
     a = await actor(),
     brand = await brandAccess(a, slug);
-  if (!a.manager || a.client)
+  if (!a.canViewReports || a.client)
     return (
       <main className="p-8">
-        Solo administración puede consultar los reportes de redes.
+        No tienes permiso para consultar los reportes de redes.
       </main>
     );
   return (
@@ -45,7 +45,7 @@ export default async function Page({
           </h1>
         </div>
       </div>
-      <SocialReportView slug={slug} today={todayLima()} brandName={brand.nombre} />
+      <SocialReportView slug={slug} today={todayLima()} brandName={brand.nombre} readOnly={!a.manager} />
     </main>
   );
 }

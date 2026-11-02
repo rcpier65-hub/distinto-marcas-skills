@@ -13,9 +13,9 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const a = await actor(req);
-    if (!a.manager || a.client)
+    if (!a.canViewReports || a.client)
       throw new StrategyError(
-        "Solo administración puede consultar el reporte de redes.",
+        "No tienes permiso para consultar el reporte de redes.",
         403,
       );
     const q = z
