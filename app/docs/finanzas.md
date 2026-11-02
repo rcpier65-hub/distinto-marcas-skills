@@ -195,3 +195,25 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
   del usuario. Evidencia privada en `output/finanzas-cobro-nov01/`, ignorada por Git.
 - Respaldo `distinto-agencia:history-base-4efe57f`; fuente y compose anterior en
   `/docker/distinto-agencia/history-c144cd0/`. Las tres redes conservadas.
+
+### Resumen de saldos por cuenta — 1 de noviembre de 2026
+
+- Producción `c13604b`, rama `codex/finanzas-resumen-cuentas`, conserva `c144cd0`.
+  Al inicio de Resumen aparecen las seis cuentas/billeteras, saldo registrado,
+  movimientos netos y acceso a completar su apertura. Cuentas reutiliza el bloque
+  y añade sus notas. Totales conocidos separados en PEN/USD, sin sumar monedas.
+- Un saldo requiere moneda, importe inicial y fecha de apertura. Vacío no es cero:
+  se muestra Por completar y se excluye del total. Se incluyen saldos negativos
+  y cero; los movimientos netos ya descuentan salidas e incluyen transferencias.
+  El saldo es acumulado, independiente del mes y del espacio Agencia/Personales.
+  No es consulta bancaria: depende de los movimientos que se registran.
+- No se modificaron cuentas ni pagos. El cobro anterior conserva su ID, importe y
+  cuenta; no se convirtió en un saldo inicial. La API no cambia.
+- Build/TypeScript, lint afectado y pruebas del modelo aprobados. Candidata VPS:
+  saldos por cuenta cotejados con API, octubre/noviembre equivalentes, cobro
+  original intacto, Pedro/Nayeli autorizados y Ailyn/Pieer/anónimo bloqueados.
+  Sesiones temporales cerradas. Navegador producción en escritorio y 390×844:
+  tarjetas legibles sin desborde y formulario de apertura accesible sin guardar.
+- Respaldo `distinto-agencia:balances-base-c144cd0`; fuente y compose anterior en
+  `/docker/distinto-agencia/balances-c13604b/`. Tres redes conservadas. Evidencia
+  privada local `output/finanzas-saldos-nov01/resumen-movil.png`.
