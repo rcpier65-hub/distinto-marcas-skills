@@ -88,6 +88,12 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.headerActions button { min-height: 44px; }
 .eyebrow {
   font-size: 10px;
   letter-spacing: 2px;
@@ -474,8 +480,11 @@ table:where(.root table) {
   .balanceAmount { font-size: 18px; }
   .balanceCard button { min-height: 44px; }
   .root {
-    padding: 70px 12px 20px;
+    padding: 20px 12px;
   }
+  .header { flex-wrap: nowrap; gap: 10px; }
+  .headerActions { flex-shrink: 0; }
+  .header .eyebrow { display: none; }
   .root h1 {
     font-size: 24px;
   }

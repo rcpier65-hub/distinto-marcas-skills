@@ -44,7 +44,7 @@ type FormState = {
 };
 export function FinanceView({ initial }: { initial: FinanceData }) {
   const [data, setData] = useState(initial),
-    [tab, setTab] = useState("Resumen"),
+    [tab, setTab] = useState("Registrar"),
     [scope, setScope] = useState("agency"),
     [currency, setCurrency] = useState("PEN"),
     [month, setMonth] = useState(initial.month),
@@ -120,9 +120,18 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
             gastar.
           </p>
         </div>
-        <span className={styles.secure}>
-          <ShieldCheck size={16} /> Pedro y Nayeli
-        </span>
+        <div className={styles.headerActions}>
+          <span className={styles.secure}>
+            <ShieldCheck size={16} /> Pedro y Nayeli
+          </span>
+          <button
+            className={styles.primary}
+            aria-label={tab === "Registrar" ? "Ver resumen de cuentas" : "Volver a registrar gastos"}
+            onClick={() => setTab(tab === "Registrar" ? "Resumen" : "Registrar")}
+          >
+            {tab === "Registrar" ? "Resumen" : "Registrar"}
+          </button>
+        </div>
       </header>
       {tab === "Resumen" && (
         <AccountBalances
@@ -132,7 +141,9 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           onManage={() => setTab("Cuentas")}
         />
       )}
-      <QuickEntry data={data} scope={scope} currency={currency} onSave={send} />
+      <div hidden={tab !== "Registrar"}>
+        <QuickEntry data={data} scope={scope} currency={currency} onSave={send} />
+      </div>
       <div className={styles.toolbar}>
         <div className={styles.segment}>
           {[
@@ -219,6 +230,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
       </div>
       <nav className={styles.tabs} aria-label="Secciones de finanzas">
         {[
+          "Registrar",
           "Resumen",
           "Cobros",
           "Gastos y equipo",
