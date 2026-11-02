@@ -222,6 +222,21 @@
   width: 100%;
   min-height: 48px;
 }
+.transferAmount {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 12px;
+}
+.balancePreview {
+  margin: -5px 0 8px !important;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.transferArrow {
+  display: block;
+  margin: 0 auto;
+  color: #8254c4;
+}
 @media (max-width: 650px) {
   .quick {
     padding: 14px;

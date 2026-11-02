@@ -283,3 +283,24 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
   `/docker/distinto-agencia/usage-91d986e/`. Candidato detenido antes de promover
   y eliminado al finalizar; tres redes existentes conservadas. Sin despliegues
   en Vercel ni cambios en otros contenedores.
+
+## Transferencias desde el registro rápido — 2 noviembre 2026
+
+Escribir o dictar «Me transferí 1,500 soles del BCP de Nayeli al BCP de Pedro»
+prepara una transferencia con origen y destino separados. Frases incompletas
+abren una revisión para elegir las cuentas o completar el importe; «mi cuenta
+personal» no supone que la persona actual sea Pedro. No se guardan movimientos
+hasta confirmar. Los cobros recibidos por transferencia siguen siendo cobros.
+
+La revisión muestra las etiquetas Agencia/Personal y el saldo registrado que
+quedaría en cada cuenta, cuando se conoce su apertura. Se usa la misma acción
+`transfer` del formulario manual: una fila, una transacción, identificador
+idempotente para reintentos, sin nuevos ingresos/gastos. El origen resta y el
+destino suma; el total combinado se mantiene. No mueve dinero en el banco.
+La fecha, moneda, cuentas distintas, autorización y Origin se validan en servidor.
+
+Pruebas: `node --experimental-strip-types scripts/test-finance-quick.mjs`.
+La integración `test-finance-transfers.mjs` requiere `TEST_BASE_URL` y acceso
+al PostgreSQL activo; crea únicamente cuentas QA aisladas y las limpia al terminar.
+Comprueba origen/destino, dos saldos, totales por uso, reintento simultáneo,
+anulación y rechazos por moneda, fecha, permisos y origen.

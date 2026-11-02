@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { prepareQuickEntry, parseMoney } from "../lib/finanzas/quick-entry.ts";
 const accounts = [
-  { id: "bcp-p", name: "BCP Pedro / Yape", owner: "pedro", currency: null },
-  { id: "bcp-n", name: "BCP Nayeli", owner: "nayeli", currency: "PEN" },
-  { id: "yape-n", name: "Yape Nayeli", owner: "nayeli", currency: "PEN" },
+  { id: "bcp-p", name: "BCP Pedro / Yape", owner: "pedro", usage: "personal", currency: null },
+  { id: "bcp-n", name: "BCP Nayeli", owner: "nayeli", usage: "agency", currency: "PEN" },
+  { id: "yape-n", name: "Yape Nayeli", owner: "nayeli", usage: "personal", currency: "PEN" },
   { id: "bbva", name: "BBVA Pedro", owner: "pedro", currency: "PEN" },
 ];
 const charges = [
@@ -98,7 +98,6 @@ for (const s of [
   "No pagué 100 soles a Lorena",
   "No gasté 100 soles en movilidad",
   "No he recibido 100 soles de Kintu",
-  "Transfiere 100 soles del BCP a BBVA",
   "Pagaré 100 soles mañana",
   "Gasto de -100 soles en taxi",
   "Gasto de 100 soles el 31/02/2026",
@@ -126,3 +125,43 @@ assert.equal(
 );
 assert.equal(parse("Gasto de 1 sol en QA movilidad").title, "Qa movilidad");
 assert.equal(parse("Gasté un dólar en café").amount, 100);
+
+for (const phrase of [
+  "Me transferí 1,500 soles del BCP de Nayeli al BCP de Pedro",
+  "Transferí mil quinientos soles desde BCP Nayeli hacia BCP Pedro",
+  "Me transferí 1500 a BCP Pedro desde BCP Nayeli",
+  "Registra una transferencia de 1500 soles del BCP de Nayeli al BCP de Pedro",
+]) {
+  const t = parse(phrase);
+  assert.equal(t.kind, "transfer", phrase);
+  assert.equal(t.amount, 150000, phrase);
+  assert.deepEqual(t.accountIds, ["bcp-n"], phrase);
+  assert.deepEqual(t.destinationIds, ["bcp-p"], phrase);
+  assert.deepEqual(t.chargeIds, []);
+  assert.deepEqual(t.problems, [], phrase);
+}
+d = parse("Me transferí a mi cuenta personal");
+assert.equal(d.kind, "transfer");
+assert.equal(d.amount, null);
+assert.deepEqual(d.accountIds, []);
+assert.deepEqual(d.destinationIds, ["bcp-p", "yape-n"]);
+assert.deepEqual(d.problems, []);
+d = parse("Transferí 100 soles desde BBVA a Yape Nayeli ayer");
+assert.equal(d.date, "2026-10-31");
+assert.deepEqual(d.accountIds, ["bbva"]);
+assert.deepEqual(d.destinationIds, ["yape-n"]);
+d = parse("Transferí 20 soles del BCP a mi cuenta personal");
+assert.deepEqual(d.accountIds, ["bcp-p", "bcp-n"]);
+assert.deepEqual(d.destinationIds, ["bcp-p", "yape-n"]);
+assert.equal(parse("Recibí una transferencia de Kintu por 100 soles en BCP Pedro").kind, "income");
+assert.equal(parse("Pagué una comisión por transferencia de 5 soles con BBVA").kind, "expense");
+for (const phrase of [
+  "No me transferí 100 soles de BCP Nayeli a BCP Pedro",
+  "No me he transferido 100 soles",
+  "Voy a transferirme 100 soles del BCP a BBVA",
+  "Transferí -100 soles del BCP a BBVA",
+  "Transferí 100 soles y 100 dólares del BCP a BBVA",
+  "Transferí 100 soles mañana del BCP a BBVA",
+  "Transferí 100 soles y 50 soles del BCP a BBVA",
+]) assert.ok(parse(phrase).problems.length, phrase);
+console.log("PASS internal transfers, separate source/destination, spoken amounts, incomplete drafts, ambiguous personal accounts and non-transfer bank payments");

@@ -19,6 +19,7 @@ import {
 } from "@/lib/finanzas/model";
 import { prepareQuickEntry, type QuickDraft } from "@/lib/finanzas/quick-entry";
 import { useQuickVoice } from "./use-quick-voice";
+import { QuickTransferReview } from "./quick-transfer-review";
 import styles from "./finance.module.css";
 import q from "./quick-entry.module.css";
 export function QuickEntry({
@@ -54,6 +55,14 @@ export function QuickEntry({
   });
   const recording = voice.status === "recording",
     working = voice.status !== "idle";
+  async function saveDraft(p: Record<string, unknown>) {
+    await onSave(p);
+    setSaved(p.action === "transfer"
+      ? `Transferencia registrada: ${amount(p.amount as number, data.accounts.find((a) => a.id === p.account_id)?.currency || draft?.currency || "PEN")}. Ambos saldos actualizados.`
+      : `${p.kind === "income" ? "Cobro" : "Gasto"} registrado: ${amount(p.amount as number, p.currency as string)}.`);
+    setText("");
+    setDraft(null);
+  }
   return (
     <section className={q.quick} aria-label="Registro rápido">
       <div className={q.head}>
@@ -61,7 +70,7 @@ export function QuickEntry({
           <h2>Registra en una frase</h2>
           <p>Escribe o dicta. Revisa y confirma.</p>
         </div>
-        <span className={q.tag}>Gastos y cobros</span>
+        <span className={q.tag}>Gastos, cobros y transferencias</span>
       </div>
       <form
         onSubmit={(e) => {
@@ -70,7 +79,7 @@ export function QuickEntry({
         }}
       >
         <textarea
-          aria-label="Describe el gasto o cobro"
+          aria-label="Describe el gasto, cobro o transferencia"
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -167,25 +176,21 @@ export function QuickEntry({
         <p>
           «Gasté 100 soles en taxi con BCP de Pedro». «Recibí 1,000 soles de
           Kintu en Yape de Nayeli».
+          {" "}«Me transferí 1,500 soles del BCP de Nayeli al BCP de Pedro».
         </p>
         <small>
           El audio se transcribe en tu VPS y no se guarda en tu historial.
           Ningún movimiento se registra hasta que confirmes.
         </small>
       </details>
-      {draft && (
+      {draft?.kind === "transfer" ? (
+        <QuickTransferReview initial={draft} data={data} onClose={() => setDraft(null)} onSave={saveDraft} />
+      ) : draft && (
         <QuickReview
           initial={draft}
           data={data}
           onClose={() => setDraft(null)}
-          onSave={async (p) => {
-            await onSave(p);
-            setSaved(
-              `${p.kind === "income" ? "Cobro" : "Gasto"} registrado: ${amount(p.amount as number, p.currency as string)}.`,
-            );
-            setText("");
-            setDraft(null);
-          }}
+          onSave={saveDraft}
         />
       )}
     </section>

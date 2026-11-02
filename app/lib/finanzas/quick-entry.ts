@@ -1,7 +1,7 @@
 import type { Account, Charge } from "./model";
 
 export type QuickDraft = {
-  kind: "income" | "expense";
+  kind: "income" | "expense" | "transfer";
   amount: number | null;
   currency: "PEN" | "USD";
   date: string;
@@ -9,6 +9,7 @@ export type QuickDraft = {
   scope: "agency" | "personal";
   owner: "agency" | "pedro" | "nayeli" | null;
   accountIds: string[];
+  destinationIds: string[];
   chargeIds: string[];
   problems: string[];
   source: string;
@@ -153,6 +154,23 @@ const validDate = (s: string) =>
 function has(s: string, word: string) {
   return new RegExp("\\b" + word + "\\b").test(s);
 }
+// Solo propone cuentas explícitas. «Mi cuenta personal» no identifica al titular.
+function transferAccountMatches(fragment: string, accounts: Account[]) {
+  const banks = ["bcp", "bbva", "interbank", "yape", "efectivo", "guardadito"].filter((b) => has(fragment, b));
+  const people = ["nayeli", "pedro"].filter((p) => has(fragment, p));
+  if (people.length > 1) return [];
+  const person = people[0];
+  const usage = /\b(personal|personales)\b/.test(fragment) ? "personal" : /\b(agencia|empresa)\b/.test(fragment) ? "agency" : null;
+  if (!banks.length && !person && !usage) return [];
+  return accounts.filter((a) => banks.every((b) => has(normalize(a.name), b)) && (!person || a.owner === person) && (!usage || a.usage === usage)).map((a) => a.id);
+}
+function transferAccounts(s: string, accounts: Account[]) {
+  const reverse = s.match(/\b(?:a|al|hacia)\s+(.+?)\s+desde\s+(.+)$/);
+  const forward = s.match(/\b(?:desde|del|de)\s+(.+?)\s+(?:a|al|hacia)\s+(.+)$/);
+  const from = reverse?.[2] || forward?.[1] || s.match(/\b(?:desde|del)\s+(.+)$/)?.[1] || "";
+  const to = reverse?.[1] || forward?.[2] || s.match(/\b(?:a|al|hacia)\s+(.+)$/)?.[1] || "";
+  return { accountIds: transferAccountMatches(from, accounts), destinationIds: transferAccountMatches(to, accounts) };
+}
 export function prepareQuickEntry(
   text: string,
   context: {
@@ -164,8 +182,11 @@ export function prepareQuickEntry(
   },
 ): QuickDraft {
   let s = normalize(text).replace(/s\/\s*\./g, "s/");
+  const internalTransfer = /\b(transferi|transfiere|transferir|transferirme|traspase|traspasa|retiro|retire)\b/.test(s)
+    || /^(?:(?:registra|registrar|anota|anotar)\s+)?(?:(?:una|la)\s+)?(?:transferencia|traspaso)\b/.test(s)
+    || (/\b(pase|pasame)\b/.test(s) && /\b(cuenta|bcp|bbva|yape|interbank|guardadito|efectivo)\b/.test(s));
   const d: QuickDraft = {
-    kind: /\b(recibi|recibimos|cobre|cobro|ingreso|ingresaron|me pago|nos pago|me pagaron|nos pagaron|depositaron)\b/.test(
+    kind: internalTransfer ? "transfer" : /\b(recibi|recibimos|cobre|cobro|ingreso|ingresaron|me pago|nos pago|me pagaron|nos pagaron|depositaron)\b/.test(
       s,
     )
       ? "income"
@@ -177,6 +198,7 @@ export function prepareQuickEntry(
     scope: context.scope,
     owner: context.scope === "agency" ? "agency" : null,
     accountIds: [],
+    destinationIds: [],
     chargeIds: [],
     problems: [],
     source: text.trim().slice(0, 2000),
@@ -184,15 +206,15 @@ export function prepareQuickEntry(
   if (text.trim().length < 3 || text.length > 2000)
     d.problems.push("Escribe una frase de hasta 2,000 caracteres.");
   if (
-    /\b(transferi|transferencia|transfiere|traspasa|retiro|retire|anula|elimina|borra|reembolso)\b/.test(
+    /\b(anula|elimina|borra|reembolso)\b/.test(
       s,
     )
   )
     d.problems.push(
-      "Para transferencias, retiros o anulaciones usa su opción en Cuentas o Movimientos.",
+      "Para reembolsos o anulaciones usa su opción en Cuentas o Movimientos.",
     );
   if (
-    /\b(no pague|no he pagado|no gaste|no he gastado|no recibi|no he recibido|no cobre|no he cobrado|debo|pendiente|por pagar|por cobrar|pagare|voy a pagar|me pagaran|recuerda)\b/.test(
+    /\b(no pague|no he pagado|no gaste|no he gastado|no recibi|no he recibido|no cobre|no he cobrado|no transferi|no he transferido|no me transferi|no me he transferido|no retire|no pase|no traspase|voy a transferir|voy a transferirme|voy a pasar|voy a retirar|transferire|retirare|debo|pendiente|por pagar|por cobrar|pagare|voy a pagar|me pagaran|recuerda)\b/.test(
       s,
     )
   )
@@ -279,11 +301,17 @@ export function prepareQuickEntry(
     d.problems.push(
       "Menciona un solo importe y una sola operación por registro.",
     );
-  if (!d.amount) d.problems.push("Indica el importe, por ejemplo 100 soles.");
+  if (!d.amount && (d.kind !== "transfer" || moneyMatches.length > 0)) d.problems.push("Indica el importe, por ejemplo 100 soles.");
   if (/\b\d+(?:[.,]\d+)*\b/.test(s))
     d.problems.push(
       "Hay otros números en la frase. Separa las operaciones o aclara el importe y la fecha.",
     );
+  if (d.kind === "transfer") {
+    Object.assign(d, transferAccounts(s, context.accounts));
+    d.title = "Transferencia entre cuentas";
+    d.problems = [...new Set(d.problems)];
+    return d;
+  }
   // Bank ownership does not decide whose income or expense it is.
   const bankPart =
     s.match(/\b(?:cuenta|bcp|bbva|yape|interbank|efectivo)\b.*$/)?.[0] || "";
