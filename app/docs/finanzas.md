@@ -315,3 +315,9 @@ bloqueo con cuenta repetida, datos incompletos y se conservó la revisión de ga
 No se confirmó el ejemplo. Evidencia: `output/finanzas-transferencias-nov02/`.
 Audio usa el transcriptor existente y el mismo parser; no se grabó una nueva voz
 para esta verificación. La candidata y los túneles de esta prueba se retiran.
+
+Corrección posterior de Pedro: **Efectivo también es Personal**. Se aplicó el
+2-nov mediante `accountUsage` a la cuenta `05b0efeb-fd50-4baf-aa78-4dfa7ae4f3de`,
+con auditoría, sin modificar titular, moneda, saldo de apertura ni movimientos.
+Ahora son cinco cuentas personales y tres de agencia. Efectivo mantiene S/102
+registrados en esta comprobación; no fijar ese saldo para cambios futuros.
