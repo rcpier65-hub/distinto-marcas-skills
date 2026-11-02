@@ -304,3 +304,14 @@ La integración `test-finance-transfers.mjs` requiere `TEST_BASE_URL` y acceso
 al PostgreSQL activo; crea únicamente cuentas QA aisladas y las limpia al terminar.
 Comprueba origen/destino, dos saldos, totales por uso, reintento simultáneo,
 anulación y rechazos por moneda, fecha, permisos y origen.
+
+Verificación publicada: `/api/version` = `9687b7d`, sobre `91d986e` conservando
+las etiquetas de cuentas y la meta semanal de S/1,500. Compilación, lint afectado,
+pruebas de frases e integración en candidata y producción aprobadas. La prueba
+usa cuentas QA propias y elimina todas sus filas al finalizar; no registra
+transferencias en las cuentas reales. Navegador en 390×844: origen BCP Nayeli,
+destino BCP Pedro, importe S/1,500 y confirmación visibles sin desplazar; se probó
+bloqueo con cuenta repetida, datos incompletos y se conservó la revisión de gastos.
+No se confirmó el ejemplo. Evidencia: `output/finanzas-transferencias-nov02/`.
+Audio usa el transcriptor existente y el mismo parser; no se grabó una nueva voz
+para esta verificación. La candidata y los túneles de esta prueba se retiran.
