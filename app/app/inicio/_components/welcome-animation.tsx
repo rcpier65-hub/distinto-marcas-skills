@@ -10,7 +10,6 @@
    motion staggered, sin animaciones repetitivas. */
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Palette, Scissors, MessageCircle, Calendar, Target,
   DollarSign, Users, Flame, Sparkles, ArrowRight,
@@ -82,7 +81,8 @@ export function WelcomeAnimation({
   rolBase: string
   acento: string
 }) {
-  const router = useRouter()
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [dismissed, setDismissed] = useState(false)
   const [step, setStep] = useState(0)
   const [closing, setClosing] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -108,11 +108,19 @@ export function WelcomeAnimation({
     if (closing) return
     setClosing(true)
     /* Esperar a que termine la animación de salida (400ms) */
-    setTimeout(() => {
-      /* Limpiar el ?welcome=1 sin recargar */
-      router.replace('/inicio')
+    closeTimer.current = setTimeout(() => {
+      setDismissed(true)
+      if (window.location.pathname === '/inicio') {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('welcome')
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+      }
     }, 450)
   }
+
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }, [])
 
   /* ESC para skipear */
   useEffect(() => {
@@ -126,11 +134,13 @@ export function WelcomeAnimation({
 
   /* Bloquear scroll del body mientras está abierto */
   useEffect(() => {
+    if (dismissed) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prev }
-  }, [])
+  }, [dismissed])
 
+  if (dismissed) return null
   return (
     <>
       <style>{`
@@ -437,7 +447,7 @@ export function WelcomeAnimation({
                 fontFamily: 'Georgia, serif',
                 marginBottom: -28,
               }}>
-                "
+                &ldquo;
               </span>
               <p style={{
                 fontSize: 22,

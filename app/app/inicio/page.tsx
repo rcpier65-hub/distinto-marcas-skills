@@ -140,16 +140,16 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   } else {
     habitosQuery = habitosQuery.is('team_member_id', null)
   }
-  const { data: habitos } = await habitosQuery
+  const { data: habitos, error: habitosReadError } = await habitosQuery
 
   const habitoIds = ((habitos ?? []) as Array<{ id: string }>).map((h) => h.id)
 
-  const { data: completados } = habitoIds.length > 0 ? await service
+  const { data: completados, error: completadosReadError } = habitoIds.length > 0 ? await service
     .from('habitos_completados')
     .select('habito_id, fecha')
     .in('habito_id', habitoIds)
     .gte('fecha', desde7Str)
-    : { data: [] }
+    : { data: [], error: null }
 
   /* Map habito_id → Set de fechas YYYY-MM-DD cumplidas en últimos 7 días */
   const historialPorHabito = new Map<string, string[]>()
@@ -402,6 +402,8 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     cumpleHoy,
     modulosAccesibles,
     habitosHoy,
+    habitosFecha: hoy,
+    habitosError: Boolean(habitosReadError || completadosReadError),
     tareasMias,
     reuniones,
     grabacionesProximas,

@@ -9,7 +9,9 @@
 import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Check, MoreVertical, Archive, Trash2 } from 'lucide-react'
-import { toggleHabitoFecha, archivarHabito, eliminarHabito } from '../_actions'
+import { archivarHabito, eliminarHabito } from '../_actions'
+
+import { useHabitCompletions } from '@/lib/habitos/use-habit-completions'
 
 const VIOLETA = '#ba41f7'
 
@@ -155,36 +157,7 @@ function HabitoMenu({ habitoId, nombre }: { habitoId: string; nombre: string }) 
 
 export function HabitosTracker({ habitos, today }: Props) {
   const [vista, setVista] = useState<'semana' | 'mes'>('semana')
-  const [, startTransition] = useTransition()
-
-  // Estado optimista: set de claves "habitoId|fecha" cumplidas.
-  const [done, setDone] = useState<Set<string>>(() => {
-    const s = new Set<string>()
-    for (const h of habitos) for (const f of h.historial) s.add(`${h.id}|${f}`)
-    return s
-  })
-
-  /* Pedro: 'NO dejar marcar vista diaria o semanal en el módulo de
-     hábitos, solo se puede marcar el día que estamos. Si pasa ese día
-     ya no se puede marcar, ni después ni antes.'
-     → Bloqueamos cualquier fecha distinta de HOY (ni futuros ni pasados). */
-  function toggle(habitoId: string, fecha: string) {
-    if (fecha !== today) {
-      if (fecha > today) toast.error('No puedes marcar días futuros')
-      else toast.error('Solo puedes marcar el hábito el mismo día. Hoy ya pasó esa fecha.')
-      return
-    }
-    const key = `${habitoId}|${fecha}`
-    const was = done.has(key)
-    setDone((prev) => { const n = new Set(prev); if (was) n.delete(key); else n.add(key); return n })
-    startTransition(async () => {
-      const r = await toggleHabitoFecha(habitoId, fecha)
-      if (!r.ok) {
-        setDone((prev) => { const n = new Set(prev); if (was) n.add(key); else n.delete(key); return n })
-        toast.error(r.error)
-      }
-    })
-  }
+  const { done, isPending, toggle } = useHabitCompletions(habitos, today)
 
   // Últimos 7 días (hoy a la derecha)
   const semana = useMemo(() => {
@@ -257,6 +230,9 @@ export function HabitosTracker({ habitos, today }: Props) {
                 return (
                   <button
                     key={d.ymd}
+                    disabled={!d.esHoy || isPending}
+                    aria-pressed={ok}
+                    aria-busy={d.esHoy && isPending}
                     onClick={() => toggle(h.id, d.ymd)}
                     className="flex flex-col items-center gap-1 group"
                     title={d.ymd}
@@ -315,11 +291,12 @@ export function HabitosTracker({ habitos, today }: Props) {
                     {mes.dias.map((d, idx) => {
                       if (!d.inMonth) return <span key={idx} aria-hidden />   // relleno fuera del mes
                       const ok = done.has(`${h.id}|${d.ymd}`)
-                      const clickable = !d.futuro
+                      const clickable = d.esHoy && !isPending
                       return (
                         <button
                           key={idx}
                           disabled={!clickable}
+                          aria-pressed={ok}
                           onClick={() => clickable && toggle(h.id, d.ymd)}
                           title={d.ymd}
                           className="aspect-square rounded-md flex items-center justify-center text-[11px] tabular-nums transition-all disabled:cursor-default hover:opacity-90"

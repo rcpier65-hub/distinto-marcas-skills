@@ -16,6 +16,7 @@
    - Desktop: panel 380×560 anclado a la burbuja. Mobile: pantalla completa.
    - `?chat=<team_member_id>` en la URL abre esa conversación (lo usa el push). */
 
+import { canLoadInBackground } from '@/lib/realtime/use-safe-refresh'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { desfaseActual } from '@/lib/tiempo/reloj'
 import { createPortal } from 'react-dom'
@@ -263,7 +264,11 @@ export function ChatFlotante() {
   useEffect(() => { noLeidosRef.current = chat ? totalNoLeidos : null }, [chat, totalNoLeidos])
 
   /* Si el usuario no es miembro del equipo, getChatInicial falla y el chat no aparece. */
+  const syncingRef = useRef(false)
   const resincronizar = useCallback(async () => {
+    if (!canLoadInBackground() || syncingRef.current) return
+    syncingRef.current = true
+    try {
     const [lista, conv] = await Promise.all([
       getChatInicial(),
       openRef.current && activoRef.current
@@ -292,6 +297,8 @@ export function ChatFlotante() {
       if (noLeidosRef.current !== null && total > noLeidosRef.current) sonarMensaje()
       setChat({ ...lista.data, contactos, grupo })
     }
+    } catch { /* conservar la última lectura cuando hay una interrupción */ }
+    finally { syncingRef.current = false }
   }, [])
 
   /* Actualiza la fila del contacto en la lista con un mensaje nuevo. */

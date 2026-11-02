@@ -135,6 +135,16 @@ export async function POST(request: Request) {
   }
 
   const today = ymdLima()
+  if (body && typeof body === 'object' && 'completado' in body) {
+    if (typeof body.completado !== 'boolean') return apiJsonError('completado debe ser booleano', 400)
+    const result = body.completado
+      ? await service.from('habitos_completados').upsert({ habito_id: id, fecha: today }, { onConflict: 'habito_id,fecha', ignoreDuplicates: true })
+      : await service.from('habitos_completados').delete().eq('habito_id', id).eq('fecha', today)
+    if (result.error) return apiJsonError('No se pudo guardar el hábito', 500)
+    revalidatePath('/habitos'); revalidatePath('/inicio')
+    return NextResponse.json({ ok: true, id, completado: body.completado, today })
+  }
+  // Compatibilidad con clientes anteriores que todavía envían solo { id }.
   const existing = await service
     .from('habitos_completados')
     .select('id')

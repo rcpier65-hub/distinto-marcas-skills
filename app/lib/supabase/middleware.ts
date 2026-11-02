@@ -75,8 +75,10 @@ export async function updateSession(request: NextRequest) {
   let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null
   let authRespondio = true
   try {
-    const { data } = await supabase.auth.getUser()
+    const { data, error } = await supabase.auth.getUser()
     user = data.user
+    // Supabase devuelve los timeouts como error, no siempre lanza excepción.
+    if (error && (!error.status || error.status >= 500 || error.status === 429)) authRespondio = false
   } catch {
     authRespondio = false
   }

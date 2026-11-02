@@ -48,6 +48,7 @@ export function NavItem({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="mk-focusable"
       title={label}
       style={{

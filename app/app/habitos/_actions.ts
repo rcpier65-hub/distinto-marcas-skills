@@ -61,11 +61,12 @@ export async function listHabitosConEstado(): Promise<
      - Si hay team_member → filtrar por team_member_id = X
      - Si NO hay (admin/owner) → filtrar por team_member_id IS NULL
        (los hábitos "default" del owner) */
-  const { data: tm } = await service
+  const { data: tm, error: memberError } = await service
     .from('team_members')
     .select('id')
     .eq('auth_user_id', user.id)
     .maybeSingle()
+  if (memberError) return { ok: false, error: 'No se pudo verificar tu usuario. Intenta nuevamente.' }
   const teamMemberId = tm?.id ?? null
 
   // 1. Hábitos activos del usuario actual
@@ -94,6 +95,7 @@ export async function listHabitosConEstado(): Promise<
   const completedResult = await service
     .from('habitos_completados')
     .select('habito_id, fecha, completado_at')
+    .in('habito_id', habitos.map((h) => h.id))
     .gte('fecha', desdeStr)
     .lte('fecha', today)
 
@@ -161,24 +163,46 @@ async function assertOwnership(
   habitoId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   /* team_member_id del user actual (null si es admin/owner sin perfil) */
-  const { data: tm } = await service
+  const { data: tm, error: memberError } = await service
     .from('team_members')
     .select('id')
     .eq('auth_user_id', userId)
     .maybeSingle()
+  if (memberError) return { ok: false, error: 'No se pudo verificar tu usuario. Intenta nuevamente.' }
   const teamMemberId = tm?.id ?? null
 
-  const { data: h } = await service
+  const { data: h, error: habitError } = await service
     .from('habitos')
     .select('id, team_member_id')
     .eq('id', habitoId)
     .maybeSingle()
 
+  if (habitError) return { ok: false, error: 'No se pudo leer el hábito. Intenta nuevamente.' }
   if (!h) return { ok: false, error: 'Hábito no encontrado' }
   if (h.team_member_id !== teamMemberId) {
     return { ok: false, error: 'Este hábito no es tuyo' }
   }
   return { ok: true }
+}
+
+/** Estado explícito: un reintento de «marcar» nunca desmarca el hábito. */
+export async function setHabitoCompletado(habitoId: string, fecha: string, completado: boolean): Promise<
+  { ok: true; completado: boolean } | { ok: false; error: string }
+> {
+  const user = await requireUser()
+  if (typeof completado !== 'boolean' || fecha !== todayStr()) {
+    return { ok: false, error: 'Solo puedes marcar el hábito del día actual en Lima.' }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any
+  const own = await assertOwnership(service, user.id, habitoId)
+  if (!own.ok) return own
+  const result = completado
+    ? await service.from('habitos_completados').upsert({ habito_id: habitoId, fecha }, { onConflict: 'habito_id,fecha', ignoreDuplicates: true })
+    : await service.from('habitos_completados').delete().eq('habito_id', habitoId).eq('fecha', fecha)
+  if (result.error) return { ok: false, error: 'No se pudo guardar. Vuelve a intentarlo.' }
+  revalidatePath('/habitos'); revalidatePath('/inicio')
+  return { ok: true, completado }
 }
 
 /**
@@ -202,6 +226,7 @@ export async function toggleHabitoHoy(habitoId: string): Promise<{ ok: true; com
     .eq('fecha', today)
     .maybeSingle()
 
+  if (existing.error) return { ok: false, error: 'No se pudo leer el hábito. Intenta nuevamente.' }
   if (existing.data) {
     // Ya marcado → desmarcar
     const { error } = await service
@@ -262,6 +287,7 @@ export async function toggleHabitoFecha(
     .eq('fecha', fecha)
     .maybeSingle()
 
+  if (existing.error) return { ok: false, error: 'No se pudo leer el hábito. Intenta nuevamente.' }
   if (existing.data) {
     const { error } = await service.from('habitos_completados').delete().eq('id', existing.data.id)
     if (error) return { ok: false, error: error.message }
@@ -299,11 +325,12 @@ export async function createHabito(args: {
 
   /* Resolver team_member_id del usuario actual. El nuevo hábito queda
      asociado a él (su lista privada). Admin/owner → team_member_id null. */
-  const { data: tm } = await service
+  const { data: tm, error: memberError } = await service
     .from('team_members')
     .select('id')
     .eq('auth_user_id', user.id)
     .maybeSingle()
+  if (memberError) return { ok: false, error: 'No se pudo verificar tu usuario. Intenta nuevamente.' }
   const teamMemberId = tm?.id ?? null
 
   // Calcular siguiente orden (max + 10) — solo dentro de los hábitos del MISMO dueño

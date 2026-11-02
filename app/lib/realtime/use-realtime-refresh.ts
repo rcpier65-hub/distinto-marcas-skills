@@ -28,7 +28,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useSafeRefresh } from './use-safe-refresh'
 import { createClient } from '@/lib/supabase/client'
 
 /* Lista de tablas que dispararán refresh. Mantener esta lista
@@ -71,7 +71,7 @@ function isEditingActive(): boolean {
 }
 
 export function useRealtimeRefresh() {
-  const router = useRouter()
+  const refresh = useSafeRefresh()
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /* Hay un refresh esperando a que el usuario termine de escribir. */
   const pendingRef = useRef(false)
@@ -98,8 +98,7 @@ export function useRealtimeRefresh() {
           pendingRef.current = true // diferir: no interrumpir la escritura
           return
         }
-        pendingRef.current = false
-        router.refresh()
+        pendingRef.current = !refresh()
       }, REFRESH_DEBOUNCE_MS)
     }
 
@@ -107,15 +106,12 @@ export function useRealtimeRefresh() {
        pendiente lo aplicamos — pero con un pequeño delay para no disparar
        si el foco salta a OTRO campo editable (ej. tabular entre celdas). */
     function onFocusOut() {
-      if (!pendingRef.current) return
-      setTimeout(() => {
-        if (pendingRef.current && !isEditingActive()) {
-          pendingRef.current = false
-          router.refresh()
-        }
-      }, 200)
+      if (pendingRef.current) scheduleRefresh()
     }
     document.addEventListener('focusout', onFocusOut)
+    document.addEventListener('visibilitychange', onFocusOut)
+    window.addEventListener('online', onFocusOut)
+    const retry = setInterval(onFocusOut, 5000)
 
     /* Una channel por tabla. Supabase permite muchas channels por
        conexión WebSocket — no abre N sockets. */
@@ -134,7 +130,10 @@ export function useRealtimeRefresh() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       document.removeEventListener('focusout', onFocusOut)
+      document.removeEventListener('visibilitychange', onFocusOut)
+      window.removeEventListener('online', onFocusOut)
+      clearInterval(retry)
       channels.forEach((ch) => supabase.removeChannel(ch))
     }
-  }, [router])
+  }, [refresh])
 }

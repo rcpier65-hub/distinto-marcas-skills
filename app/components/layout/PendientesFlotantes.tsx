@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { canLoadInBackground } from '@/lib/realtime/use-safe-refresh'
 import { GripHorizontal, Pause, Play, Bell, ChevronDown, ChevronUp, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { listarTareasFlotantes, type TareaFlotante } from '@/app/tareas/_floating-actions'
@@ -19,11 +20,15 @@ export function PendientesFlotantes({ usuario, compact = false }: { usuario: str
   const collapsed = compact ? !dockOpen : cerrado
   const [busy, setBusy] = useState<string | null>(null)
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
+  const loadingRef = useRef(false)
   const recargar = useCallback(async () => {
-    if (document.hidden) return
+    if (!canLoadInBackground() || loadingRef.current) return
+    loadingRef.current = true
+    try {
     const results = await Promise.allSettled([listarTareasFlotantes(), listarRecordatorios()])
     if (results[0].status === 'fulfilled') setTareas(results[0].value)
     if (results[1].status === 'fulfilled') setRecordatorios(results[1].value.filter(i => !i.listo))
+    } finally { loadingRef.current = false }
   }, [])
   useEffect(() => {
     const frame = requestAnimationFrame(() => {

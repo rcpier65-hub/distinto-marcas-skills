@@ -19,7 +19,7 @@ import {
   Bell,
   type LucideIcon,
 } from 'lucide-react'
-import { toggleHabitoHoy, toggleHabitoFecha } from '@/app/habitos/_actions'
+import { useHabitCompletions } from '@/lib/habitos/use-habit-completions'
 import {
   crearPendienteRapido,
   togglePendienteRapido,
@@ -66,6 +66,8 @@ export type InicioData = {
     color: string
     icon: string
   }>
+  habitosFecha: string
+  habitosError?: boolean
   habitosHoy: Array<{
     id: string
     nombre: string
@@ -255,74 +257,14 @@ function NombreAnimado({ nombre, color }: { nombre: string; color: string }) {
 }
 
 export function InicioView({ data }: { data: InicioData }) {
-  const router = useRouter()
-  const [habitos, setHabitos] = useState(data.habitosHoy)
-  const [, startTransition] = useTransition()
-  /* Saludo viene del server (timezone Lima) — ya no calculamos en cliente */
+  const hoy = data.habitosFecha
+  const { done, isPending: savingHabits, toggle: toggleHabitoFechaHome } = useHabitCompletions(data.habitosHoy, hoy)
+  const habitos = data.habitosHoy.map(h => ({ ...h, completado: done.has(`${h.id}|${hoy}`),
+    historial: [...done].filter(key => key.startsWith(`${h.id}|`)).map(key => key.split('|')[1]) }))
   const saludo = data.saludo
-  const bienvenida =
-    /[aá]$/.test(data.nombre) ? 'Bienvenida' : 'Bienvenido'
-  const completadosCount = habitos.filter((h) => h.completado).length
-
-  /* Hoy en YMD local (Lima TZ) — para el tracker de 7 días. Tomado del
-     primer item de habitosHoy si existe (calculado en server con misma
-     lógica), o fallback al cliente. */
-  const hoy = useMemo(() => {
-    const d = new Date()
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }, [])
-
-  function toggleHabito(id: string) {
-    const prev = habitos
-    const habito = habitos.find((h) => h.id === id)
-    if (!habito) return
-    const yaCompletado = habito.historial.includes(hoy)
-    setHabitos((curr) =>
-      curr.map((h) => {
-        if (h.id !== id) return h
-        const nuevoHistorial = yaCompletado
-          ? h.historial.filter((f) => f !== hoy)
-          : [...h.historial, hoy]
-        return { ...h, completado: !yaCompletado, historial: nuevoHistorial }
-      })
-    )
-    startTransition(async () => {
-      const r = await toggleHabitoHoy(id)
-      if (!r.ok) {
-        setHabitos(prev)
-        toast.error(r.error)
-      }
-    })
-  }
-
-  /* Toggle de cualquier fecha (no solo hoy) para clicks en el tracker.
-     Si fecha == hoy delegamos a toggleHabito para mantener consistencia
-     del estado 'completado'. */
-  function toggleHabitoFechaHome(id: string, fecha: string) {
-    if (fecha === hoy) { toggleHabito(id); return }
-    if (fecha > hoy) return  /* no marcar futuros */
-    const prev = habitos
-    setHabitos((curr) =>
-      curr.map((h) => {
-        if (h.id !== id) return h
-        const tiene = h.historial.includes(fecha)
-        const nuevoHistorial = tiene
-          ? h.historial.filter((f) => f !== fecha)
-          : [...h.historial, fecha]
-        return { ...h, historial: nuevoHistorial }
-      })
-    )
-    startTransition(async () => {
-      const r = await toggleHabitoFecha(id, fecha)
-      if (!r.ok) {
-        setHabitos(prev)
-        toast.error(r.error)
-      }
-    })
-  }
+  const bienvenida = /[aá]$/.test(data.nombre) ? 'Bienvenida' : 'Bienvenido'
+  const completadosCount = habitos.filter(h => h.completado).length
+  function toggleHabito(id: string) { toggleHabitoFechaHome(id, hoy) }
 
   /* Color de acento según rol — coordina con el ícono animado */
   const acento =
@@ -713,6 +655,8 @@ export function InicioView({ data }: { data: InicioData }) {
           <aside>
             <HabitosTrackerHome
               habitos={habitos}
+              saving={savingHabits}
+              loadError={data.habitosError}
               today={hoy}
               completadosCount={completadosCount}
               onToggleHoy={toggleHabito}
@@ -1658,7 +1602,11 @@ function HabitosTrackerHome({
   completadosCount,
   onToggleHoy,
   onToggleFecha,
+  saving,
+  loadError,
 }: {
+  saving: boolean
+  loadError?: boolean
   habitos: InicioData['habitosHoy']
   today: string
   completadosCount: number
@@ -1689,6 +1637,7 @@ function HabitosTrackerHome({
     })
   }, [today])
 
+  if (loadError) return <p role="status" className="rounded-xl border p-4 text-sm">No se pudieron cargar tus hábitos. Tus marcas se conservan; vuelve a intentar en unos momentos.</p>
   if (habitos.length === 0) {
     return (
       <section>
@@ -1796,15 +1745,17 @@ function HabitosTrackerHome({
                   /* Solo el día de HOY es clickeable. Días futuros
                      visibles pero deshabilitados para que el user vea
                      el plan de la semana sin poder marcar el futuro. */
-                  const clickable = d.esHoy
+                  const clickable = d.esHoy && !saving
                   return (
                     <button
                       key={d.ymd}
                       onClick={() => clickable && onToggleFecha(h.id, d.ymd)}
                       disabled={!clickable}
+                      aria-pressed={ok}
+                      aria-busy={d.esHoy && saving}
                       title={
-                        clickable
-                          ? (ok ? 'Hoy — clic para desmarcar' : 'Hoy — clic para marcar')
+                        d.esHoy
+                          ? (saving ? 'Guardando…' : ok ? 'Hoy — clic para desmarcar' : 'Hoy — clic para marcar')
                           : `${d.ymd} (próximo, no se puede marcar todavía)`
                       }
                       style={{
@@ -1851,6 +1802,7 @@ function HabitosTrackerHome({
               {!h.completado && (
                 <button
                   onClick={() => onToggleHoy(h.id)}
+                  disabled={saving}
                   style={{
                     width: '100%',
                     marginTop: 10,

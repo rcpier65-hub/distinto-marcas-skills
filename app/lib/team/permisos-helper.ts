@@ -55,23 +55,24 @@ export const getCurrentMemberPermisos = cache(async (): Promise<PermisosEfectivo
   /* Buscamos por auth_user_id. Cuando Pedro asigna contraseña a un
      miembro desde /equipo, el flujo setea este FK al crear el user
      en Supabase Auth. */
-  const { data: member } = await service
+  const { data: member, error: memberError } = await service
     .from('team_members')
     .select('*')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
+  if (memberError) throw new Error('No se pudieron verificar tus permisos. Intenta nuevamente.')
   if (!member) return null
   if (!member.activo) return null
 
   /* Cargar el rol predefinido para hacer merge */
-  const { data: rol } = await service
+  const { data: rol, error: roleError } = await service
     .from('roles_predefinidos')
     .select('*')
     .eq('id', member.rol_base)
     .maybeSingle()
 
-  if (!rol) return null
+  if (roleError || !rol) throw new Error('No se pudieron verificar tus permisos. Intenta nuevamente.')
 
   const permisos = mergePermisos(rol.permisos_default ?? {}, member.permisos_override ?? {})
 
