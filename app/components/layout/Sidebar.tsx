@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { Wallet, ReceiptText } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
 import { MARCAS_NAV, type MarcaNav } from '@/lib/mock-marcas'
@@ -168,6 +169,8 @@ export function Sidebar({ onOpenPalette, marcas = MARCAS_NAV, permisos, emailAct
           {esPedro && (
             <NavItem href="/presentaciones" icon={<PresentacionIcon />} label="Presentaciones" active={isActive('/presentaciones')} />
           )}
+          {permisos?.modulos.finanzas?.acceso === true && <NavItem href="/finanzas" icon={<Wallet size={14}/>} label="Finanzas" active={isActive('/finanzas')} />}
+          {permisos && <NavItem href="/mis-recibos" icon={<ReceiptText size={14}/>} label="Mis recibos" active={isActive('/mis-recibos')} />}
           <NavItem href="/tareas" icon={<TareasIcon />} label="Tareas" active={isActive('/tareas')} shortcut="T" />
           <NavItem href="/recordatorios" icon={<NoteIcon />} label="Recordatorios" active={isActive('/recordatorios')} />
           {puede('publicaciones') && (

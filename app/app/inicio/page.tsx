@@ -14,6 +14,7 @@
 //
 // Hábitos del día (los del user) siempre visibles en una columna lateral.
 
+import { financeMember } from '@/lib/finanzas/server'
 import { requireUser } from '@/lib/auth/get-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getCurrentMemberPermisos } from '@/lib/team/permisos-helper'
@@ -296,7 +297,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
      incluso director/CEO. Así Erick (director, mano derecha) tiene acceso a todo
      MENOS finanzas si su permiso de finanzas está en false. El dueño (sin
      team_member, p=null) sí ve todo. Pedro 14-jul-2026. */
-  const puedeVerFinanzas = p ? tieneAcceso(p.permisos, 'finanzas' as ModuloPermiso) : true
+  const puedeVerFinanzas = (await financeMember().catch(() => null))?.manager === true
 
   /* Cargamos cockpitData, lista de marcas y el reporte del día en
      paralelo. marcasNav viene de la tabla `marcas` (Supabase) → cualquier
