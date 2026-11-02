@@ -23,7 +23,8 @@
   ingresos/gastos. No ejecuta transferencias bancarias ni cambia el prestador fiscal.
 - **Mis recibos**: cualquier miembro activo entrega su RH y consulta solo sus
   documentos y pagos. Pedro/Nayeli revisan el conjunto desde Documentos. Los RH no
-  acreditan pago; los pagos se registran por separado. Número y hash evitan duplicados.
+  acreditan pago; los pagos se registran por separado. Número y hash evitan duplicados. Un documento rechazado permite subir un archivo
+  corregido con el mismo número; el original permanece en el historial.
 - Anular pagos conserva el historial y restaura el saldo de la obligación. Una
   obligación con pagos o crédito anterior no se anula directamente.
 

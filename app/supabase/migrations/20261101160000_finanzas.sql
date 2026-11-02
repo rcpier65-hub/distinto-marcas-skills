@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS public.finance_documents (
  status text NOT NULL DEFAULT 'received' CHECK(status IN ('received','reviewed','rejected')), review_note text NOT NULL DEFAULT '',
  created_at timestamptz DEFAULT now(), UNIQUE(member_id,kind,number), UNIQUE(member_id,hash)
 );
+ALTER TABLE public.finance_documents DROP CONSTRAINT IF EXISTS finance_documents_member_id_kind_number_key;
+CREATE UNIQUE INDEX IF NOT EXISTS finance_documents_current_number ON public.finance_documents(member_id,kind,number) WHERE status<>'rejected';
 ALTER TABLE public.finance_documents ADD COLUMN IF NOT EXISTS charge_id uuid REFERENCES public.finance_charges(id);
 -- No browser role can read or modify financial records, including via PostgREST.
 DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['finance_settings','finance_access','finance_accounts','finance_rules','finance_charges','finance_movements','finance_requests','finance_audit','finance_notes','finance_documents'] LOOP

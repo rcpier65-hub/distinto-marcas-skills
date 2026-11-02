@@ -311,6 +311,18 @@ try {
     ),
     "qa.png",
   );
+  f.set("charge_id", ch.id);
+  assert.equal(
+    (
+      await fetch(base + "/api/finanzas/documentos", {
+        method: "POST",
+        headers: ailyn,
+        body: f,
+      })
+    ).status,
+    403,
+  );
+  f.delete("charge_id");
   const up = await fetch(base + "/api/finanzas/documentos", {
       method: "POST",
       headers: ailyn,
@@ -364,6 +376,28 @@ try {
     ).status,
     "reviewed",
   );
+  await post(nayeli, {
+    action: "reviewReceipt",
+    id: doc.id,
+    status: "rejected",
+    note: "QA corrección",
+  });
+  f.set(
+    "file",
+    new Blob([Buffer.from("%PDF-1.4\n% QA revised receipt\n%%EOF")], {
+      type: "application/pdf",
+    }),
+    "qa-corrected.pdf",
+  );
+  const correctedResponse = await fetch(base + "/api/finanzas/documentos", {
+    method: "POST",
+    headers: ailyn,
+    body: f,
+  });
+  const corrected = await correctedResponse.json();
+  assert.equal(correctedResponse.status, 200, corrected.error);
+  ids.docs.push(corrected.id);
+  assert.notEqual(corrected.id, doc.id);
   const rest = await fetch(
     process.env.NEXT_PUBLIC_SUPABASE_URL + "/rest/v1/finance_charges?select=id",
     { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY } },
