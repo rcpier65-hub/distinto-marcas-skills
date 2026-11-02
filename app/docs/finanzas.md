@@ -243,3 +243,43 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
 - Respaldo `distinto-agencia:entry-base-c13604b`; fuente y compose anterior en
   `/docker/distinto-agencia/entry-cf4b149/`. Tres redes conservadas. Se verificó
   nuevamente producción antes de promover, sin publicar en Vercel.
+
+### Cuentas personales y de agencia — 2 de noviembre de 2026
+
+- Producción `91d986e`, rama `codex/finanzas-cuentas-separadas`, conserva la
+  entrada directa al registro de `cf4b149`. Columna opcional `finance_accounts.usage`
+  (migración `20261102060000_finance_account_usage.sql`) separa el uso operativo
+  del titular bancario/fiscal; no deduce el uso de una cuenta a partir del nombre.
+- Por instrucción expresa de Pedro se etiquetaron Personal: BCP Pedro/Yape,
+  Yape Nayeli y ambos Guardaditos. Agencia: BCP Nayeli, BBVA Pedro, Interbank
+  agencia y Efectivo. Se cambió exclusivamente `usage` mediante `accountUsage`,
+  con sesión autorizada y auditoría. No cambiaron titulares, aperturas ni notas.
+- Resumen/Cuentas muestran etiquetas y totales separados por uso y moneda.
+  Los selectores de cuenta incluyen el uso. Configurar cuenta permite elegirlo;
+  una solicitud antigua sin ese campo conserva la etiqueta existente. Cuentas
+  futuras sin clasificación no se atribuyen silenciosamente a una categoría.
+- Registro rápido avisa cuando espacio del movimiento y uso de la cuenta difieren.
+  Si no está ligado a un pendiente, ofrece corregir el espacio antes de confirmar.
+  Un pago de obligación existente conserva su espacio/titular. Se permiten casos
+  reales de gasto personal desde cuenta de agencia y viceversa; no se inventan
+  transferencias ni se reclasifica el historial automáticamente.
+- Las transferencias nuevas toman el uso de la cuenta origen, no el titular.
+  Continúan fuera de ingresos/gastos y conservan ambos movimientos de saldo.
+  Regresión del modelo verifica BCP Nayeli de agencia, separación de totales y
+  cuentas sin clasificar. El modelo y parser rápido, build/TS y lint pasan.
+- Pedro eligió explícitamente S/1,500 todas las semanas, incluidos meses de cinco
+  pagos. `owner-weekly-target` = 150000 céntimos PEN, con auditoría; se muestra
+  como meta semanal por encima de la meta mensual histórica. No genera cargos,
+  sueldos, movimientos, transferencias ni órdenes bancarias automáticas.
+- Integración candidata/producción: cuatro cuentas de cada uso, meta semanal,
+  conservación de datos existentes; Pedro/Nayeli autorizados, Ailyn/Pieer con
+  lectura y escritura bloqueadas. Sesiones temporales cerradas; ningún gasto,
+  cobro o transferencia creado durante esta entrega.
+- Navegador producción 390×844: Resumen con ambos totales, ocho etiquetas y meta
+  semanal; borrador de prueba desde BCP Pedro muestra aviso y cambia a Personal
+  con un botón. Cerrado sin confirmar y texto borrado. Entrada Registrar conservada.
+  Evidencia local privada `output/finanzas-cuentas-separadas-nov02/`.
+- Respaldo `distinto-agencia:usage-base-cf4b149`; fuente/compose anterior en
+  `/docker/distinto-agencia/usage-91d986e/`. Candidato detenido antes de promover
+  y eliminado al finalizar; tres redes existentes conservadas. Sin despliegues
+  en Vercel ni cambios en otros contenedores.
