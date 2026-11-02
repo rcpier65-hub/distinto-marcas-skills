@@ -5,14 +5,14 @@
 // a entender mejor"). Calendario muestra grid mensual con dots
 // coloreados por marca.
 //
-// Server component: intenta fetch Supabase, fallback mock.
+// Server component: carga completa de los registros reales, por páginas.
 
 import { PublicacionesView } from '@/components/views/PublicacionesView'
 import { HistoriasEnPublicaciones } from '@/components/views/HistoriasEnPublicaciones'
 import { SyncNotionButton } from './_components/SyncNotionButton'
 import { getMarcasNav } from '@/lib/marcas/get-marcas-nav'
+import { readPublicationPages } from '@/lib/publicaciones/read-pages'
 import {
-  PUBLICACIONES_MOCK,
   type PublicacionMock,
   type EstadoPubMetricool,
   type Red,
@@ -85,21 +85,22 @@ async function fetchFromSupabase(): Promise<PublicacionMock[] | null> {
         editor:editores(nombre),
         marca:marcas(slug)
       `
-    let res = await service
-      .from('publicaciones')
-      .select(FULL_COLS)
-      .order('fecha_publicacion', { ascending: false, nullsFirst: false })
-      .limit(200)
-    if (res.error) {
-      res = await service
+    const loadRows = (columns: string) => readPublicationPages<RawRow>((from, to) => service
         .from('publicaciones')
-        .select(BASE_COLS)
+        .select(columns)
         .order('fecha_publicacion', { ascending: false, nullsFirst: false })
-        .limit(200)
+        .order('id', { ascending: false })
+        .range(from, to))
+    let data: RawRow[]
+    try {
+      data = await loadRows(FULL_COLS)
+    } catch (error) {
+      // Solo degradar por columnas faltantes, nunca mostrar una carga parcial.
+      const code = (error as { code?: string })?.code
+      if (code !== '42703' && code !== 'PGRST204') throw error
+      data = await loadRows(BASE_COLS)
     }
-    const { data, error } = res
-    if (error || !data) return null
-    return (data as RawRow[])
+    return data
       .filter((r) => !(r.estado === 'disenar' && !r.fecha_publicacion))
       .map((r) => {
       const marca = Array.isArray(r.marca) ? r.marca[0] : r.marca
@@ -150,7 +151,7 @@ export default async function PublicacionesPage() {
   const canManageFechas = !p || p.member.rol_base === 'director' || p.member.nombre === 'LORENA'
 
   const [pubs, marcas, marcasFullRes, fechasRes, histRes] = await Promise.all([
-    fetchFromSupabase().then((d) => d ?? PUBLICACIONES_MOCK),
+    fetchFromSupabase(),
     getMarcasNav(),
     service.from('marcas').select('id, slug, nombre, color_primario_hex').eq('activa', true).order('nombre'),
     service.from('fechas_importantes').select('id, marca_id, titulo, fecha, nota, categoria'),
@@ -191,8 +192,14 @@ export default async function PublicacionesPage() {
         <SyncNotionButton />
       </div>
       <HistoriasEnPublicaciones historias={historiasCal} />
+      {pubs === null && (
+        <div role="alert" className="mx-6 my-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          No se pudieron cargar las publicaciones. Tus videos siguen guardados.{' '}
+          Recarga la página para volver a intentarlo.
+        </div>
+      )}
       <PublicacionesView
-        publicaciones={pubs}
+        publicaciones={pubs ?? []}
         marcas={marcas}
         fechasImportantes={fechasImportantes}
         marcasFechas={marcasFechas}

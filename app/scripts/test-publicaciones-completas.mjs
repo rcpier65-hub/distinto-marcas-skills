@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
+const source = await fs.readFile(new URL('../lib/publicaciones/read-pages.ts', import.meta.url), 'utf8');
+const { readPublicationPages } = await import('data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(source)).toString('base64'));
+const rows = Array.from({length: 1507}, (_,i) => ({id:String(i), marca:i>=1200?'antigua':'reciente', fecha:i===1506?null:'2026-10-01'}));
+const all = await readPublicationPages((from,to) => Promise.resolve({data:rows.slice(from,to+1),error:null}));
+assert.deepEqual(all, rows, 'No perder las marcas antiguas, empates de fecha ni registros sin fecha al superar 1,000');
+await assert.rejects(() => readPublicationPages((from,to) => Promise.resolve(from>=500?{data:null,error:new Error('timeout')}:{data:rows.slice(from,to+1),error:null})), /timeout/);
+assert.deepEqual(await readPublicationPages(() => Promise.resolve({data:[],error:null})), []);
+console.log('PASS listado >1,000 completo; fallo intermedio no devuelve lista parcial; vacío real');
