@@ -180,3 +180,18 @@ usuario: el navegador del teléfono pedirá su permiso la primera vez.
   acceso anterior con icono guardado, volver a añadirlo desde Safari en Finanzas.
 - Imagen de retorno `distinto-agencia:icon-base-359d33c`; compose anterior y
   fuente en `/docker/distinto-agencia/icon-4efe57f/`. Las tres redes conservadas.
+
+### Consulta de meses anteriores — 1 de noviembre de 2026
+
+- Producción `c144cd0`, rama `codex/finanzas-historial-anterior`, conserva
+  `4efe57f`. El selector mensual permitía solo noviembre de 2026 en adelante,
+  aunque el registro rápido y la API ya admiten pagos históricos. Ahora permite
+  seleccionar meses desde enero de 2000, manteniendo el máximo en el mes actual.
+- No cambia la generación de mensualidades: consultar meses anteriores al inicio
+  del módulo no genera cuotas históricas. No cambia importes, fechas ni pagos.
+- Build, TypeScript y lint aprobados. API y navegador en producción confirman
+  la lectura de octubre y su movimiento guardado, cuenta y total mensual.
+  La verificación fue de lectura; no duplicó el cobro ya registrado por solicitud
+  del usuario. Evidencia privada en `output/finanzas-cobro-nov01/`, ignorada por Git.
+- Respaldo `distinto-agencia:history-base-4efe57f`; fuente y compose anterior en
+  `/docker/distinto-agencia/history-c144cd0/`. Las tres redes conservadas.
