@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { occurrences, remaining, date } from "../lib/finanzas/model.ts";
+import { occurrences, remaining, date, accountBalance, accountTotals } from "../lib/finanzas/model.ts";
 assert.deepEqual(
   occurrences(
     { frequency: "weekly", day: 6, starts: "2026-11-01", ends: null },
@@ -56,6 +56,21 @@ assert.equal(
   0,
 );
 assert.equal(date.safeParse("2026-02-30").success, false);
+// No se convierte un movimiento conocido en saldo ni se suman monedas.
+const account = { currency: "PEN", opening: null, opening_date: null, movements: 250000 };
+assert.equal(accountBalance(account), null);
+assert.equal(accountBalance({ ...account, opening: 0 }), null);
+const bank = { ...account, opening: 0, opening_date: "2026-10-30" };
+assert.equal(accountBalance(bank), 250000);
+assert.equal(accountBalance({ ...bank, currency: null }), null);
+const accounts = [bank, account, { ...bank, currency: "USD", opening: 10000, movements: -10000 }];
+assert.deepEqual(accountTotals(accounts, "PEN"), { total: 250000, known: 1, pending: 1 });
+assert.deepEqual(accountTotals(accounts, "USD"), { total: 0, known: 1, pending: 0 });
+assert.deepEqual(accountTotals([account], "PEN"), { total: null, known: 0, pending: 1 });
+assert.deepEqual(accountTotals([], "USD"), { total: null, known: 0, pending: 0 });
+assert.equal(accountBalance({ ...bank, movements: -10000 }), -10000);
+// El neto de cada cuenta ya incorpora transferencias: el total no se duplica.
+assert.equal(accountTotals([{ ...bank, opening: 10000, movements: -6000 }, { ...bank, movements: 6000 }], "PEN").total, 10000);
 console.log(
-  "PASS weekly/monthly boundaries, leap years, schedule start/end, credit and tax arithmetic, impossible dates",
+  "PASS schedules, credit/tax, dates; account balances, unknown/zero/negative, currency isolation and transfers",
 );

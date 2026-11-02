@@ -102,6 +102,22 @@ export type Account = {
   movements: number;
   note: string;
 };
+export function accountBalance(a: Account): number | null {
+  return a.currency && a.opening !== null && a.opening_date
+    ? a.opening + a.movements
+    : null;
+}
+export function accountTotals(accounts: Account[], currency: "PEN" | "USD") {
+  const inCurrency = accounts.filter((a) => a.currency === currency);
+  const balances = inCurrency
+    .map(accountBalance)
+    .filter((balance): balance is number => balance !== null);
+  return {
+    total: balances.length ? balances.reduce((sum, n) => sum + n, 0) : null,
+    known: balances.length,
+    pending: inCurrency.length - balances.length,
+  };
+}
 export type Movement = {
   id: string;
   kind: "income" | "expense" | "transfer";

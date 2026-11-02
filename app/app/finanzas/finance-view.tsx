@@ -25,6 +25,7 @@ import {
 } from "@/lib/finanzas/model";
 import { DocumentsPanel } from "./documents-panel";
 import { QuickEntry } from "./quick-entry";
+import { AccountBalances } from "./account-balances";
 import styles from "./finance.module.css";
 type FormKind =
   | "expense"
@@ -123,6 +124,14 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           <ShieldCheck size={16} /> Pedro y Nayeli
         </span>
       </header>
+      {tab === "Resumen" && (
+        <AccountBalances
+          accounts={data.accounts}
+          today={data.today}
+          onConfigure={(account) => setForm({ kind: "account", account })}
+          onManage={() => setTab("Cuentas")}
+        />
+      )}
       <QuickEntry data={data} scope={scope} currency={currency} onSave={send} />
       <div className={styles.toolbar}>
         <div className={styles.segment}>
@@ -557,33 +566,12 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
               </button>
             </div>
           </div>
-          <div className={styles.accountGrid}>
-            {data.accounts.map((a) => (
-              <article className={styles.panel} key={a.id}>
-                <h3>{a.name}</h3>
-                <p>
-                  {a.owner ? ownerNames[a.owner] : "Titular por completar"} ·{" "}
-                  {a.currency || "Moneda pendiente"}
-                </p>
-                <h2>
-                  {a.opening === null
-                    ? "Saldo por completar"
-                    : amount(a.opening + a.movements, a.currency || "PEN")}
-                </h2>
-                <small>
-                  Movimientos registrados:{" "}
-                  {a.currency ? amount(a.movements, a.currency) : "—"}
-                </small>
-                {a.opening_date && <small>Apertura: {a.opening_date}</small>}
-                <p>{a.note}</p>
-                <button
-                  onClick={() => setForm({ kind: "account", account: a })}
-                >
-                  Configurar cuenta
-                </button>
-              </article>
-            ))}
-          </div>
+          <AccountBalances
+            accounts={data.accounts}
+            today={data.today}
+            onConfigure={(account) => setForm({ kind: "account", account })}
+            detailed
+          />
         </section>
       )}
       {tab === "Movimientos" && (

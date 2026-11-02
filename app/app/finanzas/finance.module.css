@@ -273,6 +273,81 @@ table:where(.root table) {
 .accountGrid .panel {
   margin: 0;
 }
+.balances {
+  border: 1px solid var(--mk-border, #e6e0f1);
+  border-radius: 18px;
+  padding: 20px;
+  margin: 20px 0;
+  background: var(--mk-bg-elevated, #fff);
+}
+.balanceHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.balanceHeading h2 { margin-bottom: 4px; }
+.balanceHeading button { flex-shrink: 0; }
+.balanceTotals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.balanceTotals > div {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--mk-bg-secondary, #f6f1ff);
+}
+.balanceTotals span { font-size: 12px; }
+.balanceTotals strong {
+  display: block;
+  font-size: 23px;
+  line-height: 1.4;
+  color: #8051de;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.balanceCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--mk-border, #e6e0f1);
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.balanceCard h3 { margin: 0 0 3px; }
+.balanceLabel {
+  display: block;
+  color: var(--mk-text-secondary, #767184);
+  font-size: 10px;
+  margin-top: 12px;
+}
+.balanceAmount, .balanceUnknown {
+  display: block;
+  font-size: 20px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.balanceUnknown { font-size: 15px; color: #98703a; }
+.balanceCard button {
+  margin-top: auto;
+  align-self: flex-start;
+  border: 0;
+  padding: 10px 0 0;
+  color: #8051de;
+  font-size: 12px;
+  background: none;
+  min-height: 38px;
+}
+.root .balanceFootnote { font-size: 11px; margin: 14px 0 0; }
 .error,
 .success {
   border-radius: 10px;
@@ -375,6 +450,7 @@ table:where(.root table) {
   width: 100%;
 }
 @media (max-width: 1000px) {
+  .balanceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -386,6 +462,17 @@ table:where(.root table) {
   }
 }
 @media (max-width: 650px) {
+  .balances { padding: 14px; margin-top: 14px; }
+  .balanceHeading h2 { font-size: 17px; }
+  .balanceHeading button { font-size: 11px; padding: 8px; }
+  .balanceTotals { gap: 8px; }
+  .balanceTotals > div { padding: 10px; }
+  .balanceTotals strong { font-size: 19px; }
+  .balanceTotals span { font-size: 11px; }
+  .balanceCard { padding: 11px; }
+  .balanceCard h3 { font-size: 13px; }
+  .balanceAmount { font-size: 18px; }
+  .balanceCard button { min-height: 44px; }
   .root {
     padding: 70px 12px 20px;
   }
