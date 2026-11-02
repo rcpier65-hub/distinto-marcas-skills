@@ -284,18 +284,18 @@ export function prepareQuickEntry(
     d.problems.push(
       "Hay otros números en la frase. Separa las operaciones o aclara el importe y la fecha.",
     );
-  if (/\b(personal|personales|para mi|mi casa)\b/.test(s)) {
-    d.scope = "personal";
-    d.owner = null;
-  }
-  if (/\b(agencia|distinto)\b/.test(s)) {
-    d.scope = "agency";
-    d.owner = "agency";
-  }
   // Bank ownership does not decide whose income or expense it is.
   const bankPart =
     s.match(/\b(?:cuenta|bcp|bbva|yape|interbank|efectivo)\b.*$/)?.[0] || "";
   const transactionPart = s.replace(bankPart, "");
+  if (/\b(personal|personales|para mi|mi casa)\b/.test(transactionPart)) {
+    d.scope = "personal";
+    d.owner = null;
+  }
+  if (/\b(agencia|distinto)\b/.test(transactionPart)) {
+    d.scope = "agency";
+    d.owner = "agency";
+  }
   if (d.scope === "personal") {
     if (has(transactionPart, "nayeli")) d.owner = "nayeli";
     else if (has(transactionPart, "pedro")) d.owner = "pedro";

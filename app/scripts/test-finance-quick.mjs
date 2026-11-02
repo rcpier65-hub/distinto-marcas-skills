@@ -83,6 +83,9 @@ d = parse("Gasto personal de 30 soles en almuerzo con BCP Pedro");
 assert.equal(d.scope, "personal");
 assert.equal(d.owner, null);
 assert.equal(d.amount, 3000);
+d = parse("Gasto personal de Pedro de 30 soles en almuerzo con Interbank de la agencia");
+assert.equal(d.scope, "personal");
+assert.equal(d.owner, "pedro");
 d = parse("Pagué 20 soles en taxi el 31/10/2026 con BBVA");
 assert.equal(d.date, "2026-10-31");
 assert.deepEqual(d.problems, []);
@@ -93,6 +96,8 @@ for (const s of [
   "Gasté 100 soles y 50 soles en taxi",
   "Gasté 100 soles y 50 dólares",
   "No pagué 100 soles a Lorena",
+  "No gasté 100 soles en movilidad",
+  "No he recibido 100 soles de Kintu",
   "Transfiere 100 soles del BCP a BBVA",
   "Pagaré 100 soles mañana",
   "Gasto de -100 soles en taxi",
