@@ -23,6 +23,11 @@ services:
       - "traefik.http.routers.distinto-agencia.entrypoints=websecure"
       - "traefik.http.routers.distinto-agencia.rule=Host(`app.distintostudio.com`)"
       - "traefik.http.routers.distinto-agencia.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.distinto-recursos-www.entrypoints=websecure"
+      - "traefik.http.routers.distinto-recursos-www.rule=Host(`www.distintostudio.com`) && (PathPrefix(`/recursos`) || PathPrefix(`/_next`) || PathPrefix(`/agencia`) || Path(`/api/recursos/lead`))"
+      - "traefik.http.routers.distinto-recursos-www.priority=100"
+      - "traefik.http.routers.distinto-recursos-www.service=distinto-agencia"
+      - "traefik.http.routers.distinto-recursos-www.tls.certresolver=letsencrypt"
       - "traefik.http.services.distinto-agencia.loadbalancer.server.port=3000"
     logging:
       driver: json-file

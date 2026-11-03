@@ -5,13 +5,22 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  const p = request.nextUrl.pathname
+  const host = (request.headers.get('x-forwarded-host') || request.headers.get('host') || '').split(',')[0].trim().split(':')[0]
+  if (p.startsWith('/recursos') && host === 'app.distintostudio.com') {
+    const url = request.nextUrl.clone()
+    url.protocol = 'https'
+    url.host = 'www.distintostudio.com'
+    url.port = ''
+    return NextResponse.redirect(url, 308)
+  }
+
   // PERF (Pedro 24-jul-2026): rutas que NO necesitan sesión de usuario salen
   // ANTES de llamar a Supabase. `getUser()` es una llamada de red que el
   // middleware hacía en CADA request (incluso assets y endpoints con su propia
   // auth Bearer), sumando latencia y carga innecesaria al Auth de Supabase.
   // Assets estáticos + endpoints stateless (cron/v1/render/version/debug) no
   // tienen sesión de usuario → los dejamos pasar directo.
-  const p = request.nextUrl.pathname
   const sinAuthUsuario =
     p.startsWith('/excalidraw/') ||
     p.startsWith('/imprimir/') ||   // PDF interno del servidor (firma HMAC propia, 5 min)

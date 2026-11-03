@@ -6,7 +6,7 @@ import s from '@/components/recursos/recursos.module.css'
 export const metadata = {
   title: 'Recursos para hacer crecer tu negocio — Distinto',
   description: 'Guías gratuitas de Distinto para mejorar el contenido y ordenar la transformación digital de un negocio.',
-  alternates: { canonical: 'https://app.distintostudio.com/recursos' },
+  alternates: { canonical: 'https://www.distintostudio.com/recursos' },
 }
 
 export default function ResourcesPage() {

@@ -4,7 +4,7 @@ import { SiteFrame } from '@/components/sitio/site-frame'
 export const metadata = {
   title: 'Ruta digital de 90 días para ordenar un negocio — Distinto',
   description: 'Guía práctica para conectar marketing, ventas, seguimiento, operación y datos durante los próximos 90 días.',
-  alternates: { canonical: 'https://app.distintostudio.com/recursos/madurez-digital' },
+  alternates: { canonical: 'https://www.distintostudio.com/recursos/madurez-digital' },
 }
 
 export default function DigitalMaturityPage() {

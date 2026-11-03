@@ -20,21 +20,31 @@ const NAV: { id: Seccion; href: string; label: string }[] = [
 export const DEMO_URL = "https://distintostudio.com/#agendar";
 
 export function SiteFrame({ active, children }: { active: Seccion; children: React.ReactNode }) {
+  const recursosEnWeb = active === "recursos";
+  const href = (item: (typeof NAV)[number]) => {
+    if (!recursosEnWeb) return item.href;
+    if (item.id === "inicio") return "https://www.distintostudio.com/";
+    if (item.id === "funciones") return "https://www.distintostudio.com/#servicios";
+    if (item.id === "integraciones") return "https://app.distintostudio.com/integraciones";
+    return item.href;
+  };
+  const loginHref = recursosEnWeb ? "https://app.distintostudio.com/login" : "/login";
+
   return (
     <div className={`${s.page} ${display.variable} ${sans.variable}`}>
       <header className={s.top}>
         <div className={s.topIn}>
-          <Link href="/" className={s.logo} aria-label="Distinto — inicio">
+          <Link href={recursosEnWeb ? "https://www.distintostudio.com/" : "/"} className={s.logo} aria-label="Distinto — inicio">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/agencia/distinto-horizontal.svg" alt="Distinto" width={132} height={30} />
             <span>Plataforma</span>
           </Link>
           <nav className={s.nav} aria-label="Principal">
             {NAV.map((n) => (
-              <Link key={n.id} href={n.href} className={active === n.id ? s.on : undefined}>{n.label}</Link>
+              <Link key={n.id} href={href(n)} className={active === n.id ? s.on : undefined}>{n.label}</Link>
             ))}
           </nav>
-          <Link href="/login" className={s.login}>Iniciar sesión</Link>
+          <Link href={loginHref} className={s.login}>Iniciar sesión</Link>
         </div>
       </header>
       <main>{children}</main>
@@ -48,10 +58,10 @@ export function SiteFrame({ active, children }: { active: Seccion; children: Rea
             </div>
             <div>
               <h4>Plataforma</h4>
-              <Link href="/funciones">Funciones</Link>
-              <Link href="/integraciones">Integraciones</Link>
+              <Link href={recursosEnWeb ? "https://www.distintostudio.com/#servicios" : "/funciones"}>Funciones</Link>
+              <Link href={recursosEnWeb ? "https://app.distintostudio.com/integraciones" : "/integraciones"}>Integraciones</Link>
               <Link href="/recursos">Recursos</Link>
-              <Link href="/login">Iniciar sesión</Link>
+              <Link href={loginHref}>Iniciar sesión</Link>
             </div>
             <div>
               <h4>Legal</h4>
