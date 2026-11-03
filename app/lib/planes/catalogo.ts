@@ -19,6 +19,8 @@ export type PlanItem = {
   destacado?: boolean
 }
 
+export const HORARIO_EQUIPO = 'lunes a viernes, de 8:00 a. m. a 5:00 p. m. (hora de Lima)'
+
 export const REGLAS_COMERCIALES: string[] = [
   'Precios cotizan sin IGV (salvo Ecommerce Premium Novacell/Dennys, IGV incluido).',
   'Recibo por honorarios o factura +18% IGV.',
@@ -27,7 +29,7 @@ export const REGLAS_COMERCIALES: string[] = [
   'Dominio, hosting, Shopify, Kommo, apps y licencias = cliente.',
   'Máximo 2 rondas de ajustes por pieza.',
   'No vender pauta como incluida; no community 24/7; no mezclar marcas en un fee.',
-  'Horario equipo: lun–vie 9:00–17:00.',
+  `Horario equipo: ${HORARIO_EQUIPO}.`,
 ]
 
 export const PLANES: PlanItem[] = [

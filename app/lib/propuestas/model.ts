@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { PLANES, type PlanItem } from '../planes/catalogo'
+import { HORARIO_EQUIPO, PLANES, type PlanItem } from '../planes/catalogo'
 
 const text = (max = 2000) => z.string().max(max)
 const amount = z.number().finite().min(0).max(10000000)
@@ -30,7 +30,7 @@ export function emptyProposal(): ProposalData {
     validityDays: 15, minimum: '', currency: 'PEN', tax: 'sin_igv', status: 'borrador',
     client: { name: '', contact: '', document: '', email: '', phone: '', industry: '', address: '', coverage: '' },
     objective: '', services: [], monthlyDiscount: 0, onceDiscount: 0,
-    payment: '', terms: 'Los alcances y entregables son los descritos en esta propuesta.\nLos servicios adicionales se cotizan y aprueban por separado.\nHorario del equipo: lunes a viernes, de 9:00 a. m. a 5:00 p. m.',
+    payment: '', terms: `Los alcances y entregables son los descritos en esta propuesta.\nLos servicios adicionales se cotizan y aprueban por separado.\nHorario del equipo: ${HORARIO_EQUIPO}.`,
     externalCosts: '', team: '', delivery: { subject: '', message: '' },
   }
 }

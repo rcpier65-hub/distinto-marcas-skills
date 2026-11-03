@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { CHECKLIST, FAQ, GUIA_NOTAS, PREGUNTAS, aPropuesta, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { CHECKLIST, GUIA_NOTAS, PREGUNTAS, aPropuesta, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { preguntasFrecuentes } from "@/lib/presentacion/faq";
 import { crearCola } from "@/lib/presentacion/cola";
 import { proposalNumber, type ProposalData } from "@/lib/propuestas/model";
 import { proposalHtml } from "@/lib/propuestas/document";
@@ -21,7 +22,7 @@ import { Explicadores, TEMAS } from "./explicadores";
 import { TEMAS_ADS, TEMAS_SOCIAL } from "./explicadores-servicios";
 import { PlanSocialAds, PreguntasServicio, ProcesoServicio } from "./servicios-ui";
 import { ShowcaseSocial } from "./showcase-social";
-import { PREGUNTAS_ADS, PREGUNTAS_SOCIAL, PROCESO_ADS, REUNIONES_ADS, SERVICIOS, type Servicio } from "@/lib/presentacion/servicios";
+import { PREGUNTAS_ADS, PREGUNTAS_SOCIAL, PROCESO_ADS, REUNIONES_ADS, SERVICIOS, planSugerido, type Servicio } from "@/lib/presentacion/servicios";
 import "./presentacion.css";
 
 const ETAPAS = ["Inicio", "Te escuchamos", "Cómo trabajamos", "Preguntas", "Tu plan", "Propuesta"] as const;
@@ -141,6 +142,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const htmlPropuesta = useMemo(() => proposalHtml(datosPropuesta, numeroPropuesta ? proposalNumber({ numero: numeroPropuesta, data: datosPropuesta }) : "BORRADOR"), [datosPropuesta, numeroPropuesta]);
   const resumenMensual = datosPropuesta.services.filter((x) => !x.optional && x.frequency === "mensual");
   const conWeb = s.servicios.includes("web");
+  const planSocial = s.social.plan ?? planSugerido(s.social, s.servicios.includes("ads"), conWeb);
   /* Pestaña de «Cómo trabajamos»: si se quita un servicio, cae al primero activo. */
   const procServ: Servicio = s.servicios.includes(procElegido) ? procElegido : s.servicios[0];
   const temasDe = (x: Servicio) => (x === "web" ? TEMAS : x === "social" ? TEMAS_SOCIAL : TEMAS_ADS);
@@ -268,14 +270,19 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                     <div key={x.id} className="pr-x-bloque"><h3 className="pr-faq-sub">{x.nombre}</h3><Explicadores temas={temasDe(x.id)} /></div>
                   ))}
                   <h3 className="pr-faq-sub">Otras preguntas frecuentes</h3>
-                  <div className="pr-faq-lista">
-                    {FAQ.map((f) => (
-                      <details key={f.p}>
-                        <summary>{f.p}</summary>
-                        <p>{f.r}</p>
-                      </details>
-                    ))}
-                  </div>
+                  {SERVICIOS.filter((x) => s.servicios.includes(x.id)).map((x) => (
+                    <div key={x.id}>
+                      {s.servicios.length > 1 && <h4 className="pr-faq-sub">{x.nombre}</h4>}
+                      <div className="pr-faq-lista">
+                        {preguntasFrecuentes(x.id, planSocial).map((f) => (
+                          <details key={f.p}>
+                            <summary>{f.p}</summary>
+                            <p>{f.r}</p>
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
