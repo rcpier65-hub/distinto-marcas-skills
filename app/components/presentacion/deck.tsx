@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { CHECKLIST, GUIA_NOTAS, PREGUNTAS, aPropuesta, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { CHECKLIST, PREGUNTAS, aPropuesta, enlaceSeguro, aplicarRespuesta, nivelDeSesion, type Estado, type RespuestasWeb, type Sesion } from "@/lib/presentacion/web";
+import { guiaNotasPorServicio } from "@/lib/presentacion/notas-social";
 import { preguntasFrecuentes } from "@/lib/presentacion/faq";
 import { crearCola } from "@/lib/presentacion/cola";
 import { proposalNumber, type ProposalData } from "@/lib/propuestas/model";
@@ -390,7 +391,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
             <details className="pr-guia" open>
               <summary>Preguntas guía · {ETAPAS[etapa]}</summary>
               <ul>
-                {(GUIA_NOTAS[etapa] ?? []).map((q) => {
+                {guiaNotasPorServicio(s.servicios, etapa).map((q) => {
                   const hecha = s.notas.includes(q);
                   return (
                     <li key={q}>
