@@ -1,13 +1,14 @@
 // Genera o actualiza la propuesta de una presentación (Pedro 21-oct-2026).
 // Una sola propuesta por reunión. Se actualiza con lo último de la reunión
 // mientras nadie la haya editado en Planes y Propuestas; si se editó allá, se
-// respeta y se devuelve tal cual.
+// solicita cargar esa versión antes de actualizarla.
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { proposalActor, proposalBody, proposalError, ProposalError } from '@/lib/propuestas/server'
 import { proposalSchema } from '@/lib/propuestas/model'
 import { aPropuesta, sesionSchema } from '@/lib/presentacion/web'
 import { todayLima } from '@/lib/estrategia/model'
+import { puedeActualizarPropuesta } from '@/lib/presentacion/personalizacion'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,19 +21,25 @@ export async function POST(req: Request) {
     const { data: s, error } = await any.from('presentacion_sesiones').select('id,data,propuesta_id,propuesta_revision').eq('id', id).eq('created_by', user.id).maybeSingle()
     if (error) throw error
     if (!s) throw new ProposalError('Presentación no encontrada.', 404)
-    const data = proposalSchema.parse(aPropuesta(sesionSchema.parse(s.data), todayLima(), randomUUID))
+    const sesion = sesionSchema.parse(s.data)
+    const data = proposalSchema.parse(aPropuesta(sesion, todayLima(), randomUUID))
 
     if (s.propuesta_id) {
-      const { data: p } = await any.from('propuestas_comerciales').select('id,numero,revision,data').eq('id', s.propuesta_id).eq('created_by', user.id).maybeSingle()
+      const { data: p, error: ep } = await any.from('propuestas_comerciales').select('id,numero,revision,data,updated_at').eq('id', s.propuesta_id).eq('created_by', user.id).maybeSingle()
+      if (ep) throw ep
       if (p) {
-        if (p.revision !== s.propuesta_revision) return Response.json({ propuestaId: p.id, numero: p.numero, revision: p.revision, editadaEnPlanes: true })
+        if (!puedeActualizarPropuesta(p.revision, s.propuesta_revision, sesion.personalizacion?.revisionBase)) return Response.json({ error: 'Hay cambios más recientes en Planes. Carga esa versión antes de continuar.', propuesta: p }, { status: 409 })
         const nueva = p.revision + 1
-        /* Conserva la fecha original; el filtro por revisión evita pisar una edición simultánea en Planes. */
+        /* La personalización conserva su fecha; el filtro por revisión protege ediciones simultáneas. */
         const { data: u, error: eu } = await any.from('propuestas_comerciales')
-          .update({ data: { ...data, date: p.data?.date ?? data.date }, revision: nueva, updated_at: new Date().toISOString() })
+          .update({ data: { ...data, date: sesion.personalizacion ? data.date : p.data?.date ?? data.date }, revision: nueva, updated_at: new Date().toISOString() })
           .eq('id', p.id).eq('created_by', user.id).eq('revision', p.revision).select('id,numero,revision').maybeSingle()
         if (eu) throw eu
-        if (!u) return Response.json({ propuestaId: p.id, numero: p.numero, revision: p.revision, editadaEnPlanes: true })
+        if (!u) {
+          const { data: actual, error: ea } = await any.from('propuestas_comerciales').select('id,numero,revision,data,updated_at').eq('id', p.id).eq('created_by', user.id).maybeSingle()
+          if (ea) throw ea
+          return Response.json({ error: 'La propuesta cambió en otra ventana. Carga la versión guardada antes de continuar.', propuesta: actual }, { status: 409 })
+        }
         await any.from('presentacion_sesiones').update({ propuesta_revision: nueva }).eq('id', id).eq('created_by', user.id)
         return Response.json({ propuestaId: u.id, numero: u.numero, revision: u.revision, existente: true })
       }

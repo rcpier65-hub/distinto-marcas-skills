@@ -3,7 +3,7 @@
    Etapas: portada → escuchar → cómo trabajamos → preguntas → tu web →
    propuesta. Las notas de la reunión quedan a la vista del cliente («así nos
    ordenamos»). Todo se guarda solo mientras se conversa. */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
@@ -11,8 +11,10 @@ import { CHECKLIST, PREGUNTAS, aPropuesta, enlaceSeguro, aplicarRespuesta, nivel
 import { guiaNotasPorServicio } from "@/lib/presentacion/notas-social";
 import { preguntasFrecuentes } from "@/lib/presentacion/faq";
 import { crearCola } from "@/lib/presentacion/cola";
-import { proposalNumber, type ProposalData } from "@/lib/propuestas/model";
+import { money, proposalNumber, proposalSchema, type ProposalData, type ProposalRecord } from "@/lib/propuestas/model";
 import { proposalHtml } from "@/lib/propuestas/document";
+import { crearPersonalizacion, type Personalizacion } from "@/lib/presentacion/personalizacion";
+import { PersonalizarPropuesta } from "./personalizar-propuesta";
 
 const hoyLima = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
@@ -35,7 +37,9 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   const [etapa, setEtapa] = useState(0);
   const [notasAbiertas, setNotasAbiertas] = useState(true);
   const [guardado, setGuardado] = useState<"ok" | "pendiente" | "error">("ok");
-  const [propuesta, setPropuesta] = useState<{ id: string; numero: number; revision: number; editada?: boolean } | null>(inicial.propuestaId ? { id: inicial.propuestaId, numero: 0, revision: 0 } : null);
+  const [propuesta, setPropuesta] = useState<{ id: string; numero: number; revision: number } | null>(inicial.propuestaGuardada ?? (inicial.propuestaId ? { id: inicial.propuestaId, numero: 0, revision: 0 } : null));
+  const [versionExterna, setVersionExterna] = useState<ProposalRecord | null>(() => inicial.propuestaGuardada && inicial.propuestaGuardada.revision !== inicial.propuestaRevision && inicial.propuestaGuardada.revision !== inicial.data.personalizacion?.revisionBase ? inicial.propuestaGuardada : null);
+  const [personalizando, setPersonalizando] = useState(false);
   const [descargando, setDescargando] = useState(false);
   const [procElegido, setProcServ] = useState<Servicio>(inicial.data.servicios?.[0] ?? "web");
   const [generando, setGenerando] = useState(false);
@@ -72,7 +76,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea, select, [contenteditable]")) return;
+      if (t.closest("input, textarea, select, [contenteditable], dialog")) return;
       if (e.altKey || e.metaKey || e.ctrlKey) return;
       if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); setEtapa((x) => Math.min(ETAPAS.length - 1, x + 1)); }
       if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); setEtapa((x) => Math.max(0, x - 1)); }
@@ -102,8 +106,11 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
     if (!(await cola.vaciar())) throw new Error("No se pudieron guardar los últimos cambios. Revisa la conexión y vuelve a intentar.");
     const r = await fetch("/api/presentaciones/propuesta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inicial.id }) });
     const j = await r.json();
-    if (!r.ok) throw new Error(j.error || "No se pudo guardar la propuesta");
-    const p = { id: j.propuestaId as string, numero: j.numero as number, revision: j.revision as number, editada: !!j.editadaEnPlanes };
+    if (!r.ok) {
+      if (j.propuesta && proposalSchema.safeParse(j.propuesta.data).success) setVersionExterna(j.propuesta);
+      throw new Error(j.error || "No se pudo guardar la propuesta");
+    }
+    const p = { id: j.propuestaId as string, numero: j.numero as number, revision: j.revision as number };
     setPropuesta(p);
     return p;
   };
@@ -111,7 +118,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
     setGenerando(true);
     try {
       const p = await guardarPropuesta();
-      toast.success(p.editada ? "Esta propuesta se editó en Planes; se mantiene esa versión." : `Propuesta ${proposalNumber({ numero: p.numero, data: { date: hoyLima() } as ProposalData })} guardada.`);
+      toast.success(`Propuesta ${proposalNumber({ numero: p.numero, data: { date: datosPropuesta.date } as ProposalData })} guardada.`);
     } catch (x) { toast.error(x instanceof Error ? x.message : "No se pudo guardar la propuesta"); }
     finally { setGenerando(false); }
   };
@@ -127,7 +134,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
       }
       const url = URL.createObjectURL(await r.blob());
       const a = document.createElement("a");
-      a.href = url; a.download = `${proposalNumber({ numero: p.numero, data: { date: hoyLima() } as ProposalData })} - ${(s.cliente.empresa || s.cliente.nombre || "Cliente").replace(/[/\\]/g, "-")}.pdf`; a.click();
+      a.href = url; a.download = `${proposalNumber({ numero: p.numero, data: datosPropuesta })} - ${datosPropuesta.client.name.replace(/[/\\]/g, "-")}.pdf`; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       toast.success("PDF descargado.");
     } catch (x) { toast.error(x instanceof Error ? x.message : "No se pudo generar el PDF"); }
@@ -136,11 +143,24 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
 
   const n = nivelDeSesion(s);
   const numeroPropuesta = propuesta?.numero ?? 0;
-  const datosPropuesta = useMemo(() => {
+  const fechaPropuesta = inicial.propuestaGuardada?.data.date ?? hoyLima();
+  const borradorCalculado = useMemo(() => {
     let k = 0;
-    return aPropuesta(s, hoyLima(), () => `00000000-0000-4000-8000-${String(++k).padStart(12, "0")}`);
-  }, [s]);
-  const htmlPropuesta = useMemo(() => proposalHtml(datosPropuesta, numeroPropuesta ? proposalNumber({ numero: numeroPropuesta, data: datosPropuesta }) : "BORRADOR"), [datosPropuesta, numeroPropuesta]);
+    return aPropuesta(s, fechaPropuesta, () => `00000000-0000-4000-8000-${String(++k).padStart(12, "0")}`);
+  }, [s, fechaPropuesta]);
+  const datosPropuesta = versionExterna?.data ?? borradorCalculado;
+  const vistaPropuesta = useDeferredValue(datosPropuesta);
+  const htmlPropuesta = useMemo(() => proposalHtml(vistaPropuesta, numeroPropuesta ? proposalNumber({ numero: numeroPropuesta, data: vistaPropuesta }) : "BORRADOR"), [vistaPropuesta, numeroPropuesta]);
+  const personalizar = () => {
+    if (!s.personalizacion || versionExterna) {
+      const revision = versionExterna?.revision ?? propuesta?.revision ?? 0;
+      const personalizacion = crearPersonalizacion(datosPropuesta, revision > 0 ? revision : null, () => crypto.randomUUID());
+      cambiar(x => ({ ...x, personalizacion }));
+      setVersionExterna(null);
+    }
+    setPersonalizando(true);
+  };
+  const cambiarPersonalizacion = (f: (p: Personalizacion) => Personalizacion) => cambiar(x => x.personalizacion ? { ...x, personalizacion: f(x.personalizacion) } : x);
   const resumenMensual = datosPropuesta.services.filter((x) => !x.optional && x.frequency === "mensual");
   const conWeb = s.servicios.includes("web");
   const planSocial = s.social.plan ?? planSugerido(s.social, s.servicios.includes("ads"), conWeb);
@@ -345,10 +365,12 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                     {resumenMensual.length > 0 && (
                       <div className="pr-cierre-mensual">
                         <small>Servicios mensuales</small>
-                        <ul>{resumenMensual.map((x) => <li key={x.id}><span>{x.name}</span><b>{x.price == null ? "Por definir" : `S/ ${new Intl.NumberFormat("es-PE").format(x.price)}`}</b></li>)}</ul>
+                        <ul>{resumenMensual.map((x) => <li key={x.id}><span>{x.name}</span><b>{x.price == null ? "Por definir" : money(x.price * x.quantity, datosPropuesta.currency)}</b></li>)}</ul>
                       </div>
                     )}
-                    {conWeb && <>
+                    <button type="button" className="pr-btn pr-btn-main pr-personal-abrir" onClick={personalizar}>{versionExterna ? "Personalizar versión de Planes" : s.personalizacion ? "Editar propuesta personalizada" : "Personalizar propuesta"}</button>
+                    <p className="pr-quiet">Cantidades, frecuencia, reuniones, precios, textos y condiciones: todo editable para este cliente.</p>
+                    {conWeb && !s.personalizacion && <>
                     <div className="pr-cierre-nivel">
                       <small>Desarrollo web · nivel</small>
                       <strong>{n.nombre}</strong>
@@ -363,11 +385,11 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                       value={s.precio ?? ""} onChange={(e) => { const v = e.target.value; cambiar((x) => ({ ...x, precio: v === "" ? null : Math.max(0, Number(v)) })); }} />
                     {s.precio != null && (s.precio < n.desde || s.precio > n.hasta) && <p className="pr-aviso">Fuera del rango del nivel {n.nombre} ({n.rango}).</p>}
                     </>}
-                    <p className="pr-quiet">Tus notas de la reunión no aparecen en el documento. Formas de pago de siempre: proyecto 50% / 50% y servicios mensuales con el primer mes 50% / 50%.</p>
-                    {propuesta?.editada && <p className="pr-aviso">Esta propuesta ya se editó en Planes y Propuestas: se mantiene esa versión y el PDF sale con esos cambios.</p>}
+                    <p className="pr-quiet">Tus notas de la reunión no aparecen en el documento.{s.personalizacion ? " Esta propuesta es personalizada; cambiar de plan no reemplaza tus ajustes." : " Puedes personalizar el plan sin modificar el catálogo."}</p>
+                    {versionExterna && <p className="pr-aviso">Hay cambios guardados en Planes y Propuestas. La vista previa muestra esa versión. Pulsa «Personalizar versión de Planes» para continuar desde ella sin sobrescribirla.</p>}
                     <div className="pr-cierre-acciones">
-                      <button type="button" className="pr-btn pr-btn-main" onClick={descargar} disabled={descargando || generando}>{descargando ? "Generando PDF…" : "Descargar PDF"}</button>
-                      <button type="button" className="pr-btn pr-btn-ghost" onClick={generar} disabled={generando || descargando}>{generando ? "Guardando…" : propuesta ? "Actualizar propuesta" : "Guardar propuesta"}</button>
+                      <button type="button" className="pr-btn pr-btn-main" onClick={descargar} disabled={descargando || generando || !!versionExterna}>{descargando ? "Generando PDF…" : "Descargar PDF"}</button>
+                      <button type="button" className="pr-btn pr-btn-ghost" onClick={generar} disabled={generando || descargando || !!versionExterna}>{generando ? "Guardando…" : propuesta ? "Actualizar propuesta" : "Guardar propuesta"}</button>
                     </div>
                   </div>
                   <div className="pr-doc-vista">
@@ -414,6 +436,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
           </aside>
         )}
       </div>
+      {personalizando && s.personalizacion && <PersonalizarPropuesta valor={s.personalizacion} documento={datosPropuesta} html={htmlPropuesta} guardado={guardado} cambiar={cambiarPersonalizacion} cerrar={() => setPersonalizando(false)} />}
     </div>
   );
 }

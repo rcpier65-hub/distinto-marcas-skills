@@ -6,6 +6,7 @@ import { z } from "zod";
 import { emptyProposal, serviceFromTemplate, type ProposalData, type ProposalService } from "../propuestas/model";
 import { serviciosMensuales, SERVICIOS, type RespuestasAds, type RespuestasSocial } from "./servicios";
 import { esTienda, estimarNivel, NIVELES, tieneCatalogo, type Nivel, type RespuestasWeb } from "./niveles";
+import { personalizacionSchema, propuestaPersonalizada } from "./personalizacion";
 
 export type { RespuestasWeb, Nivel };
 
@@ -210,6 +211,7 @@ export const sesionSchema = z.object({
   /* Inversión acordada en la reunión (dentro del rango del nivel). */
   precio: z.number().min(0).max(1000000).nullable().default(null),
   extras: z.array(z.object({ texto: texto(200).default(""), estado: z.enum(["incluido", "opcional", "no"]).default("incluido") })).max(20).default([]),
+  personalizacion: personalizacionSchema.nullable().optional(),
 });
 export type Sesion = z.infer<typeof sesionSchema>;
 
@@ -293,6 +295,7 @@ export const ENTREGABLES_WEB = [
    del nivel con alcance, entregables y exclusiones; opcionales a cotizar;
    forma de pago de proyecto. Las notas de la reunión no van al documento. */
 export function aPropuesta(s: Sesion, hoy: string, uid: () => string): ProposalData {
+  if (s.personalizacion) return propuestaPersonalizada(s.personalizacion);
   const n = nivelDeSesion(s);
   const p = emptyProposal();
   const empresa = s.cliente.empresa || s.cliente.nombre || "Cliente";

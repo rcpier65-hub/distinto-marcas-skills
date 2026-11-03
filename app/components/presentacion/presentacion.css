@@ -614,6 +614,57 @@
 .pr-cierre-mensual small { font-size: 12px; font-weight: 700; color: var(--suave); }
 .pr-cierre-mensual ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
 .pr-cierre-mensual li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+
+/* Editor de la propuesta: formulario amplio y PDF visible, sin el panel de notas. */
+.pr-personal-abrir { background: var(--profundo); margin: 8px 0; }
+.pr-personal-dialog { width: min(1500px, calc(100vw - 32px)); height: calc(100dvh - 32px); max-width: none; max-height: none; margin: auto; padding: 0; border: 1px solid var(--linea); border-radius: 20px; color: var(--tinta); background: var(--papel); font: 14px var(--pr-sans), sans-serif; overflow: hidden; }
+.pr-personal-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.pr-personal-dialog::backdrop { background: rgba(15, 11, 22, .55); }
+.pr-personal-cabecera, .pr-personal-pie { padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #fff; }
+.pr-personal-cabecera { border-bottom: 1px solid var(--linea); }
+.pr-personal-cabecera h2 { font-size: 24px; }
+.pr-personal-cabecera p { margin: 4px 0 0; color: var(--suave); font-size: 13px; }
+.pr-personal-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+.pr-personal-formulario { overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.pr-personal-ayuda { margin: 0; line-height: 1.6; font-size: 12px; color: var(--suave); }
+.pr-personal-servicio { border: 1px solid var(--linea); border-radius: 16px; background: #fff; }
+.pr-personal-servicio > summary { cursor: pointer; font-weight: 700; padding: 16px; color: var(--profundo); }
+.pr-personal-contenido { display: grid; gap: 14px; padding: 0 16px 16px; }
+.pr-personal-contenido h3 { font-size: 18px; margin: 8px 0 0; }
+.pr-personal-campo { display: grid; gap: 6px; font-size: 12px; font-weight: 600; min-width: 0; }
+.pr-personal-campo input, .pr-personal-campo select, .pr-personal-campo textarea { width: 100%; min-width: 0; border: 1px solid #d9cee6; background: #fff; color: var(--tinta); border-radius: 10px; padding: 10px 12px; font: 14px/1.4 var(--pr-sans), sans-serif; }
+.pr-personal-campo textarea { resize: vertical; min-height: 80px; }
+.pr-personal-campo small { font-weight: 400; color: var(--suave); line-height: 1.4; }
+.pr-personal-fila { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pr-personal-check { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.5; }
+.pr-personal-check input { width: 16px; height: 16px; accent-color: var(--profundo); }
+.pr-personal-entregas { display: grid; gap: 12px; }
+.pr-personal-entrega { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--linea); border-radius: 12px; min-width: 0; background: #faf7fe; }
+.pr-personal-entrega legend { font-size: 11px; color: var(--suave); padding: 0 5px; }
+.pr-personal-entrega-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pr-personal-excluida { background: #f5f4f6; opacity: .7; }
+.pr-personal-quitar { color: #a12543; background: none; border: 0; font-size: 12px; text-align: left; cursor: pointer; padding: 6px 0; }
+.pr-personal-agregar { display: grid; gap: 10px; padding: 12px; border: 1px dashed #c5a9e5; border-radius: 12px; }
+.pr-personal-detalles { display: grid; gap: 10px; }
+.pr-personal-detalles summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.pr-personal-detalles .pr-personal-campo { margin-top: 10px; }
+.pr-personal-preview { min-width: 0; min-height: 0; padding: 14px; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; background: #eeeaf4; }
+.pr-personal-preview > span { font-size: 12px; font-weight: 600; color: var(--suave); }
+.pr-personal-preview iframe { width: 100%; height: 100%; border: 0; border-radius: 8px; background: #fff; }
+.pr-personal-pie { border-top: 1px solid var(--linea); }
+.pr-personal-pie > div { display: grid; gap: 4px; }
+.pr-personal-pie small { font-size: 11px; color: var(--suave); }
+@media (max-width: 800px) {
+  .pr-personal-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
+  .pr-personal-cuerpo { display: block; overflow: auto; }
+  .pr-personal-formulario { overflow: visible; padding: 12px; }
+  .pr-personal-preview { height: 70dvh; }
+  .pr-personal-cabecera, .pr-personal-pie { padding: 12px; }
+  .pr-personal-pie { flex-wrap: wrap; gap: 8px; }
+  .pr-personal-pie .pr-btn { width: 100%; }
+  .pr-personal-cabecera h2 { font-size: 20px; }
+  .pr-personal-campo input, .pr-personal-campo select, .pr-personal-campo textarea { font-size: 16px; }
+}
 /* Explicadores de Social/Publicidad */
 .pr-x-bloque + .pr-x-bloque { margin-top: 8px; }
 .pr-x-curva { width: 100%; max-width: 420px; color: var(--tinta); }
