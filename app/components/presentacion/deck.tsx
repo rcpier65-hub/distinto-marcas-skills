@@ -15,6 +15,7 @@ import { money, proposalNumber, proposalSchema, type ProposalData, type Proposal
 import { proposalHtml } from "@/lib/propuestas/document";
 import { crearPersonalizacion, type Personalizacion } from "@/lib/presentacion/personalizacion";
 import { PersonalizarPropuesta } from "./personalizar-propuesta";
+import { ProposalEmail } from "@/components/propuestas/proposal-email";
 
 const hoyLima = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 import { NIVELES, type Nivel } from "@/lib/presentacion/niveles";
@@ -120,6 +121,11 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
       const p = await guardarPropuesta();
       toast.success(`Propuesta ${proposalNumber({ numero: p.numero, data: { date: datosPropuesta.date } as ProposalData })} guardada.`);
     } catch (x) { toast.error(x instanceof Error ? x.message : "No se pudo guardar la propuesta"); }
+    finally { setGenerando(false); }
+  };
+  const prepararCorreo = async () => {
+    setGenerando(true);
+    try { return await guardarPropuesta(); }
     finally { setGenerando(false); }
   };
   /* Mismo PDF que «Descargar PDF» de Planes y Propuestas. */
@@ -388,6 +394,7 @@ export function Deck({ inicial }: { inicial: SesionGuardada }) {
                     <p className="pr-quiet">Tus notas de la reunión no aparecen en el documento.{s.personalizacion ? " Esta propuesta es personalizada; cambiar de plan no reemplaza tus ajustes." : " Puedes personalizar el plan sin modificar el catálogo."}</p>
                     {versionExterna && <p className="pr-aviso">Hay cambios guardados en Planes y Propuestas. La vista previa muestra esa versión. Pulsa «Personalizar versión de Planes» para continuar desde ella sin sobrescribirla.</p>}
                     <div className="pr-cierre-acciones">
+                      <ProposalEmail prepare={prepararCorreo} disabled={descargando || generando || !!versionExterna} className="pr-btn pr-btn-main" />
                       <button type="button" className="pr-btn pr-btn-main" onClick={descargar} disabled={descargando || generando || !!versionExterna}>{descargando ? "Generando PDF…" : "Descargar PDF"}</button>
                       <button type="button" className="pr-btn pr-btn-ghost" onClick={generar} disabled={generando || descargando || !!versionExterna}>{generando ? "Guardando…" : propuesta ? "Actualizar propuesta" : "Guardar propuesta"}</button>
                     </div>
