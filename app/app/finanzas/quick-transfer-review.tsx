@@ -68,15 +68,15 @@ export function QuickTransferReview({ initial, data, onClose, onSave }: {
         </div>
         <label>Desde · cuenta de origen<select value={sourceId} required onChange={(e) => setSourceId(e.target.value)}>
           <option value="">¿De qué cuenta salió?</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} · {accountUsageName(a.usage)}</option>)}
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} · {accountUsageName(a.usage)} · Saldo: {accountBalance(a) === null ? "Por completar" : amount(accountBalance(a)!, coin)}</option>)}
         </select></label>
-        {source && <p className={q.balancePreview}>Sale {amount(cents || 0, coin)} · Saldo resultante: <strong>{previewSource !== null ? amount(previewSource, coin) : "Por completar"}</strong></p>}
+        {source && <p className={q.balancePreview}>Saldo actual: <strong>{sourceBalance !== null ? amount(sourceBalance, coin) : "Por completar"}</strong><br />Sale {amount(cents || 0, coin)} · Saldo resultante: <strong>{previewSource !== null ? amount(previewSource, coin) : "Por completar"}</strong></p>}
         <ArrowDown className={q.transferArrow} size={18} aria-hidden="true" />
         <label>Hacia · cuenta de destino<select value={destinationId} required onChange={(e) => setDestinationId(e.target.value)}>
           <option value="">¿A qué cuenta llegó?</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} · {accountUsageName(a.usage)}</option>)}
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} · {accountUsageName(a.usage)} · Saldo: {accountBalance(a) === null ? "Por completar" : amount(accountBalance(a)!, coin)}</option>)}
         </select></label>
-        {destination && <p className={q.balancePreview}>Entra {amount(cents || 0, coin)} · Saldo resultante: <strong>{previewDestination !== null ? amount(previewDestination, coin) : "Por completar"}</strong></p>}
+        {destination && <p className={q.balancePreview}>Saldo actual: <strong>{destinationBalance !== null ? amount(destinationBalance, coin) : "Por completar"}</strong><br />Entra {amount(cents || 0, coin)} · Saldo resultante: <strong>{previewDestination !== null ? amount(previewDestination, coin) : "Por completar"}</strong></p>}
         {sameAccount && <p className={q.error} role="alert">Elige dos cuentas diferentes.</p>}
         {accounts.length < 2 && <p className={q.hint}>Configura al menos dos cuentas con titular y esta moneda en Cuentas.</p>}
         <details className={q.edit} open={!validDate}>

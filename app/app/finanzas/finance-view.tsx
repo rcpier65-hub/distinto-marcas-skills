@@ -66,8 +66,11 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
       if (!r.ok) throw Error(d.error);
       setData(d);
       setMonth(m);
+      setError("");
+      return d as FinanceData;
     } catch (e) {
       setError((e as Error).message);
+      return null;
     } finally {
       setBusy(false);
     }
@@ -138,6 +141,7 @@ export function FinanceView({ initial }: { initial: FinanceData }) {
           scope={scope}
           currency={currency}
           onSave={send}
+          onRefresh={() => reload()}
         />
       </div>
       <div className={styles.toolbar}>

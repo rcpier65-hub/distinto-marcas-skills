@@ -15,6 +15,7 @@ import {
   remaining,
   ownerNames,
   accountUsageName,
+  accountBalance,
   type FinanceData,
 } from "@/lib/finanzas/model";
 import { prepareQuickEntry, reviewClassification, type QuickDraft } from "@/lib/finanzas/quick-entry";
@@ -27,34 +28,52 @@ export function QuickEntry({
   scope,
   currency,
   onSave,
+  onRefresh,
 }: {
   data: FinanceData;
   scope: string;
   currency: string;
   onSave: (p: Record<string, unknown>) => Promise<void>;
+  onRefresh: () => Promise<FinanceData | null>;
 }) {
   const [text, setText] = useState(""),
     [draft, setDraft] = useState<QuickDraft | null>(null),
     [problems, setProblems] = useState<string[]>([]),
-    [saved, setSaved] = useState("");
+    [saved, setSaved] = useState(""),
+    [preparing, setPreparing] = useState(false);
   const file = useRef<HTMLInputElement>(null);
-  function prepare(value = text) {
+  const prepareLock = useRef(false);
+  async function prepare(value = text) {
+    if (prepareLock.current) return;
+    prepareLock.current = true;
+    setPreparing(true);
     setSaved("");
-    const result = prepareQuickEntry(value, {
-      ...data,
-      today: today(),
-      scope: scope === "personal" ? "personal" : "agency",
-      currency: currency === "USD" ? "USD" : "PEN",
-    });
-    setProblems(result.problems);
-    if (!result.problems.length) setDraft(result);
+    setProblems([]);
+    try {
+      const fresh = await onRefresh();
+      if (!fresh) {
+        setProblems(["No pudimos actualizar los saldos. Reintenta Preparar."]);
+        return;
+      }
+      const result = prepareQuickEntry(value, {
+        ...fresh,
+        today: today(),
+        scope: scope === "personal" ? "personal" : "agency",
+        currency: currency === "USD" ? "USD" : "PEN",
+      });
+      setProblems(result.problems);
+      if (!result.problems.length) setDraft(result);
+    } finally {
+      prepareLock.current = false;
+      setPreparing(false);
+    }
   }
   const voice = useQuickVoice((value) => {
     setText(value);
-    prepare(value);
+    void prepare(value);
   });
   const recording = voice.status === "recording",
-    working = voice.status !== "idle";
+    working = voice.status !== "idle" || preparing;
   async function saveDraft(p: Record<string, unknown>) {
     await onSave(p);
     setSaved(p.action === "transfer"
@@ -75,7 +94,7 @@ export function QuickEntry({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          prepare();
+          void prepare();
         }}
       >
         <textarea
@@ -127,7 +146,7 @@ export function QuickEntry({
             className={styles.primary}
             disabled={!text.trim() || working}
           >
-            Preparar <ArrowUpRight size={18} />
+            {preparing ? "Actualizando saldos…" : "Preparar"} <ArrowUpRight size={18} />
           </button>
         </div>
         <input
@@ -142,7 +161,7 @@ export function QuickEntry({
           }}
         />
       </form>
-      {working && (
+      {voice.status !== "idle" && (
         <p role="status">
           {recording
             ? "Te escucho… toca Terminar audio. Máximo 1 minuto."
@@ -362,6 +381,10 @@ function QuickReview({
                     ? ownerNames[account.owner]
                     : "Titular por confirmar"}
                 </small>
+                <span className={q.accountBalance}>
+                  <span>Saldo actual</span>
+                  <b>{accountBalance(account) === null ? "Por completar" : amount(accountBalance(account)!, account.currency!)}</b>
+                </span>
               </div>
               <button
                 type="button"
@@ -391,9 +414,11 @@ function QuickReview({
                       setBankOwner("");
                     }}
                   >
-                    {a.name}
-                    {` · ${accountUsageName(a.usage)}`}
-                    {a.currency ? ` · ${a.currency}` : ""}
+                    <span>{a.name} · {accountUsageName(a.usage)}{a.currency ? ` · ${a.currency}` : ""}</span>
+                    <span className={q.accountBalance}>
+                      <span>Saldo actual</span>
+                      <b>{accountBalance(a) === null ? "Por completar" : amount(accountBalance(a)!, a.currency!)}</b>
+                    </span>
                   </button>
                 ))}
               </div>
