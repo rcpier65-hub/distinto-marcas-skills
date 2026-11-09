@@ -72,7 +72,10 @@ export function MarcaCard({
   const [texto, setTexto] = useState('')
   const [creando, setCreando] = useState(false)
   const [locales, setLocales] = useState<TareaMarca[]>([])
-  const lista = [...locales, ...tareas]
+  /* Al refrescar el servidor, la tarea recién creada llega también en `tareas`:
+     se omite la copia local para no mostrarla dos veces. */
+  const idsServidor = new Set(tareas.map((t) => t.id))
+  const lista = [...locales.filter((t) => !idsServidor.has(t.id)), ...tareas]
 
   async function agregarTarea() {
     const t = texto.trim()
