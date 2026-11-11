@@ -42,20 +42,21 @@ export async function imagenesParaPdf(brandId: string, posts: PostReport | null,
     const ig = top.filter((p) => p.network === "instagram").map((p) => p.id);
     const fb = top.filter((p) => p.network === "facebook").map((p) => p.id);
     if (token && b?.instagram_user_id && ig.length) {
-      const j = await graph("", { ids: ig.join(","), fields: "owner{id},media_type,media_url,thumbnail_url" }, token);
-      for (const id of ig) {
-        const m = j?.[id] as J | undefined;
+      /* v26 ya no acepta ?ids=, se consulta cada publicación por separado. */
+      await Promise.all(ig.map(async (id) => {
+        const m = await graph(id, { fields: "owner{id},media_type,media_url,thumbnail_url" }, token);
         if (m && (m.owner as J | undefined)?.id === b.instagram_user_id)
           frescas[id] = (m.thumbnail_url as string) || (m.media_type !== "VIDEO" ? (m.media_url as string) : null) || null;
-      }
+      }));
     }
     const pagina = b?.facebook_page_id;
     const propios = fb.filter((id) => pagina && id.startsWith(`${pagina}_`));
     if (token && pagina && propios.length) {
       const p = await graph(pagina, { fields: "id,access_token" }, token);
       const pt = p?.id === pagina && typeof p.access_token === "string" ? p.access_token : null;
-      const j = pt ? await graph("", { ids: propios.join(","), fields: "full_picture" }, pt) : null;
-      for (const id of propios) frescas[id] = ((j?.[id] as J | undefined)?.full_picture as string) || null;
+      if (pt) await Promise.all(propios.map(async (id) => {
+        frescas[id] = ((await graph(id, { fields: "full_picture" }, pt))?.full_picture as string) || null;
+      }));
     }
   }
   const tops = tiktok?.mes?.top.slice(0, 3) ?? [];
