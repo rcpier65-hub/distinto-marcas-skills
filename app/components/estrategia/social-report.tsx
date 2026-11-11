@@ -26,6 +26,7 @@ import { TrendModal, useTrend, type TrendMetric } from "./social-trend";
 import { SocialReportPdf } from "./social-report-pdf";
 import { EnviarCorreoBoton } from "./social-email";
 import { TikTokSection, useTikTok } from "./social-tiktok";
+import type { TikTokReporte } from "@/lib/tiktok/server";
 import { Download, TrendingUp } from "lucide-react";
 
 const names = { facebook: "Facebook", instagram: "Instagram" };
@@ -179,12 +180,30 @@ export function SocialReportView({
     </div>
   );
 }
+/* Mejores publicaciones y portadas de TikTok con imágenes actuales incrustadas.
+   Si falla, el PDF sale igual sin esa sección. */
+function usePdfExtra(slug: string, month: string, enabled: boolean) {
+  const clave = `${slug}:${month}`;
+  const [state, setState] = useState<{ clave: string; posts: PostReport | null; tiktok: TikTokReporte | null } | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    const c = new AbortController();
+    void fetch(`/api/meta/reporte-redes/pdf?${new URLSearchParams({ marca: slug, mes: month })}`, { signal: c.signal, cache: "no-store" })
+      .then(async (r) => (r.ok ? r.json() : { posts: null, tiktok: null }))
+      .catch(() => ({ posts: null, tiktok: null }))
+      .then((j) => { if (!c.signal.aborted) setState({ clave: `${slug}:${month}`, posts: j.posts ?? null, tiktok: j.tiktok ?? null }); });
+    return () => c.abort();
+  }, [slug, month, enabled]);
+  const vigente = enabled && state?.clave === clave ? state : null;
+  return { listo: !!vigente, posts: vigente?.posts ?? null, tiktok: vigente?.tiktok ?? null };
+}
 /* Exportar PDF: trae la tendencia de 6 meses, monta el documento A4 e imprime. */
 function ExportPdf({ slug, month, brand, report }: { slug: string; month: string; brand: string; report: SocialReport }) {
   const [on, setOn] = useState(false);
   const { data: trend, error } = useTrend(slug, month, on);
   const tk = useTikTok(slug, month, on);
-  const listo = on && (trend || error) && (tk.data || tk.error);
+  const extra = usePdfExtra(slug, month, on);
+  const listo = on && (trend || error) && (tk.data || tk.error) && extra.listo;
   useEffect(() => {
     if (!listo) return;
     const antes = document.title;
@@ -202,7 +221,7 @@ function ExportPdf({ slug, month, brand, report }: { slug: string; month: string
         <Download size={15} />
         {on ? "Preparando PDF…" : "Exportar PDF"}
       </button>
-      {on && listo && <SocialReportPdf brand={brand} report={report} trend={trend ?? null} tiktok={tk.data ?? null} />}
+      {on && listo && <SocialReportPdf brand={brand} report={report} trend={trend ?? null} tiktok={extra.tiktok ?? tk.data ?? null} posts={extra.posts} />}
     </>
   );
 }

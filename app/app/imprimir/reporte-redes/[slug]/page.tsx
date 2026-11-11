@@ -3,7 +3,8 @@
 // sin firma válida responde 404. Pedro 18-oct-2026.
 import { notFound } from "next/navigation";
 import { firmaValida, marcaCorreo } from "@/lib/social-reports/email";
-import type { SocialReport, SocialTrend } from "@/lib/social-reports/model";
+import type { PostReport, SocialReport, SocialTrend } from "@/lib/social-reports/model";
+import { imagenesParaPdf } from "@/lib/social-reports/imagenes";
 import { obtener } from "@/lib/social-reports/snapshots";
 import type { TikTokReporte } from "@/lib/tiktok/server";
 import { SocialReportDoc } from "@/components/estrategia/social-report-pdf";
@@ -24,14 +25,16 @@ export default async function Page({
   const marca = await marcaCorreo(slug);
   if (!marca) notFound();
   const por = { id: null, nombre: "Envío de reporte" };
-  const [report, trend, tiktok] = await Promise.all([
+  const [report, trend, tiktokGuardado, postsGuardados] = await Promise.all([
     obtener<SocialReport>(marca.id, mes, "report", por).then((g) => g.data),
     obtener<SocialTrend>(marca.id, mes, "trend", por).then((g) => g.data).catch(() => null),
     obtener<TikTokReporte>(marca.id, mes, "tiktok", por).then((g) => g.data).catch(() => null),
+    obtener<PostReport>(marca.id, mes, "posts", por).then((g) => g.data).catch(() => null),
   ]);
+  const { posts, tiktok } = await imagenesParaPdf(marca.id, postsGuardados, tiktokGuardado).catch(() => ({ posts: postsGuardados, tiktok: tiktokGuardado }));
   return (
     <div id="reporte-redes-doc" style={{ background: "#fff" }}>
-      <SocialReportDoc brand={marca.nombre} report={report} trend={trend} tiktok={tiktok} />
+      <SocialReportDoc brand={marca.nombre} report={report} trend={trend} tiktok={tiktok} posts={posts} />
     </div>
   );
 }

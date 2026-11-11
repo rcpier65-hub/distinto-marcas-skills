@@ -195,6 +195,25 @@ async function videos(at: string, desde: string, hasta: string): Promise<TikTokV
   return out.sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
 }
 
+/* Portadas actuales de videos de la marca (los enlaces de TikTok vencen en
+   pocos días; el PDF las pide al exportar). Solo videos de la cuenta conectada. */
+export async function portadasTikTok(brandId: string, ids: string[]): Promise<Record<string, string>> {
+  const at = ids.length ? await accessToken(brandId).catch(() => null) : null;
+  if (!at) return {};
+  const r = await fetch(`${API}/video/query/?fields=id,cover_image_url`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ filters: { video_ids: ids.slice(0, 20) } }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok || j.error?.code !== "ok") return {};
+  const out: Record<string, string> = {};
+  for (const v of (j.data?.videos ?? []) as Record<string, unknown>[]) if (typeof v.cover_image_url === "string") out[String(v.id)] = v.cover_image_url;
+  return out;
+}
+
 export type TikTokReporte = {
   conectado: boolean;
   configurado: boolean;
