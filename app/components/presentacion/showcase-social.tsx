@@ -3,9 +3,9 @@
    y cómo lo hacemos por dentro. Videos del portafolio de distintostudio.com
    y datos reales del sistema: posicionamiento, grilla del mes, guiones,
    grabaciones, flujo de diseño y edición, publicación y resultados. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { MARCAS_PORTAFOLIO, MEDIOS, PRODUCCIONES, portada, reproductorTikTok } from "@/lib/presentacion/portafolio";
+import { MARCAS_PORTAFOLIO, MEDIOS, PRODUCCIONES, enlaceTikTok, portada, reproductorTikTok } from "@/lib/presentacion/portafolio";
 import { PROCESO_SOCIAL, REUNIONES_SOCIAL } from "@/lib/presentacion/servicios";
 import { CasoReal, ProcesoVista, ReunionesVista } from "./servicios-ui";
 
@@ -102,60 +102,135 @@ export function ShowcaseSocial() {
 }
 
 /* ---------- 1. Portafolio ---------- */
+type VideoPortafolio = { tipo: "tiktok" | "video"; id: string; marca: string; rubro?: string; poster?: string };
+
 function Portafolio() {
-  const [filtro, setFiltro] = useState<string>("todas");
-  const [abierto, setAbierto] = useState<{ tipo: "tiktok" | "video"; src: string; marca: string; poster?: string } | null>(null);
-  const videos = useMemo(() => (filtro === "todas" ? MARCAS_PORTAFOLIO.flatMap((m) => m.videos.slice(0, 2).map((v) => ({ v, m }))) : MARCAS_PORTAFOLIO.filter((m) => m.nombre === filtro).flatMap((m) => m.videos.map((v) => ({ v, m })))), [filtro]);
+  const [filtro, setFiltro] = useState("todas");
+  const [abierto, setAbierto] = useState<VideoPortafolio | null>(null);
+  const [reproducir, setReproducir] = useState<boolean | null>(null);
+  const [paginaVisible, setPaginaVisible] = useState(true);
+  const reducir = useReducedMotion();
+  const dialogo = useRef<HTMLDialogElement>(null);
+  const automatico = reproducir ?? !reducir;
+  const videos = useMemo(() => {
+    const marcas = filtro === "todas" ? MARCAS_PORTAFOLIO : MARCAS_PORTAFOLIO.filter((m) => m.nombre === filtro);
+    // Alternar marcas conserva variedad en las primeras filas sin ocultar entregas.
+    return Array.from({ length: Math.max(0, ...marcas.map((m) => m.videos.length)) }, (_, i) =>
+      marcas.flatMap((m) => m.videos[i] ? [{ tipo: "tiktok" as const, id: m.videos[i], marca: m.nombre, rubro: m.rubro, poster: portada(m.videos[i]) }] : [])
+    ).flat();
+  }, [filtro]);
+  useEffect(() => {
+    const actualizar = () => setPaginaVisible(!document.hidden);
+    actualizar();
+    document.addEventListener("visibilitychange", actualizar);
+    return () => document.removeEventListener("visibilitychange", actualizar);
+  }, []);
   useEffect(() => {
     if (!abierto) return;
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); setAbierto(null); } };
+    dialogo.current?.showModal();
+    const k = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); setAbierto(null); }
+    };
     window.addEventListener("keydown", k, true);
     return () => window.removeEventListener("keydown", k, true);
   }, [abierto]);
+  const previews = automatico && paginaVisible && !abierto;
+  const total = videos.length + (filtro === "todas" ? PRODUCCIONES.length : 0);
   return (
     <div>
       <header className="pr-sc-cab">
         <h3>Contenido que hicimos para marcas reales</h3>
-        <p>Guiones, grabación, edición y publicación hechos por nuestro equipo. Toca un video para verlo.</p>
+        <p>Guiones, grabación, edición y publicación hechos por nuestro equipo. Videos verticales: ábrelos en grande para escucharlos.</p>
       </header>
       <div className="pr-sc-filtros" role="radiogroup" aria-label="Filtrar por marca">
         {["todas", ...MARCAS_PORTAFOLIO.map((m) => m.nombre)].map((n) => (
           <button key={n} type="button" role="radio" aria-checked={filtro === n} className={filtro === n ? "pr-chip pr-chip-on" : "pr-chip"} onClick={() => setFiltro(n)}>{n === "todas" ? "Todas" : n}</button>
         ))}
       </div>
+      <div className="pr-sc-video-barra">
+        <span>{total} {total === 1 ? "video" : "videos"} · Vista previa sin sonido</span>
+        <button type="button" className="pr-chip" aria-pressed={automatico} onClick={() => setReproducir(!automatico)}>{automatico ? "Pausar vistas previas" : "Reproducir vistas previas"}</button>
+      </div>
       <div className="pr-sc-videos">
-        {videos.map(({ v, m }) => (
-          <button key={v} type="button" className="pr-sc-video" onClick={() => setAbierto({ tipo: "tiktok", src: reproductorTikTok(v), marca: m.nombre })} aria-label={`Ver video de ${m.nombre}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={portada(v)} alt="" loading="lazy" />
-            <span><b>{m.nombre}</b><small>{m.rubro}</small></span>
-          </button>
-        ))}
+        {videos.map((v, i) => <TarjetaVideo key={v.id} video={v} reproducir={previews} numero={i + 1} abrir={setAbierto} />)}
       </div>
       {filtro === "todas" && (
         <>
           <h4 className="pr-sc-sub">Producciones de Distinto</h4>
-          <div className="pr-sc-videos pr-sc-videos-chicos">
-            {PRODUCCIONES.map((p) => (
-              <button key={p.n} type="button" className="pr-sc-video" onClick={() => setAbierto({ tipo: "video", src: p.video, marca: p.titulo, poster: p.portada })} aria-label={`Ver ${p.titulo}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.portada} alt="" loading="lazy" />
-                <span><b>{p.titulo}</b></span>
-              </button>
-            ))}
+          <div className="pr-sc-videos">
+            {PRODUCCIONES.map((p) => <TarjetaVideo key={p.n} video={{ tipo: "video", id: p.video, marca: p.titulo, poster: p.portada }} reproducir={previews} numero={p.n} abrir={setAbierto} />)}
           </div>
         </>
       )}
       {abierto && (
-        <div className="pr-sc-modal" role="dialog" aria-modal="true" aria-label={`Video de ${abierto.marca}`} onClick={() => setAbierto(null)}>
-          <div className="pr-sc-reproductor" onClick={(e) => e.stopPropagation()}>
+        <dialog ref={dialogo} className="pr-sc-modal" aria-label={`Video de ${abierto.marca}`} onCancel={() => setAbierto(null)} onClick={(e) => { if (e.target === e.currentTarget) setAbierto(null); }}>
+          <div className="pr-sc-reproductor">
+            <div className="pr-sc-rep-pie"><b>{abierto.marca}</b><button autoFocus type="button" className="pr-btn pr-btn-ghost" onClick={() => setAbierto(null)}>Cerrar</button></div>
             {abierto.tipo === "tiktok"
-              ? <iframe src={abierto.src} title={`Video de ${abierto.marca}`} allow="autoplay; fullscreen; encrypted-media" />
-              : <video src={abierto.src} poster={abierto.poster} controls autoPlay playsInline />}
-            <div className="pr-sc-rep-pie"><b>{abierto.marca}</b><button type="button" className="pr-btn pr-btn-ghost" onClick={() => setAbierto(null)}>Cerrar</button></div>
+              ? <ReproductorTikTok id={abierto.id} nombre={abierto.marca} />
+              : <video src={abierto.id} poster={abierto.poster} controls autoPlay playsInline />}
+            <a className="pr-sc-original" href={abierto.tipo === "tiktok" ? enlaceTikTok(abierto.id) : abierto.id} target="_blank" rel="noopener noreferrer">Abrir video original ↗</a>
           </div>
-        </div>
+        </dialog>
       )}
+    </div>
+  );
+}
+
+function TarjetaVideo({ video, reproducir, numero, abrir }: { video: VideoPortafolio; reproducir: boolean; numero: number; abrir: (video: VideoPortafolio) => void }) {
+  const tarjeta = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [sinPortada, setSinPortada] = useState(false);
+  useEffect(() => {
+    const el = tarjeta.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting && entry.intersectionRatio >= 0.25), { threshold: [0, 0.25] });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Los reproductores fuera de pantalla se desmontan: no descargan ni suenan en segundo plano.
+  const activo = reproducir && visible;
+  return (
+    <article ref={tarjeta} className="pr-sc-video" aria-label={`${video.marca} · Video ${numero}`}>
+      <div className="pr-sc-video-fondo" aria-hidden="true"><span>▶</span><b>{video.marca}</b></div>
+      {video.poster && !sinPortada && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={video.poster} alt="" loading="lazy" onError={() => setSinPortada(true)} />
+      )}
+      {activo && (video.tipo === "tiktok"
+        ? <ReproductorTikTok id={video.id} nombre={video.marca} preview />
+        : <video src={video.id} poster={video.poster} autoPlay muted loop playsInline preload="none" aria-hidden="true" />)}
+      <button type="button" className="pr-sc-video-abrir" onClick={() => abrir(video)} aria-label={`Ampliar y escuchar ${video.marca}, video ${numero}`}>
+        <span className="pr-sc-video-ampliar" aria-hidden="true">Ampliar ↗</span>
+        <span className="pr-sc-video-titulo"><b>{video.marca}</b>{video.rubro && <small>{video.rubro}</small>}</span>
+      </button>
+    </article>
+  );
+}
+
+function ReproductorTikTok({ id, nombre, preview = false }: { id: string; nombre: string; preview?: boolean }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [listo, setListo] = useState(false);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    const recibir = (e: MessageEvent) => {
+      if (e.origin !== "https://www.tiktok.com" || e.source !== frame.current?.contentWindow || !e.data?.["x-tiktok-player"]) return;
+      if (e.data.type === "onPlayerReady") {
+        for (const type of [preview ? "mute" : "unMute", "play"]) {
+          frame.current?.contentWindow?.postMessage({ "x-tiktok-player": true, type }, "https://www.tiktok.com");
+        }
+        if (!preview) setListo(true);
+      }
+      if (e.data.type === "onStateChange" && e.data.value === 1) { setListo(true); setError(false); }
+      if (e.data.type === "onPlayerError") setError(true);
+    };
+    window.addEventListener("message", recibir);
+    return () => window.removeEventListener("message", recibir);
+  }, [preview]);
+  return (
+    <div className={preview ? "pr-sc-tiktok-preview" : "pr-sc-tiktok-full"}>
+      <iframe ref={frame} src={reproductorTikTok(id, preview)} title={`${preview ? "Vista previa" : "Video"} de ${nombre}`} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen={!preview} tabIndex={preview ? -1 : undefined} aria-hidden={preview || undefined} style={preview ? { opacity: listo && !error ? 1 : 0 } : undefined} />
+      {error && <small className="pr-sc-video-error">{preview ? "Vista previa no disponible" : "TikTok no pudo reproducir este video. Puedes abrir el original."}</small>}
     </div>
   );
 }
