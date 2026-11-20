@@ -91,7 +91,8 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
   const todos = useMemo(() => meses.map(computeDirecto), [meses])
   const visibles = modo === 'cliente' ? todos.filter((m) => m.publicado) : todos
   /* Mes que espera los datos del cliente (aunque aún no esté publicado). */
-  const porCompletar = modo === 'cliente' ? [...todos].reverse().find((m) => m.pendienteCliente) ?? null : null
+  const [enCurso] = useState(() => new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 7))
+  const porCompletar = modo === 'cliente' ? [...todos].reverse().find((m) => m.pendienteCliente && m.mes < enCurso) ?? null : null
   const [idx, setIdx] = useState(Math.max(0, visibles.length - 1))
   const m = visibles[idx]
   const prev = idx > 0 ? visibles[idx - 1] : null
@@ -110,7 +111,7 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
   }
 
   const ventas = m.solesTotales ?? m.solesWeb
-  const pedidos = m.pedidosTotales ?? m.pedidosWeb
+  const pedidos = m.pedidosMostrados
   const ex = explicar(m)
 
   return (
@@ -140,6 +141,12 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         </div>
       </header>
 
+      {m.mes === enCurso && (
+        <p className="flex items-center gap-2 text-[13px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 no-imprimir">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          Mes en curso: Shopify y Facebook se actualizan solos cada 30 min{m.raw.extra?.actualizadoAt ? ` (última: ${new Date(m.raw.extra.actualizadoAt).toLocaleString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })})` : ''}. Se compara contra el mes anterior completo.
+        </p>
+      )}
       {modo === 'equipo' && !m.publicado && (
         <p className="flex items-center gap-2 text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 no-imprimir">
           <Info className="w-4 h-4 shrink-0" /> Borrador: el cliente aún no lo ve. Se publica solo el día 2 (o publícalo abajo).
@@ -161,7 +168,7 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
         <Portada icon={<Wallet className="w-4 h-4" />} color={VERDE} label={m.pendienteCliente ? 'Ventas web (Shopify)' : 'Ventas directas'} info={ex.ventas}
           valor={soles(ventas)} extra={<Variacion actual={ventas} previo={prev ? (m.pendienteCliente ? prev.solesWeb : prev.solesTotales ?? prev.solesWeb) : null} />} />
         <Portada icon={<ShoppingBag className="w-4 h-4" />} color={AZUL} label={m.pendienteCliente ? 'Pedidos web' : 'Pedidos totales'} info={ex.pedidos}
-          valor={num(pedidos)} extra={<Variacion actual={pedidos} previo={prev ? (m.pendienteCliente ? prev.pedidosWeb : prev.pedidosTotales ?? prev.pedidosWeb) : null} />} />
+          valor={num(pedidos)} extra={<Variacion actual={pedidos} previo={prev ? (m.pendienteCliente ? prev.pedidosWeb : prev.pedidosMostrados) : null} />} />
         <Portada icon={<Megaphone className="w-4 h-4" />} color={MORADO} label="Inversión Facebook Ads" info={ex.inversion}
           valor={m.fuenteMeta === 'pendiente' ? 'Pendiente' : soles(m.gastoAdsSoles)} sub={m.fuenteMeta === 'pendiente' ? undefined : `${usd(m.gastoAdsUsd)} · incluye IGV`}
           extra={m.fuenteMeta === 'pendiente' ? undefined : <Variacion actual={m.gastoAdsSoles} previo={prev?.gastoAdsSoles ?? null} invertir />} />
@@ -170,6 +177,16 @@ export function ReporteMarcaView({ nombre, meses, modo = 'equipo', onGuardarVent
           extra={<Variacion actual={m.roas ?? m.roasWeb} previo={prev ? (m.roas != null ? prev.roas ?? prev.roasWeb : prev.roasWeb) : null} />} />
       </div>
       </div>
+
+      {/* Otros canales (marketplaces, mayoristas, Mil Ideas): no suman a ventas directas */}
+      {m.canales.length > 0 && (
+        <Tarjeta>
+          <Titulo icon={<ShoppingBag className="w-4 h-4" />} color="#ea580c" info={['Montos que reporta el cliente por canal.', 'Son informativos: la venta directa, el ROAS y el costo por venta solo usan la venta directa.']}>Otros canales</Titulo>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+            {m.canales.map((c) => <Dato key={c.etiqueta} label={c.etiqueta} valor={soles(c.soles)} />)}
+          </div>
+        </Tarjeta>
+      )}
 
       {/* Meta del mes */}
       {m.objetivoSoles != null && (
@@ -384,7 +401,7 @@ function BarraDoble({ a, b }: { a: { label: string; valor: number; color: string
 
 const METRICAS_TENDENCIA: { key: string; label: string; val: (m: MesDirecto) => number | null; fmt: (n: number) => string }[] = [
   { key: 'ventas', label: 'Ventas', val: (m) => m.solesTotales ?? m.solesWeb, fmt: (n) => soles(n) },
-  { key: 'pedidos', label: 'Pedidos', val: (m) => m.pedidosTotales ?? m.pedidosWeb, fmt: (n) => num(n) },
+  { key: 'pedidos', label: 'Pedidos', val: (m) => m.pedidosMostrados, fmt: (n) => num(n) },
   { key: 'inversion', label: 'Inversión', val: (m) => m.gastoAdsSoles, fmt: (n) => soles(n) },
   { key: 'roas', label: 'ROAS', val: (m) => m.roas ?? m.roasWeb, fmt: (n) => veces(n) },
   { key: 'costo', label: 'Costo por venta', val: (m) => m.costoVenta, fmt: (n) => soles(n, 2) },
@@ -445,7 +462,7 @@ function Tabla({ meses }: { meses: MesDirecto[] }) {
               <tr key={m.mes} className="border-b border-slate-50 last:border-0">
                 <td className="px-4 py-2.5 font-semibold text-slate-900">{labelMes(m.mes)}</td>
                 <td className="px-4 py-2.5">{soles(m.solesTotales ?? m.solesWeb)}</td>
-                <td className="px-4 py-2.5">{num(m.pedidosTotales ?? m.pedidosWeb)}</td>
+                <td className="px-4 py-2.5">{num(m.pedidosMostrados)}</td>
                 <td className="px-4 py-2.5 text-slate-600">{soles(m.solesWeb)}</td>
                 <td className="px-4 py-2.5 text-slate-600">{m.solesWhatsApp == null ? 'Pendiente' : soles(m.solesWhatsApp)}</td>
                 <td className="px-4 py-2.5 text-slate-600">{soles(m.gastoAdsSoles)}</td>

@@ -185,15 +185,35 @@ export async function ajustarMesDirecto(marcaSlug: string, mes: string, d: { obj
 }
 
 /** El equipo también puede poner las ventas totales en nombre del cliente. */
-export async function guardarVentasEquipo(marcaSlug: string, mes: string, pedidos: number, soles: number): Promise<Res> {
+export async function guardarVentasEquipo(marcaSlug: string, mes: string, pedidos: number | null, soles: number): Promise<Res> {
   const err = await soloEquipo(); if (err) return { ok: false, error: err }
-  if (!(pedidos >= 0 && soles >= 0 && isFinite(pedidos) && isFinite(soles))) return { ok: false, error: 'Números inválidos' }
+  /* Pedidos es opcional: el cliente a veces solo reporta soles (Carlos, nov-2026). */
+  if (pedidos != null && !(pedidos >= 0 && isFinite(pedidos))) return { ok: false, error: 'Pedidos inválidos' }
+  if (!(soles >= 0 && isFinite(soles))) return { ok: false, error: 'Ventas inválidas' }
   try {
     const { aplicarVentasCliente } = await import('@/lib/reportes/auto')
-    await aplicarVentasCliente(marcaSlug, mes, Math.round(pedidos), soles)
+    await aplicarVentasCliente(marcaSlug, mes, pedidos == null ? null : Math.round(pedidos), Math.round(soles * 100) / 100)
     await refrescarReportes()
     return { ok: true }
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+}
+
+/** Otros canales del mes (marketplaces, mayoristas, Mil Ideas…). Informativos. */
+export async function guardarCanales(marcaSlug: string, mes: string, canales: { etiqueta: string; soles: number }[]): Promise<Res> {
+  const err = await soloEquipo(); if (err) return { ok: false, error: err }
+  if (!mesOk(mes)) return { ok: false, error: 'Mes inválido' }
+  const limpios = (canales ?? [])
+    .map((c) => ({ etiqueta: String(c.etiqueta ?? '').trim().slice(0, 80), soles: Number(c.soles) }))
+    .filter((c) => c.etiqueta)
+  if (limpios.length > 12) return { ok: false, error: 'Máximo 12 canales' }
+  if (limpios.some((c) => !(isFinite(c.soles) && c.soles >= 0))) return { ok: false, error: 'Montos inválidos' }
+  const { mesExistente } = await import('@/lib/reportes/auto')
+  const prev = await mesExistente(marcaSlug, mes)
+  if (!prev || prev.extra?.formato !== 'directo') return { ok: false, error: 'Primero genera el mes con "Actualizar datos"' }
+  const { guardarMesDb } = await import('@/lib/reportes/db')
+  await guardarMesDb(marcaSlug, { ...prev, extra: { ...prev.extra, canales: limpios.map((c) => ({ ...c, soles: Math.round(c.soles * 100) / 100 })), canalesAt: new Date().toISOString() } })
+  await refrescarReportes()
+  return { ok: true }
 }
 
 /* ══════════ Publicidad: historial mensual (Pedro 21-oct-2026) ══════════

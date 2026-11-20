@@ -51,7 +51,11 @@ export type ExtraDirecto = {
   topAnuncios?: { nombre: string; conversaciones: number; costoUsd: number }[]
   objetivoSoles?: number | null
   /* Lo que puso el cliente (ventas totales del mes). null = pendiente. */
-  cliente?: { pedidos: number; soles: number; at: string } | null
+  cliente?: { pedidos: number | null; soles: number; at: string } | null
+  /* Otros canales que reporta el cliente (Carlos, WhatsApp). Informativos:
+     NO suman a las ventas directas ni al ROAS (Pedro 20-nov-2026). */
+  canales?: { etiqueta: string; soles: number }[]
+  canalesAt?: string
   publicado?: boolean
   fuenteMeta?: 'auto' | 'manual' | 'pendiente'
   actualizadoAt?: string

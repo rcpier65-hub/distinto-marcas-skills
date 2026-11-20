@@ -65,16 +65,44 @@ export async function generarMesDirecto(slug: string, mes: string, opts: { publi
 }
 
 /** Aplica las ventas totales que pone el cliente y recalcula. */
-export async function aplicarVentasCliente(slug: string, mes: string, pedidos: number, soles: number): Promise<MesRaw> {
+export async function aplicarVentasCliente(slug: string, mes: string, pedidos: number | null, soles: number): Promise<MesRaw> {
   const prev = await mesExistente(slug, mes)
   if (!prev || prev.extra?.formato !== 'directo') throw new Error('Ese mes todavía no está preparado')
   const raw: MesRaw = {
     ...prev,
-    ventasTotales: pedidos,
+    ventasTotales: pedidos ?? prev.ventasShopify,
     ingresoDirecto: soles,
     ventasOmnicanal: soles,
     extra: { ...prev.extra, cliente: { pedidos, soles, at: new Date().toISOString() } },
   }
   await guardarMesDb(slug, raw)
   return raw
+}
+
+/* ══════════ Mes en curso en tiempo real (Pedro 20-nov-2026) ══════════
+   "Siempre debe estar en tiempo real": el mes actual se regenera solo
+   (cron cada 30 min + al abrir Reportes si tiene más de 10 min). Nunca se
+   publica al cliente: eso sigue siendo el día 2 del mes siguiente. */
+export function mesEnCursoLima(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }).slice(0, 7)
+}
+
+const enVuelo = new Map<string, Promise<unknown>>()
+
+/** Regenera el mes en curso si sus datos tienen más de `maxEdadMs`. No lanza. */
+export async function refrescarMesEnCurso(slug = SLUG_REPORTE_DIRECTO, maxEdadMs = 10 * 60_000): Promise<{ refrescado: boolean; avisos: string[]; error?: string }> {
+  const mes = mesEnCursoLima()
+  const prev = await mesExistente(slug, mes).catch(() => null)
+  const at = prev?.extra?.actualizadoAt ? Date.parse(prev.extra.actualizadoAt) : 0
+  if (at && Date.now() - at < maxEdadMs) return { refrescado: false, avisos: [] }
+  const clave = `${slug}:${mes}`
+  /* Dos pestañas abiertas a la vez no disparan dos consultas a Shopify/Meta. */
+  const tarea = enVuelo.get(clave) ?? generarMesDirecto(slug, mes).finally(() => enVuelo.delete(clave))
+  enVuelo.set(clave, tarea)
+  try {
+    const r = (await tarea) as { avisos: string[] }
+    return { refrescado: true, avisos: r.avisos }
+  } catch (e) {
+    return { refrescado: false, avisos: [], error: e instanceof Error ? e.message : String(e) }
+  }
 }

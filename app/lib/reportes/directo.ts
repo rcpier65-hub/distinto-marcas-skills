@@ -38,6 +38,9 @@ export type MesDirecto = {
   roasWeb: number | null         // solo Shopify / inversión Ads
   costoVenta: number | null      // inversión Ads / pedidos
   ticket: number | null
+  /* Pedidos a mostrar: total del cliente, web si aún no reporta, o null si reportó soles sin pedidos. */
+  pedidosMostrados: number | null
+  canales: { etiqueta: string; soles: number }[]
   conversionWhatsApp: number | null
   cac: number | null             // (Ads + gestión) / pedidos
   pctWeb: number | null          // % de los soles que vino de la web
@@ -67,7 +70,8 @@ export function computeDirecto(r: MesRaw): MesDirecto {
 
   const gastoWppSoles = x.gastoWhatsAppUsd != null ? x.gastoWhatsAppUsd * tc * (1 + igv) : gastoAdsSoles
   const ventasBase = solesTotales ?? r.ingresoShopify
-  const pedidosBase = pedidosTotales ?? r.ventasShopify
+  const pedidosBase = pedidosTotales ?? (x.cliente ? null : r.ventasShopify)
+  const divP = (a: number) => (pedidosBase == null ? null : div(a, pedidosBase))
   const objetivo = x.objetivoSoles ?? null
 
   return {
@@ -93,10 +97,12 @@ export function computeDirecto(r: MesRaw): MesDirecto {
     solesWhatsApp,
     roas: solesTotales != null ? div(solesTotales, gastoAdsSoles) : null,
     roasWeb: div(r.ingresoShopify, gastoAdsSoles),
-    costoVenta: div(gastoAdsSoles, pedidosBase),
-    ticket: div(ventasBase, pedidosBase),
+    costoVenta: divP(gastoAdsSoles),
+    ticket: divP(ventasBase),
+    pedidosMostrados: pedidosBase,
+    canales: x.canales ?? [],
     conversionWhatsApp: pedidosWhatsApp != null ? div(pedidosWhatsApp, r.leads) : null,
-    cac: div(gastoMkt, pedidosBase),
+    cac: divP(gastoMkt),
     pctWeb: solesTotales != null ? div(r.ingresoShopify, solesTotales) : null,
     objetivoSoles: objetivo,
     avanceObjetivo: objetivo ? div(ventasBase, objetivo) : null,

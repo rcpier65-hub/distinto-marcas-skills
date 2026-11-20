@@ -14,7 +14,7 @@ export function explicar(m: MesDirecto) {
   const directo = m.raw.extra?.formato === 'directo'
   const tc = String(m.tipoCambio)
   const ventas = m.solesTotales ?? m.solesWeb
-  const pedidos = m.pedidosTotales ?? m.pedidosWeb
+  const pedidos = m.pedidosMostrados
   const s2 = (n: number | null | undefined) => soles(n, 2)
   const origenTotal = directo
     ? `Ventas totales del mes que reportó el cliente (web + WhatsApp): ${s2(m.solesTotales)} en ${num(m.pedidosTotales)} pedidos.`

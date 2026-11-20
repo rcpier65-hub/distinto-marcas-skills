@@ -52,7 +52,7 @@ function variacionVs(mesPrev: string | null, a: number | null | undefined, b: nu
 export function ReportePdfDoc({ nombre, m, prev, meses }: Props) {
   const variacion = (a: number | null | undefined, b: number | null | undefined, invertir = false) => variacionVs(prev?.mes ?? null, a, b, invertir)
   const ventas = m.solesTotales ?? m.solesWeb
-  const pedidos = m.pedidosTotales ?? m.pedidosWeb
+  const pedidos = m.pedidosMostrados
   const pendiente = m.pendienteCliente
   const hoy = new Date().toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'long', year: 'numeric' })
   const tabla = meses.slice(-8).reverse()
@@ -72,7 +72,7 @@ export function ReportePdfDoc({ nombre, m, prev, meses }: Props) {
           {/* KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             <Kpi color={C.verde} label={pendiente ? 'Ventas web' : 'Ventas directas'} valor={soles(ventas)} v={variacion(ventas, prev ? (pendiente ? prev.solesWeb : prev.solesTotales ?? prev.solesWeb) : null)} />
-            <Kpi color={C.azul} label={pendiente ? 'Pedidos web' : 'Pedidos totales'} valor={num(pedidos)} v={variacion(pedidos, prev ? (pendiente ? prev.pedidosWeb : prev.pedidosTotales ?? prev.pedidosWeb) : null)} />
+            <Kpi color={C.azul} label={pendiente ? 'Pedidos web' : 'Pedidos totales'} valor={num(pedidos)} v={variacion(pedidos, prev ? (pendiente ? prev.pedidosWeb : prev.pedidosMostrados) : null)} />
             <Kpi color={C.morado} label="Inversión Facebook Ads" valor={soles(m.gastoAdsSoles)} sub={`${usd(m.gastoAdsUsd)} · con IGV`} v={variacion(m.gastoAdsSoles, prev?.gastoAdsSoles, true)} />
             <Kpi color={C.naranja} label="Retorno (ROAS)" valor={veces(m.roas ?? m.roasWeb)} sub={m.roas != null ? 'ventas ÷ inversión' : 'solo web ÷ inversión'} v={variacion(m.roas ?? m.roasWeb, prev ? (m.roas != null ? prev.roas ?? prev.roasWeb : prev.roasWeb) : null)} />
           </div>
@@ -220,7 +220,7 @@ export function ReportePdfDoc({ nombre, m, prev, meses }: Props) {
                     <tr key={x.mes} style={{ background: actual ? '#f5f3ff' : undefined, fontWeight: actual ? 700 : 400 }}>
                       <td style={celda(true)}>{labelMes(x.mes)}</td>
                       <td style={celda()}>{soles(x.solesTotales ?? x.solesWeb)}</td>
-                      <td style={celda()}>{num(x.pedidosTotales ?? x.pedidosWeb)}</td>
+                      <td style={celda()}>{num(x.pedidosMostrados)}</td>
                       <td style={celda()}>{soles(x.solesWeb)}</td>
                       <td style={celda()}>{x.solesWhatsApp == null ? '—' : soles(x.solesWhatsApp)}</td>
                       <td style={celda()}>{soles(x.gastoAdsSoles)}</td>

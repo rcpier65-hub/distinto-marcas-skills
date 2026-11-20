@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { enviarPushAClientesDeMarca, enviarPushAMiembros } from '@/lib/push/send'
-import { generarMesDirecto, SLUG_REPORTE_DIRECTO } from '@/lib/reportes/auto'
+import { generarMesDirecto, refrescarMesEnCurso, SLUG_REPORTE_DIRECTO } from '@/lib/reportes/auto'
 import { labelMes } from '@/lib/reportes/typhouse'
 
 export const dynamic = 'force-dynamic'
@@ -24,6 +24,11 @@ export async function GET(request: Request) {
   const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
   const [y, m, d] = hoy.split('-').map(Number)
   const url = new URL(request.url)
+  /* ?encurso=1 (cada 30 min): refresca el mes actual, sin publicar ni avisar. */
+  if (url.searchParams.get('encurso') === '1') {
+    const r = await refrescarMesEnCurso(SLUG_REPORTE_DIRECTO, 60_000)
+    return NextResponse.json({ ok: !r.error, encurso: true, ...r }, { status: r.error ? 500 : 200 })
+  }
   const dia = Number(url.searchParams.get('dia') ?? d)
   if (dia !== 1 && dia !== 2) return NextResponse.json({ ok: true, omitido: 'solo corre el 1 y el 2 de cada mes' })
   const mes = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`

@@ -45,6 +45,10 @@ export default async function ReportesPage() {
 }
 
 async function ReportesHubServer() {
+  /* Mes en curso en tiempo real: si los datos tienen más de 10 min se traen de
+     nuevo (máx. 12 s de espera; si Shopify/Meta tardan, se muestra lo último). */
+  const { refrescarMesEnCurso } = await import('@/lib/reportes/auto')
+  await Promise.race([refrescarMesEnCurso(), new Promise((r) => setTimeout(r, 12_000))])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = createServiceClient() as any
   const { data } = await service

@@ -7,10 +7,10 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { RefreshCw, Eye, EyeOff, Target, Megaphone, Wallet, Loader2, Settings2 } from 'lucide-react'
+import { RefreshCw, Eye, EyeOff, Target, Megaphone, Wallet, Loader2, Settings2, Store, Plus, X } from 'lucide-react'
 import { labelMes, type MesReporte } from '@/lib/reportes/typhouse'
 import { computeDirecto } from '@/lib/reportes/directo'
-import { actualizarMesDirecto, ajustarMesDirecto, guardarMetaManual, guardarVentasEquipo } from '../_actions'
+import { actualizarMesDirecto, ajustarMesDirecto, guardarCanales, guardarMetaManual, guardarVentasEquipo } from '../_actions'
 
 const campo = 'h-10 px-3 text-sm bg-white text-slate-900 border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#7170ff] focus:ring-[3px] focus:ring-[#7170ff]/15 transition w-full'
 const btnSec = 'h-10 px-4 inline-flex items-center justify-center gap-2 rounded-[11px] border border-slate-200 bg-white text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
@@ -23,12 +23,14 @@ function mesAnterior(): string {
   const d = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
+const mesActual = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 7)
 
 export function EditorDirecto({ marcaSlug, meses }: { marcaSlug: string; meses: MesReporte[] }) {
   const router = useRouter()
   const opciones = useMemo(() => {
     const set = new Set(meses.map((m) => m.mes))
     set.add(mesAnterior())
+    set.add(mesActual())
     return [...set].sort().reverse()
   }, [meses])
   const [mes, setMes] = useState(opciones[0])
@@ -93,11 +95,20 @@ export function EditorDirecto({ marcaSlug, meses }: { marcaSlug: string; meses: 
           <Bloque icon={<Wallet className="w-4 h-4" />} titulo={`Ventas totales · ${d.pendienteCliente ? 'falta el cliente' : 'cargadas'}`} color="#2563eb">
             <MiniForm ocupado={ocupado === 'ven'} boton="Guardar ventas"
               campos={[
-                { k: 'ped', label: `Pedidos totales (web: ${d.pedidosWeb})`, v: d.pedidosTotales ?? '' },
-                { k: 'sol', label: 'Ventas totales (S/)', v: d.solesTotales ?? '' },
+                { k: 'sol', label: 'Venta directa (S/) — sin marketplaces', v: d.solesTotales ?? '' },
+                { k: 'ped', label: `Pedidos totales (opcional · web: ${d.pedidosWeb})`, v: d.pedidosTotales ?? '' },
               ]}
-              onSubmit={(v) => correr('ven', () => guardarVentasEquipo(marcaSlug, mes, Number(v.ped), Number(v.sol)), 'Ventas guardadas')} />
+              onSubmit={(v) => {
+                if (v.sol.trim() === '') { toast.error('Pon la venta directa en soles'); return }
+                void correr('ven', () => guardarVentasEquipo(marcaSlug, mes, v.ped.trim() === '' ? null : Number(v.ped), Number(v.sol)), 'Ventas guardadas')
+              }} />
           </Bloque>
+          <div className="md:col-span-3">
+            <Bloque icon={<Store className="w-4 h-4" />} titulo="Otros canales · informativo, no suma a la venta directa" color="#ea580c">
+              <Canales key={`${mes}-${raw?.extra?.canalesAt ?? ''}`} inicial={d.canales} ocupado={ocupado === 'can'}
+                onGuardar={(c) => void correr('can', () => guardarCanales(marcaSlug, mes, c), 'Canales guardados')} />
+            </Bloque>
+          </div>
         </div>
       )}
     </section>
@@ -111,6 +122,28 @@ function Bloque({ icon, titulo, color, children }: { icon: React.ReactNode; titu
         <span className="w-7 h-7 rounded-[8px] inline-flex items-center justify-center" style={{ background: `${color}14`, color }}>{icon}</span>{titulo}
       </div>
       {children}
+    </div>
+  )
+}
+
+function Canales({ inicial, ocupado, onGuardar }: { inicial: { etiqueta: string; soles: number }[]; ocupado: boolean; onGuardar: (c: { etiqueta: string; soles: number }[]) => void }) {
+  const [filas, setFilas] = useState(() => (inicial.length ? inicial : [{ etiqueta: '', soles: 0 }]).map((c) => ({ etiqueta: c.etiqueta, soles: c.soles ? String(c.soles) : '' })))
+  const set = (i: number, k: 'etiqueta' | 'soles', v: string) => setFilas((p) => p.map((f, j) => (j === i ? { ...f, [k]: v } : f)))
+  return (
+    <div className="grid gap-2">
+      {filas.map((f, i) => (
+        <div key={i} className="flex gap-2">
+          <input value={f.etiqueta} onChange={(e) => set(i, 'etiqueta', e.target.value)} placeholder="Ej. Little Joe con Rappi, ML y Falabella" className={campo} aria-label="Canal" />
+          <input type="number" min={0} step="0.01" value={f.soles} onChange={(e) => set(i, 'soles', e.target.value)} placeholder="S/" className={`${campo} max-w-[140px]`} aria-label="Soles" />
+          <button type="button" onClick={() => setFilas((p) => p.filter((_, j) => j !== i))} className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-[10px] text-slate-400 hover:text-slate-700 hover:bg-white" aria-label="Quitar canal"><X className="w-4 h-4" /></button>
+        </div>
+      ))}
+      <div className="flex gap-2 flex-wrap">
+        <button type="button" onClick={() => setFilas((p) => [...p, { etiqueta: '', soles: '' }])} className={btnSec}><Plus className="w-4 h-4" /> Agregar canal</button>
+        <button type="button" disabled={ocupado} onClick={() => onGuardar(filas.filter((f) => f.etiqueta.trim()).map((f) => ({ etiqueta: f.etiqueta, soles: Number(f.soles || 0) })))} className={btnSec}>
+          {ocupado && <Loader2 className="w-4 h-4 animate-spin" />} Guardar canales
+        </button>
+      </div>
     </div>
   )
 }
